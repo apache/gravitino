@@ -685,3 +685,12 @@ SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- Role deletion soft-deletes relation rows by role_id.
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_role_rel' AND column_name = 'role_id' AND seq_in_index = 1),
+    'SELECT 1',
+    'ALTER TABLE `group_role_rel` ADD INDEX `group_role_rel_idx_role_id` (`role_id`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

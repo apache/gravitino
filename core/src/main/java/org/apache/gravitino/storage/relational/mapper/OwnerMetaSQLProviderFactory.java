@@ -189,6 +189,11 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
   }
 
+  public static String softDeleteOwnerRelOfJobsByTemplateId(
+      @Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().softDeleteOwnerRelOfJobsByTemplateId(jobTemplateId);
+  }
+
   public static String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit);

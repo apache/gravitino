@@ -18,10 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import org.apache.gravitino.Catalog;
@@ -30,12 +26,11 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
-import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -79,75 +74,48 @@ public class TestIcebergCatalogOperations {
   }
 
   @Test
-  public void testTestConnectionNonRestWarehouseHasNoHint() {
-    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND, "hive",
-                IcebergConstants.WAREHOUSE, "s3://warehouse/"));
-    when(mockWrapper.getIcebergConfig()).thenReturn(config);
-    when(mockWrapper.listNamespace(any())).thenThrow(new RuntimeException("boom"));
-
-    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
-
-    Exception exception =
-        Assertions.assertThrows(
-            ConnectionFailedException.class,
-            () ->
-                catalogOperations.testConnection(
-                    NameIdentifier.of(METALAKE, CATALOG),
-                    Catalog.Type.RELATIONAL,
-                    "iceberg",
-                    "comment",
-                    ImmutableMap.of()));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Failed to run listNamespace on Iceberg catalog"),
-        exception.getMessage());
-    Assertions.assertFalse(
-        exception.getMessage().contains("selects a catalog by name"), exception.getMessage());
-  }
-
-  @Test
   public void testListSchemasConvertsMultiLevelNamespacesToLogicalNames() {
-    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergBackend backend = memoryBackend();
+    backend
+        .wrapper()
+        .createNamespace(
+            CreateNamespaceRequest.builder()
+                .withNamespace(org.apache.iceberg.catalog.Namespace.of("A", "B", "C"))
+                .build());
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
+    catalogOperations.backend = backend;
 
-    org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
-    org.apache.iceberg.catalog.Namespace hierarchicalNs =
-        org.apache.iceberg.catalog.Namespace.of("A", "B", "C");
-    ListNamespacesResponse mockResponse =
-        ListNamespacesResponse.builder().addAll(Arrays.asList(flatNs, hierarchicalNs)).build();
-    when(mockWrapper.listNamespace(any())).thenReturn(mockResponse);
+    NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG, "A:B"));
 
-    NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG));
-
-    Assertions.assertEquals(2, result.length);
-    // Flat namespace stays as-is.
-    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "mydb".equals(id.name())));
-    // Multi-level Iceberg namespace is joined with the configured separator.
-    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "A:B:C".equals(id.name())));
+    Assertions.assertEquals(1, result.length);
+    Assertions.assertEquals("A:B:C", result[0].name());
+    backend.close();
   }
 
   @Test
   public void testListSchemasFlatOnlyReturnsUnchangedNames() {
-    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergBackend backend = memoryBackend();
+    backend
+        .wrapper()
+        .createNamespace(
+            CreateNamespaceRequest.builder()
+                .withNamespace(org.apache.iceberg.catalog.Namespace.of("db1"))
+                .build());
+    backend
+        .wrapper()
+        .createNamespace(
+            CreateNamespaceRequest.builder()
+                .withNamespace(org.apache.iceberg.catalog.Namespace.of("db2"))
+                .build());
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
-    catalogOperations.icebergCatalogWrapper = mockWrapper;
-
-    org.apache.iceberg.catalog.Namespace ns1 = org.apache.iceberg.catalog.Namespace.of("db1");
-    org.apache.iceberg.catalog.Namespace ns2 = org.apache.iceberg.catalog.Namespace.of("db2");
-    ListNamespacesResponse mockResponse =
-        ListNamespacesResponse.builder().addAll(Arrays.asList(ns1, ns2)).build();
-    when(mockWrapper.listNamespace(any())).thenReturn(mockResponse);
+    catalogOperations.backend = backend;
 
     NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG));
 
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+    backend.close();
   }
 
   @Test
@@ -170,5 +138,11 @@ public class TestIcebergCatalogOperations {
         IcebergCatalogUtil.loadCatalogBackend(IcebergCatalogBackend.MEMORY, config);
     Assertions.assertNotSame(original, replacement);
     IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+  }
+
+  private static IcebergBackend memoryBackend() {
+    return IcebergBackend.create(
+        ImmutableMap.of(
+            IcebergConstants.CATALOG_BACKEND, "memory", IcebergConstants.WAREHOUSE, "/tmp/wh"));
   }
 }

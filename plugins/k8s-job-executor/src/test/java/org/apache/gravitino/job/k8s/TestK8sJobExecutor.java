@@ -370,6 +370,124 @@ public class TestK8sJobExecutor {
   }
 
   @Test
+  public void testRejectedRetryOfCreatedSparkApplication() {
+    // An earlier attempt of the request created the SparkApplication, and the retry was rejected,
+    // e.g. by a resource quota that the created one used up.
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(
+            SparkApplicationUtils.buildSparkApplication(
+                context(1L),
+                sparkTemplate(),
+                TestSparkApplicationUtils.newConfigs(ImmutableMap.of())))
+        .create();
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(403, new StatusBuilder().withCode(403).withMessage("exceeded quota").build())
+        .once();
+
+    String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
+    Assertions.assertEquals(
+        Optional.of(jobExecutionId), executor.findSubmittedJob(context(1L), sparkTemplate()));
+    Assertions.assertNotNull(sparkApplication("gravitino-job-1"));
+  }
+
+  @Test
+  public void testRejectedRetryOfSparkApplicationOfAnotherJob() {
+    GenericKubernetesResource app =
+        SparkApplicationUtils.buildSparkApplication(
+            context(1L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    app.getMetadata().getLabels().put(K8sJobResourceUtils.LABEL_JOB_ID, "3");
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(app)
+        .create();
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(403, new StatusBuilder().withCode(403).withMessage("rejected 403").build())
+        .once();
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertTrue(e.getMessage().contains("rejected 403"), e.getMessage());
+  }
+
+  @Test
+  public void testRejectedRetryOfSparkApplicationBeingDeleted() {
+    GenericKubernetesResource deleting =
+        SparkApplicationUtils.buildSparkApplication(
+            context(1L), sparkTemplate(), TestSparkApplicationUtils.newConfigs(ImmutableMap.of()));
+    deleting.getMetadata().setFinalizers(ImmutableList.of("foregroundDeletion"));
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(deleting)
+        .create();
+    GenericKubernetesResource created = sparkApplication("gravitino-job-1");
+    created.getMetadata().setDeletionTimestamp(Instant.now().toString());
+    client
+        .genericKubernetesResources(SparkApplicationUtils.SPARK_APPLICATION)
+        .inNamespace("default")
+        .resource(created)
+        .update();
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+
+    // Its pods may still run, so it is not a confirmed rejection, and recovery still finds it.
+    IllegalStateException e =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    Assertions.assertEquals(403, ((KubernetesClientException) e.getCause()).getCode());
+    Assertions.assertTrue(executor.findSubmittedJob(context(1L), sparkTemplate()).isPresent());
+  }
+
+  @Test
+  public void testRejectedWhenLookupFails() {
+    server
+        .expect()
+        .post()
+        .withPath(APPS_PATH)
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .always();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(500, new StatusBuilder().withCode(500).build())
+        .once();
+    server
+        .expect()
+        .get()
+        .withPath(APPS_PATH + "/gravitino-job-1")
+        .andReturn(403, new StatusBuilder().withCode(403).build())
+        .once();
+
+    try (KubernetesClient noRetries = clientWithoutRetries(client.getConfiguration())) {
+      executor.initialize(TestSparkApplicationUtils.newConfigs(ImmutableMap.of()), noRetries);
+      // Whether an earlier attempt created the SparkApplication can't be told.
+      IllegalStateException unknown =
+          Assertions.assertThrows(
+              IllegalStateException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+      Assertions.assertEquals(403, ((KubernetesClientException) unknown.getCause()).getCode());
+
+      // A SparkApplication that can't be read at all couldn't be found by recovery either.
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> executor.submitJob(context(1L), sparkTemplate()));
+    }
+  }
+
+  @Test
   public void testFailJobWithoutStatus() {
     String jobExecutionId = executor.submitJob(context(1L), sparkTemplate());
     now.set(now.get().plusSeconds(601));
