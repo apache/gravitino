@@ -91,7 +91,8 @@ public class TestBuiltInJobTemplateProvider {
     // A built-in template must let a caller run it with the catalog and the table alone, so every
     // other parameter needs a default value. Catalog and updater connections have no defaults that
     // fit every deployment, and an empty where clause rewrites a whole table, so those stay
-    // required.
+    // required. The TMS maintenance task also requires action_ids: the scheduler injects the
+    // soft-slot ids and the placeholder has no default.
     Map<String, Set<String>> expected = new HashMap<>();
     Set<String> icebergCatalog =
         ImmutableSet.of(
@@ -115,7 +116,7 @@ public class TestBuiltInJobTemplateProvider {
         "builtin-iceberg-maintenance-task",
         ImmutableSet.<String>builder()
             .add("catalog_name", "catalog_type", "catalog_uri", "warehouse_location")
-            .add("maintenance_types", "policy_ids", "tables")
+            .add("maintenance_types", "policy_ids", "tables", "action_ids")
             .build());
 
     for (JobTemplate template : new BuiltInJobTemplateProvider().jobTemplates()) {

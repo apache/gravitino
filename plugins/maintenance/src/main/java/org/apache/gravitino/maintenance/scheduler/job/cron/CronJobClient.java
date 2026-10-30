@@ -40,7 +40,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
@@ -418,11 +418,11 @@ public class CronJobClient {
     if (extraTableIds.isEmpty()) {
       return true;
     }
-    Map<Long, TableTarget> byId = new LinkedHashMap<>();
-    for (TableTarget target : open.spec.getTables()) {
-      byId.put(target.getTableId(), target);
+    Map<Long, Task> byTableId = new LinkedHashMap<>();
+    for (Task task : open.spec.getTasks()) {
+      byTableId.putIfAbsent(task.getTableId(), task);
     }
-    if (byId.size() + extraTableIds.stream().filter(id -> !byId.containsKey(id)).count()
+    if (byTableId.size() + extraTableIds.stream().filter(id -> !byTableId.containsKey(id)).count()
         > batchCapacity) {
       return false;
     }
@@ -443,13 +443,13 @@ public class CronJobClient {
           extraTableIds);
       return false;
     }
-    String metalake = open.spec.metalake();
-    if (metalake == null) {
+    if (open.spec.metalake() == null) {
       LOG.warn(
           "Could not merge tables into cron-job {}: missing metalake on open spec",
           open.instanceId.getId());
       return false;
     }
+    Task template = open.spec.getTasks().get(0);
     boolean added = false;
     for (ResolvedTableRef ref : resolved) {
       if (!openCatalog.equals(ref.catalogName())) {
@@ -461,20 +461,32 @@ public class CronJobClient {
             openCatalog);
         return false;
       }
-      if (!byId.containsKey(ref.tableId())) {
-        byId.put(ref.tableId(), MaintenanceJobSpecFactory.toTarget(metalake, ref));
+      if (!byTableId.containsKey(ref.tableId())) {
+        Map<String, String> parameters = new LinkedHashMap<>(template.getParameters());
+        parameters.put("catalog_name", ref.catalogName());
+        parameters.put("table_identifier", ref.tableIdentifier());
+        byTableId.put(
+            ref.tableId(),
+            new Task(
+                ref.tableId(),
+                template.getPolicyId(),
+                template.getMaintenanceType(),
+                null,
+                parameters));
         added = true;
       }
     }
     if (!added) {
       return true;
     }
-    if (byId.size() > batchCapacity) {
+    if (byTableId.size() > batchCapacity) {
       return false;
     }
     MaintenanceJobSpec merged =
         new MaintenanceJobSpec(
-            new ArrayList<>(byId.values()), open.spec.getOperations(), open.spec.getJobConf());
+            new ArrayList<>(byTableId.values()),
+            open.spec.getUpdaterOptions(),
+            open.spec.getSparkConf());
     try {
       return client.reschedule(open.instanceId, open.executionTime, merged);
     } catch (RuntimeException e) {
@@ -570,7 +582,7 @@ public class CronJobClient {
         continue;
       }
       String instanceId = execution.getTaskInstance().getId();
-      String catalog = data.getTables().isEmpty() ? null : data.getTables().get(0).catalogName();
+      String catalog = data.getTasks().isEmpty() ? null : data.getTasks().get(0).catalogName();
       Optional<long[]> batch = MaintenanceTaskIds.parseCronBatch(instanceId);
       if (batch.isPresent()) {
         // [batchId, policyId]
@@ -608,7 +620,7 @@ public class CronJobClient {
     String expireType =
         MaintenanceJobTemplates.maintenanceType(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION)
             .orElseThrow();
-    return spec.getOperations().stream().anyMatch(op -> expireType.equals(op.getMaintenanceType()));
+    return spec.getTasks().stream().anyMatch(t -> expireType.equals(t.getMaintenanceType()));
   }
 
   private static long nextBatchId(SchedulerClient client, long policyId) {

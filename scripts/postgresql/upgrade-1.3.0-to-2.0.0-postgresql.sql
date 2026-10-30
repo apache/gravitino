@@ -270,43 +270,43 @@ COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execut
 COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
 
 CREATE TABLE IF NOT EXISTS table_maintenance_action (
-    id BIGSERIAL PRIMARY KEY,
+    action_id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
-    before_snapshot_id BIGINT,
-    after_snapshot_id BIGINT,
-    finished_at BIGINT NOT NULL DEFAULT 0,
-    created_at BIGINT NOT NULL
+    before_metrics_id BIGINT,
+    after_metrics_id BIGINT,
+    created_at BIGINT NOT NULL,
+    finished_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
-CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
-CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_before_metrics ON table_maintenance_action (before_metrics_id);
+CREATE INDEX IF NOT EXISTS idx_tma_after_metrics ON table_maintenance_action (after_metrics_id);
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
 COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
-COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.action_id IS 'maintenance action id';
 COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
-COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
-COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
+COMMENT ON COLUMN table_maintenance_action.before_metrics_id IS 'table_snapshot_metrics.metrics_id for S0 sample';
+COMMENT ON COLUMN table_maintenance_action.after_metrics_id IS 'table_snapshot_metrics.metrics_id for S1 sample';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
-    id BIGSERIAL PRIMARY KEY,
+    metrics_id BIGSERIAL PRIMARY KEY,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
     snapshot_id BIGINT NOT NULL,
     metrics_value TEXT NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
 COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
-COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_id IS 'metrics row id';
 COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
