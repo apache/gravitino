@@ -329,8 +329,7 @@ Four things are worth confirming before assuming a configuration problem is a co
 
 ## Related
 
-- [Using the Table Maintenance Service](./using-table-maintenance.md) for the in-process scheduler
-- [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough
+- [Table Maintenance Service](./optimizer.md) for the in-process scheduler and the CLI walkthrough
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
