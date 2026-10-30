@@ -410,11 +410,18 @@ public class TestSQLScripts extends TestJDBCBackend {
     executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
     seedUpgradeData();
     executeScript(upgrade);
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement();
+        ResultSet tags = statement.executeQuery("SELECT hidden FROM tag_meta")) {
+      Assertions.assertTrue(tags.next());
+      Assertions.assertFalse(tags.getBoolean(1), "Upgraded ordinary tags must remain visible");
+    }
     executeStatements(
         List.of(
             "UPDATE idp_user_meta SET enabled = FALSE, audit_info = 'preserved audit'",
             "UPDATE idp_group_meta SET group_comment = 'preserved comment'",
-            "UPDATE tag_meta SET allowed_values = '[\"blue\"]'",
+            "UPDATE tag_meta SET allowed_values = '[\"blue\"]', hidden = TRUE",
             "UPDATE tag_relation_meta SET tag_value = 'blue'",
             "UPDATE fileset_meta SET occ_version = 42",
             "UPDATE policy_meta SET occ_version = 43"),
@@ -645,7 +652,7 @@ public class TestSQLScripts extends TestJDBCBackend {
             "idp_user_meta",
                 "user_id, user_name, password_hash, current_version, last_version, enabled, audit_info",
             "idp_group_meta", "group_id, group_name, group_comment, audit_info",
-            "tag_meta", "tag_id, tag_name, allowed_values",
+            "tag_meta", "tag_id, tag_name, allowed_values, hidden",
             "tag_relation_meta", "id, tag_id, metadata_object_id, tag_value",
             "fileset_meta", "fileset_id, current_version, last_version, occ_version",
             "policy_meta", "policy_id, current_version, last_version, occ_version",

@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
@@ -144,6 +145,11 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Collections.singletonList(policy.nameIdentifier()),
             Entity.EntityType.POLICY);
+    Assertions.assertEquals(2, byPolicy.size());
+    byPolicy =
+        byPolicy.stream()
+            .filter(edge -> !HiddenPolicyTag.isHidden(edge.targetEntity().name()))
+            .collect(Collectors.toList());
     Assertions.assertEquals(1, byPolicy.size());
     Assertions.assertEquals(policy.nameIdentifier(), byPolicy.get(0).source());
     Assertions.assertEquals(Entity.EntityType.POLICY, byPolicy.get(0).sourceType());
@@ -198,7 +204,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                 NameIdentifierUtil.ofPolicy(METALAKE, "retention_b"),
                 NameIdentifierUtil.ofPolicy(METALAKE, "missing_policy")),
             Entity.EntityType.POLICY);
-    Assertions.assertEquals(2, byPolicies.size());
+    Assertions.assertEquals(4, byPolicies.size());
     Assertions.assertEquals(
         Set.of("retention_a", "retention_b"),
         byPolicies.stream().map(relation -> relation.source().name()).collect(Collectors.toSet()));
@@ -302,7 +308,8 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                 Collections.singletonList(
                     NameIdentifierUtil.ofPolicy(METALAKE, "surviving_policy")),
                 Entity.EntityType.POLICY)
-            .isEmpty());
+            .stream()
+            .allMatch(relation -> HiddenPolicyTag.isHidden(relation.targetEntity().name())));
   }
 
   @TestTemplate

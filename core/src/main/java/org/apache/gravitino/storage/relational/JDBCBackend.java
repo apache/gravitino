@@ -851,7 +851,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                     update.sourceIdentifier(),
                     update.sourceEntityType(),
                     toTagValues(update.targetsToAdd()),
-                    toTagValues(update.targetsToRemove()));
+                    toTagValues(update.targetsToRemove()),
+                    update.auditInfo().orElse(null));
       case POLICY_TAG_REL:
         Preconditions.checkArgument(
             update.sourceEntityType() == Entity.EntityType.TAG,
@@ -859,7 +860,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>)
             PolicyTagRelService.getInstance()
                 .updateRelations(
-                    update.sourceIdentifier(), update.targetsToAdd(), update.targetsToRemove());
+                    update.sourceIdentifier(),
+                    update.targetsToAdd(),
+                    update.targetsToRemove(),
+                    update.auditInfo().orElse(null));
       default:
         Preconditions.checkArgument(
             !update.hasRelationValues(),

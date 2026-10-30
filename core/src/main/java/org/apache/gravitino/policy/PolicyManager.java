@@ -20,6 +20,7 @@
 package org.apache.gravitino.policy;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.tag.TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -30,11 +31,14 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -42,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -71,6 +76,100 @@ public class PolicyManager implements PolicyDispatcher {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
+  }
+
+  /**
+   * Applies a policy to an object through its hidden tag using the entity store.
+   *
+   * <p>This internal operation is idempotent. Migration callers can group it with legacy cleanup in
+   * their storage transaction. It is not exposed through the policy dispatcher or client APIs.
+   *
+   * @param metalake The policy and object's metalake.
+   * @param policyName The policy name.
+   * @param object The metadata object to associate.
+   * @param auditInfo The audit information to preserve on newly created relations.
+   * @return The policy's hidden tag ID.
+   * @throws IOException If an entity or relation cannot be persisted.
+   */
+  public long addPolicyToObject(
+      String metalake, String policyName, MetadataObject object, Audit auditInfo)
+      throws IOException {
+    Preconditions.checkNotNull(auditInfo, "Policy binding audit information is required");
+    Preconditions.checkArgument(
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(object.type()),
+        "Unsupported policy binding object type: %s",
+        object.type());
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    PolicyEntity policy =
+        entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
+    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
+    Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object);
+    // Relation lookup validates the endpoint, including columns stored as part of a table.
+    entityStore
+        .relationOperations()
+        .listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, objectIdent, objectType);
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag;
+    try {
+      tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
+      tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
+      try {
+        entityStore.put(tag, false);
+      } catch (EntityAlreadyExistsException concurrentCreate) {
+        tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+      }
+    }
+    Preconditions.checkArgument(
+        tag.hidden()
+            && tag.valueConstraint().allowedValues() != null
+            && tag.valueConstraint().allowedValues().length == 0
+            && HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties()),
+        "Reserved tag name collision for policy %s",
+        policy.id());
+    List<RelationalEntity<?>> policies =
+        entityStore
+            .relationOperations()
+            .batchListEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                Collections.singletonList(tagIdent),
+                Entity.EntityType.TAG);
+    if (policies.isEmpty()) {
+      entityStore
+          .relationOperations()
+          .updateEntityRelations(
+              RelationUpdate.of(
+                      SupportsRelationOperations.Type.POLICY_TAG_REL,
+                      tagIdent,
+                      Entity.EntityType.TAG,
+                      new RelationEdgeTarget[] {
+                        RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
+                      },
+                      null)
+                  .withAuditInfo(auditInfo));
+    } else {
+      Preconditions.checkArgument(
+          policies.size() == 1
+              && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
+              && !policies.get(0).relationValue().isPresent(),
+          "Invalid policy relation for hidden tag %s",
+          tagIdent);
+    }
+    entityStore
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                    objectIdent,
+                    objectType,
+                    new RelationEdgeTarget[] {
+                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
+                    },
+                    null)
+                .withAuditInfo(auditInfo));
+    return tag.id();
   }
 
   @Override
@@ -215,7 +314,9 @@ public class PolicyManager implements PolicyDispatcher {
               SupportsRelationOperations.Type.POLICY_TAG_REL,
               Collections.singletonList(policyIdentifier),
               Entity.EntityType.POLICY)
-          .toArray(new RelationalEntity<?>[0]);
+          .stream()
+          .filter(relation -> !((TagEntity) relation.targetEntity()).hidden())
+          .toArray(RelationalEntity<?>[]::new);
     } catch (IOException e) {
       LOG.error(
           "Failed to list tag associations for policy {} under metalake {}",

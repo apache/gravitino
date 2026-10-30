@@ -20,6 +20,8 @@ package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * Describes an immutable relation update from a source entity to target endpoints. Target endpoint
@@ -39,18 +41,21 @@ public final class RelationUpdate {
   private final Entity.EntityType sourceEntityType;
   private final RelationEdgeTarget[] targetsToAdd;
   private final RelationEdgeTarget[] targetsToRemove;
+  @Nullable private final Audit auditInfo;
 
   private RelationUpdate(
       SupportsRelationOperations.Type relationType,
       NameIdentifier sourceIdentifier,
       Entity.EntityType sourceEntityType,
       RelationEdgeTarget[] targetsToAdd,
-      RelationEdgeTarget[] targetsToRemove) {
+      RelationEdgeTarget[] targetsToRemove,
+      @Nullable Audit auditInfo) {
     this.relationType = relationType;
     this.sourceIdentifier = sourceIdentifier;
     this.sourceEntityType = sourceEntityType;
     this.targetsToAdd = copyTargets(targetsToAdd, "targetsToAdd");
     this.targetsToRemove = copyTargets(targetsToRemove, "targetsToRemove");
+    this.auditInfo = auditInfo;
   }
 
   /**
@@ -73,7 +78,26 @@ public final class RelationUpdate {
     Preconditions.checkArgument(sourceIdentifier != null, "sourceIdentifier must not be null");
     Preconditions.checkArgument(sourceEntityType != null, "sourceEntityType must not be null");
     return new RelationUpdate(
-        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove);
+        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, null);
+  }
+
+  /**
+   * Returns an update with explicit audit metadata for newly created relations.
+   *
+   * @param auditInfo The audit metadata to preserve, for example during an offline migration.
+   * @return A copy carrying the supplied audit metadata.
+   */
+  public RelationUpdate withAuditInfo(Audit auditInfo) {
+    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    return new RelationUpdate(
+        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, auditInfo);
+  }
+
+  /**
+   * @return Explicit creation audit metadata, or empty to use the current principal and time.
+   */
+  public Optional<Audit> auditInfo() {
+    return Optional.ofNullable(auditInfo);
   }
 
   /**

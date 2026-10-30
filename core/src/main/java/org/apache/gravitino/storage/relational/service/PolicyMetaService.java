@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,19 +40,25 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
+import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -129,6 +136,8 @@ public class PolicyMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
           () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -210,6 +219,7 @@ public class PolicyMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> beforeRemove(policyId),
           () -> deletePolicyWithVersion(ident, policyPO),
+          () -> deleteHiddenTagWithoutCommit(policyPO),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyVersionMapper.class,
@@ -383,6 +393,7 @@ public class PolicyMetaService {
     if (!overwritten) {
       beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      createHiddenTagWithoutCommit(policyEntity, initializedPolicyPO);
       afterPersist(policyEntity);
       return;
     }
@@ -399,6 +410,7 @@ public class PolicyMetaService {
       }
       beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      createHiddenTagWithoutCommit(policyEntity, initializedPolicyPO);
       afterPersist(policyEntity);
       return;
     }
@@ -432,6 +444,30 @@ public class PolicyMetaService {
     SessionUtils.doWithoutCommit(
         PolicyVersionMapper.class,
         mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO()));
+  }
+
+  private void createHiddenTagWithoutCommit(PolicyEntity policy, PolicyPO policyPO) {
+    TagEntity tag = HiddenPolicyTag.create(policy, RandomIdGenerator.INSTANCE.nextId());
+    try {
+      TagMetaService.getInstance().insertTag(tag, false);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    PolicyTagRelPO relation =
+        PolicyTagRelPO.builder()
+            .withPolicyId(policy.id())
+            .withTagId(tag.id())
+            .withSelector(null)
+            .withAuditInfo(policyPO.getAuditInfo())
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+    int inserted =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class, mapper -> mapper.insertIfAbsent(relation));
+    Preconditions.checkState(
+        inserted == 1, "Failed to create the hidden tag relation for policy %s", policy.id());
   }
 
   private void insertNewPolicyWithoutCommit(PolicyPO policyPO) {
@@ -497,6 +533,26 @@ public class PolicyMetaService {
           return updated == null ? 0 : updated;
         },
         () -> policyWriteFailure(identifier, oldPolicyPO));
+  }
+
+  private void deleteHiddenTagWithoutCommit(PolicyPO policy) {
+    TagPO tag =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper ->
+                mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+                    policy.getMetalakeId(), HiddenPolicyTag.name(policy.getPolicyId())));
+    if (tag == null
+        || !tag.isHidden()
+        || !HiddenPolicyTag.properties(policy.getPolicyId()).equals(tag.getProperties())) {
+      return;
+    }
+    SessionUtils.doWithoutCommit(
+        TagMetaMapper.class,
+        mapper -> mapper.softDeleteTagMetaByIdAndVersion(tag.getTagId(), tag.getCurrentVersion()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tag.getTagId()));
   }
 
   private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {

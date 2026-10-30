@@ -71,9 +71,11 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -107,6 +109,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.AllValuesSelector;
@@ -1242,6 +1245,51 @@ public class TestTagManager {
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
         () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
+  }
+
+  /** Visibility comes from the persisted flag even when a tag has an ordinary name. */
+  @Test
+  public void testHiddenFieldControlsVisibility() throws Exception {
+    String name = "internal_tag_without_reserved_prefix";
+    TagEntity hidden =
+        TagEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(name)
+            .withNamespace(NameIdentifierUtil.ofTag(METALAKE, name).namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withHidden(true)
+            .build();
+    entityStore.put(hidden, false);
+    MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
+    try {
+      entityStore
+          .relationOperations()
+          .updateEntityRelations(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              NameIdentifier.of(METALAKE, CATALOG),
+              Entity.EntityType.CATALOG,
+              new NameIdentifier[] {hidden.nameIdentifier()},
+              new NameIdentifier[0]);
+      Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
+      Assertions.assertEquals(0, tagManager.listTagsForMetadataObject(METALAKE, object).length);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tagManager.getTag(METALAKE, name));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> tagManager.getTagForMetadataObject(METALAKE, object, name));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tagManager.deleteTag(METALAKE, name));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> tagManager.alterTag(METALAKE, name, TagChange.updateComment("changed")));
+      Assertions.assertTrue(
+          entityStore
+              .get(hidden.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)
+              .hidden());
+    } finally {
+      entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
+    }
   }
 
   @Test

@@ -227,5 +227,8 @@ ALTER TABLE `fileset_meta`
 ALTER TABLE `policy_meta`
     ADD COLUMN IF NOT EXISTS `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version' AFTER `last_version`;
 
+
+ALTER TABLE tag_meta ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE AFTER allowed_values;
+
 -- Role deletion soft-deletes relation rows by role_id.
 CREATE INDEX IF NOT EXISTS `group_role_rel_idx_role_id` ON `group_role_rel` (`role_id`);
