@@ -82,7 +82,6 @@ PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-SNAPSHOT/.dev0/')
 # Create release version for Java, Python ,Rust and Chart
 sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properties
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
-sed -i".tmp3" 's/^version = .*$/version = \"'"$RELEASE_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 sed -i".tmp4" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/Chart.yaml
 
 if [[ $(sed -n '34p' dev/charts/gravitino/values.yaml) =~ ^"  tag: " ]]; then
@@ -143,7 +142,6 @@ git tag $RELEASE_TAG
 # Create next version
 sed -i".tmp14" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
 sed -i".tmp15" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
-sed -i".tmp16" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 
 # Increase the chart version of Gravitino
 sed -i".tmp17" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino/Chart.yaml

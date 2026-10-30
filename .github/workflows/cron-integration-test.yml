@@ -4,7 +4,7 @@ name: Cron Integration Test
 # apache/gravitino. Manual / workflow_call runs can select suites (used later
 # by gravitino-test release-test).
 #
-# Phase-1 suites (gvfs-fuse, web-ui, frontend, contrib-catalog are excluded):
+# Phase-1 suites (web-ui, frontend, contrib-catalog are excluded):
 #   backend, spark, flink, maintenance, python, trino, access-control,
 #   iceberg-rest-trino, mcp, idp, tms, trino-multi-version, lance, multi-instance
 

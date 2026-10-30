@@ -23,12 +23,7 @@ Hadoop shell command reads a catalog name rather than a bucket URL.
 GVFS comes in two implementations. The Java one implements the Hadoop Compatible File System
 interface, so anything that already speaks HDFS paths works, and it requires Hadoop 3.3.1 or later.
 The Python one is built on fsspec, so it works with pandas, PyArrow, and anything else in that
-ecosystem. There is also a FUSE implementation for mounting a fileset as a local directory.
-
-:::note
-The FUSE implementation (`gvfs-fuse`) is deprecated. It is excluded from the Gradle build and
-receives no further development or support; use the Java or Python GVFS implementation instead.
-:::
+ecosystem.
 
 Credentials are the other half of it. A caller reaching storage through GVFS can be given
 short-lived credentials vended by Gravitino rather than holding long-lived cloud keys of its own,

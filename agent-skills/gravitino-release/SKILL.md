@@ -354,7 +354,7 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 
 **What it does:**
 - Clones the repo from gitbox.apache.org
-- Updates version in: `gradle.properties`, `clients/client-python/setup.py`, `clients/filesystem-fuse/Cargo.toml`, all three Helm charts (`Chart.yaml` + `values.yaml`), `mcp-server/pyproject.toml`
+- Updates version in: `gradle.properties`, `clients/client-python/setup.py`, all three Helm charts (`Chart.yaml` + `values.yaml`), `mcp-server/pyproject.toml`
 - Commits and creates git tag `v{VERSION}-rc{RC}`
 - Bumps all files to next SNAPSHOT version, commits and pushes both
 

@@ -59,8 +59,6 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-// clients:filesystem-fuse is deprecated and excluded from the build. The source is kept
-// in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("iceberg:iceberg-rest-server-experiment")
