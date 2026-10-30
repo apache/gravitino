@@ -69,6 +69,13 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new CommitStateUnknownException("", new RuntimeException()), 500);
     checkExceptionStatus(new ServiceUnavailableException(""), 503);
     checkExceptionStatus(new RuntimeException(), 500);
+    // Iceberg's own NotFoundException (e.g. a missing metadata file during registerTable) is a
+    // client error, not a server failure. It shares its simple name with
+    // javax.ws.rs.NotFoundException, so it must be mapped by its fully qualified class.
+    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 404);
+    // Iceberg throws IllegalStateException when a schema is invalid for the table's format
+    // version (e.g. a v3-only type on a v2 table), which is a bad request.
+    checkExceptionStatus(new IllegalStateException(""), 400);
   }
 
   @Test

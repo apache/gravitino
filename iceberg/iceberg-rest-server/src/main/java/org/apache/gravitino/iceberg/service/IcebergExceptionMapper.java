@@ -60,6 +60,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Map<Class<? extends Exception>, Integer> EXCEPTION_ERROR_CODES =
       ImmutableMap.<Class<? extends Exception>, Integer>builder()
           .put(IllegalArgumentException.class, 400)
+          .put(IllegalStateException.class, 400)
           .put(BadRequestException.class, 400)
           .put(ValidationException.class, 400)
           .put(IllegalNameIdentifierException.class, 400)
@@ -70,7 +71,12 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(TokenExpiredException.class, 419)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          // javax.ws.rs.NotFoundException (JAX-RS, imported above) for an unknown REST path.
           .put(NotFoundException.class, 404)
+          // Iceberg's own NotFoundException (e.g. a missing metadata file) shares the simple
+          // name with the JAX-RS one above, so it must be referenced by its fully qualified
+          // class to be mapped to 404 instead of falling through to 500.
+          .put(org.apache.iceberg.exceptions.NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
