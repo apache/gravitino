@@ -120,6 +120,13 @@ import org.slf4j.LoggerFactory;
  * role id also deletes that role's policies from both enforcers. A request that loaded the role
  * before such an eviction reloads it before its next check; see {@link
  * #evaluateWithLoadedRolePolicies}.
+ *
+ * <p>A role whose securable objects could not all be resolved is recorded in {@link
+ * #incompleteRolePolicyIds} for as long as its partial rows are installed. {@link #hasDenyPolicy}
+ * then reports a possible deny for any request holding that role: the deny enforcer's rows are
+ * missing the unresolved objects, so they cannot prove that no DENY hides one of the listed
+ * objects. This only disables the list short-circuit; per-object evaluation is unchanged, so an
+ * unresolvable DENY still cannot hide an object it never resolved to.
  */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
@@ -242,6 +249,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * policy state. See {@link #PARTIAL_ROLE_LOAD_RETRY_MS}.
    */
   private GravitinoCache<Long, Boolean> partialRoleLoadBackoff;
+
+  /**
+   * Role ids (the same string form used as the {@code sub} field of a policy row) whose currently
+   * installed policies are known to be incomplete, i.e. at least one securable object of the role
+   * could not be resolved to a metadata id during its last load.
+   *
+   * <p>An entry means the role's rows in {@link #denyEnforcer} cannot prove the absence of a DENY:
+   * the missing object may have carried one. {@link #hasDenyPolicy} therefore reports a possible
+   * deny for any request holding such a role, disabling the list short-circuit. It does not make
+   * the missing DENY itself effective; per-object evaluation is unchanged.
+   *
+   * <p>Unlike {@link #partialRoleLoadBackoff} — a retry throttle that expires on its own — an entry
+   * is added and removed only together with the policy set it describes: added by {@link
+   * #replaceRolePolicies} when a partial result is applied, and removed when a complete result
+   * replaces it or when {@link #clearRolePoliciesWithoutLock} drops the role's rows. Guarded by
+   * {@link #rolePolicyLock}; the lifetimes of the marker and of the partial policies therefore
+   * always coincide.
+   */
+  private final Set<String> incompleteRolePolicyIds = new HashSet<>();
 
   // ---- Eventual consistency caches (poller-driven) ----
 
@@ -488,6 +514,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             metalake,
             requestContext,
             () -> {
+              // The request holds these roles (direct + group-inherited); inactive roles are
+              // included because a DENY remains in effect regardless of active-role narrowing.
+              Set<String> heldRoleIds = roleSubjects(requestContext, false);
+
+              // A role whose securable objects could not all be resolved installs only the rows it
+              // could resolve, so its deny rows may be missing. This method answers an existence
+              // question — "can a DENY on these privileges hide one of the listed objects?" — and
+              // missing rows can never prove the absence of a DENY, so a held role with incomplete
+              // policies must be reported as possibly holding one. The caller then falls back to
+              // per-object checks instead of the parent-scope short-circuit. Note that this only
+              // disables that short-circuit: per-object evaluation is unchanged, so an unresolvable
+              // DENY still cannot hide an object it never resolved to.
+              for (String roleId : heldRoleIds) {
+                if (incompleteRolePolicyIds.contains(roleId)) {
+                  LOG.debug(
+                      "Reporting a possible deny for user {} because role {} holds incomplete"
+                          + " policies",
+                      userId,
+                      roleId);
+                  return true;
+                }
+              }
+
               // This is an existence query, not a per-object check: it answers "does any deny on
               // these privileges exist for the user's roles, at any scope?" The standard enforce
               // path needs a concrete metadataId, so reusing it would mean iterating every listed
@@ -496,7 +545,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               // listed objects. The match is intentionally scope-agnostic (no metadataType filter):
               // a parent-scope deny hides the whole subtree and an object-scope deny hides one
               // object, and both must disable the short-circuit.
-              for (String roleId : roleSubjects(requestContext, false)) {
+              for (String roleId : heldRoleIds) {
                 // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId,
                 // act, eft) whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all
                 // rules carried by this role. denyEnforcer is a dedicated enforcer that is only
@@ -1557,8 +1606,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (resolved.isComplete()) {
         loadedRoles.put(roleId, dbUpdatedAt);
         partialRoleLoadBackoff.invalidate(roleId);
+        // The installed rows are now the role's complete policy set, so the deny enforcer proves
+        // the absence of a DENY on these privileges again. Defensive: a previous partial load
+        // leaves no loadedRoles marker, so clearRolePoliciesWithoutLock above has normally removed
+        // the entry already.
+        incompleteRolePolicyIds.remove(String.valueOf(roleId));
       } else {
         partialRoleLoadBackoff.put(roleId, Boolean.TRUE);
+        // The rows applied above omit every securable object that did not resolve; remember that
+        // this role may be hiding a DENY so hasDenyPolicy cannot clear the list short-circuit.
+        incompleteRolePolicyIds.add(String.valueOf(roleId));
       }
       return true;
     } finally {
@@ -1628,6 +1685,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     String roleIdStr = String.valueOf(roleId);
     boolean allowRemoved = allowEnforcer.removeFilteredPolicy(0, roleIdStr);
     boolean denyRemoved = denyEnforcer.removeFilteredPolicy(0, roleIdStr);
+    // The marker describes these rows, so it must go with them. Leaving it behind would keep the
+    // list short-circuit disabled for every request holding this role even though nothing is
+    // missing.
+    incompleteRolePolicyIds.remove(roleIdStr);
     return allowRemoved || denyRemoved;
   }
 
@@ -1676,8 +1737,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *
    * <p>Earlier decisions keep their existing request-scoped results. Each new policy evaluation
    * runs inside one read-locked section without holding the lock across metadata or DB lookups.
-   * Partial role-policy resolution keeps its existing per-object behavior; reliable completeness
-   * tracking for the deny-existence scan is handled separately in issue #13691.
+   * Partial role-policy resolution keeps its existing per-object behavior; the deny-existence scan
+   * only learns that such a role may hold a missing DENY through {@link #incompleteRolePolicyIds}
+   * (see {@link #hasDenyPolicy}).
    *
    * @return the evaluation result, or empty when the request's roles kept being cleared or could
    *     not be reloaded; the caller must then fail closed
