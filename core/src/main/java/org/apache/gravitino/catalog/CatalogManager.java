@@ -1292,10 +1292,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         ? new HashMap<>()
                         : new HashMap<>(existing.getProperties());
 
-                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                Pair<CatalogChange[], SecretMaterialsHolder> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
+                writtenSecretMaterials.set(secretResult.getRight().get());
+                writtenSecretMaterials.setReplacedUrns(secretResult.getRight().getReplacedUrns());
                 CatalogChange[] effectiveChanges = secretResult.getLeft();
 
                 CatalogEntity.Builder newCatalogBuilder =
@@ -1308,6 +1309,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
               });
       alterCommitted = true;
+      writtenSecretMaterials.deleteReplaced(secretManager);
       return updatedCatalog;
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);

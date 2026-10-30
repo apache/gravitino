@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
@@ -35,6 +37,7 @@ public class TestSecretManagerAlter {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
       String urn =
           secretManager.alterSetSecretBinding(
               props,
@@ -42,7 +45,9 @@ public class TestSecretManagerAlter {
               42L,
               "jdbc-password",
               new SecretBinding("memory", "s3cr3t"),
-              written);
+              written,
+              replacedUrns);
+      Assertions.assertTrue(replacedUrns.isEmpty());
 
       Assertions.assertTrue(
           SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", urn, "catalog", 42L));
@@ -55,17 +60,34 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testAlterRemovePropertyDeletesWriteThroughSecret() {
+  void testAlterRemovePropertyDefersWriteThroughSecretDeletion() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> props = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
       String urn =
           secretManager.alterSetSecretBinding(
-              props, "catalog", 7L, "jdbc-password", new SecretBinding("memory", "old"), written);
+              props,
+              "catalog",
+              7L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
 
-      secretManager.alterRemoveProperty(props, "catalog", 7L, "jdbc-password");
+      secretManager.alterRemoveProperty(props, "catalog", 7L, "jdbc-password", replacedUrns);
 
       Assertions.assertFalse(props.containsKey("jdbc-password"));
+      // Deletion is deferred until the alter commits: the removed URN must stay
+      // resolvable while the alter may still abort.
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(1, replacedUrns.size());
+      Assertions.assertEquals(SecretUrn.parse(urn), replacedUrns.get(0));
+
+      // After the alter commits, the caller deletes the collected URN.
+      secretManager.deleteSecrets(replacedUrns);
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
@@ -93,9 +115,10 @@ public class TestSecretManagerAlter {
               7L,
               "other-secret",
               new SecretBinding("memory", "keep-me"),
-              written);
+              written,
+              new ArrayList<>());
 
-      secretManager.alterRemoveProperty(props, "catalog", 7L, "jdbc-password");
+      secretManager.alterRemoveProperty(props, "catalog", 7L, "jdbc-password", new ArrayList<>());
 
       Assertions.assertEquals(
           "keep-me",
@@ -104,16 +127,21 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testSchemaAlterRemovePropertyDeletesWriteThroughSecret() {
+  void testSchemaAlterRemovePropertyDefersWriteThroughSecretDeletion() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> props = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
       String urn =
           secretManager.alterSetSecretBinding(
-              props, "schema", 9L, "k2", new SecretBinding("memory", "old"), written);
+              props, "schema", 9L, "k2", new SecretBinding("memory", "old"), written, replacedUrns);
 
-      secretManager.alterRemoveProperty(props, "schema", 9L, "k2");
+      secretManager.alterRemoveProperty(props, "schema", 9L, "k2", replacedUrns);
 
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      secretManager.deleteSecrets(replacedUrns);
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
@@ -121,16 +149,27 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testFilesetAlterRemovePropertyDeletesWriteThroughSecret() {
+  void testFilesetAlterRemovePropertyDefersWriteThroughSecretDeletion() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> props = new HashMap<>();
       List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
       String urn =
           secretManager.alterSetSecretBinding(
-              props, "fileset", 11L, "k2", new SecretBinding("memory", "old"), written);
+              props,
+              "fileset",
+              11L,
+              "k2",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
 
-      secretManager.alterRemoveProperty(props, "fileset", 11L, "k2");
+      secretManager.alterRemoveProperty(props, "fileset", 11L, "k2", replacedUrns);
 
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      secretManager.deleteSecrets(replacedUrns);
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () -> secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
@@ -144,7 +183,13 @@ public class TestSecretManagerAlter {
           IllegalArgumentException.class,
           () ->
               secretManager.alterSetProperty(
-                  new HashMap<>(), "catalog", 1L, "jdbc-password", "******"));
+                  new HashMap<>(),
+                  "catalog",
+                  1L,
+                  "jdbc-password",
+                  "******",
+                  new ArrayList<>(),
+                  new ArrayList<>()));
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () ->
@@ -153,7 +198,263 @@ public class TestSecretManagerAlter {
                   "catalog",
                   1L,
                   "jdbc-password",
-                  "urn:gravitino-secret:memory:catalog:1:jdbc-password"));
+                  "urn:gravitino-secret:memory:catalog:1:jdbc-password",
+                  new ArrayList<>(),
+                  new ArrayList<>()));
+    }
+  }
+
+  @Test
+  void testFailedPrepareKeepsReplacedSecretReadable() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              7L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
+
+      // The batch fails at its second change, after the first change already
+      // removed the old secret. The alter aborts, so the persisted property still
+      // references the old URN and its material must still resolve.
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              SecretAlterChanges.prepareCatalogChanges(
+                  secretManager,
+                  current,
+                  7L,
+                  CatalogChange.removeProperty("jdbc-password"),
+                  CatalogChange.setProperty("other", "******")));
+
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testFailedSameProviderRotationKeepsOldValue() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              8L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
+
+      // The batch fails at its second change, after the first change wrote the new value.
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              SecretAlterChanges.prepareCatalogChanges(
+                  secretManager,
+                  current,
+                  8L,
+                  CatalogChange.setSecretBinding(
+                      "jdbc-password", new SecretBinding("memory", "new")),
+                  CatalogChange.setProperty("other", "******")));
+
+      // The failed alter wrote to a new URN, so the persisted URN keeps the old value.
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testFailedRemoveAndRebindKeepsOldValue() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              9L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
+
+      // Remove and re-bind the same key in one batch, then fail the batch.
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              SecretAlterChanges.prepareCatalogChanges(
+                  secretManager,
+                  current,
+                  9L,
+                  CatalogChange.removeProperty("jdbc-password"),
+                  CatalogChange.setSecretBinding(
+                      "jdbc-password", new SecretBinding("memory", "new")),
+                  CatalogChange.setProperty("other", "******")));
+
+      // The failed alter wrote to a new URN, so the persisted URN keeps the old value.
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testRemoveAndRebindCollectsTheOldUrn() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              10L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
+
+      // Removing the key then re-binding it in the same batch writes a new URN, so the old one is
+      // collected once and deleted after commit, while the new one keeps the new value.
+      Pair<CatalogChange[], SecretMaterialsHolder> result =
+          SecretAlterChanges.prepareCatalogChanges(
+              secretManager,
+              current,
+              10L,
+              CatalogChange.removeProperty("jdbc-password"),
+              CatalogChange.setSecretBinding("jdbc-password", new SecretBinding("memory", "new")));
+      Assertions.assertEquals(List.of(SecretUrn.parse(urn)), result.getRight().getReplacedUrns());
+      String newUrn = ((CatalogChange.SetProperty) result.getLeft()[1]).getValue();
+      Assertions.assertNotEquals(urn, newUrn);
+
+      result.getRight().deleteReplaced(secretManager);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          "new",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(newUrn)));
+    }
+  }
+
+  @Test
+  void testPostPrepareRollbackKeepsOldValue() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      List<SecretMaterial> written = new ArrayList<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              11L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              written,
+              replacedUrns);
+
+      // Prepare succeeds; the alter itself then fails (e.g. the catalog rejects it) and the
+      // dispatcher rolls back the holder's written materials.
+      Pair<CatalogChange[], SecretMaterialsHolder> result =
+          SecretAlterChanges.prepareCatalogChanges(
+              secretManager,
+              current,
+              11L,
+              CatalogChange.removeProperty("jdbc-password"),
+              CatalogChange.setSecretBinding("jdbc-password", new SecretBinding("memory", "new")));
+
+      secretManager.rollbackSecrets(result.getRight().get());
+
+      // The failed alter wrote to a new URN, so the persisted URN keeps the old value.
+      Assertions.assertEquals(
+          "old",
+          secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testDeleteAfterCommitKeepsSecretRewrittenByLaterAlter() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> current = new HashMap<>();
+      String urn =
+          secretManager.alterSetSecretBinding(
+              current,
+              "catalog",
+              12L,
+              "jdbc-password",
+              new SecretBinding("memory", "old"),
+              new ArrayList<>(),
+              new ArrayList<>());
+
+      // Alter A removes the key and commits, but has not deleted the removed secret yet.
+      Pair<CatalogChange[], SecretMaterialsHolder> removed =
+          SecretAlterChanges.prepareCatalogChanges(
+              secretManager, current, 12L, CatalogChange.removeProperty("jdbc-password"));
+
+      // Alter B, for example on another server, binds the key again and commits.
+      Pair<CatalogChange[], SecretMaterialsHolder> rebound =
+          SecretAlterChanges.prepareCatalogChanges(
+              secretManager,
+              new HashMap<>(),
+              12L,
+              CatalogChange.setSecretBinding("jdbc-password", new SecretBinding("memory", "b")));
+      String reboundUrn = ((CatalogChange.SetProperty) rebound.getLeft()[0]).getValue();
+
+      // A's deletion removes only the secret A replaced.
+      removed.getRight().deleteReplaced(secretManager);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> secretManager.getRegistry().getProvider("memory").readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          "b",
+          secretManager
+              .getRegistry()
+              .getProvider("memory")
+              .readSecret(SecretUrn.parse(reboundUrn)));
+    }
+  }
+
+  @Test
+  void testRotationWritesANewUrnAndCollectsTheOldOne() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> props = new HashMap<>();
+      List<SecretUrn> replacedUrns = new ArrayList<>();
+      String first =
+          secretManager.alterSetSecretBinding(
+              props,
+              "catalog",
+              13L,
+              "jdbc-password",
+              new SecretBinding("memory", "v1"),
+              new ArrayList<>(),
+              replacedUrns);
+      String second =
+          secretManager.alterSetProperty(
+              props, "catalog", 13L, "jdbc-password", "v2", new ArrayList<>(), replacedUrns);
+
+      Assertions.assertNotEquals(first, second);
+      Assertions.assertEquals(List.of(SecretUrn.parse(first)), replacedUrns);
+      Assertions.assertTrue(
+          SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", second, "catalog", 13L));
+      Assertions.assertEquals("v1", secretManager.readSecret(SecretUrn.parse(first)));
+      Assertions.assertEquals("v2", secretManager.readSecret(SecretUrn.parse(second)));
+
+      // Dropping the entity deletes the write-through secret it references.
+      secretManager.deleteSecretsFromProperties(props);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(SecretUrn.parse(second)));
     }
   }
 

@@ -23,6 +23,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
@@ -149,6 +150,50 @@ public class TestSecretPropertyUtils {
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey("aws-region"));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(null));
     Assertions.assertFalse(SecretPropertyUtils.isSensitivePropertyKey(""));
+  }
+
+  @Test
+  void testWriteThroughShapeAcceptsWriteIdSegment() {
+    String writeId = "0b9c5f4e-6f3a-4a52-9d1e-2b7c1e8f3a10";
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:7:jdbc-password")));
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse(
+                "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:path:kv:jdbc-password:jdbc-password")));
+    // External references that only look similar are not write-through secrets.
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:prod:1-2-3-4-5:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:" + writeId + ":jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:vault:kv:prod:jdbc-password")));
+    // The entity id must be numeric and the write id a lowercase UUID.
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:prod:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse("urn:gravitino-secret:memory:catalog:7:1-2-3-4-5:jdbc-password")));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughShape(
+            SecretUrn.parse(
+                "urn:gravitino-secret:memory:catalog:7:"
+                    + writeId.toUpperCase(Locale.ROOT)
+                    + ":jdbc-password")));
+
+    String urn = "urn:gravitino-secret:memory:catalog:7:" + writeId + ":jdbc-password";
+    Assertions.assertTrue(
+        SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", urn, "catalog", 7L));
+    Assertions.assertFalse(
+        SecretPropertyUtils.isWriteThroughForEntity("jdbc-password", urn, "catalog", 8L));
   }
 
   @Test
