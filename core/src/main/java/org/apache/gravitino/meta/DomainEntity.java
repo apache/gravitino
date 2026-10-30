@@ -38,6 +38,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.DomainRelation;
 import org.apache.gravitino.tag.TagValue;
 
 /**
@@ -116,6 +117,11 @@ public class DomainEntity implements Entity, Auditable, HasIdentifier {
 
   private final Audit auditInfo;
 
+  // Query-specific relations do not change the identity or state of the stored domain.
+  @EqualsAndHashCode.Exclude
+  @Getter(AccessLevel.NONE)
+  private final DomainRelation[] relations;
+
   @lombok.Builder(setterPrefix = "with", toBuilder = true)
   private DomainEntity(
       Long id,
@@ -128,7 +134,9 @@ public class DomainEntity implements Entity, Auditable, HasIdentifier {
       @Nullable Long backingTagId,
       @Nullable String backingTagName,
       @Nullable String backingTagValue,
-      Audit auditInfo) {
+      Audit auditInfo,
+      @Nullable DomainRelation[] relations) {
+    this.relations = relations == null ? new DomainRelation[0] : relations.clone();
     this.id = id;
     this.name = name;
     this.namespace = namespace;
@@ -151,6 +159,15 @@ public class DomainEntity implements Entity, Auditable, HasIdentifier {
         backingTagValue == null || StringUtils.isNotBlank(backingTagValue),
         "The backing tag value of domain %s must not be blank",
         name);
+  }
+
+  /**
+   * Returns relations when this entity is returned by a membership query.
+   *
+   * @return The relations to the queried object, or empty for ordinary domain reads.
+   */
+  public DomainRelation[] relations() {
+    return relations.clone();
   }
 
   @Override

@@ -480,6 +480,30 @@ public class TestDomainManagerWithMockStore {
     assertIOExceptionWrapped(() -> domainManager.unpublishDomain(METALAKE, "Finance"));
   }
 
+  /** Verifies that member listing reads only the queried domain and its sub-domains. */
+  @Test
+  public void testMemberListingDoesNotScanMetalakeDomains() throws IOException {
+    DomainEntity finance = domain("Finance", null, Domain.Status.DRAFT);
+    Mockito.when(entityStore.get(FINANCE, Entity.EntityType.DOMAIN, DomainEntity.class))
+        .thenReturn(finance);
+    Mockito.when(domainOperations.listSubDomains(FINANCE)).thenReturn(Collections.emptyList());
+    Assertions.assertEquals(
+        0,
+        domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())
+            .length);
+    Mockito.verify(domainOperations).listSubDomains(FINANCE);
+    Mockito.verify(entityStore, Mockito.never())
+        .list(any(), eq(DomainEntity.class), eq(Entity.EntityType.DOMAIN));
+    DomainEntity trading = domain("Trading", "Finance", Domain.Status.DRAFT);
+    Mockito.when(entityStore.get(TRADING, Entity.EntityType.DOMAIN, DomainEntity.class))
+        .thenReturn(trading);
+    Assertions.assertEquals(
+        0,
+        domainManager.listMembers(METALAKE, "Trading", DomainMemberFilter.builder().build())
+            .length);
+    Mockito.verify(domainOperations, Mockito.never()).listSubDomains(TRADING);
+  }
+
   @Test
   public void testListSubdomains() throws IOException {
     DomainEntity trading = domain("Trading", "Finance", Domain.Status.DRAFT);

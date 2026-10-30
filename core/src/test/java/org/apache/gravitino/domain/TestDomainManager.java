@@ -55,6 +55,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -63,7 +64,12 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
@@ -74,13 +80,17 @@ import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -89,6 +99,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestDomainManager {
@@ -147,6 +160,208 @@ public class TestDomainManager {
     for (TagEntity tag :
         entityStore.list(NamespaceUtil.ofTag(METALAKE), TagEntity.class, Entity.EntityType.TAG)) {
       entityStore.delete(tag.nameIdentifier(), Entity.EntityType.TAG);
+    }
+  }
+
+  /** Verifies stored descendant-schema expansion, prefix boundaries and nearest overrides. */
+  @ParameterizedTest
+  @ValueSource(strings = {":", "::"})
+  public void testHierarchicalSchemaMembership(String separator) throws Exception {
+    IdGenerator previousGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
+    String catalogName = "hierarchical_membership_catalog";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    try (MockedStatic<HierarchicalSchemaUtil> hierarchy =
+        Mockito.mockStatic(HierarchicalSchemaUtil.class, Mockito.CALLS_REAL_METHODS)) {
+      hierarchy.when(HierarchicalSchemaUtil::schemaSeparator).thenReturn(separator);
+      entityStore.put(catalog);
+      String rootSchema = "a_%";
+      String nestedSchema = rootSchema + separator + "b";
+      for (String schemaName : Arrays.asList(nestedSchema, "aX%" + separator + "b")) {
+        entityStore.put(
+            SchemaEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName(schemaName)
+                .withNamespace(Namespace.of(METALAKE, catalogName))
+                .withAuditInfo(audit)
+                .build());
+        entityStore.put(
+            TableEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("trades")
+                .withNamespace(Namespace.of(METALAKE, catalogName, schemaName))
+                .withColumns(Collections.emptyList())
+                .withAuditInfo(audit)
+                .build());
+      }
+      List<SchemaEntity> descendants =
+          entityStore.listDescendantSchemas(NameIdentifier.of(METALAKE, catalogName, rootSchema));
+      Assertions.assertEquals(1, descendants.size());
+      Assertions.assertEquals(nestedSchema, descendants.get(0).name());
+      createTag("dept", TagValueConstraint.anyValue());
+      domainManager.createDomain(
+          METALAKE, "Finance", null, null, TagValue.of("dept", "finance"), false);
+      domainManager.createDomain(METALAKE, "HR", null, null, TagValue.of("dept", "hr"), false);
+      assignMembershipTag(
+          NameIdentifier.of(METALAKE, catalogName, rootSchema),
+          Entity.EntityType.SCHEMA,
+          "dept",
+          "finance");
+      MetadataObject leaf =
+          MetadataObjects.parse(
+              catalogName + "." + nestedSchema + ".trades", MetadataObject.Type.TABLE);
+      try (MockedStatic<MetadataObjectUtil> objects =
+          Mockito.mockStatic(MetadataObjectUtil.class, Mockito.CALLS_REAL_METHODS)) {
+        objects
+            .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, leaf))
+            .thenAnswer(call -> null);
+        DomainMemberFilter filter =
+            DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+        DomainMember[] members = domainManager.listMembers(METALAKE, "Finance", filter);
+        Assertions.assertEquals(1, members.length);
+        Assertions.assertEquals(leaf, members[0].object());
+        Assertions.assertEquals(
+            "Finance", domainManager.listDomainsForMetadataObject(METALAKE, leaf)[0].name());
+        assignMembershipTag(
+            NameIdentifier.of(METALAKE, catalogName, nestedSchema),
+            Entity.EntityType.SCHEMA,
+            "dept",
+            "hr");
+        Assertions.assertEquals(0, domainManager.listMembers(METALAKE, "Finance", filter).length);
+        Assertions.assertEquals(
+            "HR", domainManager.listDomainsForMetadataObject(METALAKE, leaf)[0].name());
+      }
+    } finally {
+      entityStore.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, true);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousGenerator, true);
+    }
+  }
+
+  /** Verifies membership lookups against live stored tags and object lifecycles. */
+  @Test
+  public void testMembershipQueriesWithStoredInheritanceAndLifecycle() throws IOException {
+    String catalogName = "membership_catalog";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(catalog);
+    try {
+      SchemaEntity schema =
+          SchemaEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("db")
+              .withNamespace(Namespace.of(METALAKE, catalogName))
+              .withAuditInfo(audit)
+              .build();
+      entityStore.put(schema);
+      TableEntity table =
+          TableEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("trades")
+              .withNamespace(Namespace.of(METALAKE, catalogName, "db"))
+              .withColumns(Collections.emptyList())
+              .withAuditInfo(audit)
+              .build();
+      entityStore.put(table);
+      createTag("dept", TagValueConstraint.anyValue());
+      DomainEntity finance =
+          domainManager.createDomain(
+              METALAKE, "Finance", null, null, TagValue.of("dept", "finance"), false);
+      domainManager.createDomain(METALAKE, "HR", null, null, TagValue.of("dept", "hr"), false);
+      domainManager.createSubdomain(
+          METALAKE, "Finance", "Trading", null, null, TagValue.noValue("trading"), true);
+      Assertions.assertEquals(
+          0,
+          entityStore
+              .domainOperations()
+              .listDomainsByBackingTagIds(METALAKE, Collections.emptyList())
+              .size());
+      Assertions.assertEquals(
+          0,
+          entityStore
+              .domainOperations()
+              .listDomainsByBackingTagIds(
+                  "other", Collections.singletonList(finance.backingTagId()))
+              .size());
+      List<DomainEntity> boundDomains =
+          entityStore
+              .domainOperations()
+              .listDomainsByBackingTagIds(
+                  METALAKE, Collections.singletonList(finance.backingTagId()));
+      Assertions.assertEquals(2, boundDomains.size());
+      Assertions.assertTrue(
+          boundDomains.stream().allMatch(bound -> bound.backingTag().isPresent()));
+      assignMembershipTag(catalog.nameIdentifier(), Entity.EntityType.CATALOG, "dept", "finance");
+      assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "trading", null);
+      MetadataObject leaf =
+          MetadataObjects.parse(catalogName + ".db.trades", MetadataObject.Type.TABLE);
+      try (MockedStatic<MetadataObjectUtil> objects =
+          Mockito.mockStatic(MetadataObjectUtil.class, Mockito.CALLS_REAL_METHODS)) {
+        objects
+            .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, leaf))
+            .thenAnswer(call -> null);
+        DomainMember[] members =
+            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build());
+        Assertions.assertEquals(1, members.length);
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {
+              DomainRelation.inherited(
+                  MetadataObjects.parse(catalogName, MetadataObject.Type.CATALOG)),
+              DomainRelation.viaSubdomain("Trading")
+            },
+            members[0].relations());
+        Assertions.assertEquals(
+            2, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+        assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "dept", "hr");
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")},
+            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())[0]
+                .relations());
+        Assertions.assertEquals(
+            3, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+        domainManager.detachDomain(METALAKE, "Trading");
+        Assertions.assertEquals(
+            0,
+            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())
+                .length);
+        Assertions.assertEquals(
+            2, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+        domainManager.updateBackingTag(METALAKE, "HR", null);
+        Assertions.assertEquals(
+            1, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+        domainManager.attachDomain(METALAKE, "Trading", "Finance");
+        entityStore.delete(NameIdentifierUtil.ofTag(METALAKE, "trading"), Entity.EntityType.TAG);
+        createTag("trading", TagValueConstraint.noValue());
+        assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "trading", null);
+        Assertions.assertEquals(
+            0, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+        Assertions.assertEquals(
+            0,
+            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())
+                .length);
+        // The original binding survives a tag deletion but never follows a recreated name.
+        Assertions.assertEquals(
+            finance.backingTagId(), domainManager.getDomain(METALAKE, "Finance").backingTagId());
+      }
+    } finally {
+      entityStore.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, true);
     }
   }
 
@@ -762,6 +977,22 @@ public class TestDomainManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private static void assignMembershipTag(
+      NameIdentifier object, Entity.EntityType type, String tag, String value) throws IOException {
+    entityStore
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                object,
+                type,
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(
+                      NameIdentifierUtil.ofTag(METALAKE, tag), Entity.EntityType.TAG, value)
+                },
+                new RelationEdgeTarget[0]));
   }
 
   private static TagEntity tag(String name, String[] allowedValues) {

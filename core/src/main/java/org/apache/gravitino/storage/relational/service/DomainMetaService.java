@@ -92,6 +92,24 @@ public class DomainMetaService {
   }
 
   /**
+   * Lists domains backed by a set of stable tag IDs, using the backing-tag index.
+   *
+   * @param metalake The metalake name.
+   * @param backingTagIds The tag IDs; an empty list returns no domains.
+   * @return Matching domains with their parent and backing tag names.
+   */
+  public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds) {
+    if (backingTagIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<DomainPO> domainPOs =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class,
+            mapper -> mapper.listDomainPOsByMetalakeAndBackingTagIds(metalake, backingTagIds));
+    return fromDomainPOsWithParents(domainPOs, NamespaceUtil.ofDomain(metalake));
+  }
+
+  /**
    * Gets a domain by its identifier.
    *
    * @param ident The domain identifier.

@@ -125,6 +125,13 @@ public class DomainMetaSQLProviderFactory {
     return getProvider().listDomainPOsByBackingTagId(metalakeId, backingTagId);
   }
 
+  /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByMetalakeAndBackingTagIds}. */
+  public static String listDomainPOsByMetalakeAndBackingTagIds(
+      @Param("metalakeName") String metalakeName,
+      @Param("backingTagIds") List<Long> backingTagIds) {
+    return getProvider().listDomainPOsByMetalakeAndBackingTagIds(metalakeName, backingTagIds);
+  }
+
   /** Delegates {@link DomainMetaBaseSQLProvider#insertDomainMeta}. */
   public static String insertDomainMeta(@Param("domainMeta") DomainPO domainPO) {
     return getProvider().insertDomainMeta(domainPO);

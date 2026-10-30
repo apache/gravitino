@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetadataObjectRelBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.TagMetadataObjectRelPostgreSQLProvider;
@@ -77,6 +78,21 @@ public class TagMetadataObjectRelSQLProviderFactory {
       @Param("tagValue") String tagValue) {
     return getProvider()
         .listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(metalakeName, tagName, tagValue);
+  }
+
+  /**
+   * Delegates a live assignment lookup by stable tag ID.
+   *
+   * @param metalakeName The metalake of the tag.
+   * @param tagId The stable tag ID.
+   * @param tagValue The value, or null to match every value.
+   * @return The lookup SQL.
+   */
+  public static String listTagMetadataObjectRelsByTagId(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagId") Long tagId,
+      @Param("tagValue") @Nullable String tagValue) {
+    return getProvider().listTagMetadataObjectRelsByTagId(metalakeName, tagId, tagValue);
   }
 
   public static String batchInsertTagMetadataObjectRels(

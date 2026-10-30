@@ -220,6 +220,17 @@ public interface SupportsDomainOperations {
   List<DomainEntity> listSubDomains(NameIdentifier parentIdent)
       throws IOException, NoSuchEntityException;
 
+  /**
+   * Lists domains backed by any of the given stable tag IDs within one metalake.
+   *
+   * @param metalake The metalake name.
+   * @param backingTagIds The tag IDs; an empty list returns no domains.
+   * @return The domains, including their backing tag names and parent names.
+   * @throws IOException If the domains cannot be read.
+   */
+  List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException;
+
   /** The domains involved in a change, as read under the change's row locks. */
   final class LockedDomainState {
 

@@ -37,6 +37,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
@@ -252,6 +253,24 @@ public class DomainManager implements DomainDispatcher {
       LOG.error("Failed to list sub-domains of domain {} under metalake {}", name, metalake, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  @Override
+  public DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter) {
+    // getDomain validates that the metalake exists before loading the domain.
+    DomainEntity queriedDomain = getDomain(metalake, name);
+    DomainEntity[] subdomains =
+        queriedDomain.parent().isPresent()
+            ? new DomainEntity[0]
+            : listSubdomainInfos(metalake, name);
+    return new DomainMembershipResolver(entityStore)
+        .listMembers(metalake, queriedDomain, subdomains, filter);
+  }
+
+  @Override
+  public DomainEntity[] listDomainsForMetadataObject(String metalake, MetadataObject object) {
+    checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+    return new DomainMembershipResolver(entityStore).listDomains(metalake, object);
   }
 
   @Override

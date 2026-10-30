@@ -23,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.DomainRelation;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -157,6 +158,26 @@ public class TestDomainEntity {
         domain, domain.toBuilder().withStatus(Domain.Status.PUBLISHED).build());
     Assertions.assertNotEquals(domain, domain.toBuilder().withParent("Markets").build());
     Assertions.assertNotEquals(domain, domain.toBuilder().withBackingTagId(100L).build());
+  }
+
+  @Test
+  public void testQueryRelationsDoNotAffectEquality() {
+    DomainEntity domain = newDomain();
+    DomainEntity direct =
+        domain.toBuilder().withRelations(new DomainRelation[] {DomainRelation.direct()}).build();
+    DomainEntity viaSubdomain =
+        domain.toBuilder()
+            .withRelations(new DomainRelation[] {DomainRelation.viaSubdomain("Trading")})
+            .build();
+
+    Assertions.assertEquals(domain, direct);
+    Assertions.assertEquals(direct, domain);
+    Assertions.assertEquals(direct, viaSubdomain);
+    Assertions.assertEquals(domain.hashCode(), direct.hashCode());
+    Assertions.assertEquals(domain.hashCode(), viaSubdomain.hashCode());
+    Assertions.assertEquals(domain.fields(), direct.fields());
+    Assertions.assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct()}, direct.relations());
   }
 
   private DomainEntity newDomain() {
