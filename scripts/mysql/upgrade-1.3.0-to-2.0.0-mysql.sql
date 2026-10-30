@@ -686,6 +686,15 @@ PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND column_name = 'hidden'),
+    'SELECT 1',
+    'ALTER TABLE `tag_meta` ADD COLUMN `hidden` BOOLEAN NOT NULL DEFAULT FALSE COMMENT ''whether the tag is server-managed and hidden'' AFTER `allowed_values`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- Role deletion soft-deletes relation rows by role_id.
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
     WHERE table_schema = DATABASE() AND table_name = 'group_role_rel' AND column_name = 'role_id' AND seq_in_index = 1),

@@ -48,12 +48,10 @@ public class H2Database implements JDBCDatabase {
 
   public String startH2Database(Config config) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String storagePath = getStoragePath(config);
-    String originalJDBCUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     this.username = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER);
     this.password = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD);
 
-    String connectionUrl = constructH2URI(originalJDBCUrl, storagePath);
+    String connectionUrl = getConnectionUrl(config);
 
     try (Connection connection = DriverManager.getConnection(connectionUrl, username, password);
         Statement statement = connection.createStatement()) {
@@ -75,6 +73,17 @@ public class H2Database implements JDBCDatabase {
     config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, connectionUrl);
 
     return connectionUrl;
+  }
+
+  /**
+   * Resolves the configured H2 connection URL without initializing or upgrading the database.
+   *
+   * @param config The server configuration.
+   * @return The same file URL used by the embedded backend.
+   */
+  public static String getConnectionUrl(Config config) {
+    return constructH2URI(
+        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL), getStoragePath(config));
   }
 
   private static String constructH2URI(String originURI, String storagePath) {

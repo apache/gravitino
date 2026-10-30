@@ -54,6 +54,7 @@ import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
@@ -101,6 +102,7 @@ public class TagManager implements TagDispatcher {
       return entityStore
           .list(NamespaceUtil.ofTag(metalake), TagEntity.class, Entity.EntityType.TAG)
           .stream()
+          .filter(tag -> !tag.hidden())
           .toArray(Tag[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list tags under metalake {}", metalake, ioe);
@@ -120,6 +122,7 @@ public class TagManager implements TagDispatcher {
       Map<String, String> properties,
       TagValueConstraint valueConstraint)
       throws TagAlreadyExistsException {
+    HiddenPolicyTag.checkVisible(name);
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     TagEntity tagEntity =
@@ -150,19 +153,29 @@ public class TagManager implements TagDispatcher {
   }
 
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
+    HiddenPolicyTag.checkVisible(name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return loadTagEntity(metalake, name);
   }
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException {
+    HiddenPolicyTag.checkVisible(name);
+    for (TagChange change : changes) {
+      if (change instanceof TagChange.RenameTag) {
+        HiddenPolicyTag.checkVisible(((TagChange.RenameTag) change).getNewName());
+      }
+    }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     try {
       return entityStore.update(
           NameIdentifierUtil.ofTag(metalake, name),
           TagEntity.class,
           Entity.EntityType.TAG,
-          tagEntity -> updateTagEntity(tagEntity, changes));
+          tagEntity -> {
+            HiddenPolicyTag.checkVisible(tagEntity);
+            return updateTagEntity(tagEntity, changes);
+          });
     } catch (NoSuchEntityException e) {
       throw new NoSuchTagException(
           "Tag with name %s under metalake %s does not exist", name, metalake);
@@ -189,7 +202,9 @@ public class TagManager implements TagDispatcher {
   }
 
   public boolean deleteTag(String metalake, String name) {
+    HiddenPolicyTag.checkVisible(name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    checkVisibleTagIfExists(metalake, name);
     try {
       return entityStore.delete(NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
     } catch (OptimisticLockException ole) {
@@ -212,6 +227,7 @@ public class TagManager implements TagDispatcher {
 
   @Override
   public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     loadTagEntity(metalake, name);
@@ -233,9 +249,11 @@ public class TagManager implements TagDispatcher {
   @Override
   public void addPolicyForTag(
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    HiddenPolicyTag.checkVisible(tagName);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    checkVisibleTagIfExists(metalake, tagName);
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -266,9 +284,11 @@ public class TagManager implements TagDispatcher {
 
   @Override
   public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    HiddenPolicyTag.checkVisible(tagName);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    checkVisibleTagIfExists(metalake, tagName);
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -294,13 +314,11 @@ public class TagManager implements TagDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForTag(
       String metalake, String name, @Nullable String value) throws NoSuchTagException {
+    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     try {
-      if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
-        throw new NoSuchTagException(
-            "Tag with name %s under metalake %s does not exist", name, metalake);
-      }
+      loadTagEntity(metalake, name);
 
       List<GenericEntity> entities =
           entityStore
@@ -340,7 +358,7 @@ public class TagManager implements TagDispatcher {
               .relationOperations()
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, entityIdent, entityType);
-      return tags.toArray(new Tag[0]);
+      return tags.stream().filter(tag -> !tag.hidden()).toArray(Tag[]::new);
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetadataObjectException(
           e, "Failed to list tags for metadata object %s due to not found", metadataObject);
@@ -354,19 +372,23 @@ public class TagManager implements TagDispatcher {
       throws NoSuchMetadataObjectException {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
 
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     try {
       checkMetalake(NameIdentifier.of(metalake), entityStore);
-      return entityStore
-          .relationOperations()
-          .<TagEntity>getEntityByRelation(
-              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-              entityIdent,
-              entityType,
-              tagIdent);
+      TagEntity tag =
+          entityStore
+              .relationOperations()
+              .getEntityByRelation(
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                  entityIdent,
+                  entityType,
+                  tagIdent);
+      HiddenPolicyTag.checkVisible(tag);
+      return tag;
     } catch (NoSuchEntityException e) {
       // The store reports a missing tag and a missing metadata object with the same
       // exception type, so the message is the only thing that tells them apart.
@@ -420,6 +442,12 @@ public class TagManager implements TagDispatcher {
         metadataObject.type());
     validateTagValuesToAdd(tagsToAdd);
     validateTagValuesToRemove(tagsToRemove);
+    for (TagValue value : tagsToAdd == null ? new TagValue[0] : tagsToAdd) {
+      checkVisibleTagIfExists(metalake, value.name());
+    }
+    for (TagValue value : tagsToRemove == null ? new TagValue[0] : tagsToRemove) {
+      checkVisibleTagIfExists(metalake, value.name());
+    }
 
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
@@ -463,7 +491,11 @@ public class TagManager implements TagDispatcher {
                     toNameIdentifiers(metalake, tagValuesToAdd),
                     toNameIdentifiers(metalake, tagValuesToRemove));
       }
-      return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
+      return tags.stream()
+          .filter(tag -> !tag.hidden())
+          .map(Tag::name)
+          .distinct()
+          .toArray(String[]::new);
     } catch (NoSuchEntityException e) {
       // Tags that do not exist, including ones dropped or renamed while this change ran, are
       // ignored by the store, so a missing entity here is the metadata object itself.
@@ -507,6 +539,7 @@ public class TagManager implements TagDispatcher {
     Map<String, Boolean> valuedByTagName = Maps.newHashMap();
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to add must not be null");
+      HiddenPolicyTag.checkVisible(tagValue.name());
       boolean valued = tagValue.value().isPresent();
       Boolean previous = valuedByTagName.putIfAbsent(tagValue.name(), valued);
       Preconditions.checkArgument(
@@ -523,6 +556,7 @@ public class TagManager implements TagDispatcher {
 
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to remove must not be null");
+      HiddenPolicyTag.checkVisible(tagValue.name());
     }
   }
 
@@ -582,6 +616,7 @@ public class TagManager implements TagDispatcher {
         .withComment(newComment)
         .withProperties(props)
         .withAllowedValues(allowedValuesForStorage(tagEntity.valueConstraint()))
+        .withHidden(tagEntity.hidden())
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(tagEntity.auditInfo().creator())
@@ -592,10 +627,21 @@ public class TagManager implements TagDispatcher {
         .build();
   }
 
+  private void checkVisibleTagIfExists(String metalake, String name) {
+    try {
+      loadTagEntity(metalake, name);
+    } catch (NoSuchTagException e) {
+      // Missing names retain the existing idempotent delete and association behavior.
+    }
+  }
+
   private TagEntity loadTagEntity(String metalake, String name) {
     try {
-      return entityStore.get(
-          NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
+      TagEntity tag =
+          entityStore.get(
+              NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
+      HiddenPolicyTag.checkVisible(tag);
+      return tag;
     } catch (NoSuchEntityException e) {
       throw new NoSuchTagException(
           e, "Tag with name %s under metalake %s does not exist", name, metalake);
