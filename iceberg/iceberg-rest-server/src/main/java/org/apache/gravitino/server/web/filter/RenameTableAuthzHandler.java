@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web.filter;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.ICEBERG_CREATE_TABLE_AUTHORIZATION_EXPRESSION;
 
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
@@ -161,13 +162,8 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
     destContext.put(
         EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, destSchema));
 
-    String destExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE";
-
     AuthorizationExpressionEvaluator destEvaluator =
-        new AuthorizationExpressionEvaluator(destExpression);
+        new AuthorizationExpressionEvaluator(ICEBERG_CREATE_TABLE_AUTHORIZATION_EXPRESSION);
 
     boolean destAuthorized =
         destEvaluator.evaluate(
