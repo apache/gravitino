@@ -560,6 +560,32 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testInvalidMetadataObjectNameReturnsBadRequest() throws Throwable {
+    Method method =
+        TestMetadataObjectTagAssociationOperations.class.getMethod(
+            "associateTagValuesForObject",
+            String.class,
+            String.class,
+            String.class,
+            TagValuesAssociateRequest.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {"testMetalake", "schema", "a.b.c", null});
+
+    MethodInterceptor interceptor =
+        new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+    Response response = (Response) interceptor.invoke(invocation);
+
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("the length of names must be 2"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
