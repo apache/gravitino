@@ -175,6 +175,8 @@ The endpoint implements `listSemanticModelDatasets` and always returns the exist
 - **Uniqueness and ordering.** Return each dataset identifier once. Sort lexicographically by the
   model namespace components (`metalake`, `catalog`, `schema`, `semanticModel`), then by the
   case-sensitive dataset name. This order is independent of dataset order in the definition.
+  Compare every component case-sensitively by UTF-16 code units (Java `String.compareTo` order),
+  independent of locale and database collation.
 - **Empty results.** Return `identifiers: []` when the source exists but no matching datasets are
   visible.
 - **Errors.** Unsupported source types return `400`. Missing or inaccessible sources follow the
