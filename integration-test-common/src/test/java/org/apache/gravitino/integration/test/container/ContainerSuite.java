@@ -986,12 +986,7 @@ public class ContainerSuite implements Closeable {
   }
 
   private static Map<String, String> resolveClickHouseTestFiles() {
-    // The feature-specific ClickHouse test image is 25.8+, where Time types require this setting.
-    String configuredImage = System.getenv(CLICKHOUSE_TEST_IMAGE_ENV);
-    if (configuredImage == null || configuredImage.isBlank()) {
-      return ImmutableMap.of();
-    }
-
+    // ClickHouse 25.8+ needs this setting to create Time columns.
     try (InputStream settings =
         Objects.requireNonNull(
             ContainerSuite.class.getResourceAsStream("/clickhouse-test-users.xml"))) {
