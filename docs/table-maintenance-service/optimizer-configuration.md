@@ -329,7 +329,8 @@ Four things are worth confirming before assuming a configuration problem is a co
 
 ## Related
 
-- [Table Maintenance Service](./optimizer.md) for the in-process scheduler and the CLI walkthrough
+- [Service](./service.md) for the in-process service, `timeTrigger`, and the cron path
+- [Table Maintenance Service](./optimizer.md) for the CLI walkthrough
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
