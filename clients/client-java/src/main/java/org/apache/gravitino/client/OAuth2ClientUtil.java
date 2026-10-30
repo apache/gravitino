@@ -29,7 +29,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.dto.responses.OAuth2TokenResponse;
 import org.apache.gravitino.json.JsonUtils;
 
@@ -38,12 +37,15 @@ import org.apache.gravitino.json.JsonUtils;
 class OAuth2ClientUtil {
 
   public static final String SCOPE = "scope";
-  private static final Splitter CREDENTIAL_SPLITTER = Splitter.on(":").limit(2).trimResults();
+  private static final Splitter CREDENTIAL_SPLITTER = Splitter.on(":").limit(4).trimResults();
   private static final String GRANT_TYPE = "grant_type";
   private static final String CLIENT_CREDENTIALS = "client_credentials";
+  private static final String PASSWORD_GRANT = "password";
 
   private static final String CLIENT_ID = "client_id";
   private static final String CLIENT_SECRET = "client_secret";
+  private static final String USERNAME = "username";
+  private static final String PASSWORD = "password";
 
   // error type constants
   public static final String INVALID_REQUEST_ERROR = "invalid_request";
@@ -61,9 +63,12 @@ class OAuth2ClientUtil {
       String credential,
       String scope,
       String path) {
+    List<String> scopes = scope != null ? ImmutableList.of(scope) : ImmutableList.of();
+    Credential parsed = parseCredential(credential);
     Map<String, String> request =
-        clientCredentialsRequest(
-            credential, scope != null ? ImmutableList.of(scope) : ImmutableList.of());
+        parsed.username != null
+            ? passwordGrantRequest(parsed, scopes)
+            : clientCredentialsRequest(parsed, scopes);
 
     OAuth2TokenResponse response =
         client.postForm(
@@ -73,36 +78,68 @@ class OAuth2ClientUtil {
     return response;
   }
 
-  private static Pair<String, String> parseCredential(String credential) {
+  private static final class Credential {
+    private final String clientId;
+    private final String clientSecret;
+    private final String username;
+    private final String password;
+
+    private Credential(String clientId, String clientSecret, String username, String password) {
+      this.clientId = clientId;
+      this.clientSecret = clientSecret;
+      this.username = username;
+      this.password = password;
+    }
+  }
+
+  private static Credential parseCredential(String credential) {
     Preconditions.checkArgument(credential != null, "Invalid credential: null");
     List<String> parts = CREDENTIAL_SPLITTER.splitToList(credential);
     switch (parts.size()) {
+      case 4:
+        // client ID, client secret, username and password, which switches to the password grant.
+        // The client ID can be left empty if the OAuth2 server does not require one.
+        Preconditions.checkArgument(
+            !parts.get(2).isEmpty() && !parts.get(3).isEmpty(),
+            "Invalid credential: username and password are required for the password grant");
+        return new Credential(
+            parts.get(0).isEmpty() ? null : parts.get(0), parts.get(1), parts.get(2), parts.get(3));
       case 2:
         // client ID and client secret
-        return Pair.of(parts.get(0), parts.get(1));
+        return new Credential(parts.get(0), parts.get(1), null, null);
       case 1:
         // client secret
-        return Pair.of(null, parts.get(0));
+        return new Credential(null, parts.get(0), null, null);
       default:
-        // this should never happen because the credential splitter is limited to 2
-        throw new IllegalArgumentException("Invalid credential: " + credential);
+        throw new IllegalArgumentException(
+            "Invalid credential: expected client_secret, client_id:client_secret or "
+                + "client_id:client_secret:username:password");
     }
   }
 
   private static Map<String, String> clientCredentialsRequest(
-      String credential, List<String> scopes) {
-    Pair<String, String> credentialPair = parseCredential(credential);
-    return clientCredentialsRequest(credentialPair.getLeft(), credentialPair.getRight(), scopes);
-  }
-
-  private static Map<String, String> clientCredentialsRequest(
-      String clientId, String clientSecret, List<String> scopes) {
+      Credential credential, List<String> scopes) {
     ImmutableMap.Builder<String, String> formData = ImmutableMap.builder();
     formData.put(GRANT_TYPE, CLIENT_CREDENTIALS);
-    if (clientId != null) {
-      formData.put(CLIENT_ID, clientId);
+    if (credential.clientId != null) {
+      formData.put(CLIENT_ID, credential.clientId);
     }
-    formData.put(CLIENT_SECRET, clientSecret);
+    formData.put(CLIENT_SECRET, credential.clientSecret);
+    formData.put(SCOPE, toScope(scopes));
+
+    return formData.build();
+  }
+
+  private static Map<String, String> passwordGrantRequest(
+      Credential credential, List<String> scopes) {
+    ImmutableMap.Builder<String, String> formData = ImmutableMap.builder();
+    formData.put(GRANT_TYPE, PASSWORD_GRANT);
+    if (credential.clientId != null) {
+      formData.put(CLIENT_ID, credential.clientId);
+    }
+    formData.put(CLIENT_SECRET, credential.clientSecret);
+    formData.put(USERNAME, credential.username);
+    formData.put(PASSWORD, credential.password);
     formData.put(SCOPE, toScope(scopes));
 
     return formData.build();
