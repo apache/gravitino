@@ -40,16 +40,10 @@ Passwords, OAuth secrets, and keytab paths belong in `gravitino.conf`, not in po
 
 The steps below turn on a compaction schedule for one Iceberg table. `timeTrigger` is a six-field Quartz cron (`second minute hour day-of-month month day-of-week`), not a five-field Unix cron. They assume a metalake `test`, an Iceberg catalog `rest_catalog`, and a table `rest_catalog.db.t1` that already exists. Replace those names, and send `Accept: application/vnd.gravitino.v1+json` on every request.
 
-**1. Configure the server.** Add the following to `gravitino.conf` and restart Gravitino. `gravitino.maintenance.gravitinoAuth.uri` is the base URI Spark jobs use to call back into Gravitino. Set `authType` to match the server authenticator. The `basic` example below is the local user store.
+**1. Configure the server.** Register the maintenance REST callbacks in `gravitino.conf` and restart Gravitino. The job executor and client authentication are in [Configuration](./optimizer-configuration.md#tms-cluster-static-client-auth).
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.maintenance.web.rest.feature
-gravitino.job.executor = local
-gravitino.jobExecutor.local.sparkHome = /path/to/spark
-gravitino.maintenance.gravitinoAuth.uri = http://localhost:8090
-gravitino.maintenance.gravitinoAuth.authType = basic
-gravitino.maintenance.gravitinoAuth.username = {username}
-gravitino.maintenance.gravitinoAuth.password = {password}
 ```
 
 **2. Create a compaction policy with a cron trigger.**
@@ -103,17 +97,12 @@ After the cron is due, list job runs and look for template `builtin-iceberg-main
 
 Set these in `gravitino.conf`. The full key list, including OAuth and Iceberg REST auth, is in [Configuration](./optimizer-configuration.md#tms-cluster-static-client-auth).
 
-| Configuration item | Description |
-| --- | --- |
-| `gravitino.server.rest.extensionPackages` | Register the maintenance REST callbacks. Set to `org.apache.gravitino.maintenance.web.rest.feature`. |
-| `gravitino.maintenance.gravitinoAuth.uri` | Base URI for Spark callbacks. Required unless the policy sets `updaterOptions.gravitino_uri`. |
-| `gravitino.maintenance.gravitinoAuth.authType` | `none`, `simple`, `basic`, or `oauth`. Required when any other `gravitinoAuth` key besides `uri` is set. |
-| `gravitino.maintenance.gravitinoAuth.username` | User for `simple` or `basic`. |
-| `gravitino.maintenance.gravitinoAuth.password` | Password for `basic`. |
-| `gravitino.maintenance.ircAuth.*` | Iceberg REST properties copied into the Spark job. See [Iceberg REST auth](./optimizer-configuration.md#iceberg-rest--spark-auth-gravitinomaintenanceircauth--arbitrary-passthrough). |
-| `gravitino.job.executor` | `local` or `k8s`. See [Local job executor](../local-job-executor.md) and [Kubernetes job executor](../k8s-job-executor.md). |
+| Configuration item                        | Description                                                                                                                                                                           |
+|-------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `gravitino.server.rest.extensionPackages` | Register the maintenance REST callbacks. Set to `org.apache.gravitino.maintenance.web.rest.feature`.                                                                                  |
+| `gravitino.maintenance.ircAuth.*`         | Iceberg REST properties copied into the Spark job. See [Iceberg REST auth](./optimizer-configuration.md#iceberg-rest--spark-auth-gravitinomaintenanceircauth--arbitrary-passthrough). |
 
-`uri` may be set without `authType`. A policy `updaterOptions.gravitino_uri` overrides `gravitino.maintenance.gravitinoAuth.uri`. Every other `gravitinoAuth` key wins over the same key in the policy.
+A policy `updaterOptions.gravitino_uri` overrides the cluster callback URI. Every other `gravitinoAuth` key from the cluster wins over the same key in the policy.
 
 Commit-triggered maintenance also needs the Iceberg REST auxiliary service and the listener:
 
@@ -127,21 +116,21 @@ Without the listener, cron scheduling still runs. Commit-triggered maintenance d
 
 Scheduler pool sizes have these defaults:
 
-| Configuration item | Default |
-| --- | --- |
-| `gravitino.maintenance.scheduler.expandThreads` | `4` |
-| `gravitino.maintenance.scheduler.cronThreads` | `8` |
-| `gravitino.maintenance.scheduler.commitThreads` | `4` |
+| Configuration item                              | Default |
+|-------------------------------------------------|---------|
+| `gravitino.maintenance.scheduler.expandThreads` | `4`     |
+| `gravitino.maintenance.scheduler.cronThreads`   | `8`     |
+| `gravitino.maintenance.scheduler.commitThreads` | `4`     |
 
 ### Defining a Maintenance Run
 
 Three objects decide what runs.
 
-| Object | What to set |
-| --- | --- |
-| Policy | `policyType`, `enabled`, and content fields `timeTrigger` (six-field Quartz cron), `commitTrigger`, and `minIntervalMs`. |
-| Tag association | `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}` with selector `ALL_VALUES` or `TAG_VALUE`. |
-| Tag assignment | Assign the tag to the table, or to a catalog or schema ancestor. |
+| Object          | What to set                                                                                                              |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------|
+| Policy          | `policyType`, `enabled`, and content fields `timeTrigger` (six-field Quartz cron), `commitTrigger`, and `minIntervalMs`. |
+| Tag association | `POST /api/metalakes/{metalake}/tags/{tag}/policies/{policy}` with selector `ALL_VALUES` or `TAG_VALUE`.                 |
+| Tag assignment  | Assign the tag to the table, or to a catalog or schema ancestor.                                                         |
 
 The scheduler keeps a table only when this policy is the nearest one of its type. A table tag beats a schema tag, and a schema tag beats a catalog tag. Two policies of the same type on the same object are a conflict, and that table is skipped.
 
@@ -149,12 +138,12 @@ The scheduler keeps a table only when this policy is the nearest one of its type
 
 Built-in content types:
 
-| `policyType` | Cron (`timeTrigger`) | Commit (`commitTrigger`) |
-| --- | --- | --- |
-| `system_iceberg_compaction` | Yes | Yes |
-| `system_iceberg_rewrite_manifests` | Yes | Yes |
-| `system_iceberg_snapshot_expiration` | Yes | Yes |
-| `system_iceberg_orphan_file_removal` | Yes | No |
+| `policyType`                         | Cron (`timeTrigger`) | Commit (`commitTrigger`) |
+|--------------------------------------|----------------------|--------------------------|
+| `system_iceberg_compaction`          | Yes                  | Yes                      |
+| `system_iceberg_rewrite_manifests`   | Yes                  | Yes                      |
+| `system_iceberg_snapshot_expiration` | Yes                  | Yes                      |
+| `system_iceberg_orphan_file_removal` | Yes                  | No                       |
 
 Field lists for each type are in [Iceberg compaction policy](../iceberg-compaction-policy.md), [Iceberg rewrite manifests policy](../iceberg-rewrite-manifests-policy.md), and [Manage policies](../manage-policies-in-gravitino.md).
 
@@ -182,11 +171,11 @@ The submitted template is `builtin-iceberg-maintenance-task`. TMS fills `action_
 
 These endpoints are for the Spark job, not for operators. Schemas are in the [maintenance OpenAPI definition](../open-api/maintenance/maintenance.yaml).
 
-| Callback | Method and path |
-| --- | --- |
-| Before-maintenance metrics | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before` |
-| Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish` |
-| After-maintenance metrics | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after` |
+| Callback                    | Method and path                                                             |
+|-----------------------------|-----------------------------------------------------------------------------|
+| Before-maintenance metrics  | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before` |
+| Finish and release the slot | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/finish`         |
+| After-maintenance metrics   | `POST /api/metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after`  |
 
 ### Connecting Spark
 
@@ -195,9 +184,7 @@ TMS submits jobs through the Gravitino job executor. The job reads two bags that
 - `gravitinoAuth` becomes `updater_options`, including `gravitino_uri` and `metalake`. `metalake` always comes from the policy namespace.
 - `ircAuth` becomes Iceberg REST catalog properties under `spark.sql.catalog.<catalog>.*`.
 
-Point `gravitino.maintenance.gravitinoAuth.uri` at the Gravitino HTTP endpoint the executors can reach. Point `gravitino.maintenance.ircAuth` properties at the Iceberg REST endpoint, usually `http://{host}:9001/iceberg` when IRC runs in the same process.
-
-For a local Spark install, set `gravitino.job.executor=local` and `gravitino.jobExecutor.local.sparkHome`. On Kubernetes, set `gravitino.job.executor=k8s` and leave `spark_master` empty. See [Built-in jobs](../k8s-job-executor.md#built-in-jobs).
+On Kubernetes, leave `spark_master` empty. See [Built-in jobs](../k8s-job-executor.md#built-in-jobs).
 
 ## How It Works
 
