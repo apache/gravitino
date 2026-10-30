@@ -131,11 +131,11 @@ public class PolicyExpandToCronIT extends BaseIT {
     assertNotNull(spec);
     assertTrue(spec.isValid());
     assertEquals(List.of(seeded.tableId), spec.tableIds());
-    assertEquals(seeded.policyId, spec.getOperations().get(0).getPolicyId());
-    assertTrue(spec.getJobConf().containsKey("updater_options"));
-    assertEquals(seeded.catalogName, spec.getTables().get(0).catalogName());
+    assertEquals(seeded.policyId, spec.getTasks().get(0).getPolicyId());
+    assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
+    assertEquals(seeded.catalogName, spec.getTasks().get(0).catalogName());
     assertEquals(
-        seeded.schemaName + "." + seeded.tableName, spec.getTables().get(0).sparkTableIdentifier());
+        seeded.schemaName + "." + seeded.tableName, spec.getTasks().get(0).tableIdentifier());
   }
 
   private static void awaitCronCapture(String expectedInstanceId, long timeoutSeconds)

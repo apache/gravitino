@@ -93,11 +93,10 @@ class TestCommitJobClient extends TestJDBCBackend {
                 .getData();
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals(List.of(TABLE_ID), spec.tableIds());
-    Assertions.assertEquals(POLICY_ID, spec.getOperations().get(0).getPolicyId());
-    Assertions.assertTrue(spec.getJobConf().containsKey("updater_options"));
-    Assertions.assertNull(spec.getJobConf().get("catalog_name"));
-    Assertions.assertNull(spec.getJobConf().get("table_identifier"));
-    Assertions.assertEquals("iceberg", spec.getTables().get(0).catalogName());
+    Assertions.assertEquals(POLICY_ID, spec.getTasks().get(0).getPolicyId());
+    Assertions.assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
+    Assertions.assertEquals("iceberg", spec.getTasks().get(0).catalogName());
+    Assertions.assertFalse(spec.getTasks().get(0).getParameters().containsKey("updater_options"));
   }
 
   private static Function<Long, Optional<CollectedCommitChain>> fixedCollector(

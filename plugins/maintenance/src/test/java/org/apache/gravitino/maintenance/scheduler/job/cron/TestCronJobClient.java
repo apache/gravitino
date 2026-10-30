@@ -108,7 +108,7 @@ class TestCronJobClient extends TestJDBCBackend {
                 .get()
                 .getData();
     Assertions.assertTrue(spec.isValid());
-    Assertions.assertTrue(spec.getJobConf().containsKey("updater_options"));
+    Assertions.assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
     Assertions.assertEquals(List.of(1L), spec.tableIds());
   }
 
@@ -150,8 +150,8 @@ class TestCronJobClient extends TestJDBCBackend {
     MaintenanceJobSpec data =
         (MaintenanceJobSpec) client.getScheduledExecution(batch0).get().getData();
     Assertions.assertEquals(List.of(10L, 11L, 12L, 13L), data.tableIds());
-    Assertions.assertEquals(1, data.getOperations().size());
-    Assertions.assertTrue(data.getJobConf().containsKey("updater_options"));
+    Assertions.assertEquals(4, data.getTasks().size());
+    Assertions.assertTrue(data.getUpdaterOptions() != null && !data.getUpdaterOptions().isBlank());
   }
 
   @TestTemplate

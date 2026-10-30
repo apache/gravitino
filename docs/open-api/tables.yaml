@@ -193,7 +193,7 @@ components:
           type: array
           description: A list of columns
           items:
-            $ref: "#/components/schemas/Column"
+            $ref: "#/components/schemas/WritableColumn"
         comment:
           type: string
           description: The comment of the table
@@ -211,16 +211,16 @@ components:
           nullable: true
           default: [ ]
           items:
-            $ref: "#/components/schemas/SortOrder"
+            $ref: "#/components/schemas/WritableSortOrder"
         distribution:
-          $ref: "#/components/schemas/Distribution"
+          $ref: "#/components/schemas/WritableDistribution"
         partitioning:
           type: array
           description: partitioning of the table data
           nullable: true
           default: [ ]
           items:
-            $ref: "./partitioning.yaml#/components/schemas/PartitioningSpec"
+            $ref: "./partitioning.yaml#/components/schemas/WritablePartitioningSpec"
         indexes:
           type: array
           description: Indexes of the table
@@ -228,6 +228,22 @@ components:
           default: [ ]
           items:
             $ref: "./indexes.yaml#/components/schemas/IndexSpec"
+
+      example:
+        name: events
+        columns:
+          - name: id
+            type: integer
+            defaultValue:
+              type: literal
+              dataType: integer
+              value: null
+          - name: created_at
+            type: timestamp
+            defaultValue:
+              type: unparsed
+              unparsedExpression: CURRENT_TIMESTAMP
+        distribution: null
 
     Table:
       type: object
@@ -380,6 +396,46 @@ components:
           nullable: true
           default: false
 
+    WritableColumn:
+      allOf:
+        - $ref: "#/components/schemas/Column"
+        - type: object
+          properties:
+            type:
+              $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+            defaultValue:
+              $ref: "#/components/schemas/WritableColumnDefaultValue"
+
+    WritableColumnDefaultValue:
+      allOf:
+        - $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
+      description: The default value of a new or updated column, with writable literal types
+
+    WritableDistribution:
+      allOf:
+        - $ref: "#/components/schemas/Distribution"
+        - type: object
+          nullable: true
+          properties:
+            funcArgs:
+              type: array
+              nullable: true
+              items:
+                $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
+
+      example:
+        strategy: even
+        number: 0
+        funcArgs: null
+
+    WritableSortOrder:
+      allOf:
+        - $ref: "#/components/schemas/SortOrder"
+        - type: object
+          properties:
+            sortTerm:
+              $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
+
     TableUpdatesRequest:
       type: object
       required:
@@ -517,7 +573,7 @@ components:
           $ref: "#/components/schemas/FieldName"
           description: The name of the column to add
         type:
-          $ref: "./datatype.yaml#/components/schemas/DataType"
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
           description: The type of the column to add
         comment:
           type: string
@@ -539,7 +595,7 @@ components:
           default: false
         defaultValue:
           allOf:
-            - $ref: "#/components/schemas/ColumnDefaultValue"
+            - $ref: "#/components/schemas/WritableColumnDefaultValue"
           description: The default value of the column to add
       example: {
         "@type": "addColumn",
@@ -594,7 +650,7 @@ components:
           $ref: "#/components/schemas/FieldName"
           description: The name of the column to update
         newType:
-          $ref: "./datatype.yaml#/components/schemas/DataType"
+          $ref: "./datatype.yaml#/components/schemas/WritableDataType"
           description: The new type of the column
       example: {
         "@type": "updateColumnType",
@@ -688,7 +744,7 @@ components:
           $ref: "#/components/schemas/FieldName"
           description: The name of the column to update
         newDefaultValue:
-          $ref: "#/components/schemas/ColumnDefaultValue"
+          $ref: "#/components/schemas/WritableColumnDefaultValue"
           description: The new default value of the column 
       example: {
         "@type": "updateColumnDefaultValue",

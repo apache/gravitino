@@ -83,6 +83,7 @@ import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -226,6 +227,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     TableEntity.NAME.validate(ident.name(), TABLE);
+    WritableDataTypeValidator.validateTable(columns, partitions, distribution, sortOrders);
     validateColumns(columns);
 
     // Load the schema to make sure the schema exists.
@@ -288,6 +290,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     NameIdentifier nameIdentifierForLock = ident;
     String schemaName = ident.namespace().level(2);
     Arrays.stream(changes).forEach(TableOperationDispatcher::validateColumnChange);
+    for (int i = 0; i < changes.length; i++) {
+      WritableDataTypeValidator.validateTableChange(changes[i], "updates[" + i + "]");
+    }
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         TableChange.RenameTable rename = (TableChange.RenameTable) change;

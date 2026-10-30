@@ -20,8 +20,6 @@ package org.apache.gravitino.maintenance.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.mapper.TableSnapshotMetricsMapper;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
@@ -44,24 +42,19 @@ public class TableSnapshotMetricsMetaService {
   }
 
   /**
-   * Idempotently stores metrics JSON for a table/policy/snapshot triple. If a row already exists,
-   * this is a no-op (does not overwrite) so sample / listener retries are safe.
-   *
-   * <p>A concurrent insert that loses the unique-key race is treated as success (first writer
-   * wins).
+   * Inserts a metrics row and returns its generated id. The same Iceberg {@code snapshotId} may be
+   * stored more than once (S0 and S1 can share a snapshot).
    *
    * @param tableId table id
    * @param policyId policy id
-   * @param snapshotId Iceberg snapshot id
+   * @param snapshotId Iceberg snapshot id sampled with these metrics
    * @param metricsJson serialized metrics payload
+   * @return generated {@code table_snapshot_metrics.metrics_id}
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertTableSnapshotMetrics")
-  public void insertMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
-    if (getMetrics(tableId, policyId, snapshotId) != null) {
-      return;
-    }
+  public long insertMetrics(long tableId, long policyId, long snapshotId, String metricsJson) {
     TableSnapshotMetricsPO metricsMeta =
         TableSnapshotMetricsPO.builder()
             .withTableId(tableId)
@@ -70,46 +63,21 @@ public class TableSnapshotMetricsMetaService {
             .withMetricsValue(metricsJson)
             .withCreatedAt(System.currentTimeMillis())
             .build();
-    try {
-      SessionUtils.doWithCommit(
-          TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
-    } catch (RuntimeException e) {
-      if (isUniqueViolation(e)) {
-        return;
-      }
-      throw e;
-    }
+    SessionUtils.doWithCommit(
+        TableSnapshotMetricsMapper.class, mapper -> mapper.insertMetrics(metricsMeta));
+    return metricsMeta.metricsId();
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @param snapshotId snapshot id
+   * @param metricsId metrics row id
    * @return stored metrics or null
    */
   @Nullable
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getTableSnapshotMetrics")
-  public TableSnapshotMetricsPO getMetrics(long tableId, long policyId, long snapshotId) {
+      baseMetricName = "getTableSnapshotMetricsById")
+  public TableSnapshotMetricsPO getMetrics(long metricsId) {
     return SessionUtils.getWithoutCommit(
-        TableSnapshotMetricsMapper.class,
-        mapper -> mapper.selectMetrics(tableId, policyId, snapshotId));
-  }
-
-  private static boolean isUniqueViolation(Throwable throwable) {
-    for (Throwable t = throwable; t != null; t = t.getCause()) {
-      if (t instanceof SQLIntegrityConstraintViolationException) {
-        return true;
-      }
-      String message = t.getMessage();
-      if (message != null) {
-        String lower = message.toLowerCase(Locale.ROOT);
-        if (lower.contains("unique") || lower.contains("duplicate")) {
-          return true;
-        }
-      }
-    }
-    return false;
+        TableSnapshotMetricsMapper.class, mapper -> mapper.selectById(metricsId));
   }
 }
