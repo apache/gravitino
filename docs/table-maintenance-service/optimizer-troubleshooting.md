@@ -107,11 +107,11 @@ Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_
 
 Observed in `1.2.0`:
 
-| Partitioning                                                   | Rewrite |
-|----------------------------------------------------------------|---------|
-| `p`, `p, c2`                                                   | Works   |
-| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)` | Fails   |
-| `p, truncate(1, c2)`, `p, bucket(8, id)`                       | Fails   |
+| Partitioning                                                                  | Rewrite |
+|-------------------------------------------------------------------------------|---------|
+| `p`, `p, c2`                                                                    | Works   |
+| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`                  | Fails   |
+| `p, truncate(1, c2)`, `p, bucket(8, id)`                                        | Fails   |
 
 ## Related
 
