@@ -164,7 +164,7 @@ class HTTPClient:
         try:
             response = self._parse_error_response(err_body)
             response.validate()
-        except (ValueError, TypeError, KeyError, BadRequestException):
+        except (ValueError, TypeError, KeyError, BadRequestException, RecursionError):
             raise self._http_response_exception(
                 err, request, "Invalid error response"
             ) from None
@@ -204,7 +204,10 @@ class HTTPClient:
                 or any(not isinstance(item, str) for item in stack)
             ):
                 raise ValueError("Invalid error stack")
-            return ErrorResponse.from_json(err_body, infer_missing=True)
+            # Construct from validated fields so internal aliases cannot override them.
+            return ErrorResponse(
+                code, json_err_body["type"], json_err_body["message"], stack
+            )
         error = json_err_body.get("error")
         description = json_err_body.get("error_description")
         if not isinstance(error, str) or not error:
@@ -217,7 +220,7 @@ class HTTPClient:
             or any(not isinstance(item, str) for item in stack)
         ):
             raise ValueError("Invalid OAuth2 error stack")
-        return OAuth2ErrorResponse.from_json(err_body, infer_missing=True)
+        return OAuth2ErrorResponse(None, error, description, stack)
 
     # pylint: disable=too-many-locals
     def _request(

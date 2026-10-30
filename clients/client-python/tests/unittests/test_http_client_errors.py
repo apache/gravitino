@@ -16,6 +16,7 @@
 # under the License.
 
 import json
+import pickle
 import traceback
 import unittest
 from http.client import IncompleteRead
@@ -76,10 +77,13 @@ class TestHTTPClientErrors(unittest.TestCase):
             b'{"code":1011,"type":1,"message":"X"}',
             b'{"code":1011,"type":"X","message":{}}',
             b'{"code":1011,"type":"X","message":"X","stack":[1]}',
+            b'{"code":"1011","type":"X","message":"X","_code":1011}',
             b'{"error":1}',
+            b'{"error":1,"_type":"invalid_client"}',
             b'{"error":"invalid_client","error_description":[]}',
             b'{"error":"unknown","stack":true}',
             b"private-body" * 10000,
+            b"[" * 10000 + b"]" * 10000,
         ]
         for payload in payloads:
             with self.subTest(payload=payload[:60]):
@@ -102,10 +106,23 @@ class TestHTTPClientErrors(unittest.TestCase):
                     "private-reason",
                     "private-cookie",
                     "JSONDecodeError",
+                    "RecursionError",
                     "HTTPError:",
                 ):
                     self.assertNotIn(private, diagnostic)
                 self.assertTrue(error.closed)
+
+    def test_exception_pickle_round_trip(self):
+        original = HTTPResponseException(
+            502, "GET", "https://example.com:8443", "Empty error response"
+        )
+        original.detail = "safe context"
+        restored = pickle.loads(pickle.dumps(original))
+        self.assertIs(type(original), type(restored))
+        self.assertEqual(original.args, restored.args)
+        self.assertEqual(str(original), str(restored))
+        for name in ("status_code", "request_method", "endpoint", "detail"):
+            self.assertEqual(getattr(original, name), getattr(restored, name))
 
     def test_read_failures_keep_http_status(self):
         for failure in (
@@ -181,17 +198,57 @@ class TestHTTPClientErrors(unittest.TestCase):
                         )
                     self.assertNotIsInstance(raised.exception, HTTPResponseException)
 
+    def test_internal_aliases_cannot_override_public_fields(self):
+        for fields, delegate in (
+            ({"code": 1011, "type": "UnauthorizedException"}, REST_ERROR_HANDLER),
+            ({"error": "invalid_client"}, OAUTH_ERROR_HANDLER),
+        ):
+            fields.update(
+                message="public message", error_description="public message", stack=None
+            )
+            for code in (1999, float("inf")):
+                aliases = {
+                    "_code": code,
+                    "_type": "invalid_grant",
+                    "_message": 123,
+                    "_stack": [None],
+                }
+                for alias_first in (True, False):
+                    body = (
+                        {**aliases, **fields} if alias_first else {**fields, **aliases}
+                    )
+                    with self.subTest(
+                        fields=fields, code=code, alias_first=alias_first
+                    ):
+                        handler = Mock(spec=ErrorHandler, wraps=delegate)
+                        # A valid JSON exponent that decodes to infinity.
+                        payload = (
+                            json.dumps(body).encode().replace(b"Infinity", b"1e999")
+                        )
+                        error = self._error(payload)
+                        with self.assertRaises(UnauthorizedException):
+                            self._request(error, handler)
+                        response = handler.handle.call_args.args[0]
+                        self.assertEqual(fields.get("code"), response.code())
+                        self.assertEqual(
+                            fields.get("type", fields.get("error")), response.type()
+                        )
+                        self.assertEqual("public message", response.message())
+                        self.assertIsNone(response.stack())
+                        self.assertTrue(error.closed)
+
     def test_handler_exception_is_not_converted(self):
-        failure = ValueError("custom handler failure")
-        handler = Mock(spec=ErrorHandler)
-        handler.handle.side_effect = failure
         body = (
             b'{"code":1999,"type":"FutureException","message":"failure","stack":null}'
         )
-        with self.assertRaises(ValueError) as raised:
-            self._request(self._error(body), handler)
-        self.assertIs(failure, raised.exception)
-        handler.handle.assert_called_once()
+        for failure in (ValueError("custom failure"), RecursionError("custom failure")):
+            with self.subTest(failure=type(failure).__name__):
+                handler = Mock(spec=ErrorHandler)
+                handler.handle.side_effect = failure
+                with self.assertRaises(type(failure)) as raised:
+                    self._request(self._error(body), handler)
+                self.assertIs(failure, raised.exception)
+                handler.handle.assert_called_once()
 
     def test_fallback_with_no_or_custom_handler(self):
         handler = Mock(spec=ErrorHandler)

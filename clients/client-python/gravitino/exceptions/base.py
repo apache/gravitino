@@ -46,8 +46,17 @@ class HTTPResponseException(RESTException):
         self.status_code = status_code
         self.request_method = request_method
         self.endpoint = endpoint
+        self._reason = reason
         super().__init__(
             "HTTP %s for %s %s: %s", status_code, request_method, endpoint, reason
+        )
+
+    def __reduce__(self):
+        """Reconstruct the exception with its safe context and instance state."""
+        return (
+            type(self),
+            (self.status_code, self.request_method, self.endpoint, self._reason),
+            self.__dict__,
         )
 
 

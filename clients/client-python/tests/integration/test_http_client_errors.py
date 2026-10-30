@@ -18,13 +18,23 @@
 import threading
 import traceback
 import unittest
+from concurrent.futures import ProcessPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from multiprocessing import get_context
 from unittest.mock import patch
 
 from gravitino.exceptions.base import HTTPResponseException, UnauthorizedException
 from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.utils.http_client import HTTPClient
+
+
+def _request_status(origin, endpoint):
+    return (
+        HTTPClient(origin)
+        .get(endpoint, timeout=2, error_handler=REST_ERROR_HANDLER)
+        .status_code
+    )
 
 
 class _ErrorServer(BaseHTTPRequestHandler):
@@ -98,6 +108,24 @@ class TestHTTPClientErrors(unittest.TestCase):
                     self.assertIn("Unable to read", str(raised.exception))
                 self.server.release.set()
                 self.assertEqual({"ok": True}, self.client.get("success").json())
+
+    def test_error_propagation_keeps_process_pool_usable(self):
+        with ProcessPoolExecutor(
+            max_workers=1, mp_context=get_context("spawn")
+        ) as pool:
+            with self.assertRaises(HTTPResponseException) as raised:
+                pool.submit(_request_status, self.origin, "empty").result(timeout=10)
+            self.assertEqual(502, raised.exception.status_code)
+            self.assertEqual("GET", raised.exception.request_method)
+            self.assertEqual(self.origin, raised.exception.endpoint)
+            self.assertEqual(
+                f"HTTP 502 for GET {self.origin}: Empty error response",
+                str(raised.exception),
+            )
+            self.assertEqual(
+                200,
+                pool.submit(_request_status, self.origin, "success").result(timeout=10),
+            )
 
     def test_domain_errors_with_mislabeled_content_type(self):
         for endpoint, handler in (
