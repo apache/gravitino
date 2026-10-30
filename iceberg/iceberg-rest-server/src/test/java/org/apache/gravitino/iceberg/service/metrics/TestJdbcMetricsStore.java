@@ -193,7 +193,9 @@ public class TestJdbcMetricsStore {
       String selectScanReportSql = "SELECT * FROM scan_metrics_report";
       metricsStore.connections.run(validateScanReport(selectScanReportSql, scanReport));
 
-      metricsStore.clean(Instant.now());
+      // clean() deletes rows strictly older than the cutoff, and recordMetric stamps rows with
+      // Instant.now(); a cutoff in the same millisecond would keep them.
+      metricsStore.clean(Instant.now().plusMillis(1));
 
       count = metricsStore.connections.run(getTotal(countSql));
       Assertions.assertEquals(0, count);
