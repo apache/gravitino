@@ -85,7 +85,7 @@ final class CommitJobSpecFactory {
         Map<String, String> built = jobConfBuilder.build(member.policy(), ref.catalogName());
         MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, ref.catalogName());
         parts = MaintenanceJobSpecFactory.splitJobConfParts(built);
-        mergeSparkConfMaps(sparkConf, parts.sparkConf);
+        MaintenanceJobSpecFactory.mergeSparkConfMaps(sparkConf, parts.sparkConf);
       }
       Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
       parameters.put("catalog_name", ref.catalogName());
@@ -97,14 +97,6 @@ final class CommitJobSpecFactory {
 
     String sparkConfJson = sparkConf.isEmpty() ? null : writeJson(sparkConf, "spark_conf");
     return new MaintenanceJobSpec(tasks, updaterOptions, sparkConfJson);
-  }
-
-  /**
-   * Merges nested {@code spark_conf} maps into {@code into}: max resource-shaped values, otherwise
-   * first-wins {@code putIfAbsent}.
-   */
-  static void mergeSparkConfMaps(Map<String, String> into, @Nullable String fromJson) {
-    MaintenanceJobSpecFactory.mergeSparkConfMaps(into, fromJson);
   }
 
   private static String writeJson(Object value, String field) {

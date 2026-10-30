@@ -90,7 +90,7 @@ class TestCommitJobSpecFactory {
     Map<String, String> into = new HashMap<>();
     into.put("spark.executor.memory", "4g");
     into.put("shared", "first");
-    CommitJobSpecFactory.mergeSparkConfMaps(
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
         into,
         "{\"spark.executor.cores\":\"2\",\"shared\":\"later\",\"spark.driver.memory\":\"2g\"}");
 
@@ -103,7 +103,7 @@ class TestCommitJobSpecFactory {
   @Test
   void testMergeSparkConfMapsAddsWhenMissing() throws Exception {
     Map<String, String> into = new HashMap<>();
-    CommitJobSpecFactory.mergeSparkConfMaps(
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
         into, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
     Assertions.assertEquals("v", into.get("k"));
   }
