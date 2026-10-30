@@ -492,6 +492,14 @@ class MockViewOperation(ViewOperation):
 
 
 class MockSemanticModelOperation(SemanticModelOperation):
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        return "[]"
+
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        return "[]"
+
     async def list_of_semantic_models(
         self, catalog_name: str, schema_name: str
     ) -> str:

@@ -84,7 +84,7 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 ### Prerequisites
 
 - A running Gravitino server with a metalake. The examples use `test`.
-- Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- Spark available to the job executor. The [local job executor](../local-job-executor.md) needs either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`, and the [Kubernetes job executor](../k8s-job-executor.md) needs a Spark image.
 - An Iceberg Spark runtime on that Spark classpath. Built-in Iceberg templates configure
   `IcebergSparkSessionExtensions` and `SparkCatalog`, but `gravitino-jobs` does not ship the
   Iceberg Spark runtime and the templates leave `jars` empty so your Spark and Iceberg versions
@@ -97,6 +97,12 @@ Each step ends with a check. If a check fails, stop there, since every step depe
   `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`). Without it, the job fails after
   Spark starts with an error naming the missing Iceberg classes. See
   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+- With the [Kubernetes job executor](../k8s-job-executor.md), the jobs run in Spark pods: put the
+  Iceberg Spark runtime in the Spark image, in `gravitino.jobExecutor.k8s.spark.conf.spark.jars`,
+  or in `spark.jars` of `spark_conf`; leave `spark_master` empty, as the examples' `local[2]` is
+  rejected; and use catalog URIs, warehouse locations, and a `gravitino_uri` in `updater_options`
+  that the pods can reach, not `localhost`. See
+  [Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
 - `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.

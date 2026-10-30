@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS user_role_rel (
 );
 
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_user_id ON user_role_rel (user_id);
+CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
 COMMENT ON TABLE user_role_rel IS 'user role relation metadata';
 
 COMMENT ON COLUMN user_role_rel.id IS 'auto increment id';
@@ -422,6 +423,7 @@ CREATE TABLE IF NOT EXISTS group_role_rel (
 );
 
 CREATE INDEX IF NOT EXISTS group_role_rel_idx_group_id ON group_role_rel (group_id);
+CREATE INDEX IF NOT EXISTS group_role_rel_idx_role_id ON group_role_rel (role_id);
 COMMENT ON TABLE group_role_rel IS 'relation between group and role';
 COMMENT ON COLUMN group_role_rel.id IS 'auto increment id';
 COMMENT ON COLUMN group_role_rel.group_id IS 'group id';
