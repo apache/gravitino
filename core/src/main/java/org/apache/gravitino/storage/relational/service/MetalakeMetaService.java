@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -285,6 +286,10 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    DomainMetaMapper.class,
+                    mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
@@ -399,6 +404,10 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    DomainMetaMapper.class,
+                    mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
