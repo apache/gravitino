@@ -33,6 +33,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,11 +52,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 
-/** Converts between standalone Apache Ossie documents and Gravitino Semantic Models. */
+/**
+ * Converts between standalone Apache Ossie documents and Gravitino Semantic Models.
+ *
+ * <p>Consumers must explicitly provide {@code jackson-dataformat-yaml} and its runtime dependencies
+ * when using this converter, including for JSON documents.
+ */
 public final class OssieDocumentConverter {
 
   private static final Set<String> ROOT_PROPERTIES =
-      Set.of(
+      ImmutableSet.of(
           "version",
           "name",
           "description",
@@ -64,7 +71,7 @@ public final class OssieDocumentConverter {
           "metrics",
           "custom_extensions");
   private static final Set<String> DATASET_PROPERTIES =
-      Set.of(
+      ImmutableSet.of(
           "name",
           "source",
           "primary_key",
@@ -74,7 +81,7 @@ public final class OssieDocumentConverter {
           "fields",
           "custom_extensions");
   private static final Set<String> FIELD_PROPERTIES =
-      Set.of(
+      ImmutableSet.of(
           "name",
           "expression",
           "dimension",
@@ -84,16 +91,20 @@ public final class OssieDocumentConverter {
           "ai_context",
           "custom_extensions");
   private static final Set<String> RELATIONSHIP_PROPERTIES =
-      Set.of("name", "from", "to", "from_columns", "to_columns", "ai_context", "custom_extensions");
+      ImmutableSet.of(
+          "name", "from", "to", "from_columns", "to_columns", "ai_context", "custom_extensions");
   private static final Set<String> METRIC_PROPERTIES =
-      Set.of("name", "expression", "description", "datatype", "ai_context", "custom_extensions");
-  private static final Set<String> EXPRESSION_PROPERTIES = Set.of("dialects");
-  private static final Set<String> DIALECT_EXPRESSION_PROPERTIES = Set.of("dialect", "expression");
-  private static final Set<String> DIMENSION_PROPERTIES = Set.of("is_time");
-  private static final Set<String> CUSTOM_EXTENSION_PROPERTIES = Set.of("vendor_name", "data");
+      ImmutableSet.of(
+          "name", "expression", "description", "datatype", "ai_context", "custom_extensions");
+  private static final Set<String> EXPRESSION_PROPERTIES = ImmutableSet.of("dialects");
+  private static final Set<String> DIALECT_EXPRESSION_PROPERTIES =
+      ImmutableSet.of("dialect", "expression");
+  private static final Set<String> DIMENSION_PROPERTIES = ImmutableSet.of("is_time");
+  private static final Set<String> CUSTOM_EXTENSION_PROPERTIES =
+      ImmutableSet.of("vendor_name", "data");
 
   private static final Set<String> AI_CONTEXT_PROPERTIES =
-      Set.of("instructions", "synonyms", "examples");
+      ImmutableSet.of("instructions", "synonyms", "examples");
 
   private static final ObjectMapper JSON_MAPPER = createJsonMapper();
   private static final ObjectMapper YAML_MAPPER = createYamlMapper();
@@ -172,7 +183,7 @@ public final class OssieDocumentConverter {
       this.name = name;
       this.comment = comment;
       this.definition = definition;
-      this.properties = Map.copyOf(properties);
+      this.properties = ImmutableMap.copyOf(properties);
     }
 
     /**
@@ -507,18 +518,30 @@ public final class OssieDocumentConverter {
   }
 
   private static String dataTypeName(DataType dataType) {
-    return switch (dataType) {
-      case STRING -> "String";
-      case INTEGER -> "Integer";
-      case DECIMAL -> "Decimal";
-      case FLOAT -> "Float";
-      case BOOLEAN -> "Boolean";
-      case DATE -> "Date";
-      case TIME -> "Time";
-      case DATE_TIME -> "DateTime";
-      case DATE_TIME_TZ -> "DateTimeTz";
-      case OPAQUE -> "Opaque";
-    };
+    switch (dataType) {
+      case STRING:
+        return "String";
+      case INTEGER:
+        return "Integer";
+      case DECIMAL:
+        return "Decimal";
+      case FLOAT:
+        return "Float";
+      case BOOLEAN:
+        return "Boolean";
+      case DATE:
+        return "Date";
+      case TIME:
+        return "Time";
+      case DATE_TIME:
+        return "DateTime";
+      case DATE_TIME_TZ:
+        return "DateTimeTz";
+      case OPAQUE:
+        return "Opaque";
+      default:
+        throw new IllegalArgumentException("Unknown Semantic Model data type: " + dataType);
+    }
   }
 
   @Nullable
@@ -747,11 +770,11 @@ public final class OssieDocumentConverter {
   private static Map<String, String> extractProperties(ObjectNode root) {
     JsonNode extensionsNode = root.get("custom_extensions");
     if (!(extensionsNode instanceof ArrayNode)) {
-      return Map.of();
+      return ImmutableMap.of();
     }
 
     ArrayNode extensions = (ArrayNode) extensionsNode;
-    Map<String, String> properties = new LinkedHashMap<>();
+    ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
     boolean found = false;
     int index = 0;
     Iterator<JsonNode> iterator = extensions.iterator();
@@ -792,7 +815,7 @@ public final class OssieDocumentConverter {
     if (extensions.isEmpty()) {
       root.remove("custom_extensions");
     }
-    return properties;
+    return properties.build();
   }
 
   private static void ensureNoPropertiesExtension(ArrayNode extensions) {
