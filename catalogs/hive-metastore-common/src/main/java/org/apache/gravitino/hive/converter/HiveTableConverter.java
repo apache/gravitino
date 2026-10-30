@@ -58,6 +58,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -184,6 +185,19 @@ public class HiveTableConverter {
       table.setPartitionKeys(partitionFields);
     }
 
+    if (!hiveTable.originalStorageColumns().isEmpty()) {
+      table
+          .getSd()
+          .setCols(
+              hiveTable.originalStorageColumns().stream()
+                  .map(
+                      column ->
+                          new FieldSchema(
+                              column.name(),
+                              ((Types.UnparsedType) column.dataType()).unparsedType(),
+                              column.comment()))
+                  .collect(Collectors.toList()));
+    }
     table.setParameters(buildTableParameters(hiveTable));
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier

@@ -259,3 +259,38 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 
 To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
 The only difference is the storage location of the files, which is in S3. Use `location` to specify the S3 path for the database or table.
+
+### SerDe-derived schemas
+
+Tables with `<derived from deserializer>` storage column types are resolved through Hive
+Metastore's `getFields` API when loaded individually or in a batch. Ordinary tables do not
+require an additional schema-resolution request. Hudi table listing filters raw storage
+metadata without resolving unrelated table schemas, so an unresolvable non-Hudi SerDe
+table does not prevent Hudi tables from being listed. Full schema batch reads still fail
+if a requested table cannot be resolved. The table SerDe and its dependencies must
+be available on the Hive Metastore classpath.
+
+Hive 3's default storage schema reader cannot resolve these schemas. Configure the following
+property in the **Hive Metastore server's** `hive-site.xml` and restart Hive Metastore:
+
+```xml
+<property>
+  <name>metastore.storage.schema.reader.impl</name>
+  <value>org.apache.hadoop.hive.metastore.SerDeStorageSchemaReader</value>
+</property>
+```
+
+This server setting is also required when a Hive 2 client connects to a Hive 3 Metastore.
+If resolution fails or returns unresolved types, Gravitino reports an error with configuration
+guidance rather than treating the marker as a Hive data type.
+
+Property, table-comment, and table-name changes preserve the original storage column schema
+in Hive Metastore. Hive 2 HMS can reject even metadata-only alters when
+`hive.metastore.disallow.incompatible.col.type.changes=true`, because its compatibility
+check attempts to parse the stored marker as a type. Preserving the marker requires an
+HMS administrator to evaluate setting this property to `false` on the server and restarting
+HMS. This disables column type compatibility checks for **all tables**; Gravitino does not
+change this server setting. If the check rejects the marker, the error explains this limitation.
+
+Column changes on SerDe-derived tables are rejected: modify those schemas
+through the SerDe or its external schema definition (for example, `avro.schema.url`) instead.

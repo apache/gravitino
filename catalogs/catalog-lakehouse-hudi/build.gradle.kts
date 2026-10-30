@@ -131,6 +131,7 @@ dependencies {
   testImplementation(libs.commons.configuration2)
   testImplementation(libs.re2j)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.prometheus.dropwizard)

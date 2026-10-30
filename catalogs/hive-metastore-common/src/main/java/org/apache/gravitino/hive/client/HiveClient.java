@@ -111,6 +111,20 @@ public interface HiveClient extends AutoCloseable {
   List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables);
 
+  /**
+   * Returns names of tables whose storage input format starts with the supplied prefix.
+   *
+   * <p>This metadata-only operation does not resolve column schemas or load constraints.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param allTables The table names to inspect.
+   * @param inputFormatPrefix The required input format prefix.
+   * @return Matching table names.
+   */
+  List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix);
+
   List<String> getCatalogs();
 
   default void createCatalog(String catalogName, String location) {
