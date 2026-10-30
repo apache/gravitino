@@ -97,23 +97,12 @@ public class TestJobHookDispatcher {
   }
 
   @Test
-  public void testRunJobThrowsWhenSetOwnerFails() {
-    JobEntity mockJob = mock(JobEntity.class);
-    when(mockJob.nameIdentifier())
-        .thenReturn(NameIdentifier.of(NamespaceUtil.ofJob("test_metalake"), "test_job"));
-    when(mockJob.name()).thenReturn("test_job");
-    when(mockDispatcher.runJob(any(), any(), any())).thenReturn(mockJob);
-
-    doThrow(new RuntimeException("Set owner failed"))
-        .when(mockOwnerDispatcher)
-        .setOwner(any(), any(), any(), any());
-
-    RuntimeException thrown =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> hookDispatcher.runJob("test_metalake", "test_template", Collections.emptyMap()));
-    Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).runJob(any(), any(), any());
+  public void testRunJobDoesNotResetTheOwnerAssignedBeforeSubmission() {
+    JobEntity job = mock(JobEntity.class);
+    when(mockDispatcher.runJob(any(), any(), any())).thenReturn(job);
+    Assertions.assertSame(
+        job, hookDispatcher.runJob("test_metalake", "test_template", Collections.emptyMap()));
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test

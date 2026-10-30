@@ -27,9 +27,29 @@ gravitino_home="$(cd "${trino_dir}/../../..">/dev/null; pwd)"
 rm -rf "${trino_dir}/packages"
 mkdir -p "${trino_dir}/packages"
 
+# Pick the version-segment module whose Trino range covers the base image version in the
+# Dockerfile, e.g. trino-connector-478-479 for trinodb/trino:478.
+trino_version="$(sed -nE 's/^FROM trinodb\/trino:([0-9]+).*/\1/p' "${trino_dir}/Dockerfile")"
+connector_module=""
+for module_dir in "${gravitino_home}"/trino-connector/trino-connector-*; do
+  module="$(basename "${module_dir}")"
+  range="${module#trino-connector-}"
+  lo="${range%-*}"
+  hi="${range#*-}"
+  if [[ "${lo}" =~ ^[0-9]+$ && "${hi}" =~ ^[0-9]+$ ]] \
+    && (( trino_version >= lo && trino_version <= hi )); then
+    connector_module="${module}"
+    break
+  fi
+done
+if [ -z "${connector_module}" ]; then
+  echo "ERROR: no trino-connector module supports Trino version '${trino_version}'." >&2
+  exit 1
+fi
+
 cd ${gravitino_home}
-${gravitino_home}/gradlew :trino-connector:trino-connector-473-478:assembleTrinoConnector -x test
-cp -r "${gravitino_home}/distribution/gravitino-trino-connector-473-478" "${trino_dir}/packages/gravitino-trino-connector"
+${gravitino_home}/gradlew :trino-connector:${connector_module}:assembleTrinoConnector -x test
+cp -r "${gravitino_home}/distribution/gravitino-${connector_module}" "${trino_dir}/packages/gravitino-trino-connector"
 
 MYSQL_VERSION="8.0.27"
 PG_VERSION="42.7.11"

@@ -18,6 +18,8 @@
 package org.apache.gravitino.hook;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -122,5 +124,11 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
     return dispatcher.listPolicyInfosForMetadataObject(metalake, metadataObject);
+  }
+
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    return dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects);
   }
 }

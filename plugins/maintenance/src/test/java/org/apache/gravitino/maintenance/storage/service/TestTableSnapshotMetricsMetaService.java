@@ -29,18 +29,21 @@ class TestTableSnapshotMetricsMetaService extends TestJDBCBackend {
   void testInsertAndGetMetrics() {
     TableSnapshotMetricsMetaService service = TableSnapshotMetricsMetaService.getInstance();
     long before = System.currentTimeMillis();
-    service.insertMetrics(1L, 2L, 99L, "{\"mse\":1}");
+    long metricsId = service.insertMetrics(1L, 2L, 99L, "{\"mse\":1}");
     long after = System.currentTimeMillis();
-    Assertions.assertEquals("{\"mse\":1}", service.getMetrics(1L, 2L, 99L).metricsValue());
-    Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() >= before);
-    Assertions.assertTrue(service.getMetrics(1L, 2L, 99L).createdAt() <= after);
+    Assertions.assertEquals("{\"mse\":1}", service.getMetrics(metricsId).metricsValue());
+    Assertions.assertEquals(99L, service.getMetrics(metricsId).snapshotId());
+    Assertions.assertTrue(service.getMetrics(metricsId).createdAt() >= before);
+    Assertions.assertTrue(service.getMetrics(metricsId).createdAt() <= after);
   }
 
   @TestTemplate
-  void testInsertMetricsIsIdempotent() {
+  void testSameSnapshotCanHaveMultipleMetricsRows() {
     TableSnapshotMetricsMetaService service = TableSnapshotMetricsMetaService.getInstance();
-    service.insertMetrics(3L, 4L, 88L, "{\"mse\":1}");
-    service.insertMetrics(3L, 4L, 88L, "{\"mse\":2}");
-    Assertions.assertEquals("{\"mse\":1}", service.getMetrics(3L, 4L, 88L).metricsValue());
+    long first = service.insertMetrics(3L, 4L, 88L, "{\"mse\":1}");
+    long second = service.insertMetrics(3L, 4L, 88L, "{\"mse\":2}");
+    Assertions.assertNotEquals(first, second);
+    Assertions.assertEquals("{\"mse\":1}", service.getMetrics(first).metricsValue());
+    Assertions.assertEquals("{\"mse\":2}", service.getMetrics(second).metricsValue());
   }
 }

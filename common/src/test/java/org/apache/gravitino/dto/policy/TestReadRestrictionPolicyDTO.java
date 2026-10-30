@@ -37,8 +37,9 @@ public class TestReadRestrictionPolicyDTO {
   @Test
   void testRowFilterPolicyRoundTrip() throws JsonProcessingException {
     String expression =
-        "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") "
-            + "else := col(\"owner\") == session_user()";
+        "(\"Customer Region\" STRING, owner STRING) RETURNS BOOLEAN -> "
+            + "CASE WHEN is_group_member('auditors') THEN \"Customer Region\" = 'US' "
+            + "ELSE owner = CURRENT_USER() END";
     RowFilterContent content = PolicyContents.rowFilter(expression);
     PolicyDTO policy =
         PolicyDTO.builder()
@@ -53,7 +54,7 @@ public class TestReadRestrictionPolicyDTO {
 
     Assertions.assertEquals(policy, restored);
     Assertions.assertInstanceOf(PolicyContentDTO.RowFilterContentDTO.class, restored.content());
-    Assertions.assertTrue(json.contains("\"expression\":\"filter :="));
+    Assertions.assertTrue(json.contains("\"expression\":\"(\\\"Customer Region\\\" STRING"));
     Assertions.assertFalse(json.contains("\"rules\""));
     Assertions.assertEquals(content, DTOConverters.fromDTO(restored.content()));
     Assertions.assertDoesNotThrow(restored.content()::validate);
@@ -67,8 +68,8 @@ public class TestReadRestrictionPolicyDTO {
             + "\"policyType\":\"system_row_filter\","
             + "\"enabled\":true,"
             + "\"content\":{\"expression\":"
-            + "\"filter := col(\\\"region\\\") == \\\"US\\\" if "
-            + "is_group_member(\\\"auditors\\\") else := false\"}}";
+            + "\"(region STRING) RETURNS BOOLEAN -> CASE WHEN "
+            + "is_group_member('auditors') THEN region = 'US' ELSE FALSE END\"}}";
 
     PolicyCreateRequest request =
         JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
@@ -78,7 +79,8 @@ public class TestReadRestrictionPolicyDTO {
 
     RowFilterContent content = (RowFilterContent) DTOConverters.fromDTO(request.getPolicyContent());
     Assertions.assertEquals(
-        "filter := col(\"region\") == \"US\" if is_group_member(\"auditors\") else := false",
+        "(region STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') "
+            + "THEN region = 'US' ELSE FALSE END",
         content.expression());
   }
 
@@ -90,9 +92,9 @@ public class TestReadRestrictionPolicyDTO {
             + "\"policyType\":\"system_column_mask\","
             + "\"enabled\":true,"
             + "\"content\":{\"expression\":"
-            + "\"mask := action(\\\"show-last-4\\\") if "
-            + "is_group_member(\\\"pii_unmasked\\\") "
-            + "else := action(\\\"mask-alphanum\\\")\"}}";
+            + "\"(value STRING) RETURNS STRING -> CASE WHEN "
+            + "is_group_member('pii_unmasked') THEN show_last_4(value) "
+            + "ELSE mask_alphanum(value) END\"}}";
 
     PolicyCreateRequest request =
         JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
@@ -103,8 +105,8 @@ public class TestReadRestrictionPolicyDTO {
     ColumnMaskContent content =
         (ColumnMaskContent) DTOConverters.fromDTO(request.getPolicyContent());
     Assertions.assertEquals(
-        "mask := action(\"show-last-4\") if is_group_member(\"pii_unmasked\") "
-            + "else := action(\"mask-alphanum\")",
+        "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('pii_unmasked') "
+            + "THEN show_last_4(value) ELSE mask_alphanum(value) END",
         content.expression());
   }
 
@@ -113,25 +115,25 @@ public class TestReadRestrictionPolicyDTO {
     assertUpdateRoundTrip(
         "system_row_filter",
         PolicyContents.rowFilter(
-            "filter := col(\"region\") == \"US\" if session_user() == \"alice\" "
-                + "else := col(\"owner\") == session_user()"));
+            "(region STRING, owner STRING) RETURNS BOOLEAN -> CASE WHEN CURRENT_USER() = 'alice' "
+                + "THEN region = 'US' ELSE owner = CURRENT_USER() END"));
     assertUpdateRoundTrip(
         "system_column_mask",
         PolicyContents.columnMask(
-            "mask := action(\"show-last-4\") if session_user() == \"alice\" "
-                + "else := action(\"replace-with-null\")"));
+            "(value STRING) RETURNS STRING -> CASE WHEN CURRENT_USER() = 'alice' "
+                + "THEN show_last_4(value) ELSE NULL END"));
   }
 
   @Test
   void testStoredContentRoundTripUsesEachBuiltInContentClass() throws JsonProcessingException {
     RowFilterContent rowFilter =
         PolicyContents.rowFilter(
-            "filter := col(\"region\") == \"US\" if is_group_member(\"analysts\") "
-                + "else := col(\"owner\") == session_user()");
+            "(region STRING, owner STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('analysts') "
+                + "THEN region = 'US' ELSE owner = CURRENT_USER() END");
     ColumnMaskContent columnMask =
         PolicyContents.columnMask(
-            "mask := action(\"show-last-4\") if is_group_member(\"analysts\") "
-                + "else := action(\"replace-with-null\")");
+            "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('analysts') "
+                + "THEN show_last_4(value) ELSE NULL END");
 
     PolicyContent restoredRowFilter =
         JsonUtils.anyFieldMapper()

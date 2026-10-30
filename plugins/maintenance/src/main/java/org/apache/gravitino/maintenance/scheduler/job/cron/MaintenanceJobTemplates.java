@@ -49,6 +49,12 @@ public final class MaintenanceJobTemplates {
    */
   public static final String POLICY_IDS_KEY = "policy_ids";
 
+  /**
+   * JobConf key for {@code table_maintenance_action.action_id} values parallel to {@link
+   * #POLICY_IDS_KEY} (comma-separated). Injected at submit after soft-slot acquire.
+   */
+  public static final String ACTION_IDS_KEY = "action_ids";
+
   /** JobConf key for overlaid updater options (JSON object string). */
   public static final String UPDATER_OPTIONS_JOB_CONF_KEY = "updater_options";
 

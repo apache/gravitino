@@ -147,4 +147,34 @@ public class TableMetaSQLProviderFactory {
       @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
     return getProvider().batchSelectTableByIdentifier(schemaId, tableNames);
   }
+  /**
+   * Returns the single-statement table snapshot SQL for a schema ID and name.
+   *
+   * @param schemaId the parent schema ID
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName) {
+    return getProvider().selectTableWithColumnsBySchemaIdAndName(schemaId, tableName);
+  }
+
+  /**
+   * Returns the single-statement table snapshot SQL for a full name.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .selectTableWithColumnsByFullQualifiedName(
+            metalakeName, catalogName, schemaName, tableName);
+  }
 }

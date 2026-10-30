@@ -24,12 +24,14 @@ components:
         - $ref: "#/components/schemas/Literal"
         - $ref: "#/components/schemas/Field"
         - $ref: "#/components/schemas/Function"
+        - $ref: "#/components/schemas/UnparsedExpression"
       discriminator:
         propertyName: type
         mapping:
           literal: "#/components/schemas/Literal"
           field: "#/components/schemas/Field"
           function: "#/components/schemas/Function"
+          unparsed: "#/components/schemas/UnparsedExpression"
 
     Literal:
       type: object
@@ -46,6 +48,7 @@ components:
         value:
           type: string
           description: The string format of the literal value
+          nullable: true
 
     Field:
       type: object
@@ -79,3 +82,52 @@ components:
           description: The arguments of the function
           items:
             $ref: "#/components/schemas/FunctionArg"
+
+    UnparsedExpression:
+      type: object
+      description: >-
+        An opaque SQL expression passed to the catalog. Unlike UnparsedType,
+        this expression does not declare a data type and is allowed on writes.
+      required:
+        - type
+        - unparsedExpression
+      properties:
+        type:
+          type: string
+          enum:
+            - "unparsed"
+        unparsedExpression:
+          type: string
+          description: The SQL expression text
+
+    WritableFunctionArg:
+      oneOf:
+        - $ref: "#/components/schemas/WritableLiteral"
+        - $ref: "#/components/schemas/Field"
+        - $ref: "#/components/schemas/WritableFunction"
+        - $ref: "#/components/schemas/UnparsedExpression"
+      discriminator:
+        propertyName: type
+        mapping:
+          literal: "#/components/schemas/WritableLiteral"
+          field: "#/components/schemas/Field"
+          function: "#/components/schemas/WritableFunction"
+          unparsed: "#/components/schemas/UnparsedExpression"
+
+    WritableLiteral:
+      allOf:
+        - $ref: "#/components/schemas/Literal"
+        - type: object
+          properties:
+            dataType:
+              $ref: "./datatype.yaml#/components/schemas/WritableDataType"
+
+    WritableFunction:
+      allOf:
+        - $ref: "#/components/schemas/Function"
+        - type: object
+          properties:
+            funcArgs:
+              type: array
+              items:
+                $ref: "#/components/schemas/WritableFunctionArg"

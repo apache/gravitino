@@ -1,0 +1,77 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+eq	row	(x STRING) RETURNS BOOLEAN -> x = 'US'
+neq	row	(x STRING) RETURNS BOOLEAN -> x <> 'US'
+neq_alias	row	(x STRING) RETURNS BOOLEAN -> x != 'US'
+lt	row	(x STRING) RETURNS BOOLEAN -> x < 'US'
+lte	row	(x STRING) RETURNS BOOLEAN -> x <= 'US'
+gt	row	(x STRING) RETURNS BOOLEAN -> x > 'US'
+gte	row	(x STRING) RETURNS BOOLEAN -> x >= 'US'
+in	row	(x STRING) RETURNS BOOLEAN -> x IN ('US', 'CA', NULL)
+not_in	row	(x STRING) RETURNS BOOLEAN -> x NOT IN ('US', NULL)
+between	row	(x STRING) RETURNS BOOLEAN -> x BETWEEN 'A' AND 'Z'
+not_between	row	(x STRING) RETURNS BOOLEAN -> x NOT BETWEEN 'A' AND 'Z'
+is_null	row	(x STRING) RETURNS BOOLEAN -> x IS NULL
+is_not_null	row	(x STRING) RETURNS BOOLEAN -> x IS NOT NULL
+like	row	(x STRING) RETURNS BOOLEAN -> x LIKE 'Acme%'
+not_like	row	(x STRING) RETURNS BOOLEAN -> x NOT LIKE 'Acme%'
+precedence	row	(x STRING) RETURNS BOOLEAN -> NOT x = 'US' OR x IS NULL AND FALSE
+searched_case	row	(x STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN x = 'US' ELSE x = CURRENT_USER() END
+simple_case	row	(x STRING) RETURNS BOOLEAN -> CASE x WHEN 'US' THEN TRUE WHEN NULL THEN FALSE END
+quoted_string	row	(x STRING) RETURNS BOOLEAN -> x = 'O''Brien\n😀'
+unsupported_user_attribute	row	(x STRING) RETURNS BOOLEAN -> x = user_attribute('region')
+quoted_identifier	row	("Customer Region" STRING) RETURNS BOOLEAN -> "Customer Region" = 'US'
+nan	row	(x DOUBLE) RETURNS BOOLEAN -> is_nan(x)
+date_part	row	(x DATE) RETURNS BOOLEAN -> year(x) = 2026 AND month(x) = 3 OR day(x) = 15
+date	row	(x DATE) RETURNS BOOLEAN -> x = DATE '2024-02-29'
+time	row	(x TIME) RETURNS BOOLEAN -> x = TIME '12:30:00.123456'
+timestamp	row	(x TIMESTAMP) RETURNS BOOLEAN -> x = TIMESTAMP '2026-01-01 12:30:00'
+timestamp_zone	row	(x TIMESTAMP WITH TIME ZONE) RETURNS BOOLEAN -> x = TIMESTAMP WITH TIME ZONE '2026-01-01 12:30:00+00:00'
+integer_min	row	(x INTEGER) RETURNS BOOLEAN -> x = -2147483648
+long_max	row	(x LONG) RETURNS BOOLEAN -> x = 9223372036854775807
+decimal	row	(x DECIMAL(4,2)) RETURNS BOOLEAN -> x = 99.99
+mask_alphanum	mask	(value STRING) RETURNS STRING -> mask_alphanum(value)
+show_first_4	mask	(value STRING) RETURNS STRING -> show_first_4(value)
+show_last_4	mask	(value STRING) RETURNS STRING -> show_last_4(value)
+mask_to_fixed_value	mask	(value STRING) RETURNS STRING -> mask_to_fixed_value(value)
+replace_with_null	mask	(value STRING) RETURNS STRING -> replace_with_null(value)
+sha256_global	mask	(value STRING) RETURNS STRING -> sha256_global(value)
+sha256_query_local	mask	(value STRING) RETURNS STRING -> sha256_query_local(value)
+mask_nested	mask	(value STRING) RETURNS STRING -> show_last_4(mask_alphanum(value))
+mask_case	mask	(value STRING) RETURNS STRING -> CASE WHEN CURRENT_USER() = 'alice' THEN value ELSE NULL END
+truncate_to_year	mask	(value TIMESTAMP WITH TIME ZONE) RETURNS TIMESTAMP WITH TIME ZONE -> truncate_to_year(value)
+truncate_to_month	mask	(value TIMESTAMP WITH TIME ZONE) RETURNS TIMESTAMP WITH TIME ZONE -> truncate_to_month(value)
+invalid_rego	row	filter := true
+missing_declarations	row	TRUE
+duplicate_parameters	row	(x STRING, X STRING) RETURNS BOOLEAN -> TRUE
+undeclared	row	() RETURNS BOOLEAN -> x = 1
+non_boolean	row	() RETURNS BOOLEAN -> 1
+invalid_branch	row	() RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE 1 END
+invalid_mask	mask	(value STRING) RETURNS STRING -> show_last_4(value, 4)
+unknown_function	row	() RETURNS BOOLEAN -> unknown()
+integer_overflow	row	(x INTEGER) RETURNS BOOLEAN -> x = 2147483648
+fractional_integer	row	(x INTEGER) RETURNS BOOLEAN -> x = 1.1
+invalid_date	row	() RETURNS BOOLEAN -> DATE '2025-02-29' IS NULL
+invalid_precision	row	(x TIME(3)) RETURNS BOOLEAN -> TRUE
+invalid_pattern	row	() RETURNS BOOLEAN -> 'x' LIKE '%x'
+chained_comparison	row	() RETURNS BOOLEAN -> 1 < 2 < 3
+numeric_boundary	row	() RETURNS BOOLEAN -> 1and TRUE
+sql_comment	row	() RETURNS BOOLEAN -> TRUE -- comment
+invalid_quote	row	() RETURNS BOOLEAN -> 'unterminated
+unsupported_user_attribute_mask	mask	(value STRING) RETURNS STRING -> user_attribute('region')
+unsupported_user_attribute_unselected	row	() RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE user_attribute('active') END

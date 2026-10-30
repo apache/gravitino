@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.MetricInfoListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
@@ -47,6 +48,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.hc.core5.http.HttpHeaders;
 
 /** Implements schema-scoped Semantic Model operations through the Gravitino REST API. */
@@ -83,6 +85,43 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
     return Arrays.stream(response.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    checkSemanticModelNamespace(namespace);
+    EntityListResponse response =
+        restClient.get(
+            formatMetricRequestPath(getSemanticModelFullNamespace(namespace)),
+            Collections.singletonMap("details", "false"),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+    return Arrays.stream(response.identifiers())
+        .map(ident -> NameIdentifier.of(relativeMetricNamespace(ident.namespace()), ident.name()))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    checkSemanticModelNamespace(namespace);
+    MetricInfoListResponse response =
+        restClient.get(
+            formatMetricRequestPath(getSemanticModelFullNamespace(namespace)),
+            Collections.singletonMap("details", "true"),
+            MetricInfoListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+    return Arrays.stream(response.getMetrics())
+        .map(
+            info ->
+                new GenericSemanticModelMetric(
+                    relativeMetricNamespace(info.namespace()), info.metric()))
+        .toArray(SemanticModelMetric[]::new);
   }
 
   /** {@inheritDoc} */
@@ -258,6 +297,18 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
 
   private Namespace getSemanticModelFullNamespace(Namespace semanticModelNamespace) {
     return Namespace.of(catalogNamespace.level(0), catalogName, semanticModelNamespace.level(0));
+  }
+
+  private static String formatMetricRequestPath(Namespace namespace) {
+    return BaseSchemaCatalog.formatSchemaRequestPath(
+            Namespace.of(namespace.level(0), namespace.level(1)))
+        + "/"
+        + RESTUtils.encodeString(namespace.level(2))
+        + "/semantic-model-metrics";
+  }
+
+  private static Namespace relativeMetricNamespace(Namespace namespace) {
+    return Namespace.of(namespace.level(2), namespace.level(3));
   }
 
   private static String ossieMediaType(OssieFormat format) {

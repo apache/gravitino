@@ -63,6 +63,8 @@ public class TableMetaService {
   private static final Logger LOG = LoggerFactory.getLogger(TableMetaService.class);
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
+  private final BasePOStorageOps<TablePO, TableMetaMapper> snapshotOps =
+      new HierarchicalConversionPOStorageOps<>(new TablePOStorageOps(true));
 
   public static TableMetaService getInstance() {
     return INSTANCE;
@@ -124,13 +126,9 @@ public class TableMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableByIdentifier")
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
-    TablePO tablePO = getTablePOByIdentifier(identifier);
-
-    List<ColumnPO> columnPOs =
-        TableColumnMetaService.getInstance()
-            .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
-
-    return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, identifier.namespace());
+    TablePO tablePO = getTablePOByIdentifier(identifier, snapshotOps);
+    return POConverters.fromTableAndColumnPOs(
+        tablePO, tablePO.requireColumnPOs(), identifier.namespace());
   }
 
   @Monitored(
@@ -237,10 +235,8 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    TablePO oldTablePO = getTablePOByIdentifier(identifier);
-    List<ColumnPO> oldTableColumns =
-        TableColumnMetaService.getInstance()
-            .getColumnsByTableIdAndVersion(oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+    TablePO oldTablePO = getTablePOByIdentifier(identifier, snapshotOps);
+    List<ColumnPO> oldTableColumns = oldTablePO.requireColumnPOs();
     TableEntity oldTableEntity =
         POConverters.fromTableAndColumnPOs(oldTablePO, oldTableColumns, identifier.namespace());
 
@@ -422,11 +418,17 @@ public class TableMetaService {
   }
 
   private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
+    return getTablePOByIdentifier(identifier, ops);
+  }
+
+  private TablePO getTablePOByIdentifier(
+      NameIdentifier identifier, BasePOStorageOps<TablePO, TableMetaMapper> readOps) {
     NameIdentifierUtil.checkTable(identifier);
     TablePO tablePO =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
-            mapper -> POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.TABLE));
+            mapper ->
+                POStorageReadRouting.getPO(mapper, identifier, readOps, Entity.EntityType.TABLE));
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,

@@ -431,9 +431,9 @@ public class PolicyContents {
   /**
    * Creates a row-filter policy for tagged tables.
    *
-   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
-   * filter :=}. The server performs grammar and semantic validation when the policy is created or
-   * updated.
+   * <p>The expression must be a complete {@code restricted-sql-v1} definition, for example {@code
+   * (region STRING) RETURNS BOOLEAN -> region = 'US'}. The server validates syntax and types when
+   * the policy is created or updated.
    *
    * @param expression complete row-filter program
    * @return structurally validated read-restriction policy content
@@ -447,9 +447,10 @@ public class PolicyContents {
   /**
    * Creates a column-mask policy for tagged tables or columns.
    *
-   * <p>The expression must be a complete {@code restricted-rego-v1} program beginning with {@code
-   * mask := action(...)}. The server performs grammar and semantic validation when the policy is
-   * created or updated.
+   * <p>The expression must be a complete {@code restricted-sql-v1} definition with one parameter
+   * and the same return type, for example {@code (value STRING) RETURNS STRING ->
+   * show_last_4(value)}. The parameter binds to the selected column independently of its local
+   * name. The server validates syntax and types when the policy is created or updated.
    *
    * @param expression complete column-mask program
    * @return structurally validated read-restriction policy content

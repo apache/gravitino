@@ -342,6 +342,24 @@ public abstract class TestJDBCBackend {
     }
   }
 
+  protected int countActiveRowsWhere(String table, String whereClause) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, whereClause))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("Doesn't contain data");
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
   protected BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
     return BaseMetalake.builder()
         .withId(id)

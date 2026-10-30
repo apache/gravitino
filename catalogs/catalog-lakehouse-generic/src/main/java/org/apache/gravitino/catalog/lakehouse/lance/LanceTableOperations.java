@@ -231,10 +231,26 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
+    if (register) {
+      if (mode == CreationMode.CREATE) {
+        // Check metadata before accessing storage so an existing name consistently reports a
+        // conflict. The final strict insert still detects a concurrent registration.
+        try {
+          if (store().exists(ident, Entity.EntityType.TABLE)) {
+            throw new TableAlreadyExistsException("Table %s already exists", ident);
+          }
+        } catch (IOException e) {
+          throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
+        }
+      }
+      // Validate before OVERWRITE can remove existing metadata or managed data.
+      validateExistingDatasetLocation(ident, location, properties);
+    }
+
     // Handle OVERWRITE mode - drop existing table if present
     if (mode == CreationMode.OVERWRITE) {
       if (register) {
-        dropTable(ident);
+        dropExternalTableForRegistration(ident);
       } else {
         purgeTable(ident);
       }
@@ -849,36 +865,16 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @return the new version id of the Lance dataset after applying the changes
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
+    // Reject what Lance cannot apply before opening the dataset, so a change that fails these
+    // checks does not leave the changes before it applied to the dataset but not to the metadata.
+    validateLanceTableChanges(changes);
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn addColumn) {
-          String[] fieldName = addColumn.fieldName();
-          Preconditions.checkArgument(
-              fieldName.length == 1,
-              "Lance only supports adding top-level columns: %s",
-              String.join(".", fieldName));
-          String columnName = fieldName[0];
-          Preconditions.checkArgument(
-              addColumn.isNullable(),
-              "Lance only supports adding nullable columns because existing rows are backfilled "
-                  + "with null: %s",
-              columnName);
-          Preconditions.checkArgument(
-              TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
-              "Lance only supports appending new columns: %s",
-              columnName);
-          Preconditions.checkArgument(
-              !addColumn.isAutoIncrement(),
-              "Lance does not support adding auto-increment columns: %s",
-              columnName);
-          Preconditions.checkArgument(
-              addColumn.getDefaultValue() == null
-                  || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
-              "Lance does not support default values when adding columns: %s",
-              columnName);
+          String columnName = addColumn.fieldName()[0];
 
           Field field =
               LanceDataTypeConverter.CONVERTER.toArrowField(
@@ -886,7 +882,7 @@ public class LanceTableOperations extends ManagedTableOperations {
           LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
           dataset.addColumns(List.of(field));
         } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
-          dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
+          dataset.dropColumns(List.of(deleteColumn.fieldName()[0]));
         } else if (change instanceof TableChange.AddIndex addIndex) {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
           IndexParams indexParams = getIndexParamsByIndexType(indexType);
@@ -902,16 +898,10 @@ public class LanceTableOperations extends ManagedTableOperations {
                   .build());
         } else if (change instanceof TableChange.RenameColumn renameColumn) {
           ColumnAlteration lanceColumnAlter =
-              new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
+              new ColumnAlteration.Builder(renameColumn.fieldName()[0])
                   .rename(renameColumn.getNewName())
                   .build();
           dataset.alterColumns(List.of(lanceColumnAlter));
-        } else {
-          // Currently, only column add/drop/rename and index addition are supported.
-          // TODO: Support change column type once we have a clear knowledge about the means of
-          // castTo in Lance.
-          throw new UnsupportedOperationException(
-              "Unsupported changes to lance table: " + change.getClass().getSimpleName());
         }
       }
       return dataset.getVersion().getId();
@@ -920,6 +910,52 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
+    }
+  }
+
+  private static void validateLanceTableChanges(TableChange[] changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String[] fieldName = addColumn.fieldName();
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", fieldName));
+        String columnName = fieldName[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+      } else if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.RenameColumn) {
+        String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+        // Gravitino stores a Lance table's columns as top-level columns only, so a nested change
+        // applied to the dataset could not be recorded in the metadata.
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports dropping or renaming top-level columns: %s",
+            String.join(".", fieldName));
+      } else if (!(change instanceof TableChange.AddIndex)) {
+        // Currently, only column add/drop/rename and index addition are supported.
+        // TODO: Support change column type once we have a clear knowledge about the means of
+        // castTo in Lance.
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
     }
   }
 
@@ -951,6 +987,64 @@ public class LanceTableOperations extends ManagedTableOperations {
             .build();
       default:
         throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+  }
+
+  private void dropExternalTableForRegistration(NameIdentifier ident) {
+    try {
+      Table existing = super.loadTable(ident);
+      validateLanceTable(ident, existing);
+      Preconditions.checkArgument(
+          LancePropertiesUtils.isExternalTable(existing.properties()),
+          "Cannot overwrite managed Lance table %s with a registration; "
+              + "explicitly drop or purge the managed table before registering a replacement",
+          ident);
+      // Registration replaces external metadata only. Calling dropTable could delete a managed
+      // dataset, including the same dataset that the incoming registration just validated.
+      super.dropTable(ident);
+    } catch (NoSuchTableException e) {
+      // No existing registration needs replacing.
+    }
+  }
+
+  /**
+   * Validates that a caller-supplied location resolves to an existing, valid Lance dataset before
+   * metadata changes adopt it. An explicit purge can later delete the registered location, so a
+   * plain directory must not be adopted as if it were a Lance dataset (issue #13696).
+   *
+   * <p>This checks dataset existence, not operator-defined storage scope or purge authorization.
+   *
+   * @param ident the table being registered, used only for the error message
+   * @param location the caller-supplied dataset location
+   * @param properties the table properties, used to resolve storage options
+   * @throws IllegalArgumentException if the SDK rejects the dataset location as invalid input
+   * @throws RuntimeException if storage access or closing the validation dataset fails
+   */
+  private void validateExistingDatasetLocation(
+      NameIdentifier ident, String location, Map<String, String> properties) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
+    String context =
+        String.format(
+            "Could not validate location %s for Lance table %s as a readable Lance dataset",
+            location, ident);
+    Dataset dataset;
+    try {
+      dataset = openDataset(location, storageOptions);
+    } catch (IllegalArgumentException e) {
+      // Lance maps DatasetNotFound and InvalidInput to IllegalArgumentException, while storage
+      // I/O errors use IOException. Preserve that distinction for the REST error mapper.
+      throw ExceptionMessages.illegalArgument(context + "; check dataset existence and format", e);
+    } catch (Exception e) {
+      throw ExceptionMessages.wrap(
+          context + "; check access permissions and storage connectivity", e);
+    }
+
+    try (Dataset ignored = dataset) {
+      LOG.debug("Validated Lance dataset at location {} for table {}", location, ident);
+    } catch (Exception e) {
+      // Cleanup failures are server errors, even if close throws IllegalArgumentException.
+      throw ExceptionMessages.wrap("Failed to close validated dataset for table " + ident, e);
     }
   }
 }

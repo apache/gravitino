@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.listener;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
@@ -280,6 +282,38 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
       eventBus.dispatchEvent(
           new ListPolicyInfosForMetadataObjectFailureEvent(
               PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    metadataObjects.forEach(
+        object ->
+            eventBus.dispatchEvent(
+                new ListPolicyInfosForMetadataObjectPreEvent(
+                    PrincipalUtils.getCurrentUserName(), metalake, object)));
+    try {
+      Map<MetadataObject, PolicyEntity[]> results =
+          dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects);
+      metadataObjects.forEach(
+          object -> {
+            PolicyEntity[] policies = results.get(object);
+            eventBus.dispatchEvent(
+                new ListPolicyInfosForMetadataObjectEvent(
+                    PrincipalUtils.getCurrentUserName(),
+                    metalake,
+                    object,
+                    policies != null ? policies.length : -1));
+          });
+      return results;
+    } catch (Exception e) {
+      metadataObjects.forEach(
+          object ->
+              eventBus.dispatchEvent(
+                  new ListPolicyInfosForMetadataObjectFailureEvent(
+                      PrincipalUtils.getCurrentUserName(), metalake, object, e)));
       throw e;
     }
   }

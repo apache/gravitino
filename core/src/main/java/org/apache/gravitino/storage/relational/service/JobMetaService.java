@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -37,6 +38,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -245,7 +247,7 @@ public class JobMetaService {
         });
   }
 
-  /** Deletes a job only if the observed version is still active. */
+  /** Deletes a job and its owner relation only if the observed version is still active. */
   void deleteJobWithVersion(NameIdentifier ident, JobPO observed) {
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -256,7 +258,13 @@ public class JobMetaService {
                         mapper ->
                             mapper.softDeleteJobByRunIdWithVersion(
                                 observed.jobRunId(), observed.currentVersion())),
-                () -> writeFailure(ident, observed)));
+                () -> writeFailure(ident, observed)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        observed.jobRunId(), MetadataObject.Type.JOB.name())));
   }
 
   private RuntimeException writeFailure(NameIdentifier ident, JobPO observed) {

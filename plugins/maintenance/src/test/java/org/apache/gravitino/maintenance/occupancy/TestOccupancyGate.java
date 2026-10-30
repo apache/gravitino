@@ -62,7 +62,7 @@ class TestOccupancyGate extends TestJDBCBackend {
         gate.shouldSkip(table.id(), policyId, 3_600_000L, System.currentTimeMillis()));
 
     long finishedAt = System.currentTimeMillis();
-    actions.markFinished(7001L, table.id(), policyId, 200L, finishedAt);
+    actions.markFinished(claim.actionId(), finishedAt);
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
     Assertions.assertEquals(
         finishedAt, actions.getByJobIdAndTableId(7001L, table.id()).finishedAt());
@@ -86,7 +86,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     long jobId = 8001L;
     actions.bindJobId(claim, jobId);
     long finishedAt = 1_700_000_000_000L;
-    actions.markFinished(jobId, table.id(), policyId, null, finishedAt);
+    actions.markFinished(claim.actionId(), finishedAt);
 
     Assertions.assertTrue(
         gate.withinMinInterval(table.id(), policyId, 60_000L, finishedAt + 1_000L));
@@ -119,7 +119,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
     Assertions.assertTrue(
         actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).isPresent());
-    Assertions.assertEquals(claim.id(), actions.getById(claim.id()).id());
+    Assertions.assertEquals(claim.actionId(), actions.getById(claim.actionId()).actionId());
   }
 
   private PolicyEntity insertPolicy(String metalakeName, String policyName) throws IOException {

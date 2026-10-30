@@ -27,6 +27,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -50,6 +52,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
@@ -325,6 +328,7 @@ public class TestLanceTableOperations {
     properties.put(LANCE_CREATION_MODE, "OVERWRITE");
     if (register) {
       properties.put(LANCE_TABLE_REGISTER, "true");
+      Mockito.doReturn(mock(Dataset.class)).when(lanceTableOps).openDataset(eq(location), anyMap());
     }
 
     IllegalArgumentException exception =
@@ -1115,6 +1119,36 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testHandleLanceTableChangeValidatesBeforeChangingDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    // Each request starts with a valid change, which must not reach the dataset when a later
+    // change in the same request is rejected.
+    List<TableChange> rejectedChanges =
+        List.of(
+            TableChange.renameColumn(new String[] {"parent", "nested"}, "renamed"),
+            TableChange.deleteColumn(new String[] {"parent", "nested"}, false),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.updateColumnComment(new String[] {"col1"}, "comment"));
+    for (TableChange rejected : rejectedChanges) {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              lanceTableOps.handleLanceTableChange(
+                  table,
+                  new TableChange[] {
+                    TableChange.deleteColumn(new String[] {"col1"}, false), rejected
+                  }));
+    }
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+    verify(dataset, never()).dropColumns(anyList());
+    verify(dataset, never()).alterColumns(anyList());
+  }
+
+  @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
@@ -1654,6 +1688,390 @@ public class TestLanceTableOperations {
         loaded.properties().containsKey(LANCE_TABLE_DECLARED),
         "lance.declared must be removed after schema is written");
     verify(dataset).getSchema();
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Location validation before storage I/O (issue #13696)
+  // ---------------------------------------------------------------------------
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Dataset not found", "Invalid dataset location"})
+  public void testRegisterRejectsLocationWithoutValidLanceDataset(String reason) throws Exception {
+    // Registering a table adopts an existing dataset at the caller-supplied location. A location
+    // that does not resolve to a valid Lance dataset must be rejected before any metadata is
+    // written, otherwise a later explicit purge could delete the unrelated directory.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("not-a-dataset").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    IllegalArgumentException storageFailure = new IllegalArgumentException(reason);
+    Mockito.doThrow(storageFailure).when(lanceTableOps).openDataset(eq(location), any());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertTrue(
+        failure.getMessage().contains("Could not validate location"),
+        "Error must describe a validation failure, got: " + failure.getMessage());
+    Assertions.assertTrue(failure.getMessage().contains(location));
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    Assertions.assertTrue(failure.getMessage().contains("dataset existence and format"));
+    Assertions.assertSame(storageFailure, failure.getCause());
+    verify(store, never()).put(any(), Mockito.anyBoolean());
+  }
+
+  @Test
+  public void testRegisterRejectsBlankLocation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertTrue(
+        failure.getMessage().contains("Table location must be specified"),
+        "Blank location must be rejected, got: " + failure.getMessage());
+    verify(store, never()).put(any(), Mockito.anyBoolean());
+  }
+
+  @Test
+  public void testRegisterAcceptsLocationWithValidLanceDataset() throws Exception {
+    // A location that opens as a valid Lance dataset passes validation and the table metadata is
+    // then written to the entity store.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("valid-dataset").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(1L).toString());
+
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(eq(location), anyMap());
+
+    Table registered =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    new Column[0],
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertEquals("table", registered.name());
+    verify(lanceTableOps).openDataset(eq(location), anyMap());
+    verify(dataset).close();
+    verify(store).put(any(), Mockito.anyBoolean());
+  }
+
+  /** Invalid replacement registration must preserve both metadata and managed data. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRegisterOverwriteRejectsInvalidLocationBeforeDroppingExistingTable(boolean external)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "original");
+    String oldLocation = tempDir.resolve("original-dataset").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(oldLocation, columns, Map.of())) {
+      // The existing dataset must survive rejection of its proposed replacement.
+    }
+    TableEntity existing =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_LOCATION,
+                oldLocation,
+                Table.PROPERTY_EXTERNAL,
+                Boolean.toString(external)));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(existing);
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    String invalidLocation = tempDir.resolve("invalid-replacement").toString();
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                invalidLocation,
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                LANCE_TABLE_REGISTER,
+                "true",
+                LANCE_CREATION_MODE,
+                "OVERWRITE"));
+    IllegalArgumentException invalidDataset = new IllegalArgumentException("not a Lance dataset");
+    Mockito.doThrow(invalidDataset).when(lanceTableOps).openDataset(eq(invalidLocation), anyMap());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertSame(invalidDataset, failure.getCause());
+    verify(store, never()).delete(any(), any());
+    verify(store, never()).put(any(), anyBoolean());
+    try (Dataset preserved = Dataset.open().uri(oldLocation).build()) {
+      Assertions.assertEquals("id", preserved.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  /** Register-overwrite must not destroy a managed dataset, even when reusing its location. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRegisterOverwriteRejectsManagedTableWithoutDeletingData(boolean reuseLocation)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "managed");
+    String originalLocation = tempDir.resolve("managed-original").toString();
+    String replacementLocation =
+        reuseLocation ? originalLocation : tempDir.resolve("existing-replacement").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(originalLocation, columns, Map.of())) {
+      // Existing managed data belongs to the old table, not to the registration operation.
+    }
+    if (!reuseLocation) {
+      try (Dataset ignored = lanceTableOps.createDataset(replacementLocation, columns, Map.of())) {
+        // Both replacement variants are valid datasets.
+      }
+    }
+    TableEntity existing =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_LOCATION,
+                originalLocation,
+                Table.PROPERTY_EXTERNAL,
+                "false"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(existing);
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                replacementLocation,
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                LANCE_TABLE_REGISTER,
+                "true",
+                LANCE_CREATION_MODE,
+                "OVERWRITE"));
+
+    properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(2L).toString());
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"),
+                    () ->
+                        lanceTableOps.createTable(
+                            ident,
+                            columns,
+                            null,
+                            properties,
+                            new Transform[0],
+                            null,
+                            new SortOrder[0],
+                            new Index[0])));
+
+    Assertions.assertTrue(failure.getMessage().contains("Cannot overwrite managed Lance table"));
+    verify(store, never()).delete(any(), any());
+    verify(store, never()).put(any(), anyBoolean());
+    try (Dataset original = Dataset.open().uri(originalLocation).build();
+        Dataset replacement = Dataset.open().uri(replacementLocation).build()) {
+      Assertions.assertEquals("id", original.getSchema().getFields().get(0).getName());
+      Assertions.assertEquals("id", replacement.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  /** Exercise the real SDK against a plain directory, not just a stubbed open failure. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRegisterRejectsMissingOrPlainDirectoryWithoutChangingItsContents(boolean missing)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "not_a_dataset");
+    Path directory = Files.createDirectory(tempDir.resolve("unrelated-directory"));
+    Path marker = Files.writeString(directory.resolve("keep.txt"), "unrelated data");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                (missing ? directory.resolve("missing") : directory).toString(),
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                LANCE_TABLE_REGISTER,
+                "true"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                new Column[0],
+                null,
+                properties,
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+
+    verify(store, never()).put(any(), anyBoolean());
+    verify(store, never()).delete(any(), any());
+    Assertions.assertTrue(Files.isDirectory(directory));
+    Assertions.assertEquals("unrelated data", Files.readString(marker));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"CREATE,true", "CREATE,false", "OVERWRITE,true", "OVERWRITE,false"})
+  void testRegisterStorageFailureIsNotBadInput(String mode, boolean io) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Exception storageFailure =
+        io ? new IOException("storage timed out") : new RuntimeException("storage unavailable");
+    Mockito.doAnswer(
+            invocation -> {
+              throw storageFailure;
+            })
+        .when(lanceTableOps)
+        .openDataset(anyString(), anyMap());
+
+    RuntimeException failure =
+        Assertions.assertThrows(RuntimeException.class, () -> register(ident, mode));
+
+    Assertions.assertFalse(failure instanceof IllegalArgumentException);
+    Assertions.assertSame(storageFailure, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains(storageFailure.getMessage()));
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    verify(store, never()).put(any(), anyBoolean());
+    verify(store, never()).delete(any(), any());
+  }
+
+  @Test
+  void testRegisterCloseFailureIsNotBadInput() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Dataset dataset = mock(Dataset.class);
+    IllegalArgumentException closeFailure =
+        new IllegalArgumentException("allocator cleanup failed");
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(anyString(), anyMap());
+    doThrow(closeFailure).when(dataset).close();
+
+    RuntimeException failure =
+        Assertions.assertThrows(RuntimeException.class, () -> register(ident, "OVERWRITE"));
+
+    Assertions.assertFalse(failure instanceof IllegalArgumentException);
+    Assertions.assertSame(closeFailure, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains(closeFailure.getMessage()));
+    verify(store, never()).put(any(), anyBoolean());
+    verify(store, never()).delete(any(), any());
+  }
+
+  @Test
+  void testRegisterCreateChecksExistingNameBeforeAccessingDataset() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    TableAlreadyExistsException failure =
+        Assertions.assertThrows(TableAlreadyExistsException.class, () -> register(ident, "CREATE"));
+
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+    verify(store, never()).put(any(), anyBoolean());
+    verify(store, never()).delete(any(), any());
+  }
+
+  @Test
+  void testRegisterCreateRetainsStrictInsertForConcurrentRegistration() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
+    Dataset dataset = mock(Dataset.class);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(anyString(), anyMap());
+    doThrow(new EntityAlreadyExistsException("concurrent registration"))
+        .when(store)
+        .put(any(), eq(false));
+
+    Assertions.assertThrows(TableAlreadyExistsException.class, () -> register(ident, "CREATE"));
+
+    verify(store).put(any(), eq(false));
+    verify(dataset).close();
+    verify(store, never()).delete(any(), any());
+  }
+
+  @Test
+  void testRegisterCreateMetadataReadFailureStopsBeforeDatasetAccess() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    IOException readFailure = new IOException("metadata unavailable");
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenThrow(readFailure);
+
+    RuntimeException failure =
+        Assertions.assertThrows(RuntimeException.class, () -> register(ident, "CREATE"));
+
+    Assertions.assertFalse(failure instanceof IllegalArgumentException);
+    Assertions.assertSame(readFailure, failure.getCause());
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  private Table register(NameIdentifier ident, String mode) throws Exception {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(Table.PROPERTY_LOCATION, tempDir.resolve("registration").toString());
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.put(LANCE_CREATION_MODE, mode);
+    properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(1L).toString());
+    return PrincipalUtils.doAs(
+        new UserPrincipal("tester"),
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                new Column[0],
+                null,
+                properties,
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
   }
 
   private static TableEntity tableEntity(

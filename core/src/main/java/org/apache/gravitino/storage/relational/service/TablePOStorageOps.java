@@ -29,7 +29,21 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 
 public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper> {
 
-  public TablePOStorageOps() {}
+  private final boolean includeColumns;
+
+  public TablePOStorageOps() {
+    this(false);
+  }
+
+  /**
+   * Creates storage operations with optional single-statement column loading for get operations.
+   * Lists remain metadata-only.
+   *
+   * @param includeColumns whether get operations load the column snapshot
+   */
+  public TablePOStorageOps(boolean includeColumns) {
+    this.includeColumns = includeColumns;
+  }
 
   @Override
   public void insertPO(TableMetaMapper mapper, TablePO tablePO, boolean overwrite) {
@@ -47,15 +61,20 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
 
   @Override
   public TablePO getPO(TableMetaMapper mapper, Long parentId, String name) {
-    return mapper.selectTableMetaBySchemaIdAndName(parentId, name);
+    return includeColumns
+        ? mapper.selectTableWithColumnsBySchemaIdAndName(parentId, name)
+        : mapper.selectTableMetaBySchemaIdAndName(parentId, name);
   }
 
   @Override
   public TablePO getPOByFullName(TableMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
     TablePO po =
-        mapper.selectTableByFullQualifiedName(
-            namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
+        includeColumns
+            ? mapper.selectTableWithColumnsByFullQualifiedName(
+                namespace.level(0), namespace.level(1), namespace.level(2), identifier.name())
+            : mapper.selectTableByFullQualifiedName(
+                namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
     // INNER JOIN on metalake/catalog: a null PO means the metalake or catalog does not exist.
     if (po == null) {
       throw new NoSuchEntityException(

@@ -17,6 +17,7 @@
 #
 # Supplement only dependencies actually included in the artifact.
 # Sources and audited versions are documented in README.md.
+org.antlr:antlr4-runtime:4.13.2=LICENSE.antlr4 | ANTLR4 runtime (BSD-3-Clause)
 com.aliyun.oss:aliyun-sdk-oss:3.10.2=LICENSE.aliyun-inieditor | Aliyun OSS (Apache-2.0), including IniEditor (BSD-2-Clause)
 com.aliyun.oss:aliyun-sdk-oss:3.13.0=LICENSE.aliyun-inieditor | Aliyun OSS (Apache-2.0), including IniEditor (BSD-2-Clause)
 com.google.api-client:google-api-client:1.24.1=LICENSE.google-cloudshell | Google API Client (Apache-2.0), including CloudShellCredential (BSD-3-Clause)

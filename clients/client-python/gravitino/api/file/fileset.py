@@ -61,6 +61,10 @@ class Fileset(Auditable):
     """The reserved property name for the fileset name placeholder, when creating a fileset, all
     placeholders as {{fileset}} will be replaced by the fileset name"""
 
+    PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED = "allow-existing-location-as-managed"
+    """Whether a managed fileset may adopt an existing non-empty location. Defaults to false
+    and cannot be changed after creation."""
+
     class Type(Enum):
         """An enum representing the type of the fileset object."""
 

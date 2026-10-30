@@ -62,6 +62,7 @@ import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -548,6 +549,27 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(
         errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
+  }
+
+  @Test
+  public void testDropNonEmptyMetalake() {
+    doThrow(
+            new NonEmptyMetalakeException(
+                "Metalake test has catalogs, please drop them first or use force option"))
+        .when(metalakeManager)
+        .dropMetalake(any(), anyBoolean());
+
+    Response response =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+    Assertions.assertEquals(NonEmptyMetalakeException.class.getSimpleName(), error.getType());
+    Assertions.assertTrue(error.getMessage().contains("Metalake test has catalogs"));
   }
 
   @Test

@@ -60,6 +60,9 @@ public class ErrorConstants {
   /** Error codes for optimistic-lock conflicts. */
   public static final int OPTIMISTIC_LOCK_CONFLICT_CODE = 1012;
 
+  /** Error codes for service unavailable. */
+  public static final int SERVICE_UNAVAILABLE_CODE = 1013;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

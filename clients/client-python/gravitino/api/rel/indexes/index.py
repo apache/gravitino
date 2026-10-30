@@ -24,7 +24,8 @@ from typing import List, Optional
 class Index(ABC):
     """The Index interface defines methods for implementing table index columns.
 
-    Catalogs may provide key and connector-specific index types.
+    Catalogs may provide generic key and connector-specific index types; supported operations
+    depend on the catalog.
     """
 
     @unique
@@ -67,6 +68,9 @@ class Index(ABC):
         DATA_SKIPPING_USEARCH = "DATA_SKIPPING_USEARCH"
         """Legacy ClickHouse USearch index metadata. This type is metadata-only."""
 
+        DATA_SKIPPING_TEXT = "DATA_SKIPPING_TEXT"
+        """ClickHouse full-text data-skipping index loaded from native table metadata."""
+
         DATA_SKIPPING_VECTOR_SIMILARITY = "DATA_SKIPPING_VECTOR_SIMILARITY"
         """ClickHouse vector similarity data skipping index."""
 
@@ -101,5 +105,5 @@ class Index(ABC):
         pass  # pragma: no cover
 
     def properties(self) -> dict[str, str]:
-        """Returns the index properties, or an empty map when none are defined."""
+        """Returns optional index properties, empty when none are defined."""
         return {}

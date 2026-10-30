@@ -30,6 +30,18 @@ class SemanticModelOperation(ABC):
         pass
 
     @abstractmethod
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        """Return visible metric identifiers with full REST namespaces as JSON."""
+        pass
+
+    @abstractmethod
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        """Return complete visible metrics and their full namespaces as JSON."""
+        pass
+
+    @abstractmethod
     async def load_semantic_model(
         self, catalog_name: str, schema_name: str, semantic_model_name: str
     ) -> str:

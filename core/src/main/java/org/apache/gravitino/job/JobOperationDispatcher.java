@@ -138,7 +138,7 @@ public interface JobOperationDispatcher extends Closeable {
    * @param includeOutput whether to also fetch and attach the job's stdout/stderr output
    * @param maxLines the maximum number of (most recent) output lines to return, or {@code null} to
    *     use the global default
-   * @param maxBytes the maximum number of (most recent) output bytes to read, or {@code null} to
+   * @param maxBytes the maximum number of (most recent) output bytes to return, or {@code null} to
    *     use the global default
    * @return the job entity associated with the specified ID
    * @throws NoSuchJobException if no job with the specified ID exists

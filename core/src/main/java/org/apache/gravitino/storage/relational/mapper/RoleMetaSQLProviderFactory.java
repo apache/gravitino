@@ -127,4 +127,29 @@ public class RoleMetaSQLProviderFactory {
   public static String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
     return getProvider().batchGetRoleUpdatedAt(roleIds);
   }
+  /**
+   * Returns SQL for a role and privilege snapshot by name.
+   *
+   * @param metalakeId the metalake ID
+   * @param roleName the role name
+   * @return the aggregate select SQL
+   */
+  public static String selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    return getProvider().selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /**
+   * Returns SQL for matching roles and all their privileges.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the aggregate select SQL
+   */
+  public static String listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .listRolesWithPrivilegesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
+  }
 }

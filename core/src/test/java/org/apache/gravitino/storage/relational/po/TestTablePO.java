@@ -22,6 +22,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +49,19 @@ public class TestTablePO {
     }
     Assertions.assertTrue(
         dropped.isEmpty(), () -> "TablePO.builder(TablePO) does not copy these fields: " + dropped);
+    Assertions.assertNotSame(source.requireColumnPOs(), copy.requireColumnPOs());
+    copy.requireColumnPOs().clear();
+    Assertions.assertEquals(1, source.requireColumnPOs().size());
+  }
+
+  @Test
+  void testMetadataOnlyCopyRetainsUnloadedColumns() throws Exception {
+    TablePO source = fullyPopulated();
+    FieldUtils.writeField(source, "columnPOs", null, true);
+    TablePO copy = TablePO.builder(source).build();
+
+    Assertions.assertNull(copy.getColumnPOs());
+    Assertions.assertThrows(IllegalStateException.class, copy::requireColumnPOs);
   }
 
   /** Every field set to a distinct value, so a missed copy cannot pass by coincidence. */
@@ -71,6 +85,26 @@ public class TestTablePO {
             .withIndexes("indexes")
             .withComment("comment");
     TablePO po = builder.build();
+    // Populate the aggregate field as MyBatis does, with a non-empty snapshot so a missed copy
+    // fails.
+    ColumnPO column =
+        ColumnPO.builder()
+            .withColumnId(10L)
+            .withColumnName("column")
+            .withColumnPosition(0)
+            .withMetalakeId(2L)
+            .withCatalogId(3L)
+            .withSchemaId(4L)
+            .withTableId(1L)
+            .withTableVersion(5L)
+            .withColumnType("integer")
+            .withNullable((byte) 1)
+            .withAutoIncrement((byte) 0)
+            .withColumnOpType((byte) 0)
+            .withAuditInfo("audit")
+            .withDeletedAt(0L)
+            .build();
+    FieldUtils.writeField(po, "columnPOs", new ArrayList<>(List.of(column)), true);
 
     // Guard the guard: if a new field is added and left unset above, the comparison would trivially
     // hold with null on both sides and prove nothing.

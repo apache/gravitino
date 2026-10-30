@@ -121,15 +121,7 @@ public class PolicyMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);

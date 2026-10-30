@@ -21,6 +21,7 @@ from typing import Optional
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_model_metric import SemanticModelMetric
 from gravitino.exceptions.base import (
     NoSuchSemanticModelException,
     UnsupportedOperationException,
@@ -54,6 +55,45 @@ class SemanticModelCatalog(ABC):
         Raises:
             NoSuchSchemaException: If the schema does not exist.
         """
+
+    def list_metrics(self, namespace: Namespace) -> list[NameIdentifier]:
+        """List visible metric identifiers across the Semantic Models in a schema.
+
+        Identifiers are relative to this catalog. Each identifier's namespace
+        contains the schema and Semantic Model names, and its name is the exact
+        metric name.
+        Results are ordered by model identifier and then case-sensitive metric name.
+
+        Args:
+            namespace (Namespace): A single-level schema namespace.
+
+        Returns:
+            list[NameIdentifier]: The visible metric identifiers, or an empty list.
+
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+            UnsupportedOperationException: If metric discovery is not supported.
+        """
+        raise UnsupportedOperationException("Metric listing is not supported")
+
+    def list_metric_infos(self, namespace: Namespace) -> list[SemanticModelMetric]:
+        """List complete visible metrics across the Semantic Models in a schema.
+
+        Each result contains a namespace of schema and model names and the complete
+        metric definition. Visibility and ordering match :meth:`list_metrics`.
+        The request fails as a whole if metric definitions cannot be decoded.
+
+        Args:
+            namespace (Namespace): A single-level schema namespace.
+
+        Returns:
+            list[SemanticModelMetric]: The visible metrics, or an empty list.
+
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+            UnsupportedOperationException: If metric discovery is not supported.
+        """
+        raise UnsupportedOperationException("Metric info listing is not supported")
 
     @abstractmethod
     def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:

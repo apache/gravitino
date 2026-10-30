@@ -122,9 +122,21 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.UseCatalog.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
-    waitForUpdatingPolicies();
-    sparkSession.sql(SQL_USE_CATALOG);
+    try {
+      metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+      waitForUpdatingPolicies();
+      sparkSession.sql(SQL_USE_CATALOG);
+    } catch (RuntimeException | Error failure) {
+      // A failed refresh must not leave "reset" behind and fail every subsequent test.
+      try {
+        metalake.deleteRole(roleName);
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (cleanupFailure != failure) {
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      throw failure;
+    }
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
   }

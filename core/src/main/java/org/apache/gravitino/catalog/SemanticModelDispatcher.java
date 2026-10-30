@@ -35,6 +35,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Dispatches schema-scoped Semantic Model operations through the server pipeline. */
 public interface SemanticModelDispatcher {
@@ -47,6 +48,24 @@ public interface SemanticModelDispatcher {
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException;
+
+  /**
+   * Lists metric identifiers across the live Semantic Models in a schema.
+   *
+   * @param namespace The full schema namespace.
+   * @return Metric identifiers, ordered by model identifier and case-sensitive metric name.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException;
+
+  /**
+   * Lists complete metrics across the live Semantic Models in a schema.
+   *
+   * @param namespace The full schema namespace.
+   * @return Decoded metrics, ordered by model identifier and case-sensitive metric name.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException;
 
   /**
    * Loads a Semantic Model by identifier.

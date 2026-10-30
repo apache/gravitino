@@ -395,7 +395,7 @@ components:
       name: outputMaxBytes
       in: query
       description: >
-        The maximum number of (most recent) output bytes to read, when includeOutput is true.
+        The maximum number of (most recent) output bytes to return, when includeOutput is true.
         Ignored otherwise. Can only narrow the globally configured gravitino.job.outputMaxBytes
         cap, never widen it - a value larger than the global cap is clamped down to it. Omit to
         use the global default.

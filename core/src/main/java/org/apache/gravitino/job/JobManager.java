@@ -37,7 +37,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -53,11 +56,15 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
@@ -121,6 +128,21 @@ public class JobManager implements JobOperationDispatcher {
   // stop.
   private static final int CANCELLATION_TIMEOUT_IN_PULL_INTERVALS = 3;
 
+  // How many of the jobs whose status pull failed are named in the log of a poll.
+  private static final int MAX_LOGGED_FAILED_JOBS = 5;
+
+  // A job is registered with this placeholder execution id before it is handed to the job
+  // executor, and gets the real one once the submission returns. The placeholder is unique per job,
+  // as the execution id is part of a unique key, and is never handed to the job executor.
+  private static final String PENDING_SUBMISSION_EXECUTION_ID_PREFIX = "pending-submission:";
+
+  // A submission normally returns in seconds. A job whose submission is still not recorded after
+  // this many pull intervals is considered left behind, e.g. by a server that exited while
+  // submitting it, and is reconciled with the job executor.
+  private static final int SUBMISSION_TIMEOUT_IN_PULL_INTERVALS = 3;
+
+  private static final int SUBMISSION_WRITE_MAX_ATTEMPTS = 3;
+
   private final EntityStore entityStore;
 
   private final File stagingDir;
@@ -137,6 +159,16 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long cancellationTimeoutInMs;
 
+  private final long submissionTimeoutInMs;
+
+  // Whether the job executor implements findSubmittedJob(), so a job whose submission outcome is
+  // unknown can be recovered rather than removed.
+  private final boolean findsSubmittedJobs;
+
+  // The ids of the jobs this server is submitting. The status pull of this server leaves them to
+  // their submission however long it takes, only the other servers settle them once it times out.
+  private final Set<Long> jobsBeingSubmitted = ConcurrentHashMap.newKeySet();
+
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
   @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
@@ -150,6 +182,9 @@ public class JobManager implements JobOperationDispatcher {
       Config config, EntityStore entityStore, IdGenerator idGenerator, JobExecutor jobExecutor) {
     this.entityStore = entityStore;
     this.jobExecutor = jobExecutor;
+    this.findsSubmittedJobs =
+        JobExecutorFactory.implementsMethod(
+            jobExecutor.getClass(), "findSubmittedJob", JobContext.class, JobTemplate.class);
     this.idGenerator = idGenerator;
 
     String stagingDirPath = config.get(Configs.JOB_STAGING_DIR);
@@ -215,6 +250,7 @@ public class JobManager implements JobOperationDispatcher {
     }
     this.cancellationTimeoutInMs =
         jobStatusPullIntervalInMs * CANCELLATION_TIMEOUT_IN_PULL_INTERVALS;
+    this.submissionTimeoutInMs = jobStatusPullIntervalInMs * SUBMISSION_TIMEOUT_IN_PULL_INTERVALS;
     this.statusPullExecutor =
         Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -475,7 +511,8 @@ public class JobManager implements JobOperationDispatcher {
               }
             });
 
-    if (!includeOutput) {
+    // A job whose submission is not recorded yet has no execution, so no output either.
+    if (!includeOutput || isPendingSubmission(entity)) {
       return entity;
     }
 
@@ -488,7 +525,7 @@ public class JobManager implements JobOperationDispatcher {
         maxBytes == null || maxBytes > 0, "maxBytes must be positive if specified");
 
     // A caller-specified maxLines/maxBytes can only narrow the globally configured cap, never
-    // widen it - the global configuration remains a hard upper bound on read cost/response size.
+    // widen it - the global configuration remains a hard upper bound on the response size.
     int effectiveMaxLines = clampToGlobalMax(maxLines, jobOutputMaxLines);
     int effectiveMaxBytes = clampToGlobalMax(maxBytes, jobOutputMaxBytes);
 
@@ -566,35 +603,19 @@ public class JobManager implements JobOperationDispatcher {
       throw new RuntimeException("Failed to serialize the runtime job template", e);
     }
 
-    // The job is queued once it is submitted. Take the time before the submission, so that it is
+    // The job is queued once it is registered. Take the time before the submission, so that it is
     // never later than the time the job executor reports the job started, which can happen right
     // after the job is submitted.
     Instant queuedAt = Instant.now();
 
-    // Submit the job template to the job executor
-    String jobExecutionId;
-    try {
-      jobExecutionId =
-          jobExecutor.submitJob(new JobContext(jobId, metalake, jobStagingDir), jobTemplate);
-    } catch (IllegalArgumentException e) {
-      // The job executor rejects the job because it cannot be launched, for example, a required
-      // configuration is missing. Rethrow it as is so the caller gets the original reason.
-      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
-      throw e;
-    } catch (Exception e) {
-      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
-      throw new RuntimeException(
-          String.format(
-              "Failed to submit job %s of job template %s for execution: %s",
-              jobId, jobTemplateName, e.getMessage()),
-          e);
-    }
-
-    // Create a new JobEntity to represent the job
-    JobEntity jobEntity =
+    // Register the job before handing it to the job executor, so that an execution is never left
+    // running without a job, e.g. when the server exits right after the submission. Until the
+    // submission is recorded, the job carries a placeholder execution id, and the status pull
+    // settles it if the submission is not recorded in time.
+    JobEntity pendingJobEntity =
         JobEntity.builder()
             .withId(jobId)
-            .withJobExecutionId(jobExecutionId)
+            .withJobExecutionId(pendingSubmissionExecutionId(jobId))
             .withJobTemplateName(jobTemplateName)
             .withStatus(JobHandle.Status.QUEUED)
             .withNamespace(NamespaceUtil.ofJob(metalake))
@@ -609,52 +630,316 @@ public class JobManager implements JobOperationDispatcher {
             .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
+    jobsBeingSubmitted.add(jobId);
     try {
-      entityStore.put(jobEntity, false /* overwrite */);
+      return registerAndSubmit(metalake, pendingJobEntity, jobTemplate, jobStagingDir);
+    } finally {
+      jobsBeingSubmitted.remove(jobId);
+    }
+  }
+
+  private JobEntity registerAndSubmit(
+      String metalake, JobEntity pendingJobEntity, JobTemplate jobTemplate, File jobStagingDir) {
+    long jobId = pendingJobEntity.id();
+    String jobTemplateName = pendingJobEntity.jobTemplateName();
+    try {
+      entityStore.put(pendingJobEntity, false /* overwrite */);
     } catch (NoSuchEntityException e) {
-      LOG.error(
-          "Job {} was submitted as execution {} but could not be registered because its template "
-              + "{} or metalake {} no longer exists",
-          jobEntity.name(),
-          jobExecutionId,
-          jobTemplateName,
-          metalake,
-          e);
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
       throw new NoSuchJobTemplateException(
           e,
           "Job template with name %s under metalake %s does not exist",
           jobTemplateName,
           metalake);
-    } catch (OptimisticLockException e) {
-      // Cancellation is asynchronous and cannot undo work that already finished. Request it
-      // best-effort, but do not expose a retryable conflict after submitting an execution.
-      LOG.warn(
-          "Job {} was submitted as execution {} but could not be registered because of a "
-              + "concurrent operation, cancelling the execution",
-          jobEntity.name(),
-          jobExecutionId,
-          e);
-      try {
-        jobExecutor.cancelJob(jobExecutionId);
-      } catch (Exception cancelFailure) {
-        LOG.error(
-            "Failed to cancel the unregistered execution {} of job {}",
-            jobExecutionId,
-            jobEntity.name(),
-            cancelFailure);
-        e.addSuppressed(cancelFailure);
-      }
-      throw new RuntimeException(
-          String.format(
-              "Failed to register job %s after submitting execution %s; cancellation was attempted "
-                  + "but the execution may already have run. Check the execution before retrying",
-              jobEntity.name(), jobExecutionId),
-          e);
+    } catch (RuntimeException e) {
+      // Nothing is submitted yet, so a conflict is reported as is and the caller can retry.
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
+      throw e;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
+      deleteStagingDirOfUnsubmittedJob(jobStagingDir, jobId);
+      throw new RuntimeException("Failed to register the job entity " + pendingJobEntity, e);
     }
 
-    return jobEntity;
+    // Ownership must be durable before the external submission: recovery does not run the
+    // original request's post hook. A failure here has no external side effect to recover.
+    try {
+      OwnerDispatcher owners = GravitinoEnv.getInstance().internalOwnerDispatcher();
+      if (owners != null) {
+        owners.setOwner(
+            metalake,
+            NameIdentifierUtil.toMetadataObject(
+                pendingJobEntity.nameIdentifier(), Entity.EntityType.JOB),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (RuntimeException e) {
+      deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, e);
+      throw e;
+    }
+
+    // Submit the job template to the job executor
+    String jobExecutionId;
+    try {
+      jobExecutionId =
+          jobExecutor.submitJob(new JobContext(jobId, metalake, jobStagingDir), jobTemplate);
+    } catch (IllegalArgumentException | JobSubmissionRejectedException e) {
+      // The job executor rejects the job because it cannot be launched, for example, a required
+      // configuration is missing. Rethrow it as is so the caller gets the original reason.
+      deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, e);
+      throw e;
+    } catch (Exception e) {
+      if (!findsSubmittedJobs) {
+        // The job executor can't find an execution the submission may have left, so the
+        // registration couldn't recover it. The job executor removes what it created instead.
+        RuntimeException failure =
+            new RuntimeException(
+                String.format(
+                    "Failed to submit job %s of job template %s for execution: %s",
+                    pendingJobEntity.name(), jobTemplateName, e.getMessage()),
+                e);
+        deleteUnsubmittedJob(metalake, pendingJobEntity, jobStagingDir, failure);
+        throw failure;
+      }
+
+      RuntimeException failure =
+          new RuntimeException(
+              String.format(
+                  "Failed to submit job %s of job template %s for execution: %s. The outcome is"
+                      + " unknown, so the job is kept and cancelled, and any execution found for it"
+                      + " in the job executor is cancelled too. Check the job before retrying",
+                  pendingJobEntity.name(), jobTemplateName, e.getMessage()),
+              e);
+      // A failed request is not proof that nothing was submitted. Keep the recovery anchor
+      // and persist cancellation before returning the failure. Never replay the submission.
+      markFailedSubmissionForCancellation(metalake, pendingJobEntity, null, failure);
+      throw failure;
+    }
+
+    return recordSubmission(metalake, pendingJobEntity, jobExecutionId);
+  }
+
+  // Persists the cancellation of a job whose submission failed. The execution id, if the job
+  // executor returned one, is recorded along with it, so the status pull keeps cancelling that
+  // execution rather than settling the job when a lookup doesn't find it.
+  private void markFailedSubmissionForCancellation(
+      String metalake, JobEntity job, @Nullable String jobExecutionId, Exception failure) {
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, job.name());
+    String execution =
+        jobExecutionId == null
+            ? "an execution of job id " + job.id()
+            : "execution " + jobExecutionId;
+    for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
+      try {
+        TreeLockUtils.doWithTreeLock(
+            jobIdent,
+            LockType.WRITE,
+            () ->
+                entityStore.update(
+                    jobIdent,
+                    JobEntity.class,
+                    Entity.EntityType.JOB,
+                    latest ->
+                        toCancellingJobEntity(
+                            jobExecutionId == null
+                                ? latest
+                                : withSubmittedExecution(latest, jobExecutionId))));
+        return;
+      } catch (OptimisticLockException e) {
+        failure.addSuppressed(e);
+      } catch (NoSuchEntityException e) {
+        // E.g. its metalake was dropped. Nothing is left to recover the execution with.
+        LOG.error(
+            "Job {} under metalake {} failed to be submitted or recorded and no longer exists, so"
+                + " its cancellation can't be retried. Check the job executor for {}",
+            job.name(),
+            metalake,
+            execution,
+            failure);
+        return;
+      } catch (Exception e) {
+        failure.addSuppressed(e);
+        break;
+      }
+    }
+    // The registration is still retained if the store cannot record the cancellation. Recovery
+    // can at least track a found execution instead of leaving it unknown to Gravitino.
+    LOG.error(
+        "Job {} under metalake {} failed to be submitted or recorded and its cancellation could"
+            + " not be recorded. The job registration is retained; check the job and {} before"
+            + " retrying",
+        job.name(),
+        metalake,
+        execution,
+        failure);
+  }
+
+  private JobEntity recordSubmission(
+      String metalake, JobEntity pendingJobEntity, String jobExecutionId) {
+    NameIdentifier jobIdent = NameIdentifierUtil.ofJob(metalake, pendingJobEntity.name());
+    Exception failure = null;
+    JobEntity recorded = null;
+    // entityStore.update() re-reads the job, so a conflict with a concurrent write, e.g. a
+    // cancellation, succeeds when retried. The retries are bounded, a job that still can't be
+    // recorded is settled by the status pull.
+    for (int attempt = 1; attempt <= SUBMISSION_WRITE_MAX_ATTEMPTS; attempt++) {
+      try {
+        recorded =
+            TreeLockUtils.doWithTreeLock(
+                jobIdent,
+                LockType.WRITE,
+                () ->
+                    entityStore.update(
+                        jobIdent,
+                        JobEntity.class,
+                        Entity.EntityType.JOB,
+                        latest -> withSubmittedExecution(latest, jobExecutionId)));
+        break;
+      } catch (OptimisticLockException e) {
+        if (failure == null) {
+          failure = e;
+        } else if (failure != e) {
+          failure.addSuppressed(e);
+        }
+      } catch (Exception e) {
+        // The job is gone, e.g. its metalake was dropped, or the store failed.
+        if (failure != null && failure != e) {
+          e.addSuppressed(failure);
+        }
+        failure = e;
+        break;
+      }
+    }
+
+    if (recorded != null && jobExecutionId.equals(recorded.jobExecutionId())) {
+      if (recorded.status() == JobHandle.Status.CANCELLING) {
+        // The job was cancelled while it was being submitted, before it could be cancelled in the
+        // job executor.
+        cancelSubmittedExecution(recorded, jobExecutionId, null);
+      }
+      return recorded;
+    }
+
+    // The submission could not be recorded, or another server settled the job as its submission
+    // took too long. Cancellation is asynchronous and cannot undo work that already finished, so
+    // request it best-effort, but do not expose a retryable conflict after submitting an execution.
+    String reason;
+    if (recorded == null) {
+      reason = "the submission could not be recorded";
+    } else {
+      String settledAs =
+          isPendingSubmission(recorded)
+              ? "marked it as " + recorded.status()
+              : "recorded execution " + recorded.jobExecutionId() + " for it";
+      reason =
+          String.format(
+              "another Gravitino server %s, as its submission took longer than %d ms. Make sure"
+                  + " the job executor submits a job within three"
+                  + " gravitino.job.statusPullIntervalInMs, and that all servers use the same"
+                  + " interval and have their clocks in sync",
+              settledAs, submissionTimeoutInMs);
+    }
+    RuntimeException registrationFailure =
+        new RuntimeException(
+            String.format(
+                "Failed to register job %s after submitting execution %s: %s. Cancellation was"
+                    + " attempted but the execution may already have run. Check the execution"
+                    + " before retrying",
+                pendingJobEntity.name(), jobExecutionId, reason),
+            failure);
+    LOG.warn(
+        "Job {} was submitted as execution {} but {}, cancelling the execution",
+        pendingJobEntity.name(),
+        jobExecutionId,
+        reason,
+        failure);
+    if (recorded == null && !(failure instanceof NoSuchEntityException)) {
+      // The registration still anchors recovery even when recording the id conflicted. Persist
+      // the cancellation intent with the known execution id, so a failed immediate cancellation is
+      // retried even if the job executor can't look up the submission.
+      markFailedSubmissionForCancellation(
+          metalake, pendingJobEntity, jobExecutionId, registrationFailure);
+    }
+    cancelSubmittedExecution(pendingJobEntity, jobExecutionId, registrationFailure);
+    throw registrationFailure;
+  }
+
+  // Records the execution of a job whose submission is still pending. A job whose submission was
+  // settled by the status pull in the meantime, which keeps the placeholder execution id, is left
+  // as is.
+  private JobEntity withSubmittedExecution(JobEntity latestJobEntity, String jobExecutionId) {
+    if (!isPendingSubmission(latestJobEntity) || isFinishedStatus(latestJobEntity.status())) {
+      return latestJobEntity;
+    }
+
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(jobExecutionId)
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        // The job stays QUEUED, or CANCELLING if it was cancelled while being submitted.
+        .withStatus(latestJobEntity.status())
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(latestJobEntity.auditInfo())
+        .withStartedAt(latestJobEntity.startedAt())
+        .withFinishedAt(latestJobEntity.finishedAt())
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
+        .build();
+  }
+
+  private void cancelSubmittedExecution(
+      JobEntity job, String jobExecutionId, @Nullable Exception failure) {
+    try {
+      jobExecutor.cancelJob(jobExecutionId);
+    } catch (NoSuchJobException e) {
+      // Both the server submitting the job and the one reconciling it may cancel the execution.
+      LOG.info("The execution {} of job {} is already gone", jobExecutionId, job.name());
+    } catch (Exception cancelFailure) {
+      LOG.error(
+          "Failed to cancel the execution {} of job {}", jobExecutionId, job.name(), cancelFailure);
+      if (failure != null) {
+        failure.addSuppressed(cancelFailure);
+      }
+    }
+  }
+
+  // Only used when no execution was submitted, including owner-registration failure, or when the
+  // job executor can't look up submissions. Never remove this recovery anchor for a submission
+  // whose outcome is unknown if findSubmittedJob() could recover its execution.
+  private void deleteUnsubmittedJob(
+      String metalake, JobEntity pendingJobEntity, File jobStagingDir, Exception failure) {
+    try {
+      entityStore.delete(
+          NameIdentifierUtil.ofJob(metalake, pendingJobEntity.name()), Entity.EntityType.JOB);
+    } catch (Exception e) {
+      failure.addSuppressed(e);
+      LOG.warn(
+          "Failed to delete unsubmitted job {}, settling its registration as FAILED",
+          pendingJobEntity.name(),
+          e);
+      try {
+        updateJobEntity(
+            metalake,
+            pendingJobEntity,
+            latest ->
+                toUpdatedStatusJobEntity(latest, JobExecutionInfo.of(JobHandle.Status.FAILED)));
+      } catch (RuntimeException settleFailure) {
+        failure.addSuppressed(settleFailure);
+        LOG.warn(
+            "Failed to settle unsubmitted job {}; its registration is retained",
+            pendingJobEntity.name(),
+            settleFailure);
+      }
+    }
+    deleteStagingDirOfUnsubmittedJob(jobStagingDir, pendingJobEntity.id());
+  }
+
+  @VisibleForTesting
+  static String pendingSubmissionExecutionId(long jobId) {
+    return PENDING_SUBMISSION_EXECUTION_ID_PREFIX + jobId;
+  }
+
+  private static boolean isPendingSubmission(JobEntity job) {
+    return job.jobExecutionId() != null
+        && job.jobExecutionId().startsWith(PENDING_SUBMISSION_EXECUTION_ID_PREFIX);
   }
 
   @Override
@@ -664,19 +949,24 @@ public class JobManager implements JobOperationDispatcher {
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
     JobEntity jobEntity = getJob(metalake, jobId, false);
 
-    if (jobEntity.status() == JobHandle.Status.CANCELLING
-        || jobEntity.status() == JobHandle.Status.CANCELLED
+    if (jobEntity.status() == JobHandle.Status.CANCELLED
         || jobEntity.status() == JobHandle.Status.SUCCEEDED
         || jobEntity.status() == JobHandle.Status.FAILED) {
-      // If the job is already cancelling, cancelled, succeeded, or failed, we do not need to cancel
-      // it again.
+      // Never change a terminal job or request its cancellation again.
       return jobEntity;
     }
 
     // Cancel the job using the job executor if this server owns the job. Otherwise, the job runs
     // on another server, so only mark it as CANCELLING below, and the owning server cancels it
-    // when it pulls the job status next time.
-    if (jobExecutor.ownsJob(jobEntity.jobExecutionId())) {
+    // when it pulls the job status next time. A job whose submission is not recorded yet is only
+    // marked as CANCELLING, and its execution is cancelled once the submission is recorded.
+    if (isPendingSubmission(jobEntity)) {
+      LOG.info(
+          "Job {} under metalake {} is being submitted, marking it as CANCELLING for its execution "
+              + "to be cancelled once it is submitted",
+          jobId,
+          metalake);
+    } else if (jobExecutor.ownsJob(jobEntity.jobExecutionId())) {
       try {
         jobExecutor.cancelJob(jobEntity.jobExecutionId());
       } catch (NoSuchJobException e) {
@@ -701,33 +991,68 @@ public class JobManager implements JobOperationDispatcher {
           metalake);
     }
 
+    if (jobEntity.status() == JobHandle.Status.CANCELLING) {
+      // The cancellation above is retried, but its durable intent and timeout must not be reset.
+      return jobEntity;
+    }
+
     // Update the job status to CANCELING
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofJob(metalake, jobId),
-        LockType.WRITE,
-        () -> {
-          try {
-            // entityStore.update() re-fetches the latest entity itself right before applying the
-            // updater, rather than reusing the snapshot taken before the (potentially slow)
-            // external cancel call above - a concurrent status poll could have persisted a real
-            // startedAt/finishedAt in that gap, and carrying forward the stale snapshot would
-            // clobber it back to the sentinel.
-            return entityStore.update(
-                NameIdentifierUtil.ofJob(metalake, jobId),
-                JobEntity.class,
-                Entity.EntityType.JOB,
-                this::toCancellingJobEntity);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchJobException(
-                "Job with ID %s under metalake %s does not exist, this could be due to the job "
-                    + "not existing or being deleted concurrently.",
-                jobId, metalake);
-          } catch (IOException e) {
-            throw new RuntimeException(
-                String.format("Failed to update job entity for job %s to CANCELING status", jobId),
-                e);
-          }
-        });
+    JobEntity cancellingJobEntity =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifierUtil.ofJob(metalake, jobId),
+            LockType.WRITE,
+            () -> {
+              try {
+                // entityStore.update() re-fetches the latest entity itself right before applying
+                // the updater, rather than reusing the snapshot taken before the (potentially
+                // slow) external cancel call above - a concurrent status poll could have persisted
+                // a real startedAt/finishedAt in that gap, and carrying forward the stale snapshot
+                // would clobber it back to the sentinel.
+                return entityStore.update(
+                    NameIdentifierUtil.ofJob(metalake, jobId),
+                    JobEntity.class,
+                    Entity.EntityType.JOB,
+                    this::toCancellingJobEntity);
+              } catch (NoSuchEntityException e) {
+                throw new NoSuchJobException(
+                    "Job with ID %s under metalake %s does not exist, this could be due to the job "
+                        + "not existing or being deleted concurrently.",
+                    jobId, metalake);
+              } catch (IOException e) {
+                throw new RuntimeException(
+                    String.format(
+                        "Failed to update job entity for job %s to CANCELING status", jobId),
+                    e);
+              }
+            });
+
+    // The submission was recorded after the job was read above, so the server submitting it has
+    // seen it QUEUED and won't cancel it. Cancel it here, as nobody else would cancel it in a job
+    // executor whose job state is not node local.
+    if (isPendingSubmission(jobEntity)
+        && !isPendingSubmission(cancellingJobEntity)
+        && cancellingJobEntity.status() == JobHandle.Status.CANCELLING
+        && jobExecutor.ownsJob(cancellingJobEntity.jobExecutionId())) {
+      try {
+        jobExecutor.cancelJob(cancellingJobEntity.jobExecutionId());
+      } catch (NoSuchJobException e) {
+        // The status pull settles it as CANCELLED.
+        LOG.info(
+            "The execution {} of job {} is already gone",
+            cancellingJobEntity.jobExecutionId(),
+            jobId);
+      } catch (Exception e) {
+        // The intent is durable, so the status pull retries this cancellation after a failure.
+        throw new RuntimeException(
+            String.format(
+                "Job %s under metalake %s is marked as CANCELLING, but failed to cancel its"
+                    + " execution %s, which was submitted meanwhile. The status pull will retry"
+                    + " the cancellation; the cancel request can also be retried",
+                jobId, metalake, cancellingJobEntity.jobExecutionId()),
+            e);
+      }
+    }
+    return cancellingJobEntity;
   }
 
   private JobEntity toCancellingJobEntity(JobEntity latestJobEntity) {
@@ -1046,42 +1371,67 @@ public class JobManager implements JobOperationDispatcher {
                         || job.status() == JobHandle.Status.CANCELLING)
             .toList();
 
+    // A job whose status can't be pulled or updated is kept unchanged, and retried in the next
+    // poll. While the job executor fails, for example while its backend is unreachable, every job
+    // fails the same way on every poll, so the failures are logged once per poll.
     long now = System.currentTimeMillis();
-    activeJobs.forEach(
-        job -> {
-          // A failure on one job must never stop the status pull of the others.
-          try {
-            // Only the job executor instance owning the job can query its status. The jobs
-            // owned by other servers are skipped, except a node local job whose cancellation its
-            // owner has not answered in time: the owner has likely exited, e.g. the server
-            // restarted, so nobody else would ever settle it. The other jobs left behind by a
-            // server that has exited are settled by cleanUpStagingDirs() once they expire.
-            if (jobExecutor.ownsJob(job.jobExecutionId())) {
-              pullAndUpdateOwnedJobStatus(metalake, job);
-            } else if (jobExecutor.isJobStateNodeLocal() && isCancellationUnanswered(job, now)) {
-              settleUnansweredCancellation(metalake, job, now);
-            }
-          } catch (Throwable t) {
-            LOG.error(
-                "Failed to update the status of job {} with execution id {} under metalake {}",
-                job.name(),
-                job.jobExecutionId(),
-                metalake,
-                t);
+    List<String> failedJobs = new ArrayList<>();
+    Throwable firstFailure = null;
+    for (JobEntity job : activeJobs) {
+      // A failure on one job must never stop the status pull of the others.
+      try {
+        // A job whose submission is not recorded yet has no execution to query. It is left to the
+        // server submitting it, unless another server is submitting it and doesn't record it in
+        // time, e.g. because that server has exited.
+        if (isPendingSubmission(job)) {
+          if (!jobsBeingSubmitted.contains(job.id()) && isSubmissionUnanswered(job, now)) {
+            reconcilePendingSubmission(metalake, job, now);
           }
-        });
+          continue;
+        }
+
+        // Only the job executor instance owning the job can query its status. The jobs owned by
+        // other servers are skipped, except a node local job whose cancellation its owner has not
+        // answered in time: the owner has likely exited, e.g. the server restarted, so nobody else
+        // would ever settle it. The other jobs left behind by a server that has exited are settled
+        // by cleanUpStagingDirs() once they expire.
+        if (jobExecutor.ownsJob(job.jobExecutionId())) {
+          pullAndUpdateOwnedJobStatus(metalake, job);
+        } else if (jobExecutor.isJobStateNodeLocal() && isCancellationUnanswered(job, now)) {
+          settleUnansweredCancellation(metalake, job, now);
+        }
+      } catch (Throwable t) {
+        LOG.debug(
+            "Failed to pull or update the status of job {} with execution id {} under metalake {}",
+            job.name(),
+            job.jobExecutionId(),
+            metalake,
+            t);
+        failedJobs.add(job.name());
+        firstFailure = firstFailure == null ? t : firstFailure;
+      }
+    }
+
+    if (firstFailure != null) {
+      LOG.warn(
+          "Failed to pull or update the status of {} of {} active jobs under metalake {}, for"
+              + " example {}, retrying in the next poll. The first failure:",
+          failedJobs.size(),
+          activeJobs.size(),
+          metalake,
+          failedJobs.subList(0, Math.min(failedJobs.size(), MAX_LOGGED_FAILED_JOBS)),
+          firstFailure);
+    }
   }
 
   private void pullAndUpdateOwnedJobStatus(String metalake, JobEntity job) {
     JobExecutionInfo observed;
     try {
       observed = jobExecutor.getJobExecutionInfo(job.jobExecutionId());
-      // The job was marked as CANCELLING by another server, which can't cancel it itself, so
-      // cancel it here as the owner. This only applies to node local job state, other job
-      // executors are cancelled directly by the server handling the request, and they may keep
-      // reporting the job as running while cancelling it asynchronously.
-      if (jobExecutor.isJobStateNodeLocal()
-          && job.status() == JobHandle.Status.CANCELLING
+      // CANCELLING is a durable intent, including for shared runners. Retry until the runner
+      // acknowledges cancellation or reports a terminal result. An acknowledged asynchronous
+      // cancellation is left alone while it reports CANCELLING.
+      if (job.status() == JobHandle.Status.CANCELLING
           && (observed.status() == JobHandle.Status.QUEUED
               || observed.status() == JobHandle.Status.STARTED)) {
         observed = cancelOwnedJob(metalake, job);
@@ -1104,14 +1454,6 @@ public class JobManager implements JobOperationDispatcher {
           job.jobExecutionId(),
           metalake,
           observed.status());
-    } catch (Exception e) {
-      // Keep the job unchanged, and retry it in the next poll.
-      LOG.error(
-          "Failed to pull or cancel job {} by execution id {}",
-          job.name(),
-          job.jobExecutionId(),
-          e);
-      return;
     }
 
     // Besides the status, the job executor may report the timestamps of the job later than its
@@ -1488,6 +1830,81 @@ public class JobManager implements JobOperationDispatcher {
                     metalake,
                     cancellationTimeoutInMs,
                     settledJob.status()));
+  }
+
+  // Settles a job whose submission was not recorded in time, with the job executor as the source of
+  // truth: an execution found for the job is recorded, so the job is tracked like any other one.
+  // Otherwise the job is marked as FAILED, or CANCELLED if it was cancelled. If the submission
+  // returns after that, the server submitting the job cancels the execution.
+  private void reconcilePendingSubmission(String metalake, JobEntity job, long now) {
+    Optional<String> found = findSubmittedExecution(metalake, job);
+    AtomicBoolean settled = new AtomicBoolean(false);
+    Optional<JobEntity> settledJob =
+        updateJobEntity(
+                metalake,
+                job,
+                latestJobEntity -> {
+                  // The submission may have been recorded since the listJobs() snapshot.
+                  if (!isPendingSubmission(latestJobEntity)
+                      || isFinishedStatus(latestJobEntity.status())
+                      || !isSubmissionUnanswered(latestJobEntity, now)) {
+                    return latestJobEntity;
+                  }
+                  settled.set(true);
+                  if (found.isPresent()) {
+                    return withSubmittedExecution(latestJobEntity, found.get());
+                  }
+                  return toUpdatedStatusJobEntity(
+                      latestJobEntity,
+                      JobExecutionInfo.of(
+                          latestJobEntity.status() == JobHandle.Status.CANCELLING
+                              ? JobHandle.Status.CANCELLED
+                              : JobHandle.Status.FAILED));
+                })
+            .filter(updated -> settled.get());
+    if (settledJob.isEmpty()) {
+      return;
+    }
+
+    JobEntity updated = settledJob.get();
+    if (found.isPresent()) {
+      LOG.warn(
+          "The submission of job {} under metalake {} was not recorded within {} ms, found its "
+              + "execution {} in the job executor and recorded it",
+          job.name(),
+          metalake,
+          submissionTimeoutInMs,
+          found.get());
+      if (updated.status() == JobHandle.Status.CANCELLING) {
+        cancelSubmittedExecution(updated, found.get(), null);
+      }
+    } else {
+      LOG.warn(
+          "The submission of job {} under metalake {} was not recorded within {} ms and the job "
+              + "executor has no execution of it, marking it as {}. This could be due to the "
+              + "Gravitino server submitting the job having exited.",
+          job.name(),
+          metalake,
+          submissionTimeoutInMs,
+          updated.status());
+    }
+  }
+
+  private Optional<String> findSubmittedExecution(String metalake, JobEntity job) {
+    if (job.runtimeJobTemplate() == null) {
+      return Optional.empty();
+    }
+    JobTemplate jobTemplate =
+        DTOConverters.fromDTO(
+            DTOConverters.fromRuntimeJobTemplateJson(job.runtimeJobTemplate(), job.name()));
+    Optional<String> found =
+        jobExecutor.findSubmittedJob(
+            new JobContext(job.id(), metalake, jobStagingDir(job.id())), jobTemplate);
+    return Objects.requireNonNull(found, "findSubmittedJob must return an Optional");
+  }
+
+  private boolean isSubmissionUnanswered(JobEntity job, long now) {
+    return now - lastUpdatedTimeInMs(job) > submissionTimeoutInMs;
   }
 
   private boolean isCancellationUnanswered(JobEntity job, long now) {

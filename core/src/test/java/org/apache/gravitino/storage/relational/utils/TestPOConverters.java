@@ -77,6 +77,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -249,6 +250,38 @@ public class TestPOConverters {
 
     ColumnEntity convertedColumn1 = POConverters.fromColumnPO(columnPO1);
     assertEquals(expectedColumn1.comment(), convertedColumn1.comment());
+  }
+
+  @Test
+  public void testFromColumnPOWithLegacyNullDefault() throws JsonProcessingException {
+    Type legacyType = Types.UnparsedType.of("future_type");
+    ColumnPO columnPO =
+        createColumnPO(
+            1L,
+            "legacy",
+            0,
+            1L,
+            1L,
+            1L,
+            1L,
+            legacyType,
+            null,
+            true,
+            false,
+            Literals.of(null, legacyType),
+            ColumnPO.ColumnOpType.CREATE);
+
+    Literal<?> storedDefault =
+        (Literal<?>)
+            JsonUtils.anyFieldMapper().readValue(columnPO.getDefaultValue(), Expression.class);
+    assertEquals(legacyType, storedDefault.dataType());
+    assertNull(storedDefault.value());
+
+    // Loading existing metadata must preserve the converter's null normalization without applying
+    // the validation that rejects this declared type on new writes.
+    ColumnEntity convertedColumn = POConverters.fromColumnPO(columnPO);
+    assertEquals(legacyType, convertedColumn.dataType());
+    assertEquals(Literals.NULL, convertedColumn.defaultValue());
   }
 
   @Test

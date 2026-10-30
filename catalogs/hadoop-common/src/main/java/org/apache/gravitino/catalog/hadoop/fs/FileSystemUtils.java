@@ -211,9 +211,14 @@ public class FileSystemUtils {
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
 
-      config.forEach(
-          (k, v) ->
-              writeProperty(writer, StringUtils.isNotBlank(bypass) ? k.replace(bypass, "") : k, v));
+      // Configuration keeps the last value of a key within one resource. Write the bypass keys
+      // first so that a plain key wins over its bypass twin, as in toHadoopConfigMap.
+      config.entrySet().stream()
+          .filter(e -> StringUtils.isNotBlank(bypass) && e.getKey().startsWith(bypass))
+          .forEach(e -> writeProperty(writer, e.getKey().substring(bypass.length()), e.getValue()));
+      config.entrySet().stream()
+          .filter(e -> StringUtils.isBlank(bypass) || !e.getKey().startsWith(bypass))
+          .forEach(e -> writeProperty(writer, e.getKey(), e.getValue()));
       writer.writeEndElement();
       writer.writeEndDocument();
       writer.close();

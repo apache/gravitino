@@ -23,9 +23,9 @@ import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
@@ -36,12 +36,11 @@ import org.slf4j.LoggerFactory;
  * in-flight gate → soft-slot claim → {@code runJob} → bind job id.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
- * shape; batch pick overlays per-table keys and submits one Spark job per table. If any spec table
- * is in-flight, the whole pick stops without partial submits (one-shot row is still removed by the
- * caller).
+ * shape; each {@link Task} becomes one Spark job. If any task table is in-flight, the whole pick
+ * stops without partial submits (one-shot row is still removed by the caller).
  *
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
- * {@code rules} in jobConf). Policy / jobConf are not recomputed here.
+ * {@code rules} in task parameters).
  */
 public final class MaintenanceSparkSubmitPipeline {
 
@@ -86,17 +85,16 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<CronJobIds.TablePolicyIds> tableIds = CronJobIds.parseTable(instanceId);
-    Optional<CronJobIds.BatchPolicyIds> batchIds = CronJobIds.parseBatch(instanceId);
+    Optional<long[]> tableIds = MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<long[]> batchIds = MaintenanceTaskIds.parseCronBatch(instanceId);
     if (tableIds.isEmpty() && batchIds.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
     }
 
-    Operation step = spec.getOperations().get(0);
-    long policyId = step.getPolicyId();
-    long expectedPolicyId =
-        tableIds.isPresent() ? tableIds.get().policyId() : batchIds.get().policyId();
+    long policyId = spec.getTasks().get(0).getPolicyId();
+    // parseCron* returns [leftId, policyId]
+    long expectedPolicyId = tableIds.isPresent() ? tableIds.get()[1] : batchIds.get()[1];
     if (policyId != expectedPolicyId) {
       LOG.warn(
           "Skipping cron-job submit for {}: spec policyId {} != instance policyId {}",
@@ -105,9 +103,19 @@ public final class MaintenanceSparkSubmitPipeline {
           expectedPolicyId);
       return;
     }
+    for (Task task : spec.getTasks()) {
+      if (task.getPolicyId() != policyId) {
+        LOG.warn(
+            "Skipping cron-job submit for {}: mixed policyIds in tasks ({} vs {})",
+            instanceId,
+            policyId,
+            task.getPolicyId());
+        return;
+      }
+    }
     if (tableIds.isPresent()) {
-      long expectedTableId = tableIds.get().tableId();
-      if (spec.getTables().size() != 1 || spec.getTables().get(0).getTableId() != expectedTableId) {
+      long expectedTableId = tableIds.get()[0];
+      if (spec.getTasks().size() != 1 || spec.getTasks().get(0).getTableId() != expectedTableId) {
         LOG.warn(
             "Skipping cron-job submit for {}: spec tables {} do not match instance tableId {}",
             instanceId,
@@ -119,28 +127,29 @@ public final class MaintenanceSparkSubmitPipeline {
 
     // minInterval was gated at expand enqueue; pick only blocks on in-flight. Any in-flight
     // member aborts the whole pick so a batch row is not partially submitted then deleted.
-    for (TableTarget target : spec.getTables()) {
-      if (occupancyGate.isInFlight(target.getTableId(), policyId)) {
+    for (Task task : spec.getTasks()) {
+      if (occupancyGate.isInFlight(task.getTableId(), policyId)) {
         LOG.info(
             "Skipping cron-job {} entirely (table {} in-flight for policy {})",
             instanceId,
-            target.getTableId(),
+            task.getTableId(),
             policyId);
         return;
       }
     }
-    for (TableTarget target : spec.getTables()) {
-      submitOne(spec, target, policyId);
+    for (Task task : spec.getTasks()) {
+      submitOne(spec, task);
     }
   }
 
-  private void submitOne(MaintenanceJobSpec spec, TableTarget target, long policyId) {
+  private void submitOne(MaintenanceJobSpec spec, Task task) {
+    long policyId = task.getPolicyId();
     Optional<OccupancyClaim> claim =
-        actionMetaService.tryAcquireInFlight(target.getTableId(), policyId, claimTimeoutMs);
+        actionMetaService.tryAcquireInFlight(task.getTableId(), policyId, claimTimeoutMs);
     if (claim.isEmpty()) {
       LOG.info(
           "Skipping cron-job submit for table {} policy {} (lost soft-slot race)",
-          target.getTableId(),
+          task.getTableId(),
           policyId);
       return;
     }
@@ -148,18 +157,17 @@ public final class MaintenanceSparkSubmitPipeline {
     Map<String, String> jobConf;
     try {
       jobConf =
-          jobConfBuilder.resolveForSubmit(
-              MaintenanceJobSpecFactory.jobConfForTable(spec.getJobConf(), target));
+          jobConfBuilder.resolveForSubmit(MaintenanceJobSpecFactory.jobConfForTask(spec, task));
     } catch (RuntimeException e) {
       releaseClaimQuietly(claim.get());
       LOG.warn(
-          "Skipping cron-job submit for table {} policy {}: invalid spec table target: {}",
-          target.getTableId(),
+          "Skipping cron-job submit for table {} policy {}: invalid task: {}",
+          task.getTableId(),
           policyId,
           e.toString());
       return;
     }
-    runAndBind(spec.metalake(), jobConf, claim.get(), target.getTableId(), policyId);
+    runAndBind(spec.metalake(), jobConf, claim.get(), task.getTableId(), policyId);
   }
 
   private void runAndBind(
@@ -168,6 +176,7 @@ public final class MaintenanceSparkSubmitPipeline {
       OccupancyClaim claim,
       long tableId,
       long policyId) {
+    jobConf.put(MaintenanceJobTemplates.ACTION_IDS_KEY, Long.toString(claim.actionId()));
     Long jobId = null;
     try {
       jobId =
@@ -203,12 +212,14 @@ public final class MaintenanceSparkSubmitPipeline {
       if (!actionMetaService.deleteUnboundClaim(claim)) {
         LOG.debug(
             "Occupancy claim {} created_at={} was not released (reclaimed or already bound)",
-            claim.id(),
+            claim.actionId(),
             claim.createdAt());
       }
     } catch (RuntimeException releaseError) {
       LOG.warn(
-          "Failed to release occupancy claim {} after submit failure", claim.id(), releaseError);
+          "Failed to release occupancy claim {} after submit failure",
+          claim.actionId(),
+          releaseError);
     }
   }
 }

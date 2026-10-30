@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.scheduler;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,126 +30,128 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
 
 /**
  * Enqueue-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and
  * {@code commit-job} rows.
  *
- * <p>Thin envelope only: {@link #jobConf} is the same {@code Map<String,String>} passed to {@code
- * runJob} (including {@code updater_options} as a JSON string). Tables carry {@code tableId} plus
- * NameIdentifier levels (metalake first); operations carry {@code policyId} plus the wire
- * maintenance type. Metalake for {@code runJob} is derived from {@link #tables}.
+ * <p>Shape stays close to Iceberg update-stats {@code runJob} conf: each {@link Task} carries TMS
+ * routing fields plus a flat {@code parameters} map (old template placeholders). Shared session
+ * bags {@code updater_options} and {@code spark_conf} sit at the envelope top as JSON object
+ * strings. Submit merges one task (cron) or all tasks (commit chain) into the flat {@code
+ * Map<String,String>} passed to {@code runJob}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MaintenanceJobSpec {
 
-  private List<TableTarget> tables = new ArrayList<>();
-  private List<Operation> operations = new ArrayList<>();
-  private Map<String, String> jobConf = new LinkedHashMap<>();
+  private List<Task> tasks = new ArrayList<>();
+
+  @JsonProperty("updater_options")
+  private String updaterOptions;
+
+  @JsonProperty("spark_conf")
+  private String sparkConf;
 
   /** Jackson / empty constructor. */
   public MaintenanceJobSpec() {}
 
   /**
-   * @param tables table targets (order preserved)
-   * @param operations maintenance operations (order preserved; cron: one; commit: chain)
-   * @param jobConf runJob configuration map
+   * @param tasks maintenance tasks (order preserved)
+   * @param updaterOptions JSON object string for {@code updater_options}
+   * @param sparkConf JSON object string for {@code spark_conf}; may be null when empty
    */
   public MaintenanceJobSpec(
-      List<TableTarget> tables, List<Operation> operations, Map<String, String> jobConf) {
-    this.tables = new ArrayList<>(Preconditions.checkNotNull(tables, "tables"));
-    this.operations = new ArrayList<>(Preconditions.checkNotNull(operations, "operations"));
-    this.jobConf = new LinkedHashMap<>(Preconditions.checkNotNull(jobConf, "jobConf"));
+      List<Task> tasks, @Nullable String updaterOptions, @Nullable String sparkConf) {
+    this.tasks = new ArrayList<>(Preconditions.checkNotNull(tasks, "tasks"));
+    this.updaterOptions = updaterOptions;
+    this.sparkConf = sparkConf;
   }
 
   /**
-   * @return table targets
+   * @return maintenance tasks
    */
-  public List<TableTarget> getTables() {
-    return tables;
+  public List<Task> getTasks() {
+    return tasks;
   }
 
   /**
-   * @param tables table targets
+   * @param tasks maintenance tasks
    */
-  public void setTables(List<TableTarget> tables) {
-    this.tables = tables == null ? new ArrayList<>() : new ArrayList<>(tables);
+  public void setTasks(List<Task> tasks) {
+    this.tasks = tasks == null ? new ArrayList<>() : new ArrayList<>(tasks);
   }
 
   /**
-   * @return maintenance operations
+   * @return shared updater options JSON string
    */
-  public List<Operation> getOperations() {
-    return operations;
+  public String getUpdaterOptions() {
+    return updaterOptions;
   }
 
   /**
-   * @param operations maintenance operations
+   * @param updaterOptions shared updater options JSON string
    */
-  public void setOperations(List<Operation> operations) {
-    this.operations = operations == null ? new ArrayList<>() : new ArrayList<>(operations);
+  public void setUpdaterOptions(String updaterOptions) {
+    this.updaterOptions = updaterOptions;
   }
 
   /**
-   * @return runJob configuration
+   * @return shared spark_conf JSON string
    */
-  public Map<String, String> getJobConf() {
-    return jobConf;
+  public String getSparkConf() {
+    return sparkConf;
   }
 
   /**
-   * @param jobConf runJob configuration
+   * @param sparkConf shared spark_conf JSON string
    */
-  public void setJobConf(Map<String, String> jobConf) {
-    this.jobConf = jobConf == null ? new LinkedHashMap<>() : new LinkedHashMap<>(jobConf);
+  public void setSparkConf(String sparkConf) {
+    this.sparkConf = sparkConf;
   }
 
   /**
-   * @return unmodifiable table entity ids in spec order
+   * @return unmodifiable table entity ids in task order (may contain duplicates across types)
    */
   @JsonIgnore
   public List<Long> tableIds() {
-    if (tables == null || tables.isEmpty()) {
+    if (tasks == null || tasks.isEmpty()) {
       return List.of();
     }
     return Collections.unmodifiableList(
-        tables.stream().map(TableTarget::getTableId).collect(Collectors.toList()));
+        tasks.stream().map(Task::getTableId).collect(Collectors.toList()));
   }
 
   /**
-   * Metalake for {@code runJob} / cancel, taken from the first table's NameIdentifier.
+   * Metalake for {@code runJob} / cancel, taken from {@code updater_options.metalake}.
    *
-   * @return metalake name, or {@code null} when tables are missing / incomplete
+   * @return metalake name, or {@code null} when missing
    */
   @JsonIgnore
   @Nullable
   public String metalake() {
-    if (tables == null || tables.isEmpty()) {
+    if (updaterOptions == null || updaterOptions.isBlank()) {
       return null;
     }
-    List<String> identifier = tables.get(0).getIdentifier();
-    if (identifier == null || identifier.isEmpty()) {
-      return null;
-    }
-    String name = identifier.get(0);
-    return name == null || name.isBlank() ? null : name;
+    Map<String, String> options =
+        IcebergSparkConfigUtils.parseFlatJsonMap(
+            updaterOptions, MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
+    String metalake = options.get("metalake");
+    return metalake == null || metalake.isBlank() ? null : metalake.trim();
   }
 
   /**
-   * @return true when tables, operations, and jobConf look usable for submit
+   * @return true when tasks and shared updater_options look usable for submit
    */
   @JsonIgnore
   public boolean isValid() {
     return metalake() != null
-        && tables != null
-        && !tables.isEmpty()
-        && operations != null
-        && !operations.isEmpty()
-        && jobConf != null
-        && !jobConf.isEmpty()
-        && operations.get(0).getPolicyId() > 0
-        && tables.stream().allMatch(TableTarget::isValid)
-        && operations.stream().allMatch(Operation::isValid);
+        && updaterOptions != null
+        && !updaterOptions.isBlank()
+        && tasks != null
+        && !tasks.isEmpty()
+        && tasks.stream().allMatch(Task::isValid);
   }
 
   @Override
@@ -160,45 +163,61 @@ public final class MaintenanceJobSpec {
       return false;
     }
     MaintenanceJobSpec that = (MaintenanceJobSpec) o;
-    return Objects.equals(tables, that.tables)
-        && Objects.equals(operations, that.operations)
-        && Objects.equals(jobConf, that.jobConf);
+    return Objects.equals(tasks, that.tasks)
+        && Objects.equals(updaterOptions, that.updaterOptions)
+        && Objects.equals(sparkConf, that.sparkConf);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tables, operations, jobConf);
+    return Objects.hash(tasks, updaterOptions, sparkConf);
   }
 
   @Override
   public String toString() {
-    return "MaintenanceJobSpec{tables="
+    return "MaintenanceJobSpec{tasks="
+        + (tasks == null ? 0 : tasks.size())
+        + ", tableIds="
         + tableIds()
-        + ", operations="
-        + (operations == null ? 0 : operations.size())
-        + ", jobConfKeys="
-        + (jobConf == null ? 0 : jobConf.size())
         + '}';
   }
 
-  /** One table covered by this spec. */
+  /**
+   * One runnable maintenance unit (typically one {@code runJob} on the cron path; commit chains
+   * pack several tasks into one Spark submit).
+   */
   @JsonIgnoreProperties(ignoreUnknown = true)
-  public static final class TableTarget {
+  public static final class Task {
 
     private long tableId;
-    private List<String> identifier = new ArrayList<>();
+    @Nullable private Long actionId;
+    private long policyId;
+    private String maintenanceType;
+    private Map<String, String> parameters = new LinkedHashMap<>();
 
     /** Jackson constructor. */
-    public TableTarget() {}
+    public Task() {}
 
     /**
      * @param tableId table entity id
-     * @param identifier NameIdentifier levels (metalake, catalog, …, table)
+     * @param policyId policy entity id
+     * @param maintenanceType Spark wire maintenance type
+     * @param actionId soft-slot action id when known; null at enqueue
+     * @param parameters flat template placeholders (old builtin jobConf keys)
      */
-    public TableTarget(long tableId, List<String> identifier) {
+    public Task(
+        long tableId,
+        long policyId,
+        String maintenanceType,
+        @Nullable Long actionId,
+        Map<String, String> parameters) {
       Preconditions.checkArgument(tableId > 0, "tableId must be positive");
+      Preconditions.checkArgument(policyId > 0, "policyId must be positive");
       this.tableId = tableId;
-      this.identifier = new ArrayList<>(Preconditions.checkNotNull(identifier, "identifier"));
+      this.policyId = policyId;
+      this.maintenanceType = Preconditions.checkNotNull(maintenanceType, "maintenanceType");
+      this.actionId = actionId;
+      this.parameters = new LinkedHashMap<>(Preconditions.checkNotNull(parameters, "parameters"));
     }
 
     /**
@@ -216,84 +235,18 @@ public final class MaintenanceJobSpec {
     }
 
     /**
-     * @return NameIdentifier levels
+     * @return soft-slot action id, or null before acquire
      */
-    public List<String> getIdentifier() {
-      return identifier;
-    }
-
-    /**
-     * @param identifier NameIdentifier levels
-     */
-    public void setIdentifier(List<String> identifier) {
-      this.identifier = identifier == null ? new ArrayList<>() : new ArrayList<>(identifier);
-    }
-
-    /**
-     * @return Spark catalog name ({@code identifier[1]})
-     */
-    @JsonIgnore
     @Nullable
-    public String catalogName() {
-      return identifier != null && identifier.size() >= 2 ? identifier.get(1) : null;
+    public Long getActionId() {
+      return actionId;
     }
 
     /**
-     * @return {@code schema.table} (or nested) Spark table identifier
+     * @param actionId soft-slot action id
      */
-    @JsonIgnore
-    @Nullable
-    public String sparkTableIdentifier() {
-      if (identifier == null || identifier.size() < 3) {
-        return null;
-      }
-      return String.join(".", identifier.subList(2, identifier.size()));
-    }
-
-    @JsonIgnore
-    boolean isValid() {
-      return tableId > 0
-          && identifier != null
-          && identifier.size() >= 3
-          && identifier.stream().noneMatch(part -> part == null || part.isBlank());
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof TableTarget)) {
-        return false;
-      }
-      TableTarget that = (TableTarget) o;
-      return tableId == that.tableId && Objects.equals(identifier, that.identifier);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(tableId, identifier);
-    }
-  }
-
-  /** One maintenance operation (cron: single type; commit: chain member). */
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static final class Operation {
-
-    private long policyId;
-    private String maintenanceType;
-
-    /** Jackson constructor. */
-    public Operation() {}
-
-    /**
-     * @param policyId policy entity id
-     * @param maintenanceType Spark wire name
-     */
-    public Operation(long policyId, String maintenanceType) {
-      Preconditions.checkArgument(policyId > 0, "policyId must be positive");
-      this.policyId = policyId;
-      this.maintenanceType = Preconditions.checkNotNull(maintenanceType, "maintenanceType");
+    public void setActionId(@Nullable Long actionId) {
+      this.actionId = actionId;
     }
 
     /**
@@ -324,9 +277,48 @@ public final class MaintenanceJobSpec {
       this.maintenanceType = maintenanceType;
     }
 
+    /**
+     * @return flat template placeholders
+     */
+    public Map<String, String> getParameters() {
+      return parameters;
+    }
+
+    /**
+     * @param parameters flat template placeholders
+     */
+    public void setParameters(Map<String, String> parameters) {
+      this.parameters =
+          parameters == null ? new LinkedHashMap<>() : new LinkedHashMap<>(parameters);
+    }
+
+    /**
+     * @return Spark catalog name from {@code parameters.catalog_name}
+     */
+    @JsonIgnore
+    @Nullable
+    public String catalogName() {
+      return blankToNull(parameters == null ? null : parameters.get("catalog_name"));
+    }
+
+    /**
+     * @return {@code schema.table} from {@code parameters.table_identifier}
+     */
+    @JsonIgnore
+    @Nullable
+    public String tableIdentifier() {
+      return blankToNull(parameters == null ? null : parameters.get("table_identifier"));
+    }
+
     @JsonIgnore
     boolean isValid() {
-      return policyId > 0 && maintenanceType != null && !maintenanceType.isBlank();
+      return tableId > 0
+          && policyId > 0
+          && maintenanceType != null
+          && !maintenanceType.isBlank()
+          && parameters != null
+          && catalogName() != null
+          && tableIdentifier() != null;
     }
 
     @Override
@@ -334,16 +326,24 @@ public final class MaintenanceJobSpec {
       if (this == o) {
         return true;
       }
-      if (!(o instanceof Operation)) {
+      if (!(o instanceof Task)) {
         return false;
       }
-      Operation that = (Operation) o;
-      return policyId == that.policyId && Objects.equals(maintenanceType, that.maintenanceType);
+      Task that = (Task) o;
+      return tableId == that.tableId
+          && policyId == that.policyId
+          && Objects.equals(actionId, that.actionId)
+          && Objects.equals(maintenanceType, that.maintenanceType)
+          && Objects.equals(parameters, that.parameters);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(policyId, maintenanceType);
+      return Objects.hash(tableId, actionId, policyId, maintenanceType, parameters);
+    }
+
+    private static @Nullable String blankToNull(@Nullable String value) {
+      return value == null || value.isBlank() ? null : value.trim();
     }
   }
 }

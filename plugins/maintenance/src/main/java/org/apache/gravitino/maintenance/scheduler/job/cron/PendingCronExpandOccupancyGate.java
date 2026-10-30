@@ -45,7 +45,7 @@ public final class PendingCronExpandOccupancyGate implements ExpandOccupancyGate
     if (delegate.shouldSkip(tableId, policyId, minIntervalMs, nowMs)) {
       return true;
     }
-    return RelationalCronJobScheduler.isQueuedForPolicy(
-        RelationalCronJobScheduler.client(dataSource), tableId, policyId);
+    return CronJobClient.isTableAlreadyQueued(
+        CronJobClient.schedulerClient(dataSource), tableId, policyId);
   }
 }

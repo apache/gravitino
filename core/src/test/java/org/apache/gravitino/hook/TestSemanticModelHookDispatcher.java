@@ -46,6 +46,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -56,6 +57,29 @@ public class TestSemanticModelHookDispatcher {
 
   private static final NameIdentifier IDENT =
       NameIdentifier.of("metalake1", "catalog1", "schema1", "sales_model");
+
+  @Test
+  public void testMetricDiscoveryForwardsBothModes() {
+    SemanticModelDispatcher delegate = Mockito.mock(SemanticModelDispatcher.class);
+    SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(delegate, () -> null);
+    NameIdentifier[] names = {
+      NameIdentifier.of(
+          Namespace.of(
+              IDENT.namespace().level(0),
+              IDENT.namespace().level(1),
+              IDENT.namespace().level(2),
+              IDENT.name()),
+          "metric")
+    };
+    SemanticModelMetric[] infos = {Mockito.mock(SemanticModelMetric.class)};
+    Mockito.when(delegate.listMetrics(IDENT.namespace())).thenReturn(names);
+    Mockito.when(delegate.listMetricInfos(IDENT.namespace())).thenReturn(infos);
+    assertSame(names, hook.listMetrics(IDENT.namespace()));
+    assertSame(infos, hook.listMetricInfos(IDENT.namespace()));
+    Mockito.verify(delegate).listMetrics(IDENT.namespace());
+    Mockito.verify(delegate).listMetricInfos(IDENT.namespace());
+    Mockito.verifyNoMoreInteractions(delegate);
+  }
 
   @Test
   public void testCreateSemanticModelSetsCreatorAsOwner() throws Exception {

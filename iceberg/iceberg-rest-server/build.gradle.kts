@@ -281,12 +281,16 @@ val experimentalTest by tasks.registering(Test::class) {
   systemProperty("spark.ui.enabled", "false")
   setIncludes(
     setOf(
-      "**/IcebergExperimentalAuthorizationIT.class"
+      "**/IcebergExperimentalAuthorizationIT.class",
+      "**/IcebergReadRestrictionIT.class"
     )
   )
   filter {
     includeTestsMatching(
       "org.apache.gravitino.iceberg.integration.test.IcebergExperimentalAuthorizationIT"
+    )
+    includeTestsMatching(
+      "org.apache.gravitino.iceberg.integration.test.IcebergReadRestrictionIT"
     )
   }
   mustRunAfter(tasks.test)
@@ -302,6 +306,7 @@ val experimentalTest by tasks.registering(Test::class) {
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   exclude("**/IcebergExperimentalAuthorizationIT.class")
+  exclude("**/IcebergReadRestrictionIT.class")
   if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/test/**")

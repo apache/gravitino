@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.ltgt.gradle.errorprone.errorprone
 
 /*
@@ -22,12 +23,21 @@ plugins {
   `maven-publish`
   id("java")
   id("idea")
+  antlr
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
   alias(libs.plugins.aspectj.post.compile.weaving)
+  alias(libs.plugins.shadow)
+}
+
+val shadedAntlr by configurations.creating {
+  isCanBeConsumed = false
 }
 
 dependencies {
+  antlr(libs.antlr.tool)
+  shadedAntlr(libs.antlr.runtime)
+  compileOnly(libs.antlr.runtime)
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
@@ -78,6 +88,7 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.antlr.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.junit.platform.testkit)
@@ -202,11 +213,12 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 
 // :core:test is kept for IDEs and local habit, and is deprecated: run a lane instead. CI skips it
 // (`build` passes `-x :core:test`) and runs each lane in its own `core-test` job.
-// TestRestrictedRegoGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
+// TestRestrictedSqlGoldenFile reads docs/policies.md. It is a unit test, so only coreUnitTest and
 // the legacy :core:test run it; the database lanes don't need the input.
 listOf("coreUnitTest", "test").forEach {
   tasks.named<Test>(it) {
     inputs.file(rootProject.file("docs/policies.md"))
+    inputs.property("updateRestrictedSqlGolden", providers.environmentVariable("GRAVITINO_UPDATE_RESTRICTED_SQL_GOLDEN").orElse("false"))
     systemProperty("gravitino.repositoryRoot", rootProject.projectDir.path)
   }
 }
@@ -227,9 +239,50 @@ tasks.test {
 }
 
 tasks.withType<JavaCompile>().configureEach {
+  options.errorprone.excludedPaths.set(".*/generated-src/antlr/.*")
   if (name.contains("jcstress", ignoreCase = true)) {
-    options.errorprone.excludedPaths.set(".*/generated/.*")
+    options.errorprone.excludedPaths.set(".*/(generated|generated-src/antlr)/.*")
   }
+}
+
+// The generator is build tooling; only antlr4-runtime belongs on the server classpath.
+configurations.matching { it.name in setOf("api", "implementation") }.configureEach {
+  setExtendsFrom(extendsFrom.filterNot { it.name == "antlr" })
+}
+
+tasks.generateGrammarSource {
+  arguments = arguments + listOf("-visitor", "-no-listener", "-package", "org.apache.gravitino.policy.sql.antlr")
+}
+
+tasks.named<Jar>("sourcesJar") {
+  dependsOn(tasks.generateGrammarSource)
+}
+
+val shadedCoreJar = tasks.named<ShadowJar>("shadowJar") {
+  configurations = listOf(shadedAntlr)
+  archiveClassifier.set("")
+  relocate("org.antlr.v4.runtime", "org.apache.gravitino.shaded.org.antlr.v4.runtime")
+}
+
+tasks.jar {
+  enabled = false
+  dependsOn(shadedCoreJar)
+}
+
+// Every runtime consumer, including Spark test fixtures, must use the relocated parser classes.
+listOf("apiElements", "runtimeElements").forEach { name ->
+  configurations.named(name) {
+    outgoing.artifacts.clear()
+    outgoing.artifact(shadedCoreJar)
+  }
+}
+
+components.named<AdhocComponentWithVariants>("java") {
+  withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
+}
+
+tasks.javadoc {
+  exclude("**/policy/sql/antlr/**")
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {
