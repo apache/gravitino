@@ -123,8 +123,16 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
+        String.format(
+            "application/vnd.gravitino.v%d+json, some other header",
+            ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
+    assertEquals(
+        Collections.singletonList(
+            String.format(
+                "application/vnd.gravitino.v%d+json, some other header",
+                ApiVersion.defaultVersion().version())),
+        Collections.list(captor.getValue().getHeaders("Accept")));
   }
 
   @Test
@@ -171,6 +179,30 @@ public class TestVersioningFilter {
   }
 
   @Test
+  public void testDoFilterPreservesJsonAcceptHeader() throws ServletException, IOException {
+    VersioningFilter filter = new VersioningFilter();
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(new Vector<>(Collections.singletonList("application/json")).elements());
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    ArgumentCaptor<MutableHttpServletRequest> captor =
+        ArgumentCaptor.forClass(MutableHttpServletRequest.class);
+    verify(mockChain).doFilter(captor.capture(), any());
+    String expectedAccept =
+        String.format(
+            "application/vnd.gravitino.v%d+json, application/json",
+            ApiVersion.defaultVersion().version());
+    assertEquals(expectedAccept, captor.getValue().getHeader("Accept"));
+    assertEquals(
+        Collections.singletonList(expectedAccept),
+        Collections.list(captor.getValue().getHeaders("Accept")));
+  }
+
+  @Test
   public void testContentTypeVersionWithWildcardAccept() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
@@ -189,7 +221,7 @@ public class TestVersioningFilter {
     ArgumentCaptor<MutableHttpServletRequest> captor =
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
-    assertEquals("application/vnd.gravitino.v2+json", captor.getValue().getHeader("Accept"));
+    assertEquals("application/vnd.gravitino.v2+json, */*", captor.getValue().getHeader("Accept"));
   }
 
   @Test
@@ -232,7 +264,9 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
+        String.format(
+            "application/vnd.gravitino.v%d+json, invalid-format",
+            ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
   }
 
