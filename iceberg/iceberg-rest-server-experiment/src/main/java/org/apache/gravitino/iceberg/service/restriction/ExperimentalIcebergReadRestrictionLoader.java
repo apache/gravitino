@@ -223,6 +223,9 @@ public final class ExperimentalIcebergReadRestrictionLoader
                 Collections.singletonMap(fieldId, program),
                 schema,
                 bindingContext);
+        if (resolved.isEmpty()) {
+          continue;
+        }
         distinct.putIfAbsent(ReadRestrictionsParser.toJson(resolved), program);
       }
       if (distinct.size() > 1) {
