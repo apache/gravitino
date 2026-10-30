@@ -97,6 +97,9 @@ public class AuthorizationRequestContext {
   /** Per-request metadataId→owner cache. Deduplicates isOwner within a single request. */
   private final Map<Long, Optional<OwnerInfo>> ownerCache = new ConcurrentHashMap<>();
 
+  /** Resolved bindings and read failures are retained only for the exact target in this request. */
+  private final Map<TagPolicyKey, TagPolicyResolution> tagPolicyCache = new ConcurrentHashMap<>();
+
   /**
    * Per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch on the
    * authorize hot path. When present, {@code versionCheckAndLoadRoles} can skip its dedicated
@@ -333,6 +336,36 @@ public class AuthorizationRequestContext {
         id -> Objects.requireNonNull(loader.apply(id), "Owner loader must not return null"));
   }
 
+  /**
+   * Resolves tag-policy data at most once per target, independently of principal and privilege.
+   *
+   * @param metalake the containing metalake
+   * @param target the original canonical target, not an ancestor visited by the RBAC walk
+   * @param loader the resolver, returning a complete non-null list or throwing
+   * @return the immutable resolved bindings
+   * @throws RuntimeException if resolution fails
+   */
+  public List<ResolvedTagPolicy> computeTagPoliciesIfAbsent(
+      String metalake, MetadataObject target, Supplier<List<ResolvedTagPolicy>> loader) {
+    TagPolicyKey key = new TagPolicyKey(metalake, target);
+    TagPolicyResolution resolution =
+        tagPolicyCache.computeIfAbsent(key, ignored -> new TagPolicyResolution());
+    synchronized (resolution) {
+      if (resolution.failure != null) {
+        throw resolution.failure;
+      }
+      if (resolution.bindings == null) {
+        try {
+          resolution.bindings = List.copyOf(loader.get());
+        } catch (RuntimeException e) {
+          resolution.failure = e;
+          throw e;
+        }
+      }
+      return resolution.bindings;
+    }
+  }
+
   public String getOriginalAuthorizationExpression() {
     return originalAuthorizationExpression;
   }
@@ -457,6 +490,18 @@ public class AuthorizationRequestContext {
   }
 
   private static class CatalogNormalizationState {
+    @Nullable private RuntimeException failure;
+  }
+
+  @AllArgsConstructor
+  @EqualsAndHashCode
+  private static class TagPolicyKey {
+    private final String metalake;
+    private final MetadataObject target;
+  }
+
+  private static class TagPolicyResolution {
+    @Nullable private List<ResolvedTagPolicy> bindings;
     @Nullable private RuntimeException failure;
   }
 }
