@@ -311,16 +311,14 @@ public class IcebergNamespaceOperations {
   @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      expression = AuthorizationExpressionConstants.ICEBERG_CREATE_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      RegisterTableRequest registerTableRequest,
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.REGISTER_TABLE)
+          RegisterTableRequest registerTableRequest,
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
