@@ -1561,6 +1561,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private boolean awaitRolePolicyLoad(RolePolicyLoadKey key, CompletableFuture<Boolean> result) {
     try {
+      // There is no separate waiter timeout. This wait depends on the owner's completion,
+      // including its DB pool maxWaitMillis and query execution time (and query timeouts, if set).
+      // One stuck owner can delay every request waiting on its roles.
       return result.get();
     } catch (InterruptedException e) {
       // Interrupting a waiter must not cancel the load other requests still depend on.
@@ -1587,7 +1590,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (pendingLoads.isEmpty()) {
       return;
     }
-    Set<Long> unreadableRoleIds = new HashSet<>();
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     List<NameIdentifier> roleIdents =
         pendingLoads.stream()
@@ -1618,8 +1620,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 metalake,
                 key,
                 roleEntitiesById.get(key.roleVersion.getRoleId()),
-                requestContext,
-                unreadableRoleIds));
+                requestContext));
       } catch (RuntimeException | Error e) {
         // A failed role must not fail another role's waiters, including roles still to be loaded.
         // Settle each owned flight before the caller awaits results and propagates its failure.
@@ -1633,8 +1634,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       RolePolicyLoadKey key,
       @Nullable RoleEntity roleEntity,
-      AuthorizationRequestContext requestContext,
-      Set<Long> unreadableRoleIds) {
+      AuthorizationRequestContext requestContext) {
     RoleUpdatedAt rv = key.roleVersion;
     long roleId = rv.getRoleId();
     // Stores may not support batchGet for ROLE, or may return only part of a batch. Every owned
@@ -1676,10 +1676,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     ResolvedRolePolicies resolved = resolution.get();
 
-    if (!replaceUnclearedRolePolicies(key, resolved, unreadableRoleIds)) {
-      // A newer load or an invalidation superseded this work. The caller retains its pre-load
-      // request generation, so the existing bounded evaluation loop reloads cleared policies.
-      return !unreadableRoleIds.contains(roleId);
+    RolePolicyPublication publication = replaceUnclearedRolePolicies(key, resolved);
+    if (publication != RolePolicyPublication.APPLIED) {
+      // A skipped publication can follow an invalidation. Keep the caller's pre-load request
+      // generation so the bounded evaluation loop revalidates and reloads cleared policies.
+      return publication != RolePolicyPublication.UNREADABLE;
     }
 
     if (!resolved.isComplete()) {
@@ -1700,13 +1701,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return Math.max(roleClearGenerations.getOrDefault(roleId, 0L), prunedRoleClearGeneration);
   }
 
-  private boolean replaceUnclearedRolePolicies(
-      RolePolicyLoadKey key, ResolvedRolePolicies resolved, Set<Long> unreadableRoleIds) {
+  private RolePolicyPublication replaceUnclearedRolePolicies(
+      RolePolicyLoadKey key, ResolvedRolePolicies resolved) {
     rolePolicyLock.writeLock().lock();
     try {
       long roleId = key.roleVersion.getRoleId();
       if (roleClearGenerationWithoutLock(roleId) != key.clearGeneration) {
-        return false;
+        return RolePolicyPublication.SKIPPED;
       }
       RolePolicyLoadState state = rolePolicyLoadStates.get(roleId);
       if (state.highestVersion > key.roleVersion.getUpdatedAt()) {
@@ -1721,17 +1722,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               roleId,
               key.roleVersion.getUpdatedAt(),
               state.highestVersion);
-          unreadableRoleIds.add(roleId);
+          return RolePolicyPublication.UNREADABLE;
         }
         // A complete newer version already satisfies the request. Do not delegate an obsolete
         // candidate to replacement: expiry between two marker probes could otherwise admit it.
-        return false;
+        return RolePolicyPublication.SKIPPED;
       }
       return replaceRolePolicies(
-          key.roleVersion.getRoleId(), key.roleVersion.getUpdatedAt(), resolved);
+              key.roleVersion.getRoleId(), key.roleVersion.getUpdatedAt(), resolved)
+          ? RolePolicyPublication.APPLIED
+          : RolePolicyPublication.SKIPPED;
     } finally {
       rolePolicyLock.writeLock().unlock();
     }
+  }
+
+  private enum RolePolicyPublication {
+    APPLIED,
+    SKIPPED,
+    UNREADABLE
   }
 
   private static final class RolePolicyLoadState {
