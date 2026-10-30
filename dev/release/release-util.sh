@@ -71,7 +71,7 @@ function run_silent {
 
   echo "========================"
   echo "= $BANNER"
-  echo "Command: $@"
+  echo "Command: $*"
   echo "Log file: $LOG_FILE"
 
   local EC=0
