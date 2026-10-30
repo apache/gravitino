@@ -29,7 +29,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -39,17 +41,27 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.iceberg.EnvironmentContext;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.view.BaseView;
+import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
+import org.apache.iceberg.view.ImmutableViewVersion;
 import org.apache.iceberg.view.ViewMetadata;
+import org.apache.iceberg.view.ViewOperations;
+import org.apache.iceberg.view.ViewVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -502,6 +514,133 @@ public class TestIcebergViewCatalogOperations {
     operations.alterView(ident, ViewChange.setProperty("k", "v"));
 
     verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
+  @Test
+  public void testAlterViewAddsVersionsForRepeatedDefinitions() throws InterruptedException {
+    Column[] columnsA = {Column.of("id", Types.IntegerType.get(), null)};
+    Column[] columnsB = {
+      Column.of("id", Types.IntegerType.get(), null),
+      Column.of("name", Types.StringType.get(), null)
+    };
+    String sqlA = "SELECT id FROM source WHERE age > 10";
+    String sqlB = "SELECT id, name FROM source WHERE age > 20";
+    AtomicReference<ViewMetadata> metadata = new AtomicReference<>(newViewMetadata(columnsA, sqlA));
+    IcebergViewCatalogOperations operations =
+        new IcebergViewCatalogOperations(mockCommittingViewCatalog(metadata));
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+
+    operations.alterView(ident, replacement(columnsB, sqlB));
+    operations.alterView(ident, replacement(columnsA, sqlA));
+    Thread.sleep(2L);
+    View replaced = operations.alterView(ident, replacement(columnsB, sqlB));
+
+    Assertions.assertEquals(4, metadata.get().currentVersionId());
+    Assertions.assertEquals(4, metadata.get().versions().size());
+    Assertions.assertEquals(4, metadata.get().history().size());
+    Assertions.assertEquals(2, metadata.get().schemas().size());
+    Assertions.assertEquals(sqlB, replaced.sqlFor("spark").get().sql());
+    Assertions.assertEquals(2, replaced.columns().length);
+    Assertions.assertEquals("value", replaced.properties().get("keep"));
+
+    Thread.sleep(2L);
+    operations.alterView(ident, replacement(columnsB, sqlB));
+
+    ViewVersion latest = metadata.get().currentVersion();
+    Assertions.assertEquals(5, latest.versionId());
+    Assertions.assertEquals(5, metadata.get().versions().size());
+    Assertions.assertEquals(5, metadata.get().history().size());
+    Assertions.assertEquals(2, metadata.get().schemas().size());
+    Assertions.assertEquals("alter", latest.summary().get("operation"));
+    Assertions.assertEquals(
+        Long.toString(latest.timestampMillis()), latest.summary().get("timestamp-ms"));
+    Assertions.assertNotEquals(metadata.get().version(4).summary(), latest.summary());
+  }
+
+  @Test
+  public void testAlterViewPropertyChangesDoNotAddVersion() {
+    Column[] columns = {Column.of("id", Types.IntegerType.get(), null)};
+    AtomicReference<ViewMetadata> metadata =
+        new AtomicReference<>(newViewMetadata(columns, "SELECT id FROM source"));
+    IcebergViewCatalogOperations operations =
+        new IcebergViewCatalogOperations(mockCommittingViewCatalog(metadata));
+
+    View altered =
+        operations.alterView(
+            NameIdentifier.of("schema1", "view1"),
+            ViewChange.setProperty("custom", "value"),
+            ViewChange.removeProperty("keep"));
+
+    Assertions.assertEquals(1, metadata.get().currentVersionId());
+    Assertions.assertEquals(1, metadata.get().versions().size());
+    Assertions.assertEquals(1, metadata.get().history().size());
+    Assertions.assertEquals("value", altered.properties().get("custom"));
+    Assertions.assertFalse(altered.properties().containsKey("keep"));
+  }
+
+  private static ViewChange replacement(Column[] columns, String sql) {
+    return ViewChange.replaceView(
+        columns,
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("spark").withSql(sql).build()
+        },
+        null,
+        null,
+        null);
+  }
+
+  private static ViewMetadata newViewMetadata(Column[] columns, String sql) {
+    Schema schema = ConvertUtil.toIcebergSchema(columns);
+    ViewVersion version =
+        ImmutableViewVersion.builder()
+            .versionId(1)
+            .timestampMillis(1L)
+            .schemaId(schema.schemaId())
+            .defaultNamespace(Namespace.of("schema1"))
+            .addRepresentations(
+                ImmutableSQLViewRepresentation.builder().dialect("spark").sql(sql).build())
+            .putAllSummary(EnvironmentContext.get())
+            .build();
+    return ViewMetadata.builder()
+        .setLocation("file:/views/view1")
+        .setProperties(Collections.singletonMap("keep", "value"))
+        .setCurrentVersion(version, schema)
+        .build();
+  }
+
+  private static IcebergCatalogWrapper mockCommittingViewCatalog(
+      AtomicReference<ViewMetadata> metadata) {
+    ViewOperations viewOperations = Mockito.mock(ViewOperations.class);
+    when(viewOperations.current()).thenAnswer(invocation -> metadata.get());
+    when(viewOperations.refresh()).thenAnswer(invocation -> metadata.get());
+    doAnswer(
+            invocation -> {
+              Assertions.assertSame(metadata.get(), invocation.getArgument(0));
+              ViewMetadata updated = invocation.getArgument(1);
+              metadata.set(
+                  ViewMetadata.buildFrom(updated)
+                      .setMetadataLocation("file:/views/view1/metadata.json")
+                      .build());
+              return null;
+            })
+        .when(viewOperations)
+        .commit(any(ViewMetadata.class), any(ViewMetadata.class));
+    metadata.set(
+        ViewMetadata.buildFrom(metadata.get())
+            .setMetadataLocation("file:/views/view1/metadata.json")
+            .build());
+    ViewCatalog catalog = Mockito.mock(ViewCatalog.class);
+    when(catalog.loadView(any(TableIdentifier.class)))
+        .thenReturn(new BaseView(viewOperations, "view1"));
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    when(wrapper.loadView(any(TableIdentifier.class)))
+        .thenAnswer(invocation -> CatalogHandlers.loadView(catalog, invocation.getArgument(0)));
+    when(wrapper.updateView(any(TableIdentifier.class), any(UpdateTableRequest.class)))
+        .thenAnswer(
+            invocation ->
+                CatalogHandlers.updateView(
+                    catalog, invocation.getArgument(0), invocation.getArgument(1)));
+    return wrapper;
   }
 
   private static LoadViewResponse mockLoadViewResponse() {
