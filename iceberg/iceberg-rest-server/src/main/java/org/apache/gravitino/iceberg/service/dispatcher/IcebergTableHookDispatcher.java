@@ -20,11 +20,13 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -128,7 +130,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
-    dispatcher.renameTable(context, renameTableRequest);
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
@@ -136,6 +137,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     NameIdentifier tableDest =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake, context.catalogName(), renameTableRequest.destination(), separator);
+    // Read the locations before the rename, while the source table still exists, like
+    // TableHookDispatcher.alterTable.
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(tableSource, Entity.EntityType.TABLE);
+    dispatcher.renameTable(context, renameTableRequest);
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
       if (store != null) {
@@ -170,6 +176,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileTableEntity(context, renameTableRequest.source());
     bestEffortReconcileTableEntity(context, renameTableRequest.destination());
+
+    // The backend rename succeeded, so rename the table's privileges in the authorization plugins
+    // and evict the cached name-id mapping, like TableHookDispatcher.alterTable. The destination
+    // may be in another namespace. A failed rename throws above and keeps the privileges.
+    AuthorizationUtils.authorizationPluginRenamePrivileges(
+        tableSource, Entity.EntityType.TABLE, tableDest, locations);
   }
 
   @Override
