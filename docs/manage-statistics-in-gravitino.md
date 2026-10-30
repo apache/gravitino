@@ -172,6 +172,26 @@ List<PartitionStatistics> statistics = orders.supportsPartitionStatistics().list
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.stats.partition_range import PartitionRange
+
+statistics = orders.supports_partition_statistics().list_partition_statistics(
+    PartitionRange.between(
+        "dt=2026-08-01", PartitionRange.BoundType.CLOSED,
+        "dt=2026-08-31", PartitionRange.BoundType.CLOSED,
+    )
+)
+for partition in statistics:
+    print(partition.partition_name(), [stat.name() for stat in partition.statistics()])
+```
+
+Use `PartitionRange.ALL_PARTITIONS` for an unbounded query, or `down_to`/`up_to`
+for a single bound. `OPEN` excludes the endpoint and `CLOSED` includes it. Names are
+compared by the server; the Python client does not parse dates or sort results.
+
+</TabItem>
 </Tabs>
 
 ### Drop Partition Statistics

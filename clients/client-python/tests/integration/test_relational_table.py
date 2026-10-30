@@ -19,6 +19,8 @@ import logging
 from datetime import date
 from random import randint
 
+import requests
+
 from gravitino import (
     Catalog,
     GravitinoAdminClient,
@@ -28,10 +30,15 @@ from gravitino import (
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.types.types import Types
+from gravitino.api.stats.partition_range import PartitionRange
 from gravitino.api.stats.statistic_values import StatisticValues
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
+)
+from gravitino.exceptions.base import (
+    NoSuchMetadataObjectException,
+    NoSuchTableException,
 )
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -186,3 +193,97 @@ class TestRelationalTable(IntegrationTestEnv):
         remaining_keys = [k for k in stats if k not in keys_to_drop]
         self.assertTrue(table_stats_ops.drop_statistics(remaining_keys))
         self.assertEqual(len(table_stats_ops.list_statistics()), 0)
+
+    def test_relational_table_partition_statistics_query(self):
+        """Query REST-seeded statistics without creating physical partitions."""
+        table = self.relational_catalog.load_table(self.TABLE_IDENT)
+        operations = table.supports_partition_statistics()
+        bound = PartitionRange.BoundType
+        names = [f"dt=2026-10-0{day}/country=cn" for day in (1, 2, 3)]
+        names.append("dt=2026-10-04/country=中 +?#")
+        endpoint = (
+            f"http://localhost:8090/api/metalakes/{self.METALAKE_NAME}/objects/table/"
+            f"{self.CATALOG_NAME}.{self.SCHEMA_NAME}.{self.TABLE_NAME}/statistics/partitions"
+        )
+        self.assertEqual([], table.list_partition_names())
+        self.assertEqual(
+            [], operations.list_partition_statistics(PartitionRange.ALL_PARTITIONS)
+        )
+        try:
+            payload = [
+                {"partitionName": name, "statistics": {"custom-count": 0}}
+                for name in names
+            ]
+            with requests.put(
+                endpoint, json={"updates": payload}, timeout=30
+            ) as response:
+                response.raise_for_status()
+                self.assertEqual(0, response.json()["code"])
+            results = operations.list_partition_statistics(
+                PartitionRange.ALL_PARTITIONS
+            )
+            self.assertEqual(set(names), {item.partition_name() for item in results})
+            for result in results:
+                self.assertEqual(
+                    {"custom-count": 0},
+                    {stat.name(): stat.value().value() for stat in result.statistics()},
+                )
+            cases = [
+                (
+                    PartitionRange.down_to(names[1], bound.OPEN),
+                    {names[2], names[-1]},
+                ),
+                (PartitionRange.up_to(names[1], bound.CLOSED), set(names[:2])),
+                (
+                    PartitionRange.between(
+                        names[-1], bound.CLOSED, names[-1], bound.CLOSED
+                    ),
+                    {names[-1]},
+                ),
+            ]
+            for lower in bound:
+                for upper in bound:
+                    expected = {names[1]}
+                    if lower == bound.CLOSED:
+                        expected.add(names[0])
+                    if upper == bound.CLOSED:
+                        expected.add(names[2])
+                    cases.append(
+                        (
+                            PartitionRange.between(names[0], lower, names[2], upper),
+                            expected,
+                        )
+                    )
+            for partition_range, expected in cases:
+                with self.subTest(partition_range=partition_range):
+                    results = operations.list_partition_statistics(partition_range)
+                    self.assertEqual(
+                        expected, {item.partition_name() for item in results}
+                    )
+        finally:
+            payload = [
+                {"partitionName": name, "statisticNames": ["custom-count"]}
+                for name in names
+            ]
+            with requests.post(
+                endpoint, json={"drops": payload}, timeout=30
+            ) as response:
+                response.raise_for_status()
+                self.assertEqual(0, response.json()["code"])
+
+    def test_partition_statistics_query_missing_table(self):
+        """A bound query still checks that its table exists."""
+        identifier = NameIdentifier.of(self.SCHEMA_NAME, "partition_statistics_deleted")
+        table = self.relational_catalog.create_table(
+            identifier=identifier,
+            columns=[
+                ColumnDTO.builder()
+                .with_name("id")
+                .with_data_type(Types.IntegerType.get())
+                .build()
+            ],
+        )
+        operations = table.supports_partition_statistics()
+        self.assertTrue(self.relational_catalog.drop_table(identifier))
+        with self.assertRaises((NoSuchMetadataObjectException, NoSuchTableException)):
+            operations.list_partition_statistics(PartitionRange.ALL_PARTITIONS)
