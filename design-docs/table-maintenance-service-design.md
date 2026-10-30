@@ -602,7 +602,7 @@ gravitino.maintenance.ircAuth.oauthCredential = client_id:client_secret
 | Phase | Work                                                                                  |
 | ----- | ------------------------------------------------------------------------------------- |
 | 1     | `TableMaintenanceRESTFeature`; start/stop three db-scheduler pools                    |
-| 2     | `PolicyExpandPipeline` + `MaintenanceCronSubmitPipeline` + gates                     |
+| 2     | `PolicyExpandPipeline` + `MaintenanceCronSubmitPipeline` + gates                      |
 | 3     | Migrations: `scheduled_*_tasks`, `table_maintenance_action`, `table_snapshot_metrics` |
 | 4     | IRC EventListener upserts commit-job; policy create → INSERT expand; Job listener     |
 | 5     | Metrics, shutdown, docs; `gravitino.conf` client auth; privilege docs                 |
