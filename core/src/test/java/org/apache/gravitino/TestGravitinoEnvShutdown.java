@@ -27,10 +27,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.metrics.MetricsSystem;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -98,6 +101,21 @@ public class TestGravitinoEnvShutdown {
     InOrder order = inOrder(auxServiceManager, entityStore);
     order.verify(auxServiceManager).serviceStop();
     order.verify(entityStore).close();
+  }
+
+  @Test
+  void testShutdownClearsComponentsSetByEarlierCode() throws IllegalAccessException {
+    TestGravitinoEnv env = new TestGravitinoEnv();
+    env.setGravitinoAuthorizer(mock(GravitinoAuthorizer.class));
+    FieldUtils.writeField(
+        env, "internalAccessControlDispatcher", mock(AccessControlDispatcher.class), true);
+    FieldUtils.writeField(env, "metricsSystem", new MetricsSystem(), true);
+
+    env.shutdown();
+
+    Assertions.assertNull(env.gravitinoAuthorizer());
+    Assertions.assertNull(env.internalAccessControlDispatcher());
+    Assertions.assertNull(env.metricsSystem());
   }
 
   private static final class TestGravitinoEnv extends GravitinoEnv {}
