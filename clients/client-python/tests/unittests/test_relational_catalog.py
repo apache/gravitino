@@ -153,6 +153,32 @@ class TestRelationalCatalog(unittest.TestCase):
             table = self.catalog.load_table(self.table_identifier)
             self.assertEqual(table.name(), self.table_dto.name())
 
+    def test_load_table_with_text_index(self):
+        response_json = json.loads(TableResponse(0, self.table_dto).to_json())
+        response_json["table"]["indexes"].append(
+            {
+                "indexType": "DATA_SKIPPING_TEXT",
+                "name": "idx_name",
+                "fieldNames": [["name"]],
+                "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+            }
+        )
+        mock_resp = self._get_mock_http_resp(json.dumps(response_json))
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            table = self.catalog.load_table(self.table_identifier)
+
+        text_index = table.index()[1]
+        self.assertIs(text_index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(text_index.name(), "idx_name")
+        self.assertEqual(text_index.field_names(), [["name"]])
+        self.assertEqual(
+            text_index.properties(), {"tokenizer": "ngrams", "ngram_size": "3"}
+        )
+
     def test_load_table_with_vector_similarity_index(self):
         response_json = json.loads(TableResponse(0, self.table_dto).to_json())
         response_json["table"]["indexes"] = [
