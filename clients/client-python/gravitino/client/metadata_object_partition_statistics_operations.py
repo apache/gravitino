@@ -18,19 +18,9 @@
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.stats.partition_range import PartitionRange
 from gravitino.api.stats.partition_statistics import PartitionStatistics
-from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
-from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
 from gravitino.api.stats.supports_partition_statistics import (
     SupportsPartitionStatistics,
 )
-from gravitino.dto.requests.partition_statistics_drop_request import (
-    PartitionStatisticsDropRequest,
-)
-from gravitino.dto.requests.partition_statistics_update_request import (
-    PartitionStatisticsUpdateRequest,
-)
-from gravitino.dto.responses.base_response import BaseResponse
-from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_statistics_list_response import (
     PartitionStatisticsListResponse,
 )
@@ -43,7 +33,7 @@ from gravitino.utils.precondition import Precondition
 
 
 class MetadataObjectPartitionStatisticsOperations(SupportsPartitionStatistics):
-    """Bind the existing partition statistics REST contract to the Python API."""
+    """Bind the existing partition statistics query to the Python API."""
 
     def __init__(
         self,
@@ -95,30 +85,3 @@ class MetadataObjectPartitionStatisticsOperations(SupportsPartitionStatistics):
         )
         result.validate()
         return list(result.partition_statistics)
-
-    def update_partition_statistics(
-        self, updates: list[PartitionStatisticsUpdate]
-    ) -> None:
-        request = PartitionStatisticsUpdateRequest(updates)
-        request.validate()
-        response = self._rest_client.put(
-            endpoint=self.request_path,
-            json=request,
-            error_handler=STATISTICS_ERROR_HANDLER,
-        )
-        BaseResponse.from_json(response.body, infer_missing=True).validate()
-
-    def drop_partition_statistics(self, drops: list[PartitionStatisticsDrop]) -> bool:
-        request = PartitionStatisticsDropRequest(drops)
-        request.validate()
-        response = self._rest_client.post(
-            endpoint=self.request_path,
-            json=request,
-            error_handler=STATISTICS_ERROR_HANDLER,
-        )
-        result = DropResponse.from_json(response.body, infer_missing=True)
-        result.validate()
-        Precondition.check_argument(
-            isinstance(result.dropped(), bool), '"dropped" must be a boolean'
-        )
-        return result.dropped()

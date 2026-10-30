@@ -129,7 +129,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   "updates": [
     {
       "partitionName": "dt=2026-08-02",
-      "statistics": {"custom-row-estimate": 18000}
+      "statistics": {"custom.row_estimate": "18000"}
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -140,26 +140,10 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-stats.put("custom-row-estimate", StatisticValues.longValue(18000L));
+stats.put("custom.row_estimate", StatisticValues.longValue(18000L));
 
 orders.supportsPartitionStatistics().updatePartitionStatistics(
     ImmutableList.of(PartitionStatisticsModification.update("dt=2026-08-02", stats)));
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
-from gravitino.api.stats.statistic_values import StatisticValues
-
-# orders is a table loaded through catalog.as_table_catalog().load_table(...).
-orders.supports_partition_statistics().update_partition_statistics(
-    [PartitionStatisticsUpdate(
-        partition_name="dt=2026-08-02",
-        statistics={"custom-row-estimate": StatisticValues.long_value(18000)},
-    )]
-)
 ```
 
 </TabItem>
@@ -221,7 +205,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "drops": [
     {
       "partitionName": "dt=2026-08-02",
-      "statisticNames": ["custom-row-estimate"]
+      "statisticNames": ["custom.row_estimate"]
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -234,25 +218,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 orders.supportsPartitionStatistics().dropPartitionStatistics(
     ImmutableList.of(
         PartitionStatisticsModification.drop(
-            "dt=2026-08-02", ImmutableList.of("custom-row-estimate"))));
+            "dt=2026-08-02", ImmutableList.of("custom.row_estimate"))));
 ```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
-
-dropped = orders.supports_partition_statistics().drop_partition_statistics(
-    [PartitionStatisticsDrop("dt=2026-08-02", ["custom-row-estimate"])]
-)
-```
-
-The return value is the server's boolean indicating whether statistics were dropped.
-This does not delete the physical partition or its data. Update and drop each send
-one batch request without automatic retries. Limits and transaction semantics depend
-on the configured partition-statistics storage backend. Invalid names, missing tables,
-unmodifiable statistics, and unsupported operations use the existing SDK exceptions.
 
 </TabItem>
 </Tabs>

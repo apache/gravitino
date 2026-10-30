@@ -139,7 +139,7 @@ class Table(Auditable):
         )
 
     def supports_partition_statistics(self) -> SupportsPartitionStatistics:
-        """Return operations for partition statistics held by Gravitino."""
+        """Return queries for partition statistics held by Gravitino."""
         raise UnsupportedOperationException(
             "Table does not support partition statistics operations."
         )

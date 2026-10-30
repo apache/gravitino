@@ -19,15 +19,13 @@ from abc import ABC, abstractmethod
 
 from gravitino.api.stats.partition_range import PartitionRange
 from gravitino.api.stats.partition_statistics import PartitionStatistics
-from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
-from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
 
 
 class SupportsPartitionStatistics(ABC):
-    """Access partition statistics stored by Gravitino.
+    """Query partition statistics stored by Gravitino.
 
-    Physical partition objects need not exist. Supported operations and batch
-    limits depend on the server and its configured statistics storage backend.
+    Physical partition objects need not exist. Query support depends on the
+    server and its configured statistics storage backend.
     """
 
     @abstractmethod
@@ -35,22 +33,3 @@ class SupportsPartitionStatistics(ABC):
         self, partition_range: PartitionRange
     ) -> list[PartitionStatistics]:
         """List partition statistics within the supplied open or closed bounds."""
-
-    @abstractmethod
-    def update_partition_statistics(
-        self, updates: list[PartitionStatisticsUpdate]
-    ) -> None:
-        """Create or overwrite statistics with one batch request.
-
-        Invalid names, unmodifiable statistics, missing tables and unsupported
-        operations raise the existing statistics exceptions. Writes are not
-        automatically retried.
-        """
-
-    @abstractmethod
-    def drop_partition_statistics(self, drops: list[PartitionStatisticsDrop]) -> bool:
-        """Drop the named statistics and return the server's dropped flag.
-
-        This operation does not delete physical partitions. Storage semantics
-        and failures follow the server; the client does not retry the batch.
-        """

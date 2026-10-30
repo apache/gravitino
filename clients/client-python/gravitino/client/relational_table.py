@@ -31,8 +31,6 @@ from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.partition_range import PartitionRange
 from gravitino.api.stats.partition_statistics import PartitionStatistics
-from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
-from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_partition_statistics import (
@@ -333,14 +331,6 @@ class RelationalTable(
         return self._partition_statistics_operations.list_partition_statistics(
             partition_range
         )
-
-    def update_partition_statistics(
-        self, updates: list[PartitionStatisticsUpdate]
-    ) -> None:
-        self._partition_statistics_operations.update_partition_statistics(updates)
-
-    def drop_partition_statistics(self, drops: list[PartitionStatisticsDrop]) -> bool:
-        return self._partition_statistics_operations.drop_partition_statistics(drops)
 
     def support_secrets(self) -> SupportsSecrets:
         return self

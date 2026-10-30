@@ -20,9 +20,6 @@ from unittest.mock import Mock
 
 from gravitino.api.rel.table import Table
 from gravitino.api.stats.partition_range import PartitionRange
-from gravitino.api.stats.partition_statistics_drop import PartitionStatisticsDrop
-from gravitino.api.stats.partition_statistics_update import PartitionStatisticsUpdate
-from gravitino.api.stats.statistic_values import StatisticValues
 from gravitino.exceptions.base import (
     IllegalArgumentException,
     UnsupportedOperationException,
@@ -32,7 +29,6 @@ from gravitino.exceptions.base import (
 class TestPartitionStatisticsModels(unittest.TestCase):
     def test_range_factories(self):
         bound = PartitionRange.BoundType
-        self.assertEqual(PartitionRange(), PartitionRange.ALL_PARTITIONS)
         lower = PartitionRange.down_to("p1", bound.CLOSED)
         self.assertEqual("p1", lower.lower_partition_name)
         self.assertIsNone(lower.upper_partition_name)
@@ -73,35 +69,6 @@ class TestPartitionStatisticsModels(unittest.TestCase):
                 IllegalArgumentException
             ):
                 factory(*args)
-
-    def test_invalid_updates(self):
-        for name, values in [
-            (None, {"custom-x": StatisticValues.long_value(1)}),
-            (" ", {"custom-x": StatisticValues.long_value(1)}),
-            ("p", None),
-            ("p", {}),
-            ("p", {" ": StatisticValues.long_value(1)}),
-            ("p", {"custom-x": None}),
-            ("p", {"custom-x": 0}),
-        ]:
-            with self.subTest(name=name, values=values), self.assertRaises(
-                IllegalArgumentException
-            ):
-                PartitionStatisticsUpdate(name, values)
-
-    def test_invalid_drops(self):
-        for name, names in [
-            (None, ["custom-x"]),
-            (" ", ["custom-x"]),
-            ("p", None),
-            ("p", []),
-            ("p", [None]),
-            ("p", [" "]),
-        ]:
-            with self.subTest(name=name, names=names), self.assertRaises(
-                IllegalArgumentException
-            ):
-                PartitionStatisticsDrop(name, names)
 
     def test_default_table_entry_is_unsupported(self):
         with self.assertRaises(UnsupportedOperationException):

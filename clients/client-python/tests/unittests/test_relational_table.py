@@ -238,14 +238,9 @@ class TestRelationalTable(unittest.TestCase):
         operations = table.supports_partition_statistics()
         self.assertIs(table, operations)
         self.assertIsInstance(operations, SupportsPartitionStatistics)
-        for method, result in [
-            ("list_partition_statistics", []),
-            ("update_partition_statistics", None),
-            ("drop_partition_statistics", True),
-        ]:
-            with self.subTest(method=method):
-                delegate = getattr(factory.return_value, method)
-                delegate.return_value = result
-                argument = object()
-                self.assertIs(result, getattr(operations, method)(argument))
-                delegate.assert_called_once_with(argument)
+        delegate = factory.return_value.list_partition_statistics
+        argument = object()
+        self.assertIs(
+            delegate.return_value, operations.list_partition_statistics(argument)
+        )
+        delegate.assert_called_once_with(argument)
