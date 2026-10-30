@@ -565,6 +565,29 @@ public abstract class TestGravitinoPaimonCatalog {
         "bos-secret-key", catalog.capturedHadoopConf.get("fs.bos.secret.access.key"));
   }
 
+  /** Verifies that fs.oss.* options stay out of Paimon options for non-OSS warehouses. */
+  @Test
+  public void testOpenKeepsOssOptionsOutOfPaimonOptionsForNonOssWarehouse() {
+    Catalog mockCatalog = catalogWithCredentials();
+    Map<String, String> options = new HashMap<>();
+    options.put("warehouse", "s3://bucket/path");
+    options.put("hadoop." + PaimonConstants.OSS_ACCESS_KEY, "oss-access-key");
+    options.put("hadoop." + PaimonConstants.OSS_SECRET_KEY, "oss-secret-key");
+    options.put("hadoop.fs.oss.endpoint", "oss-endpoint");
+
+    CapturingPaimonCatalog catalog = new CapturingPaimonCatalog(options, mockCatalog);
+    catalog.open();
+
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.OSS_ACCESS_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.OSS_SECRET_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey("fs.oss.endpoint"));
+    Assertions.assertEquals(
+        "oss-access-key", catalog.capturedHadoopConf.get(PaimonConstants.OSS_ACCESS_KEY));
+    Assertions.assertEquals(
+        "oss-secret-key", catalog.capturedHadoopConf.get(PaimonConstants.OSS_SECRET_KEY));
+    Assertions.assertEquals("oss-endpoint", catalog.capturedHadoopConf.get("fs.oss.endpoint"));
+  }
+
   /** Verifies that vended filesystem credentials are moved to Hadoop configuration. */
   @Test
   public void testOpenMovesStorageCredentialsToHadoopConf() {
