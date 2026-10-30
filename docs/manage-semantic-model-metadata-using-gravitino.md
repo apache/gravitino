@@ -67,6 +67,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
     .withMetalake("example").build()) {
@@ -325,6 +326,144 @@ loaded = models.load_semantic_model(ident)
 
 </TabItem>
 </Tabs>
+
+### Discover Metrics in a Schema
+
+Use schema-level metric discovery to find metrics across the current definitions of Semantic
+Models in one schema. You can list identifiers or retrieve complete metric definitions without
+first listing and loading each model. These examples use the `total_revenue` metric in
+`mart.sales_model` created above, before importing any other models.
+
+#### List Metric Identifiers
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  'http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-model-metrics'
+```
+
+The default is `details=false`; only `true` (case-insensitive) enables complete metric definitions.
+If `sales_model` is the only model with metrics in this schema, the default response is:
+
+```json
+{
+  "code": 0,
+  "identifiers": [
+    {
+      "namespace": ["example", "sales", "mart", "sales_model"],
+      "name": "total_revenue"
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+NameIdentifier[] metricIdentifiers = models.listMetrics(Namespace.of("mart"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+metric_identifiers = models.list_metrics(Namespace.of("mart"))
+```
+
+</TabItem>
+</Tabs>
+
+Metric names are unique within a model. Two models can both define `total_revenue`; use the
+namespace together with the metric name to distinguish them.
+
+| Interface | Namespace in each result | Metric name |
+|-----------|--------------------------|-------------|
+| REST | `["example", "sales", "mart", "sales_model"]` | `total_revenue` |
+| Java / Python, using the loaded `sales` catalog | `["mart", "sales_model"]` | `total_revenue` |
+
+The SDK methods accept a schema namespace, such as `Namespace.of("mart")`. Do not include the
+metalake, catalog, or model in that argument.
+
+#### Retrieve Metric Definitions
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  'http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-model-metrics?details=true'
+```
+
+For the same model, the response is:
+
+```json
+{
+  "code": 0,
+  "metrics": [
+    {
+      "namespace": ["example", "sales", "mart", "sales_model"],
+      "metric": {
+        "name": "total_revenue",
+        "expression": {
+          "dialects": [
+            {"dialect": "ANSI_SQL", "expression": "SUM(orders.order_amount)"}
+          ]
+        },
+        "datatype": "Decimal"
+      }
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+SemanticModelMetric[] metricInfos = models.listMetricInfos(Namespace.of("mart"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+metric_infos = models.list_metric_infos(Namespace.of("mart"))
+```
+
+</TabItem>
+</Tabs>
+
+Each SDK result exposes `namespace()` and `metric()`. The metric contains its name, expression,
+and any stored data type, description, AI context, or custom extensions. To construct its identifier,
+use `NameIdentifier.of(info.namespace(), info.metric().name())` in Java or
+`NameIdentifier.builder(info.namespace(), info.metric().name())` in Python.
+
+#### Ordering, Visibility, and Updates
+
+Both listing modes sort results by the containing model's identifier and then by case-sensitive
+metric name. Models without metrics contribute no entries. If there are no visible metrics, REST
+returns an empty `identifiers` or `metrics` array and the SDKs return an empty array or list.
+
+With authorization enabled, discovery requires access to the parent catalog and schema. It
+includes metrics only from models the caller can discover through `USE_SEMANTIC_MODEL`,
+`MODIFY_SEMANTIC_MODEL`, or ownership, as described in
+[Ownership and Privileges](#ownership-and-privileges). Discovery does not revalidate access to
+source tables or views and does not grant access to source data.
+
+Discovery reflects each model's current committed definition: renaming a model changes the
+namespace returned for its metrics, replacing its definition changes the discovered metrics,
+and dropping it removes its metrics from discovery. Manage metric definitions through their
+containing Semantic Models; discovery does not provide a separate metric lifecycle or execute
+metric expressions.
+
+An empty result is a successful discovery response. Missing schemas, denied parent access, and
+unsupported operations are reported as errors. Storage or decoding failures fail the request
+instead of returning partial results. See the
+[REST API reference](./api/rest/gravitino-rest-api)
+for response and error details.
 
 ### Alter a Semantic Model
 
@@ -591,6 +730,7 @@ An authorized request for an absent model returns `false` (`dropped: false` in R
 
 The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 `list_of_semantic_models`, `load_semantic_model`, `create_semantic_model`, `alter_semantic_model`,
-and `drop_semantic_model`. Enable the `semantic_model` tool tag when filtering tools.
+`drop_semantic_model`, `list_metrics`, and `list_metric_infos`. Enable the `semantic_model` tool tag
+when filtering tools. Metric discovery tools return the same full namespaces as REST.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
 export. The current Web UI does not provide Semantic Model workflows.
