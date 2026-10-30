@@ -31,6 +31,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
@@ -145,9 +146,11 @@ public class HiveGravitinoOperationOperator {
     String[] splits = partitionName.split(PARTITION_NAME_DELIMITER);
     Object[] values = new Object[splits.length];
     for (int i = 0; i < splits.length; i++) {
+      // Partition names use the Hive path escaping, which Gravitino and HMS share.
       values[i] =
           SparkPartitionUtils.getSparkPartitionValue(
-              splits[i].split(PARTITION_VALUE_DELIMITER)[1], partitionSchema.apply(i).dataType());
+              ExternalCatalogUtils.unescapePathName(splits[i].split(PARTITION_VALUE_DELIMITER)[1]),
+              partitionSchema.apply(i).dataType());
     }
     return new GenericInternalRow(values);
   }
@@ -160,9 +163,8 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
       partitionName.append(
-          names[i]
-              + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+          partitionNamePart(
+              names[i], SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType)));
       if (i < names.length - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
@@ -177,13 +179,20 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
       partitionName.append(
-          structField.name()
-              + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+          partitionNamePart(
+              structField.name(),
+              SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType)));
       if (i < numFields - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
     }
     return partitionName.toString();
+  }
+
+  /** Builds one {@code column=value} part of a partition name with the Hive path escaping. */
+  private static String partitionNamePart(String column, String value) {
+    return ExternalCatalogUtils.escapePathName(column)
+        + PARTITION_VALUE_DELIMITER
+        + ExternalCatalogUtils.escapePathName(String.valueOf(value));
   }
 }
