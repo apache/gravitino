@@ -172,7 +172,7 @@ public class CommitJobClient {
       for (CommitChainMember member : chain) {
         policies.add(member.policy());
       }
-      MaintenanceAuthConsistency.requirePoliciesConsistent(policies, gravitinoConfig);
+      MaintenanceAuthConsistency.requireSameAuth(policies, gravitinoConfig);
     } catch (IllegalArgumentException e) {
       LOG.error("Skipping commit-job enqueue for table {}: {}", tableId, e.getMessage());
       return Optional.empty();

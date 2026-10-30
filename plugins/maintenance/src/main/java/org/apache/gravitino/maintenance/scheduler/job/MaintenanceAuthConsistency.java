@@ -55,8 +55,7 @@ public final class MaintenanceAuthConsistency {
    * @param gravitinoConfig server config used for auth overlay
    * @throws IllegalArgumentException when effective auth options disagree
    */
-  public static void requirePoliciesConsistent(
-      List<PolicyEntity> policies, Config gravitinoConfig) {
+  public static void requireSameAuth(List<PolicyEntity> policies, Config gravitinoConfig) {
     Preconditions.checkNotNull(policies, "policies");
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
     if (policies.size() <= 1) {
@@ -75,10 +74,10 @@ public final class MaintenanceAuthConsistency {
               ? ((ExecutablePolicyContent) content).executionSpec()
               : PolicyExecutionSpec.empty();
       Map<String, String> gravitinoAuth =
-          projectGravitinoAuth(
+          gravitinoAuthKeys(
               MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()));
       Map<String, String> ircAuth =
-          projectIrcAuth(
+          ircAuthKeys(
               MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions()),
               clusterIrcKeys);
 
@@ -90,12 +89,12 @@ public final class MaintenanceAuthConsistency {
       }
       if (!expectedGravitino.equals(gravitinoAuth)) {
         throw new IllegalArgumentException(
-            mismatchMessage(
+            differingKeysMessage(
                 "gravitinoAuth", expectedId, policy.id(), expectedGravitino, gravitinoAuth));
       }
       if (!Objects.equals(expectedIrc, ircAuth)) {
         throw new IllegalArgumentException(
-            mismatchMessage("ircAuth", expectedId, policy.id(), expectedIrc, ircAuth));
+            differingKeysMessage("ircAuth", expectedId, policy.id(), expectedIrc, ircAuth));
       }
     }
   }
@@ -108,7 +107,7 @@ public final class MaintenanceAuthConsistency {
    * @param right enqueue snapshot
    * @return true when both snapshots agree on effective gravitino/IRC auth
    */
-  public static boolean agrees(
+  public static boolean hasSameAuth(
       Config gravitinoConfig, MaintenanceJobSpec left, MaintenanceJobSpec right) {
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
     Preconditions.checkNotNull(left, "left");
@@ -124,16 +123,15 @@ public final class MaintenanceAuthConsistency {
         IcebergSparkConfigUtils.parseFlatJsonMap(left.getSparkConf(), "spark_conf");
     Map<String, String> rightSpark =
         IcebergSparkConfigUtils.parseFlatJsonMap(right.getSparkConf(), "spark_conf");
-    return projectGravitinoAuth(leftUpdater).equals(projectGravitinoAuth(rightUpdater))
-        && projectIrcAuth(leftSpark, clusterIrcKeys)
-            .equals(projectIrcAuth(rightSpark, clusterIrcKeys));
+    return gravitinoAuthKeys(leftUpdater).equals(gravitinoAuthKeys(rightUpdater))
+        && ircAuthKeys(leftSpark, clusterIrcKeys).equals(ircAuthKeys(rightSpark, clusterIrcKeys));
   }
 
   /**
    * Ids and differing key names only. Auth values (passwords / tokens) must not land in server
    * logs.
    */
-  private static String mismatchMessage(
+  private static String differingKeysMessage(
       String authName,
       long expectedId,
       long actualId,
@@ -153,7 +151,7 @@ public final class MaintenanceAuthConsistency {
         authName, expectedId, actualId, differing);
   }
 
-  private static Map<String, String> projectGravitinoAuth(
+  private static Map<String, String> gravitinoAuthKeys(
       @Nullable Map<String, String> updaterOptions) {
     Map<String, String> projected = new TreeMap<>();
     if (updaterOptions == null) {
@@ -168,11 +166,8 @@ public final class MaintenanceAuthConsistency {
     return projected;
   }
 
-  /**
-   * Projects IRC auth-shaped keys: every cluster {@code ircAuth} key present after overlay, plus
-   * any remaining jobOption / spark_conf key that looks like catalog auth.
-   */
-  private static Map<String, String> projectIrcAuth(
+  /** Keeps cluster {@code ircAuth} keys and any other key that looks like catalog auth. */
+  private static Map<String, String> ircAuthKeys(
       @Nullable Map<String, String> overlaidJobOptions, Set<String> clusterIrcKeys) {
     Map<String, String> projected = new TreeMap<>();
     if (overlaidJobOptions == null) {
@@ -183,14 +178,14 @@ public final class MaintenanceAuthConsistency {
       if (key == null || entry.getValue() == null) {
         continue;
       }
-      if (clusterIrcKeys.contains(key) || isIrcAuthShaped(key)) {
+      if (clusterIrcKeys.contains(key) || isCatalogAuthKey(key)) {
         projected.put(key, entry.getValue());
       }
     }
     return projected;
   }
 
-  private static boolean isIrcAuthShaped(String key) {
+  private static boolean isCatalogAuthKey(String key) {
     String lower = key.toLowerCase(Locale.ROOT);
     return lower.contains(".auth.")
         || lower.startsWith("auth.")

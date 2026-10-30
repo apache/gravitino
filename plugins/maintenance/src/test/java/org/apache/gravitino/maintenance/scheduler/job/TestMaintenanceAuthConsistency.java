@@ -40,7 +40,7 @@ class TestMaintenanceAuthConsistency {
     PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
     PolicyEntity b = policy(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none"));
     Assertions.assertDoesNotThrow(
-        () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
+        () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
   }
 
   @Test
@@ -51,7 +51,7 @@ class TestMaintenanceAuthConsistency {
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertTrue(message.contains("gravitinoAuth mismatch"));
     Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
@@ -68,7 +68,7 @@ class TestMaintenanceAuthConsistency {
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertTrue(message.contains("ircAuth mismatch"));
     Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
@@ -93,7 +93,7 @@ class TestMaintenanceAuthConsistency {
     IllegalArgumentException ex =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
+            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
     String message = ex.getMessage();
     Assertions.assertFalse(message.contains(secretA), message);
     Assertions.assertFalse(message.contains(secretB), message);
@@ -109,18 +109,18 @@ class TestMaintenanceAuthConsistency {
     PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
     PolicyEntity b = policy(2L, Map.of("rest.auth.type", "oauth"), Map.of());
     Assertions.assertDoesNotThrow(
-        () -> MaintenanceAuthConsistency.requirePoliciesConsistent(List.of(a, b), config));
+        () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
   }
 
   @Test
-  void testAgreesHelper() {
+  void testHasSameAuth() {
     Config config = new Config(false) {};
     MaintenanceJobSpec left = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");
     MaintenanceJobSpec right = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");
     MaintenanceJobSpec mismatch =
         spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"basic\"}");
-    Assertions.assertTrue(MaintenanceAuthConsistency.agrees(config, left, right));
-    Assertions.assertFalse(MaintenanceAuthConsistency.agrees(config, left, mismatch));
+    Assertions.assertTrue(MaintenanceAuthConsistency.hasSameAuth(config, left, right));
+    Assertions.assertFalse(MaintenanceAuthConsistency.hasSameAuth(config, left, mismatch));
   }
 
   private static MaintenanceJobSpec spec(String updaterOptions, String sparkConf) {

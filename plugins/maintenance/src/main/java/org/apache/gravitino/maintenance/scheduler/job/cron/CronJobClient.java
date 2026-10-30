@@ -441,7 +441,7 @@ public class CronJobClient {
       List<QueuedExpireJob> peersToClaim,
       int batchCapacity) {
     if (enqueueSpec != null
-        && !MaintenanceAuthConsistency.agrees(gravitinoConfig, target.spec, enqueueSpec)) {
+        && !MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, enqueueSpec)) {
       LOG.debug(
           "Skipping snapshot-expiry coalesce into {}: enqueue auth mismatch with target",
           target.instanceId.getId());
@@ -450,7 +450,7 @@ public class CronJobClient {
 
     List<QueuedExpireJob> claimable = new ArrayList<>();
     for (QueuedExpireJob peer : peersToClaim) {
-      if (!MaintenanceAuthConsistency.agrees(gravitinoConfig, target.spec, peer.spec)) {
+      if (!MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, peer.spec)) {
         LOG.debug(
             "Skipping claim of cron-job {} for snapshot-expiry coalesce: auth mismatch with target {}",
             peer.instanceId.getId(),
