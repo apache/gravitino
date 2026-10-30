@@ -88,15 +88,15 @@ unknown or blank suffixes fail fast when the server loads config. Supported `aut
 exactly four: **`none`**, **`simple`**, **`basic`**, **`oauth`**. When any Gravitino auth key is
 set, `authType` is required, and `basic` / `oauth` also require their mode-specific fields below.
 
-| Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                     |
-| ----------------- | -------------------- | ----------------------- | ------------------------------------------- |
-| `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`       |
-| `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required) |
-| `password`        | `password`           | `basic`                 | Password or secret reference (required)     |
-| `oauthServerUri`  | `oauth_server_uri`   | `oauth`                 | OAuth2 token server base URI (required)     |
-| `oauthPath`       | `oauth_path`         | `oauth`                 | Token path (for example `oauth2/token`) (required) |
+| Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                                |
+|-------------------|----------------------|-------------------------|--------------------------------------------------------|
+| `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`                  |
+| `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required)   |
+| `password`        | `password`           | `basic`                 | Password or secret reference (required)                |
+| `oauthServerUri`  | `oauth_server_uri`   | `oauth`                 | OAuth2 token server base URI (required)                |
+| `oauthPath`       | `oauth_path`         | `oauth`                 | Token path (for example `oauth2/token`) (required)     |
 | `oauthCredential` | `oauth_credential`   | `oauth`                 | Client credential, often `client_id:secret` (required) |
-| `oauthScope`      | `oauth_scope`        | `oauth`                 | Token scope (IdP-specific) (required)       |
+| `oauthScope`      | `oauth_scope`        | `oauth`                 | Token scope (IdP-specific) (required)                  |
 
 **1. `none`** — Gravitino authorization disabled; omit the prefix or set:
 
