@@ -82,7 +82,9 @@ listOf(
     resolutionStrategy {
       // Only Spark ITs use Spark's matching Jackson modules.
       setForcedModules(
-        "com.github.ben-manes.caffeine:caffeine:$caffeineVersion",
+        *forcedModules.filterNot { it.group.startsWith("com.fasterxml.jackson.") }.toTypedArray()
+      )
+      force(
         "javax.ws.rs:javax.ws.rs-api:$javaxWsRsVersion",
         "org.glassfish.jersey.core:jersey-server:$jerseyVersion",
         "org.glassfish.jersey.core:jersey-common:$jerseyVersion",
