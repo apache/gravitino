@@ -74,6 +74,7 @@ the path mapping and convert automatically.
 | `fs.gravitino.client.`                                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                                                                          | (none)                                                         | No                                  |
 | `fs.gravitino.filesetMetadataCache.enable`            | Whether to cache the fileset, fileset schema or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata, the client cannot see the latest changes.                                                                                                             | `false`                                                        | No                                  |
 | `fs.gravitino.autoCreateLocation`                     | The configuration key for whether to enable auto-creation of fileset location when the server-side filesystem ops are disabled and the location does not exist.                                                                                                                                                                                                        | `true`                                                         | No                                  |
+| `fs.gravitino.delegationToken.filesets`               | Comma-separated fileset paths, such as `gvfs://fileset/catalog/schema/fileset`, to collect Hadoop delegation tokens for. Needed on Kerberized HDFS when a job reads filesets stored outside `fs.defaultFS`. See [Via Apache Spark](#via-apache-spark).                                                                                                                 | (none)                                                         | No                                  |
 | `fs.path.config.<name>`                               | Defines a logical location entry. Set `fs.path.config.<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs.path.config.<name>.config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client. Note: location names must not contain (`.`, `_`). | (none)                                                         | No                                  |
 
 To configure the Gravitino client, use properties prefixed with `fs.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `fs.` prefix.
@@ -279,6 +280,27 @@ fs.getFileStatus(filesetPath);
 
     rdd.foreach(println)
     ```
+
+4. Collect delegation tokens for filesets on Kerberized HDFS (if necessary).
+
+   On YARN with Kerberized HDFS, executors authenticate to HDFS with delegation tokens that Spark
+   collects when the application starts. Spark gets a token for `fs.defaultFS` by itself. If a
+   fileset is stored on another HDFS cluster, list it so that GVFS collects a token for that
+   cluster too:
+
+    ```shell
+    --conf spark.kerberos.access.hadoopFileSystems=gvfs://fileset
+    --conf spark.hadoop.fs.gravitino.delegationToken.filesets=gvfs://fileset/test_catalog/test_schema/test_fileset_1,gvfs://fileset/test_catalog/test_schema/test_fileset_2
+    ```
+
+   `gvfs://fileset` makes Spark ask GVFS for tokens, and GVFS then collects one for each fileset
+   listed in `fs.gravitino.delegationToken.filesets`. Listing the filesets in
+   `spark.kerberos.access.hadoopFileSystems` instead doesn't work: Spark asks GVFS for tokens
+   without passing the path, so GVFS never sees which filesets were listed there.
+
+   GVFS only returns tokens owned by the current user. A fileset that authenticates with its own
+   Kerberos principal and keytab (`authentication.kerberos.*`) without impersonation gets no token,
+   since its executors log in with that keytab instead.
 
 #### Via TensorFlow
 
