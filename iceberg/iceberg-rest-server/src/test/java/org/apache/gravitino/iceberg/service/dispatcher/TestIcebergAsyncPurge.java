@@ -111,6 +111,53 @@ class TestIcebergAsyncPurge {
   }
 
   @Test
+  void testAsyncDropResolvesCatalogIdBeforeBackendDrop() {
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    TableMetadata metadata = mock(TableMetadata.class);
+    when(wrapper.loadTableMetadata(any())).thenReturn(metadata);
+
+    // The catalog-id lookup fails. It must fail the request before the irreversible backend drop,
+    // not after it, or the drop commits while every hook side effect is skipped.
+    try (MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      CatalogManager catalogManager = mock(CatalogManager.class);
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.catalogManager()).thenReturn(catalogManager);
+      when(catalogManager.doWithCatalog(any(), any()))
+          .thenThrow(new RuntimeException("catalog lookup failed"));
+
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () -> tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true));
+    }
+
+    verify(wrapper, never()).dropTable(any());
+    verify(cleanup, never()).addJob(any());
+  }
+
+  @Test
+  void testAsyncDropEnqueueFailureAfterBackendDropDoesNotFailRequest() {
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    TableMetadata metadata = mock(TableMetadata.class);
+    when(metadata.metadataFileLocation()).thenReturn("s3://b/db/t/metadata/0.json");
+    when(wrapper.loadTableMetadata(any())).thenReturn(metadata);
+    when(wrapper.fileIOImpl()).thenReturn("io");
+    when(wrapper.fileIOProperties()).thenReturn(Collections.emptyMap());
+    when(cleanup.addJob(any())).thenThrow(new RuntimeException("job store unavailable"));
+
+    // The catalog drop has committed when the enqueue fails. Propagating the failure reports a
+    // failed drop to the client and the event bus, and skips the hook's entity and privilege
+    // cleanup, while a retry returns 404.
+    try (MockedStatic<GravitinoEnv> ignored = mockCatalogId()) {
+      Assertions.assertDoesNotThrow(
+          () -> tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true));
+    }
+    verify(wrapper).dropTable(TABLE);
+  }
+
+  @Test
   void testSyncPurgeByDefault() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
