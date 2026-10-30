@@ -22,7 +22,10 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -34,6 +37,7 @@ import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
@@ -310,6 +314,51 @@ public abstract class OperationDispatcher {
       LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e);
       return null;
     }
+  }
+
+  /**
+   * Returns whether importing the external object {@code ident} may reuse {@code id}, the id it
+   * carries in its {@link StringIdentifier} property.
+   *
+   * <p>Any client of the external system can set that property, so it is not proof of identity.
+   * Reusing the id is right only when the external system renamed an object that Gravitino already
+   * tracks: the stored entity with that id sits under the same parent, and its old name is gone
+   * from the catalog. In every other case the id belongs to another object, or to none, and reusing
+   * it would rename or move another live entity, with its owner and grants, onto this object. The
+   * caller then imports the object under a fresh id.
+   *
+   * @param id The id from the external object's {@link StringIdentifier} property.
+   * @param ident The identifier of the external object being imported.
+   * @param type The entity type.
+   * @param entityClass The entity class.
+   * @param existsInCatalog Tells whether an object still exists in the external catalog.
+   * @param <E> The entity type.
+   * @return true if the import may reuse {@code id}, false if it must generate a fresh id.
+   */
+  protected <E extends Entity & HasIdentifier> boolean canReuseStringId(
+      long id,
+      NameIdentifier ident,
+      Entity.EntityType type,
+      Class<E> entityClass,
+      Predicate<NameIdentifier> existsInCatalog) {
+    Optional<E> holder;
+    try {
+      // Only siblings can be the same object under an old name, so look among them alone. The
+      // relational store skips the costly fields in this listing.
+      holder =
+          store.list(ident.namespace(), entityClass, type).stream()
+              .filter(e -> e.id() != null && e.id() == id)
+              .findFirst();
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to look up the stored owner of id %s before importing %s", id, ident);
+    }
+
+    if (!holder.isPresent()) {
+      return false;
+    }
+    NameIdentifier storedIdent = holder.get().nameIdentifier();
+    return storedIdent.equals(ident) || !existsInCatalog.test(storedIdent);
   }
 
   private <T> Map<String, String> getPropertiesForSet(T... t) {
