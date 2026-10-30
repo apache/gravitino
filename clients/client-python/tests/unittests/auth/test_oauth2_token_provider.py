@@ -18,9 +18,6 @@
 import unittest
 import base64
 import json
-import subprocess
-import sys
-from textwrap import dedent
 from threading import Barrier, Event, Lock, Thread
 from time import monotonic
 from unittest.mock import patch
@@ -334,44 +331,39 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
     def test_concurrent_renewal_failure(self):
         self._assert_concurrent_renewal(True)
 
-    def test_stalled_worker_does_not_block_test_process_exit(self):
-        script = dedent("""
-            from threading import Event, Thread
-            from tests.unittests.auth.test_oauth2_token_provider import TestOAuth2TokenExpiry
+    def _assert_concurrent_renewal(self, fails):
+        provider = self.provider(token_response("old", expires_in=60))
+        self.advance(54)
+        start, entered, release = Barrier(5), Event(), Event()
+        active = Lock()
+        results = [None] * 4
 
-            worker = Thread(target=Event().wait, name="stalled-oauth2-worker", daemon=True)
-            worker.start()
-            case = TestOAuth2TokenExpiry()
+        def renew(*_args, **_kwargs):
+            # pylint: disable-next=consider-using-with  # Detect overlap without blocking.
+            self.assertTrue(active.acquire(blocking=False), "Overlapping requests")
             try:
-                case._join_workers([worker], timeout=0)
-            except AssertionError as error:
-                assert "stalled-oauth2-worker" in str(error)
-            else:
-                raise AssertionError("A stalled worker did not fail the join")
-            # Deliberately leave the worker blocked: interpreter exit must still complete.
-            """)
-        subprocess.run(
-            [sys.executable, "-c", script],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+                entered.set()
+                self.assertTrue(release.wait(5))
+                if fails:
+                    raise UnauthorizedException("secret")
+                return token_response("renewed", expires_in=60)
+            finally:
+                active.release()
 
-    def _join_workers(self, workers, timeout=5):
-        deadline = monotonic() + timeout
-        for worker in workers:
-            worker.join(timeout=max(0, deadline - monotonic()))
-        alive = [worker.name for worker in workers if worker.is_alive()]
-        self.assertFalse(alive, f"OAuth2 worker threads did not finish: {alive}")
+        def access(index):
+            try:
+                start.wait(5)
+                results[index] = provider.get_token_data()
+            except Exception as error:  # pylint: disable=broad-exception-caught
+                results[index] = type(error)
 
-    def _run_workers(self, target, start, entered, release):
+        self.fetch.side_effect = renew
         workers = []
         barrier_passed = False
         try:
             for index in range(start.parties - 1):
                 worker = Thread(
-                    target=target,
+                    target=access,
                     args=(index,),
                     name=f"oauth2-renewal-worker-{index}",
                     daemon=True,
@@ -385,40 +377,13 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             release.set()
             if not barrier_passed:
                 start.abort()
-            self._join_workers(workers)
-
-    def _assert_concurrent_renewal(self, fails):
-        provider = self.provider(token_response("old", expires_in=60))
-        self.advance(54)
-        start, entered, release = Barrier(5), Event(), Event()
-        active = Lock()
-        in_flight = False
-        results = [None] * 4
-
-        def renew(*_args, **_kwargs):
-            nonlocal in_flight
-            with active:
-                self.assertFalse(in_flight, "Overlapping token requests")
-                in_flight = True
-            try:
-                entered.set()
-                self.assertTrue(release.wait(5))
-                if fails:
-                    raise UnauthorizedException("secret")
-                return token_response("renewed", expires_in=60)
-            finally:
-                with active:
-                    in_flight = False
-
-        def access(index):
-            try:
-                start.wait(5)
-                results[index] = provider.get_token_data()
-            except Exception as error:  # pylint: disable=broad-exception-caught
-                results[index] = type(error)
-
-        self.fetch.side_effect = renew
-        self._run_workers(access, start, entered, release)
+            deadline = monotonic() + 5
+            for worker in workers:
+                worker.join(timeout=max(0, deadline - monotonic()))
+            self.assertFalse(
+                [worker.name for worker in workers if worker.is_alive()],
+                "OAuth2 worker threads did not finish",
+            )
         self.assertEqual(
             [UnauthorizedException if fails else b"Bearer renewed"] * 4, results
         )
