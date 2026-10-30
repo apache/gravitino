@@ -6,7 +6,7 @@ name: Cron Integration Test
 #
 # Phase-1 suites (gvfs-fuse, web-ui, frontend, contrib-catalog are excluded):
 #   backend, spark, flink, maintenance, python, trino, access-control,
-#   iceberg-rest-trino, mcp, idp, trino-multi-version, lance, multi-instance
+#   iceberg-rest-trino, mcp, idp, tms, trino-multi-version, lance, multi-instance
 
 run-name: OSS IT (${{ inputs.suites || 'all' }}) caller=${{ inputs.caller_run_id || 'manual' }}
 
@@ -66,6 +66,7 @@ jobs:
       iceberg-rest-trino: ${{ steps.parse.outputs.iceberg-rest-trino }}
       mcp: ${{ steps.parse.outputs.mcp }}
       idp: ${{ steps.parse.outputs.idp }}
+      tms: ${{ steps.parse.outputs.tms }}
       trino-multi-version: ${{ steps.parse.outputs.trino-multi-version }}
       lance: ${{ steps.parse.outputs.lance }}
       multi-instance: ${{ steps.parse.outputs.multi-instance }}
@@ -92,6 +93,7 @@ jobs:
               "iceberg-rest-trino",
               "mcp",
               "idp",
+              "tms",
               "trino-multi-version",
               "lance",
               "multi-instance",
@@ -207,6 +209,14 @@ jobs:
     with:
       java-version: ${{ needs.select-suites.outputs.java-version }}
 
+  tms:
+    name: tms
+    needs: select-suites
+    if: needs.select-suites.outputs.tms == 'true'
+    uses: ./.github/workflows/tms-test-action.yml
+    with:
+      java-version: ${{ needs.select-suites.outputs.java-version }}
+
   trino-multi-version:
     name: trino-multi-version
     needs: select-suites
@@ -239,6 +249,7 @@ jobs:
       - iceberg-rest-trino
       - mcp
       - idp
+      - tms
       - trino-multi-version
       - lance
       - multi-instance
@@ -258,6 +269,7 @@ jobs:
           ICEBERG_REST_TRINO: ${{ needs.iceberg-rest-trino.result }}
           MCP: ${{ needs.mcp.result }}
           IDP: ${{ needs.idp.result }}
+          TMS: ${{ needs.tms.result }}
           TRINO_MULTI_VERSION: ${{ needs.trino-multi-version.result }}
           LANCE: ${{ needs.lance.result }}
           MULTI_INSTANCE: ${{ needs.multi-instance.result }}
@@ -284,6 +296,7 @@ jobs:
           | iceberg-rest-trino | ${ICEBERG_REST_TRINO} |
           | mcp | ${MCP} |
           | idp | ${IDP} |
+          | tms | ${TMS} |
           | trino-multi-version | ${TRINO_MULTI_VERSION} |
           | lance | ${LANCE} |
           | multi-instance | ${MULTI_INSTANCE} |
@@ -294,7 +307,7 @@ jobs:
             failed=1
           fi
           for result in "$BACKEND" "$SPARK" "$FLINK" "$MAINTENANCE" "$PYTHON" "$TRINO" \
-            "$ACCESS_CONTROL" "$ICEBERG_REST_TRINO" "$MCP" "$IDP" \
+            "$ACCESS_CONTROL" "$ICEBERG_REST_TRINO" "$MCP" "$IDP" "$TMS" \
             "$TRINO_MULTI_VERSION" "$LANCE" "$MULTI_INSTANCE"
           do
             if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then

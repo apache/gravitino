@@ -154,7 +154,9 @@ health check at `GET /health/ready` so a server that has lost its database stops
 Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
 that directory on storage shared by all servers, for example an NFS mount, so that a request for a
 job's output can be served by any server. Otherwise only the server that ran the job can return
-it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
+it, and the others return empty output. See [Local Job Executor](local-job-executor.md). The
+[Kubernetes job executor](k8s-job-executor.md) keeps no job state on the servers, so any server can
+return a job's output.
 
 ## Server Configuration
 
@@ -657,7 +659,19 @@ server, are documented with those services. See
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing.                                                     | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                                                                      | `300000` (5 minutes)          |
 | `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
-| `gravitino.job.outputMaxBytes`         | Maximum number of bytes read from the tail of a job's stdout/stderr when fetching its output.                                                                  | `262144` (256KB)              |
+| `gravitino.job.outputMaxBytes`         | Maximum number of bytes returned from the tail of a job's stdout/stderr when fetching its output.                                                              | `262144` (256KB)              |
+
+#### Table maintenance cooldowns
+
+When a table-maintenance policy omits `minIntervalMs`, the server uses these per-type keys, then
+the code defaults below. Policy content always wins when set.
+
+| Configuration Item                                     | Description                                     | Default Value   |
+|--------------------------------------------------------|-------------------------------------------------|-----------------|
+| `gravitino.maintenance.compaction.minIntervalMs`       | Cooldown between finished compaction runs       | `3600000` (1h)  |
+| `gravitino.maintenance.manifest-rewrite.minIntervalMs` | Cooldown between finished manifest-rewrite runs | `3600000` (1h)  |
+| `gravitino.maintenance.snapshot-expiry.minIntervalMs`  | Cooldown between finished snapshot-expiry runs  | `3600000` (1h)  |
+| `gravitino.maintenance.orphan-cleanup.minIntervalMs`   | Cooldown between finished orphan-cleanup runs   | `86400000` (1d) |
 
 ### Key Management
 

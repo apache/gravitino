@@ -1,0 +1,443 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.trino.connector.catalog;
+
+import com.google.common.base.Preconditions;
+import io.airlift.log.Logger;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.ConnectorTableProperties;
+import io.trino.spi.connector.ConnectorViewDefinition;
+import io.trino.spi.connector.ConnectorViewDefinition.ViewColumn;
+import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.TypeManager;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.NotImplementedException;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
+import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
+import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.metadata.GravitinoView;
+import org.apache.gravitino.trino.connector.util.ColumnComments;
+import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.json.JsonCodec;
+
+/**
+ * This interface is used to handle different parts of catalog metadata from different catalog
+ * connectors.
+ */
+public class CatalogConnectorMetadataAdapter {
+
+  private static final Logger LOG = Logger.get(CatalogConnectorMetadataAdapter.class);
+
+  /**
+   * Reserved, namespaced Gravitino view property used to round-trip a Trino native view's {@code
+   * SECURITY DEFINER} owner through {@code createView}/{@code getViewDefinition}; it is stripped
+   * from and never settable via caller-supplied {@code viewProperties} ({@code WITH (...)}) so it
+   * cannot be spoofed. Its absence means the view is {@code SECURITY INVOKER}.
+   *
+   * <p>Package-visible so {@link CatalogConnectorMetadata#createView} can explicitly remove it on
+   * {@code CREATE OR REPLACE VIEW} when the new definition has no owner, since {@code
+   * computePropertyChanges} only ever adds/updates properties and never removes them.
+   */
+  static final String RESERVED_VIEW_OWNER_PROPERTY = "trino.internal.view.owner";
+
+  /**
+   * View output columns are never physically stored by the underlying catalog (only the view's SQL
+   * text is), so unlike table columns they must not be constrained by a catalog's physical storage
+   * restrictions (e.g. Iceberg rejecting {@code varchar(n)}, Hive rejecting {@code timestamp with
+   * time zone}); doing so has rejected otherwise-valid view output types, or accepted them on
+   * create only to reject the same type when reloading the view. Use the unrestricted base
+   * transformer for view columns instead of the catalog-specific {@link #dataTypeTransformer}.
+   */
+  private static final GeneralDataTypeTransformer VIEW_DATA_TYPE_TRANSFORMER =
+      new GeneralDataTypeTransformer();
+
+  /** The list of schema properties supported by this catalog connector. */
+  protected final List<PropertyMetadata<?>> schemaProperties;
+
+  /** The list of table properties supported by this catalog connector. */
+  protected final List<PropertyMetadata<?>> tableProperties;
+
+  /** The list of column properties supported by this catalog connector. */
+  protected final List<PropertyMetadata<?>> columnProperties;
+
+  /** The data type transformer used to convert between Gravitino and Trino types. */
+  protected final GeneralDataTypeTransformer dataTypeTransformer;
+
+  /**
+   * Constructs a new CatalogConnectorMetadataAdapter.
+   *
+   * @param schemaProperties The list of schema properties supported by this catalog connector
+   * @param tableProperties The list of table properties supported by this catalog connector
+   * @param columnProperties The list of column properties supported by this catalog connector
+   * @param dataTypeTransformer The data type transformer used to convert between Gravitino and
+   *     Trino types
+   */
+  public CatalogConnectorMetadataAdapter(
+      List<PropertyMetadata<?>> schemaProperties,
+      List<PropertyMetadata<?>> tableProperties,
+      List<PropertyMetadata<?>> columnProperties,
+      GeneralDataTypeTransformer dataTypeTransformer) {
+    this.schemaProperties = schemaProperties;
+    this.tableProperties = tableProperties;
+    this.columnProperties = columnProperties;
+    this.dataTypeTransformer = dataTypeTransformer;
+  }
+
+  /**
+   * Retrieves the schema properties for the specified Gravitino schema.
+   *
+   * @param schema the Gravitino schema
+   * @return a map of schema properties
+   */
+  public Map<String, Object> getSchemaProperties(GravitinoSchema schema) {
+    return toTrinoSchemaProperties(schema.getProperties());
+  }
+
+  /**
+   * Retrieves the data type transformer for the specified Gravitino schema.
+   *
+   * @return the data type transformer
+   */
+  public GeneralDataTypeTransformer getDataTypeTransformer() {
+    return dataTypeTransformer;
+  }
+
+  /**
+   * Transform Gravitino table metadata to Trino ConnectorTableMetadata
+   *
+   * @param gravitinoTable the Gravitino table
+   * @return the Trino ConnectorTableMetadata
+   */
+  public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
+    SchemaTableName schemaTableName =
+        new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
+    ArrayList<ColumnMetadata> columnMetadataList = new ArrayList<>();
+    for (GravitinoColumn column : gravitinoTable.getColumns()) {
+      columnMetadataList.add(getColumnMetadata(column));
+    }
+
+    Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
+    return new ConnectorTableMetadata(
+        schemaTableName,
+        columnMetadataList,
+        properties,
+        Optional.ofNullable(gravitinoTable.getComment()));
+  }
+
+  /**
+   * Transform Trino ConnectorTableMetadata to Gravitino table metadata
+   *
+   * @param tableMetadata the Trino ConnectorTableMetadata
+   * @return the Gravitino table metadata
+   */
+  public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
+    String tableName = tableMetadata.getTableSchema().getTable().getTableName();
+    String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
+    String comment = tableMetadata.getComment().orElse("");
+    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+
+    List<GravitinoColumn> columns = new ArrayList<>();
+    for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
+      ColumnMetadata column = tableMetadata.getColumns().get(i);
+      columns.add(
+          new GravitinoColumn(
+              column.getName(),
+              dataTypeTransformer.getGravitinoType(column.getType()),
+              i,
+              ColumnComments.read(column),
+              column.isNullable(),
+              false,
+              column.getProperties()));
+    }
+
+    return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  /**
+   * Transform Gravitino view metadata to Trino ConnectorViewDefinition. The view's {@code SECURITY
+   * DEFINER} owner, if any, is read back from the {@link #RESERVED_VIEW_OWNER_PROPERTY} reserved
+   * property (set by {@link #createView}); its absence means the view is {@code SECURITY INVOKER},
+   * matching Trino's own invariant that {@code runAsInvoker} and a present owner are mutually
+   * exclusive.
+   *
+   * <p>{@link ConnectorViewDefinition} requires a catalog to be present whenever a schema is
+   * present. Some catalogs (e.g. Iceberg) can store a default schema without a default catalog; in
+   * single-metalake mode the current Trino catalog is used as a fallback, since the schema is
+   * implicitly relative to it. In multi-metalake mode the bare Gravitino catalog name is not the
+   * name Trino actually resolves catalogs by, so this fallback cannot be applied and the view is
+   * rejected instead of being exposed with a wrong or unresolvable catalog.
+   *
+   * @param view the Gravitino view
+   * @param catalogName the name of the Trino catalog this view belongs to
+   * @param singleMetalakeMode whether the connector is running in single-metalake mode
+   * @return the Trino ConnectorViewDefinition
+   */
+  public ConnectorViewDefinition getViewDefinition(
+      GravitinoView view, String catalogName, boolean singleMetalakeMode) {
+    Preconditions.checkArgument(
+        view.getSql() != null,
+        "View %s.%s has no Trino dialect SQL representation",
+        view.getSchemaName(),
+        view.getName());
+    List<ViewColumn> columns =
+        view.getColumns().stream()
+            .map(
+                column ->
+                    new ViewColumn(
+                        column.getName(),
+                        VIEW_DATA_TYPE_TRANSFORMER.getTrinoType(column.getType()).getTypeId(),
+                        Optional.ofNullable(column.getComment())))
+            .collect(Collectors.toList());
+
+    String defaultCatalog = view.getDefaultCatalog();
+    if (defaultCatalog == null && view.getDefaultSchema() != null) {
+      if (!singleMetalakeMode) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+            String.format(
+                "View %s.%s has a default schema without a default catalog, which is not "
+                    + "supported in multi-metalake mode",
+                view.getSchemaName(), view.getName()));
+      }
+      defaultCatalog = catalogName;
+    }
+
+    String ownerProperty = view.getProperties().get(RESERVED_VIEW_OWNER_PROPERTY);
+    return new ConnectorViewDefinition(
+        view.getSql(),
+        Optional.ofNullable(defaultCatalog),
+        Optional.ofNullable(view.getDefaultSchema()),
+        columns,
+        Optional.ofNullable(view.getComment()),
+        Optional.ofNullable(ownerProperty),
+        ownerProperty == null,
+        List.of());
+  }
+
+  /**
+   * Transform Trino ConnectorViewDefinition to Gravitino view metadata. The {@code viewProperties}
+   * are merged as-is into the resulting view's generic properties; the caller cannot set {@link
+   * #RESERVED_VIEW_OWNER_PROPERTY} directly through them since it is reserved to round-trip the
+   * definition's own owner/{@code runAsInvoker}.
+   *
+   * <p>Gravitino views have no field to persist the view's {@code path} (the catalogs/schemas used
+   * to resolve unqualified function names, set via {@code SET PATH}), so a definition with a
+   * non-empty path is rejected rather than silently discarding it; loading a view therefore always
+   * returns an empty path, which is safe because no view with a non-empty path is ever stored.
+   *
+   * @param viewName the schema-qualified view name
+   * @param definition the Trino ConnectorViewDefinition
+   * @param viewProperties the Trino view properties
+   * @return the Gravitino view metadata
+   */
+  public GravitinoView createView(
+      SchemaTableName viewName,
+      ConnectorViewDefinition definition,
+      Map<String, Object> viewProperties) {
+    if (!definition.getPath().isEmpty()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "View " + viewName + " has a non-empty path (SET PATH), which Gravitino cannot persist");
+    }
+    TypeManager typeManager = JsonCodec.getTypeManager(getClass().getClassLoader());
+    List<GravitinoColumn> columns = new ArrayList<>();
+    List<ViewColumn> viewColumns = definition.getColumns();
+    for (int i = 0; i < viewColumns.size(); i++) {
+      ViewColumn column = viewColumns.get(i);
+      Type trinoType = typeManager.getType(column.getType());
+      columns.add(
+          new GravitinoColumn(
+              column.getName(),
+              VIEW_DATA_TYPE_TRANSFORMER.getGravitinoType(trinoType),
+              i,
+              column.getComment().orElse(null),
+              true,
+              false,
+              Map.of()));
+    }
+
+    Map<String, String> properties = new HashMap<>(toGravitinoTableProperties(viewProperties));
+    properties.remove(RESERVED_VIEW_OWNER_PROPERTY);
+    definition.getOwner().ifPresent(owner -> properties.put(RESERVED_VIEW_OWNER_PROPERTY, owner));
+    return new GravitinoView(
+        viewName.getSchemaName(),
+        viewName.getTableName(),
+        columns,
+        definition.getComment().orElse(null),
+        properties,
+        definition.getOriginalSql(),
+        definition.getCatalog().orElse(null),
+        definition.getSchema().orElse(null));
+  }
+
+  /**
+   * Removes specified keys from a map of properties.
+   *
+   * @param properties the map of properties to remove keys from
+   * @param keyToDelete the set of keys to remove
+   * @return a new map with the specified keys removed
+   */
+  protected Map<String, Object> removeKeys(
+      Map<String, Object> properties, Set<String> keyToDelete) {
+    return properties.entrySet().stream()
+        .filter(entry -> !keyToDelete.contains(entry.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  /**
+   * Transform Trino schema metadata to Gravitino schema metadata
+   *
+   * @param schemaName the name of the schema
+   * @param properties the properties of the schema
+   * @return the Gravitino schema metadata
+   */
+  public GravitinoSchema createSchema(String schemaName, Map<String, Object> properties) {
+    return new GravitinoSchema(schemaName, toGravitinoSchemaProperties(properties), "");
+  }
+
+  /**
+   * Transform Gravitino column metadata to Trino ColumnMetadata
+   *
+   * @param column the Gravitino column
+   * @return the Trino ColumnMetadata
+   */
+  public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
+    return ColumnMetadata.builder()
+        .setName(column.getName())
+        .setType(dataTypeTransformer.getTrinoType(column.getType()))
+        .setComment(Optional.ofNullable(column.getComment()))
+        .setNullable(column.isNullable())
+        .setHidden(column.isHidden())
+        .setProperties(column.getProperties())
+        .build();
+  }
+
+  /**
+   * Transform Gravitino table properties to Trino ConnectorTableProperties
+   *
+   * @param table the Gravitino table
+   * @return the Trino ConnectorTableProperties
+   */
+  public ConnectorTableProperties getTableProperties(GravitinoTable table) {
+    throw new NotImplementedException();
+  }
+
+  /**
+   * Normalize Gravitino attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @param propertyTemplate the Trino property template
+   * @return the normalized properties
+   */
+  private Map<String, Object> normalizeProperties(
+      Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
+    // TODO yuhui redo this function once Gravitino table properties are supported..
+    // Trino only supports properties defined in the propertyTemplate.
+    Map<String, Object> validProperties = new HashMap<>();
+    for (PropertyMetadata<?> propertyMetadata : propertyTemplate) {
+      String name = propertyMetadata.getName();
+      if (properties.containsKey(name)) {
+        validProperties.put(name, properties.get(name));
+      } else {
+        LOG.warn("Property %s is not defined in Trino, we will ignore it", name);
+      }
+    }
+    return validProperties;
+  }
+
+  /**
+   * Normalize Gravitino table attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @return the Trino properties
+   */
+  public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
+    return normalizeProperties(properties, tableProperties);
+  }
+
+  /**
+   * Normalize Gravitino schema attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @return the Trino properties
+   */
+  public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
+    return normalizeProperties(properties, schemaProperties);
+  }
+
+  /**
+   * Normalize Trino table attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
+  public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
+    return removeUnsetProperties(properties);
+  }
+
+  /**
+   * Normalize Trino schema attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
+  public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
+    return removeUnsetProperties(properties);
+  }
+
+  /**
+   * Remove Trino unset attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
+  private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
+    return properties.entrySet().stream()
+        .filter(e -> e.getValue() != null)
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
+  }
+
+  /**
+   * Creates a new Gravitino column from a Trino ColumnMetadata.
+   *
+   * @param column the Trino ColumnMetadata
+   * @return the new Gravitino column
+   */
+  public GravitinoColumn createColumn(ColumnMetadata column) {
+    return new GravitinoColumn(
+        column.getName(),
+        dataTypeTransformer.getGravitinoType(column.getType()),
+        -1,
+        ColumnComments.read(column),
+        column.isNullable(),
+        false,
+        column.getProperties());
+  }
+}

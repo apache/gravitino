@@ -41,6 +41,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
 import org.apache.gravitino.storage.IdGenerator;
 
@@ -86,6 +87,20 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     schemaDispatcher.loadSchema(schemaIdent);
     return managedOperations.listSemanticModels(namespace);
+  }
+
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetrics(namespace);
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetricInfos(namespace);
   }
 
   @Override

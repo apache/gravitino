@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 /** Typed thresholds and target options for Iceberg manifest rewriting. */
-public class IcebergRewriteManifestsContent implements PolicyContent {
+public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyContent {
   /** Property key for strategy type. */
   public static final String STRATEGY_TYPE_KEY = "strategy.type";
   /** Property key for the job template. */
@@ -69,7 +69,7 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
 
   /** Creates default thresholds targeting Iceberg's current default partition spec. */
   public IcebergRewriteManifestsContent() {
-    this(null, null, null, null, null);
+    this(null, null, null, null, null, PolicyExecutionSpec.empty());
   }
 
   IcebergRewriteManifestsContent(
@@ -78,6 +78,23 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
       @Nullable Long avgManifestSizeThresholdBytes,
       @Nullable Integer specId,
       @Nullable Boolean useCaching) {
+    this(
+        manifestCountCritical,
+        manifestCountWarning,
+        avgManifestSizeThresholdBytes,
+        specId,
+        useCaching,
+        PolicyExecutionSpec.empty());
+  }
+
+  IcebergRewriteManifestsContent(
+      @Nullable Long manifestCountCritical,
+      @Nullable Long manifestCountWarning,
+      @Nullable Long avgManifestSizeThresholdBytes,
+      @Nullable Integer specId,
+      @Nullable Boolean useCaching,
+      @Nullable PolicyExecutionSpec executionSpec) {
+    super(executionSpec);
     this.manifestCountCritical =
         manifestCountCritical == null ? DEFAULT_MANIFEST_COUNT_CRITICAL : manifestCountCritical;
     this.manifestCountWarning =
@@ -167,7 +184,7 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
 
   @Override
   public void validate() {
-    PolicyContent.super.validate();
+    super.validate();
     Preconditions.checkArgument(manifestCountWarning > 0, "manifest_count_warning must be > 0");
     Preconditions.checkArgument(
         manifestCountCritical >= manifestCountWarning,
@@ -183,7 +200,8 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
       return false;
     }
     IcebergRewriteManifestsContent that = (IcebergRewriteManifestsContent) other;
-    return Objects.equals(manifestCountCritical, that.manifestCountCritical)
+    return executionFieldsEqual(that)
+        && Objects.equals(manifestCountCritical, that.manifestCountCritical)
         && Objects.equals(manifestCountWarning, that.manifestCountWarning)
         && Objects.equals(avgManifestSizeThresholdBytes, that.avgManifestSizeThresholdBytes)
         && Objects.equals(specId, that.specId)
@@ -193,10 +211,30 @@ public class IcebergRewriteManifestsContent implements PolicyContent {
   @Override
   public int hashCode() {
     return Objects.hash(
+        executionFieldsHashCode(),
         manifestCountCritical,
         manifestCountWarning,
         avgManifestSizeThresholdBytes,
         specId,
         useCaching);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder("IcebergRewriteManifestsContent{");
+    sb.append("manifestCountCritical=")
+        .append(manifestCountCritical)
+        .append(", manifestCountWarning=")
+        .append(manifestCountWarning)
+        .append(", avgManifestSizeThresholdBytes=")
+        .append(avgManifestSizeThresholdBytes)
+        .append(", specId=")
+        .append(specId)
+        .append(", useCaching=")
+        .append(useCaching)
+        .append(", ");
+    appendExecutionFields(sb);
+    sb.append('}');
+    return sb.toString();
   }
 }

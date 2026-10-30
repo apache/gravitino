@@ -125,7 +125,11 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     version INT NOT NULL,
     semantic_model_name VARCHAR(128) NOT NULL,
     semantic_model_comment TEXT DEFAULT NULL,
-    semantic_model_definition TEXT NOT NULL,
+    datasets TEXT NOT NULL,
+    relationships TEXT DEFAULT NULL,
+    metrics TEXT DEFAULT NULL,
+    ai_context TEXT DEFAULT NULL,
+    custom_extensions TEXT DEFAULT NULL,
     properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -146,10 +150,37 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic mod
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'structured definition snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.metrics IS 'metric definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.ai_context IS 'model AI context snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.custom_extensions IS 'model custom extensions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+CREATE TABLE IF NOT EXISTS semantic_model_metric_meta (
+    metric_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    metric_name TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (metric_id)
+);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_model_live ON semantic_model_metric_meta (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_metalake_id ON semantic_model_metric_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_catalog_id ON semantic_model_metric_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_schema_id ON semantic_model_metric_meta (schema_id);
+COMMENT ON TABLE semantic_model_metric_meta IS 'semantic model metric identities';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_id IS 'stable internal metric id';
+COMMENT ON COLUMN semantic_model_metric_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN semantic_model_metric_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN semantic_model_metric_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN semantic_model_metric_meta.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_name IS 'metric name';
+COMMENT ON COLUMN semantic_model_metric_meta.deleted_at IS 'metric retired at';
 
 CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
     task_name VARCHAR(100) NOT NULL,
@@ -248,7 +279,7 @@ CREATE TABLE IF NOT EXISTS table_maintenance_action (
     finished_at BIGINT NOT NULL DEFAULT 0,
     created_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
+CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
@@ -306,3 +337,7 @@ COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency ve
 
 ALTER TABLE policy_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';
+
+-- Role deletion soft-deletes relation rows by role_id.
+CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
+CREATE INDEX IF NOT EXISTS group_role_rel_idx_role_id ON group_role_rel (role_id);

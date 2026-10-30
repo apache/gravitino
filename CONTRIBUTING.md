@@ -127,6 +127,8 @@ Fork runs cannot notify `apache/gravitino` when they finish, so a sweep polls re
 
 The publishers report **Fork CI** and **ASF Allowlist Check** only as commit statuses, each listed once on the PR and linking to the corresponding run; the **Fork CI** link names the run attempt, which also records what the status reports. Commit statuses do not appear on the PR's **Checks** tab. Queued and running CI both have a pending status, with the description distinguishing whether jobs have started; this also applies to PRs that edit CI definitions. Failed tests report failure and cancellation reports error, both suggesting a re-run in the fork when the description has room. A successful fork run with changed CI definitions stays pending as **Fork CI passed; trusted verification required** until a trusted run verifies the PR. The job that stops a run on the first failure only observes the other jobs: its own errors never fail the run.
 
+The status publisher checks required suites against the upstream commit the run tested: the base-branch commit merged into the head for fork runs, or the dispatch commit for trusted runs. Adding a suite on the default branch does not invalidate earlier successful runs. A later run that tests a base commit with the new suite needs it, so merge the latest base branch and push if the status reports a missing suite.
+
 Known limitations of Fork CI:
 
 * New/edited PR notifications wake a default-branch publisher. Fork run completions and reruns, including reruns of successful runs, are polled on a five-minute schedule, subject to GitHub scheduling delays and a bounded API budget. All open PRs, including settled successes, remain watched. The starting PR rotates on each scheduled interval; large queues can take longer. Committers can force-refresh a particular PR using **Update Fork CI Status** with its PR number.
@@ -225,6 +227,19 @@ You can also build manually with:
 ## 🧰 Setting Up Your IDE (Optional)
 
 Import Gravitino into IntelliJ IDEA or Eclipse as a Gradle project.
+
+The SQL policy parser's ANTLR runtime is relocated into the packaged core JAR.
+Core's unrelocated module class output uses a `compileOnly` ANTLR dependency, so
+launching the server directly with IDE module outputs requires adding the ANTLR
+runtime version declared in `gradle/libs.versions.toml` to the launch classpath.
+Without it, SQL policy parsing can fail with `NoClassDefFoundError` for
+`org.antlr.v4.runtime` classes. Building the shaded JAR alone does not change the
+IDE's module classpath.
+
+To debug with the packaged runtime, build the distribution, enable
+`GRAVITINO_DEBUG_OPTS` in `conf/gravitino-env.sh`, start it with
+`bin/gravitino.sh start`, and attach an IDE remote JVM debugger as described in
+[the installation guide](docs/how-to-install.md).
 
 ## 💡 Tips for WSL Users
 
