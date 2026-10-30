@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.iceberg.integration.test.auth.ReadRestrictionGroupAuthenticator;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.policy.Policy;
@@ -84,12 +85,22 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, null, new HashMap<>());
   }
 
+  /**
+   * Starts the server and authenticates setup requests as the service administrator.
+   *
+   * @throws Exception if server startup or client initialization fails
+   */
+  @Override
+  protected void startServer() throws Exception {
+    super.startServer();
+    client.close();
+    client = GravitinoAdminClient.builder(serverUri).withSimpleAuth(SUPER_USER).build();
+  }
+
   /** {@inheritDoc} */
   @Override
   protected String authenticator() {
-    // BaseIT requires the "simple" entry to create its Basic-auth admin client. The fixture
-    // handles all Basic tokens; the second authenticator is only a client-setup hint to BaseIT.
-    return ReadRestrictionGroupAuthenticator.class.getCanonicalName() + ",simple";
+    return ReadRestrictionGroupAuthenticator.class.getCanonicalName();
   }
 
   @Override
