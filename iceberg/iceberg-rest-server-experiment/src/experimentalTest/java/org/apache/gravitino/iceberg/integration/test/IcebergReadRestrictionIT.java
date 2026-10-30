@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.iceberg.integration.test.auth.ReadRestrictionGroupAuthenticator;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
@@ -45,11 +46,11 @@ import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.server.authentication.ReadRestrictionGroupAuthenticator;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -86,6 +87,8 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   /** {@inheritDoc} */
   @Override
   protected String authenticator() {
+    // BaseIT requires the "simple" entry to create its Basic-auth admin client. The fixture
+    // handles all Basic tokens; the second authenticator is only a client-setup hint to BaseIT.
     return ReadRestrictionGroupAuthenticator.class.getCanonicalName() + ",simple";
   }
 
@@ -94,8 +97,13 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     return TestDatabaseName.PG_ICEBERG_READ_RESTRICTION_IT;
   }
 
+  @BeforeEach
+  void resetUserRoles() {
+    revokeUserRoles();
+  }
+
   @Test
-  void testSparkEnforcesReadRestrictions() {
+  void testSparkEnforcesReadRestrictions() throws Exception {
     String tableName = "read_restrictions";
     createTable(SCHEMA_NAME, tableName);
     grantTablePrivileges(tableName, Privileges.SelectTable.allow(), Privileges.ModifyTable.allow());
@@ -105,6 +113,11 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     sql("INSERT INTO %s VALUES (1, 10), (2, 20)", tableName);
     List<Object[]> unrestrictedRows = sql("SELECT col_1, col_2 FROM %s ORDER BY col_1", tableName);
     Assertions.assertEquals(2, unrestrictedRows.size());
+
+    Assertions.assertTrue(
+        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
+            .path("read-restrictions")
+            .isMissingNode());
 
     String suffix = UUID.randomUUID().toString().replace("-", "");
     String rowFilterTag = "row_filter_tag_" + suffix;
@@ -142,7 +155,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   }
 
   @Test
-  void testRowFilterFollowsPolicyAndTagChanges() {
+  void testRowFilterFollowsPolicyAndTagChanges() throws Exception {
     String tableName = "row_filter_lifecycle";
     createTable(SCHEMA_NAME, tableName);
     grantTablePrivileges(tableName, Privileges.SelectTable.allow(), Privileges.ModifyTable.allow());
@@ -150,14 +163,15 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     sql("USE %s", SCHEMA_NAME);
     sql("INSERT INTO %s VALUES (1, 10), (2, 20)", tableName);
 
-    String tag =
-        createPolicyTag(
+    PolicyTag policyTag =
+        createPolicyAndTag(
             Policy.BuiltInType.ROW_FILTER, "(col_1 INTEGER) RETURNS BOOLEAN -> col_1 = 1");
+    String tag = policyTag.tagName;
     Table table = loadTable(tableName);
     table.supportsTags().associateTags(new String[] {tag}, null);
     assertRows(tableName, new Object[] {1, 10});
 
-    String policy = policyNameForTag(tag);
+    String policy = policyTag.policyName;
     metalakeClientWithAllPrivilege.disablePolicy(policy);
     assertRows(tableName, new Object[] {1, 10}, new Object[] {2, 20});
 
@@ -166,6 +180,18 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
 
     table.supportsTags().associateTags(null, new String[] {tag});
     assertRows(tableName, new Object[] {1, 10}, new Object[] {2, 20});
+    Assertions.assertTrue(
+        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
+            .path("read-restrictions")
+            .isMissingNode());
+    table.supportsTags().associateTags(new String[] {tag}, null);
+    assertRows(tableName, new Object[] {1, 10});
+    Assertions.assertTrue(metalakeClientWithAllPrivilege.deleteTag(tag));
+    assertRows(tableName, new Object[] {1, 10}, new Object[] {2, 20});
+    Assertions.assertTrue(
+        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
+            .path("read-restrictions")
+            .isMissingNode());
   }
 
   @Test
@@ -327,12 +353,13 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     sql("USE %s", SCHEMA_NAME);
     sql("INSERT INTO %s VALUES (1, 10), (2, 20)", tableName);
 
-    String firstTag =
-        createPolicyTag(
+    PolicyTag policyTag =
+        createPolicyAndTag(
             Policy.BuiltInType.ROW_FILTER, "(col_1 INTEGER) RETURNS BOOLEAN -> col_1 = 1");
+    String firstTag = policyTag.tagName;
     String secondTag = "duplicate_tag_" + UUID.randomUUID().toString().replace("-", "");
     metalakeClientWithAllPrivilege.createTag(secondTag, null, new HashMap<>());
-    String policy = policyNameForTag(firstTag);
+    String policy = policyTag.policyName;
     metalakeClientWithAllPrivilege.addPolicyForTag(secondTag, policy);
     loadTable(tableName).supportsTags().associateTags(new String[] {firstTag, secondTag}, null);
 
@@ -405,7 +432,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   }
 
   @Test
-  void testInheritedTagValueSelectsPolicyAndTableValueOverridesIt() {
+  void testInheritedTagValueSelectsPolicyAndTableValueOverridesIt() throws Exception {
     String schemaName = "inherited_restrictions";
     String inheritedTable = "inherited_filter";
     String overriddenTable = "overridden_filter";
@@ -445,6 +472,11 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         .supportsTags()
         .associateTags(new TagValue[] {TagValue.of(tag, "risk")}, null);
 
+    Assertions.assertFalse(loadRestrictionsAs(schemaName, inheritedTable, NORMAL_USER).isEmpty());
+    Assertions.assertTrue(
+        loadTableResponseAs(schemaName, overriddenTable, NORMAL_USER)
+            .path("read-restrictions")
+            .isMissingNode());
     assertRows(inheritedTable, new Object[] {1, 10});
     assertRows(overriddenTable, new Object[] {1, 10}, new Object[] {2, 20});
 
@@ -753,6 +785,10 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   }
 
   private String createPolicyTag(Policy.BuiltInType type, String expression) {
+    return createPolicyAndTag(type, expression).tagName;
+  }
+
+  private PolicyTag createPolicyAndTag(Policy.BuiltInType type, String expression) {
     String suffix = UUID.randomUUID().toString().replace("-", "");
     String tag = "restriction_tag_" + suffix;
     String policy = "restriction_policy_" + suffix;
@@ -766,7 +802,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
             ? PolicyContents.rowFilter(expression)
             : PolicyContents.columnMask(expression));
     metalakeClientWithAllPrivilege.addPolicyForTag(tag, policy);
-    return tag;
+    return new PolicyTag(tag, policy);
   }
 
   private Table loadTable(String tableName) {
@@ -779,10 +815,6 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         .loadTable(NameIdentifier.of(schemaName, tableName));
   }
 
-  private String policyNameForTag(String tag) {
-    return "restriction_policy_" + tag.substring("restriction_tag_".length());
-  }
-
   private void assertRows(String tableName, Object[]... expectedRows) {
     List<Object[]> rows = sql("SELECT col_1, col_2 FROM %s ORDER BY col_1", tableName);
     Assertions.assertEquals(expectedRows.length, rows.size());
@@ -792,12 +824,25 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   }
 
   private String loadRestrictionsAs(String tableName, String userName) throws Exception {
+    return loadRestrictionsAs(SCHEMA_NAME, tableName, userName);
+  }
+
+  private String loadRestrictionsAs(String schemaName, String tableName, String userName)
+      throws Exception {
+    JsonNode response = loadTableResponseAs(schemaName, tableName, userName);
+    JsonNode restrictions = response.path("read-restrictions");
+    Assertions.assertFalse(restrictions.isMissingNode(), response.toString());
+    return restrictions.toString();
+  }
+
+  private JsonNode loadTableResponseAs(String schemaName, String tableName, String userName)
+      throws Exception {
     String uri =
         getIcebergRestServiceUri()
             + "v1/"
             + GRAVITINO_CATALOG_NAME
             + "/namespaces/"
-            + SCHEMA_NAME
+            + schemaName
             + "/tables/"
             + tableName;
     String credentials = userName + ":mock";
@@ -811,9 +856,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     HttpResponse<String> response =
         HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     Assertions.assertEquals(200, response.statusCode(), response.body());
-    JsonNode restrictions = new ObjectMapper().readTree(response.body()).path("read-restrictions");
-    Assertions.assertFalse(restrictions.isMissingNode(), response.body());
-    return restrictions.toString();
+    return new ObjectMapper().readTree(response.body());
   }
 
   private void grantTablePrivileges(String tableName, Privilege... privileges) {
@@ -835,5 +878,15 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         SecurableObjects.ofTable(schemaObject, tableName, ImmutableList.copyOf(privileges)));
     metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+  }
+
+  private static final class PolicyTag {
+    private final String tagName;
+    private final String policyName;
+
+    private PolicyTag(String tagName, String policyName) {
+      this.tagName = tagName;
+      this.policyName = policyName;
+    }
   }
 }

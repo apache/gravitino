@@ -203,17 +203,13 @@ tasks {
 // Share the authorization IT harness with the experimental service module.
 val testJar by tasks.registering(Jar::class) {
   archiveClassifier.set("tests")
-  from(sourceSets.test.get().output) {
-    include(
-      "org/apache/gravitino/iceberg/integration/test/IcebergAuthorizationIT*.class",
-      "org/apache/gravitino/iceberg/integration/test/IcebergTableAuthorizationIT*.class"
-    )
-  }
+  // Shared test resources must not inherit the production JAR's logging/resource exclusions.
+  setExcludes(emptyList())
+  from(sourceSets.test.get().output)
 }
 
 configurations.create("testArtifacts") {
   isCanBeResolved = false
-  extendsFrom(configurations.testRuntimeClasspath.get())
 }
 
 artifacts {
