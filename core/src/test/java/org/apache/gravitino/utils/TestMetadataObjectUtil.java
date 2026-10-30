@@ -121,15 +121,11 @@ public class TestMetadataObjectUtil {
   public void testMetadataObjectEntityTypes() {
     Set<Entity.EntityType> entityTypes = MetadataObjectUtil.metadataObjectEntityTypes();
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
-      if (type == MetadataObject.Type.DOMAIN) {
-        // DOMAIN is not backed by an entity yet.
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> MetadataObjectUtil.toEntityType(type));
-        continue;
-      }
       Assertions.assertTrue(entityTypes.contains(MetadataObjectUtil.toEntityType(type)));
     }
-    Assertions.assertEquals(MetadataObject.Type.values().length - 1, entityTypes.size());
+    Assertions.assertEquals(MetadataObject.Type.values().length, entityTypes.size());
+    Assertions.assertEquals(
+        Entity.EntityType.DOMAIN, MetadataObjectUtil.toEntityType(MetadataObject.Type.DOMAIN));
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> entityTypes.add(Entity.EntityType.USER));
   }
@@ -199,6 +195,11 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofDomain("metalake", "Finance/Trading"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of(null, "Finance/Trading", MetadataObject.Type.DOMAIN)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog", "schema", "function"),

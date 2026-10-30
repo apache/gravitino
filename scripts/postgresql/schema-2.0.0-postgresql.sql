@@ -1314,3 +1314,34 @@ COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_met
 COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
 COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
 COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';
+
+CREATE TABLE IF NOT EXISTS domain_meta (
+    domain_id BIGINT NOT NULL,
+    domain_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    domain_comment VARCHAR(256) DEFAULT '',
+    domain_status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    backing_tag_id BIGINT DEFAULT NULL,
+    backing_tag_value VARCHAR(256) DEFAULT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (domain_id),
+    UNIQUE (metalake_id, domain_name, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS domain_meta_idx_backing_tag ON domain_meta (metalake_id, backing_tag_id, backing_tag_value, deleted_at);
+COMMENT ON TABLE domain_meta IS 'domain metadata';
+COMMENT ON COLUMN domain_meta.domain_id IS 'domain id';
+COMMENT ON COLUMN domain_meta.domain_name IS 'domain name';
+COMMENT ON COLUMN domain_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN domain_meta.domain_comment IS 'domain comment';
+COMMENT ON COLUMN domain_meta.domain_status IS 'domain status, DRAFT or PUBLISHED';
+COMMENT ON COLUMN domain_meta.backing_tag_id IS 'id of the backing tag, NULL if the domain has none';
+COMMENT ON COLUMN domain_meta.backing_tag_value IS 'value of the backing tag, NULL binds the tag without a value';
+COMMENT ON COLUMN domain_meta.properties IS 'domain properties';
+COMMENT ON COLUMN domain_meta.audit_info IS 'domain audit info';
+COMMENT ON COLUMN domain_meta.current_version IS 'domain current version';
+COMMENT ON COLUMN domain_meta.last_version IS 'domain last version';
+COMMENT ON COLUMN domain_meta.deleted_at IS 'domain deleted at';

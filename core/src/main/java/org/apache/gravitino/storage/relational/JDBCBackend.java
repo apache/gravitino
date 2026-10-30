@@ -53,6 +53,7 @@ import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
@@ -75,6 +76,7 @@ import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterF
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
@@ -168,6 +170,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().listJobTemplatesByNamespace(namespace);
+      case DOMAIN:
+        return (List<E>) DomainMetaService.getInstance().listDomainsByNamespace(namespace);
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
       case TABLE_STATISTIC:
@@ -281,6 +285,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().getJobTemplateByIdentifier(ident);
+      case DOMAIN:
+        return (E) DomainMetaService.getInstance().getDomainByIdentifier(ident);
       case JOB:
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
       case VIEW:
@@ -331,6 +337,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
+      case DOMAIN:
+        return (List<E>) DomainMetaService.getInstance().batchGetDomainByIdentifier(identifiers);
       case USER:
         // TODO: Add true batch SQL operations for users, roles, and views
         List<E> users = Lists.newArrayList();
@@ -522,6 +530,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case DOMAIN:
+        return DomainMetaService.getInstance()
+            .deleteDomainMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -559,6 +571,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
       case JOB:
       case VIEW:
+      case DOMAIN:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
@@ -1031,6 +1044,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
       JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
+    } else if (e instanceof DomainEntity) {
+      DomainMetaService.getInstance().insertDomain((DomainEntity) e, overwritten);
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
     } else if (e instanceof ViewEntity) {
@@ -1082,6 +1097,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
+      case DOMAIN:
+        return (E) DomainMetaService.getInstance().updateDomain(ident, updater);
       case JOB:
         return (E) JobMetaService.getInstance().updateJob(ident, updater);
       case VIEW:
@@ -1127,6 +1144,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
+      case DOMAIN:
+        return DomainMetaService.getInstance().deleteDomain(ident);
       case JOB:
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:

@@ -25,15 +25,18 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -177,6 +180,30 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
               + schemaId
               + ", '{}', 1, 1, 0)");
     }
+  }
+
+  @TestTemplate
+  public void testSoftDeleteOrphanedDomainRelations() throws Exception {
+    String metalake = "metalake_for_orphan_domain_relation_test";
+    createAndInsertMakeLake(metalake);
+    DomainEntity liveDomain =
+        DomainEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("live_domain")
+            .withNamespace(NamespaceUtil.ofDomain(metalake))
+            .withStatus(Domain.Status.DRAFT)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(liveDomain, false);
+
+    insertRelations("DOMAIN", liveDomain.id(), ORPHAN_ID);
+
+    Assertions.assertEquals(
+        4,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.DOMAIN, 10));
+    Assertions.assertEquals(4, countActiveRelations(liveDomain.id()));
+    Assertions.assertEquals(0, countActiveRelations(ORPHAN_ID));
   }
 
   private void insertRelations(String type, long liveId, long orphanId) throws SQLException {
