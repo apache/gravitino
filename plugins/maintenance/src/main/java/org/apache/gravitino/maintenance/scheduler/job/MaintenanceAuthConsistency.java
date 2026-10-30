@@ -29,7 +29,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.PolicyContent;
@@ -49,56 +51,6 @@ public final class MaintenanceAuthConsistency {
   private MaintenanceAuthConsistency() {}
 
   /**
-   * Effective auth view for one policy or enqueue snapshot (id is for error messages only).
-   *
-   * <p>{@code updaterOptions} / {@code jobOptions} should already include cluster overlay when
-   * built from enqueue {@code task_data}; {@link #fromPolicy} applies overlay itself.
-   */
-  public static final class AuthView {
-    private final long id;
-    private final Map<String, String> updaterOptions;
-    private final Map<String, String> jobOptions;
-
-    /**
-     * @param id policy or row id for mismatch messages
-     * @param updaterOptions overlaid updater options (may be empty)
-     * @param jobOptions overlaid job options or spark_conf-derived auth-shaped map (may be empty)
-     */
-    public AuthView(
-        long id,
-        @Nullable Map<String, String> updaterOptions,
-        @Nullable Map<String, String> jobOptions) {
-      this.id = id;
-      this.updaterOptions = updaterOptions == null ? Map.of() : updaterOptions;
-      this.jobOptions = jobOptions == null ? Map.of() : jobOptions;
-    }
-
-    /**
-     * @return id used in mismatch messages
-     */
-    public long id() {
-      return id;
-    }
-  }
-
-  /**
-   * Builds an auth view from a policy by applying cluster gravitino/IRC overlays.
-   *
-   * @param policy policy entity
-   * @param gravitinoConfig server config
-   * @return overlaid auth view
-   */
-  public static AuthView fromPolicy(PolicyEntity policy, Config gravitinoConfig) {
-    Preconditions.checkNotNull(policy, "policy");
-    Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
-    PolicyExecutionSpec spec = executionSpec(policy.content());
-    return new AuthView(
-        policy.id(),
-        MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()),
-        MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions()));
-  }
-
-  /**
    * @param policies commit-chain (or other) policy members
    * @param gravitinoConfig server config used for auth overlay
    * @throws IllegalArgumentException when effective auth options disagree
@@ -110,64 +62,68 @@ public final class MaintenanceAuthConsistency {
     if (policies.size() <= 1) {
       return;
     }
-    List<AuthView> views = new ArrayList<>(policies.size());
-    for (PolicyEntity policy : policies) {
-      views.add(fromPolicy(policy, gravitinoConfig));
-    }
-    requireConsistent(gravitinoConfig, views);
-  }
-
-  /**
-   * Compares already-overlaid auth views (for example enqueue {@code task_data} snapshots).
-   *
-   * @param gravitinoConfig server config (for cluster IRC key set)
-   * @param views auth views to compare; size &lt;= 1 is a no-op
-   * @throws IllegalArgumentException when effective auth options disagree
-   */
-  public static void requireConsistent(Config gravitinoConfig, List<AuthView> views) {
-    Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
-    Preconditions.checkNotNull(views, "views");
-    if (views.size() <= 1) {
-      return;
-    }
 
     Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
     Map<String, String> expectedGravitino = null;
     Map<String, String> expectedIrc = null;
     long expectedId = -1L;
 
-    for (AuthView view : views) {
-      Map<String, String> gravitinoAuth = projectGravitinoAuth(view.updaterOptions);
-      Map<String, String> ircAuth = projectIrcAuth(view.jobOptions, clusterIrcKeys);
+    for (PolicyEntity policy : policies) {
+      PolicyExecutionSpec spec = executionSpec(policy.content());
+      Map<String, String> gravitinoAuth =
+          projectGravitinoAuth(
+              MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()));
+      Map<String, String> ircAuth =
+          projectIrcAuth(
+              MaintenanceAuthConfigs.overlayJobOptions(gravitinoConfig, spec.jobOptions()),
+              clusterIrcKeys);
 
       if (expectedGravitino == null) {
         expectedGravitino = gravitinoAuth;
         expectedIrc = ircAuth;
-        expectedId = view.id;
+        expectedId = policy.id();
         continue;
       }
       if (!expectedGravitino.equals(gravitinoAuth)) {
         throw new IllegalArgumentException(
             mismatchMessage(
-                "gravitinoAuth", expectedId, view.id, expectedGravitino, gravitinoAuth));
+                "gravitinoAuth", expectedId, policy.id(), expectedGravitino, gravitinoAuth));
       }
       if (!Objects.equals(expectedIrc, ircAuth)) {
         throw new IllegalArgumentException(
-            mismatchMessage("ircAuth", expectedId, view.id, expectedIrc, ircAuth));
+            mismatchMessage("ircAuth", expectedId, policy.id(), expectedIrc, ircAuth));
       }
     }
   }
 
   /**
-   * @return true when both views agree on effective gravitino/IRC auth after projection
+   * Compares enqueue snapshots. Spec maps are already cluster-overlaid at build time.
+   *
+   * @param gravitinoConfig server config (for cluster IRC key set)
+   * @param left enqueue snapshot
+   * @param right enqueue snapshot
+   * @return true when both snapshots agree on effective gravitino/IRC auth
    */
-  public static boolean agrees(Config gravitinoConfig, AuthView left, AuthView right) {
-    try {
-      requireConsistent(gravitinoConfig, List.of(left, right));
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+  public static boolean agrees(
+      Config gravitinoConfig, MaintenanceJobSpec left, MaintenanceJobSpec right) {
+    Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig");
+    Preconditions.checkNotNull(left, "left");
+    Preconditions.checkNotNull(right, "right");
+    Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
+    return projectGravitinoAuth(
+                flatJson(
+                    left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY))
+            .equals(
+                projectGravitinoAuth(
+                    flatJson(
+                        right.getUpdaterOptions(),
+                        MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY)))
+        && projectIrcAuth(flatJson(left.getSparkConf(), "spark_conf"), clusterIrcKeys)
+            .equals(projectIrcAuth(flatJson(right.getSparkConf(), "spark_conf"), clusterIrcKeys));
+  }
+
+  private static Map<String, String> flatJson(@Nullable String json, String field) {
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, field);
   }
 
   /**

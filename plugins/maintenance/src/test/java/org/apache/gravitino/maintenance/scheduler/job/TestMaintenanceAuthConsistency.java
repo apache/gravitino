@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -114,17 +115,16 @@ class TestMaintenanceAuthConsistency {
   @Test
   void testAgreesHelper() {
     Config config = new Config(false) {};
-    MaintenanceAuthConsistency.AuthView left =
-        MaintenanceAuthConsistency.fromPolicy(
-            policy(1L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none")), config);
-    MaintenanceAuthConsistency.AuthView right =
-        MaintenanceAuthConsistency.fromPolicy(
-            policy(2L, Map.of("rest.auth.type", "none"), Map.of("auth_type", "none")), config);
-    MaintenanceAuthConsistency.AuthView mismatch =
-        MaintenanceAuthConsistency.fromPolicy(
-            policy(3L, Map.of("rest.auth.type", "basic"), Map.of("auth_type", "none")), config);
+    MaintenanceJobSpec left = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");
+    MaintenanceJobSpec right = spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"none\"}");
+    MaintenanceJobSpec mismatch =
+        spec("{\"auth_type\":\"none\"}", "{\"rest.auth.type\":\"basic\"}");
     Assertions.assertTrue(MaintenanceAuthConsistency.agrees(config, left, right));
     Assertions.assertFalse(MaintenanceAuthConsistency.agrees(config, left, mismatch));
+  }
+
+  private static MaintenanceJobSpec spec(String updaterOptions, String sparkConf) {
+    return new MaintenanceJobSpec(List.of(), updaterOptions, sparkConf);
   }
 
   private static PolicyEntity policy(

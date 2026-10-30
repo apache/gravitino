@@ -39,7 +39,6 @@ import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
@@ -47,7 +46,6 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
-import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency.AuthView;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
@@ -442,9 +440,8 @@ public class CronJobClient {
       @Nullable MaintenanceJobSpec enqueueSpec,
       List<QueuedExpireJob> peersToClaim,
       int batchCapacity) {
-    AuthView targetAuth = authView(target.spec);
     if (enqueueSpec != null
-        && !MaintenanceAuthConsistency.agrees(gravitinoConfig, targetAuth, authView(enqueueSpec))) {
+        && !MaintenanceAuthConsistency.agrees(gravitinoConfig, target.spec, enqueueSpec)) {
       LOG.debug(
           "Skipping snapshot-expiry coalesce into {}: enqueue auth mismatch with target",
           target.instanceId.getId());
@@ -453,7 +450,7 @@ public class CronJobClient {
 
     List<QueuedExpireJob> claimable = new ArrayList<>();
     for (QueuedExpireJob peer : peersToClaim) {
-      if (!MaintenanceAuthConsistency.agrees(gravitinoConfig, targetAuth, authView(peer.spec))) {
+      if (!MaintenanceAuthConsistency.agrees(gravitinoConfig, target.spec, peer.spec)) {
         LOG.debug(
             "Skipping claim of cron-job {} for snapshot-expiry coalesce: auth mismatch with target {}",
             peer.instanceId.getId(),
@@ -498,22 +495,6 @@ public class CronJobClient {
     String mergedSparkConf =
         MaintenanceJobSpecFactory.mergeSparkConfJson(sparkConfJsons.toArray(new String[0]));
     return rescheduleMergedTaskData(client, target, tasksToAdd, mergedSparkConf, batchCapacity);
-  }
-
-  /**
-   * Builds an auth view from enqueue {@code task_data}. Spec maps are already cluster-overlaid at
-   * build time.
-   */
-  private static AuthView authView(MaintenanceJobSpec spec) {
-    long id = 0L;
-    if (spec.getTasks() != null && !spec.getTasks().isEmpty()) {
-      id = spec.getTasks().get(0).getPolicyId();
-    }
-    return new AuthView(
-        id,
-        IcebergSparkConfigUtils.parseFlatJsonMap(
-            spec.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY),
-        IcebergSparkConfigUtils.parseFlatJsonMap(spec.getSparkConf(), "spark_conf"));
   }
 
   /**
