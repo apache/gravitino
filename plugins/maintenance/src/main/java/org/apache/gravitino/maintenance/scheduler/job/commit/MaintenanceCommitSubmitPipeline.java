@@ -25,8 +25,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
@@ -42,9 +41,9 @@ import org.slf4j.LoggerFactory;
  * abort if any step is in-flight → soft-slot claim for every chain policy → one chained {@code
  * runJob} → bind the same job id on every claim.
  *
- * <p>Chain collection, cooldown filtering, auth consistency, and jobConf merge happen at enqueue
- * (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job} row
- * after this method returns.
+ * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
+ * enqueue (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job}
+ * row after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {
 
@@ -99,29 +98,28 @@ public final class MaintenanceCommitSubmitPipeline {
           "Skipping commit-job submit for table {} with missing/invalid task_data spec", tableId);
       return;
     }
-    TableTarget target = spec.getTables().get(0);
-    if (target.getTableId() != tableId) {
+    if (spec.getTasks().stream().anyMatch(task -> task.getTableId() != tableId)) {
       LOG.warn(
-          "Skipping commit-job submit for instance {} whose spec tableId is {}",
+          "Skipping commit-job submit for instance {} whose spec tableIds are {}",
           instanceId,
-          target.getTableId());
+          spec.tableIds());
       return;
     }
 
     // Design §5.2.3: any remaining type in-flight → delete commit-job and stop.
-    for (Operation step : spec.getOperations()) {
-      if (occupancyGate.isInFlight(tableId, step.getPolicyId())) {
+    for (Task task : spec.getTasks()) {
+      if (occupancyGate.isInFlight(tableId, task.getPolicyId())) {
         LOG.info(
             "Skipping commit-job submit for table {} (type {} policy {} still in-flight)",
             tableId,
-            step.getMaintenanceType(),
-            step.getPolicyId());
+            task.getMaintenanceType(),
+            task.getPolicyId());
         return;
       }
     }
 
     List<Long> policyIds =
-        spec.getOperations().stream().map(Operation::getPolicyId).collect(Collectors.toList());
+        spec.getTasks().stream().map(Task::getPolicyId).collect(Collectors.toList());
     Optional<List<OccupancyClaim>> claims =
         actionMetaService.tryAcquireInFlightBatch(tableId, policyIds, claimTimeoutMs);
     if (claims.isEmpty()) {
@@ -140,17 +138,16 @@ public final class MaintenanceCommitSubmitPipeline {
     Map<String, String> jobConf;
     try {
       jobConf =
-          jobConfBuilder.resolveForSubmit(
-              MaintenanceJobSpecFactory.jobConfForTable(
-                  spec.getJobConf(), spec.getTables().get(0)));
+          jobConfBuilder.resolveForSubmit(MaintenanceJobSpecFactory.jobConfForCommitChain(spec));
     } catch (RuntimeException e) {
       actionMetaService.deleteClaims(claims);
       LOG.warn(
-          "Skipping commit-job submit for table {}: invalid spec table target: {}",
-          tableId,
-          e.toString());
+          "Skipping commit-job submit for table {}: invalid task_data: {}", tableId, e.toString());
       return;
     }
+    jobConf.put(
+        MaintenanceJobTemplates.ACTION_IDS_KEY,
+        claims.stream().map(c -> Long.toString(c.actionId())).collect(Collectors.joining(",")));
     Long jobId = null;
     try {
       jobId =
@@ -161,10 +158,8 @@ public final class MaintenanceCommitSubmitPipeline {
           "Submitted commit-job for table {} as job {} (chain={}, policies={})",
           tableId,
           jobId,
-          spec.getOperations().stream()
-              .map(Operation::getMaintenanceType)
-              .collect(Collectors.toList()),
-          spec.getOperations().stream().map(Operation::getPolicyId).collect(Collectors.toList()));
+          spec.getTasks().stream().map(Task::getMaintenanceType).collect(Collectors.toList()),
+          spec.getTasks().stream().map(Task::getPolicyId).collect(Collectors.toList()));
     } catch (RuntimeException e) {
       if (jobId != null) {
         cancelJobQuietly(metalake, jobId);
@@ -173,7 +168,7 @@ public final class MaintenanceCommitSubmitPipeline {
       LOG.warn(
           "Failed commit-job submit for table {} policies={}: {}",
           tableId,
-          spec.getOperations().stream().map(Operation::getPolicyId).collect(Collectors.toList()),
+          spec.getTasks().stream().map(Task::getPolicyId).collect(Collectors.toList()),
           e.toString());
     }
   }
