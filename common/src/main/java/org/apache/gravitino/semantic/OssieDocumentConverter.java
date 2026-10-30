@@ -52,7 +52,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 
-/** Converts between standalone Apache Ossie documents and Gravitino Semantic Models. */
+/**
+ * Converts between standalone Apache Ossie documents and Gravitino Semantic Models.
+ *
+ * <p>Consumers must explicitly provide {@code jackson-dataformat-yaml} and its runtime dependencies
+ * when using this converter, including for JSON documents.
+ */
 public final class OssieDocumentConverter {
 
   private static final Set<String> ROOT_PROPERTIES =
@@ -765,11 +770,11 @@ public final class OssieDocumentConverter {
   private static Map<String, String> extractProperties(ObjectNode root) {
     JsonNode extensionsNode = root.get("custom_extensions");
     if (!(extensionsNode instanceof ArrayNode)) {
-      return new LinkedHashMap<>();
+      return ImmutableMap.of();
     }
 
     ArrayNode extensions = (ArrayNode) extensionsNode;
-    Map<String, String> properties = new LinkedHashMap<>();
+    ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
     boolean found = false;
     int index = 0;
     Iterator<JsonNode> iterator = extensions.iterator();
@@ -810,7 +815,7 @@ public final class OssieDocumentConverter {
     if (extensions.isEmpty()) {
       root.remove("custom_extensions");
     }
-    return properties;
+    return properties.build();
   }
 
   private static void ensureNoPropertiesExtension(ArrayNode extensions) {

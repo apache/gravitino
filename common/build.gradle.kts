@@ -38,16 +38,17 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
-  implementation(libs.jackson.dataformat.yaml)
   implementation(libs.jakarta.validation.api)
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.commons.dbcp2)
+  compileOnly(libs.jackson.dataformat.yaml)
   compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
