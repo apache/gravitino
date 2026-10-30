@@ -160,6 +160,7 @@ dependencies {
   add(experimentalImplementation, libs.testcontainers.postgresql)
   add(experimentalImplementation, libs.junit.jupiter.api)
   add(experimentalImplementation, libs.junit.jupiter.params)
+  add(experimentalTestSources.runtimeOnlyConfigurationName, libs.mysql.driver)
   add(experimentalTestSources.runtimeOnlyConfigurationName, libs.junit.jupiter.engine)
 }
 
