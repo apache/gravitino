@@ -18,6 +18,7 @@
 import unittest
 import base64
 import json
+import sys
 from threading import Barrier, Event, Lock, Thread
 from time import monotonic
 from unittest.mock import patch
@@ -28,6 +29,7 @@ from gravitino.exceptions.base import (
     BadRequestException,
     GravitinoRuntimeException,
     IllegalArgumentException,
+    RESTException,
     UnauthorizedException,
 )
 from gravitino.utils.http_client import HTTPClient
@@ -36,6 +38,11 @@ from tests.unittests.auth import mock_base
 from tests.unittests.auth.mock_base import mock_token_response as token_response
 
 OAUTH_PORT = 1082
+
+
+class _StructuredRESTException(RESTException):
+    def __init__(self, status, method, endpoint, reason):
+        super().__init__("%s %s %s %s", status, method, endpoint, reason)
 
 
 class _TestOAuth2TokenProvider(OAuth2TokenProvider):
@@ -160,6 +167,12 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             + ".signature"
         )
 
+    @staticmethod
+    def deep_jwt():
+        depth = sys.getrecursionlimit() + 10
+        payload = b'{"nested":' + b"[" * depth + b"0" + b"]" * depth + b"}"
+        return "e30." + base64.urlsafe_b64encode(payload).decode() + ".signature"
+
     def assert_lifetime(self, token, metadata, lifetime, margin):
         provider = self.provider(
             token_response(token, **metadata), token_response("renewed", expires_in=60)
@@ -192,6 +205,7 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             for value in [False, "60", 1.5, {}, 10**1000]
         ]
         malformed = ["a.%%%.c", "a._w.c", "a.eA.c", "a.W10.c", "e30.e30.signature"]
+        malformed.append(self.deep_jwt())
         malformed += [
             self.jwt(value)
             for value in [True, "2060", float("nan"), float("inf"), 10**1000]
@@ -204,6 +218,7 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
     def test_unusable_or_expired_metadata_is_rejected(self):
         cases = [
             ("opaque", {}),
+            (self.deep_jwt(), {}),
             ("opaque", {"expires_in": "60"}),
             ("opaque", {"expires_in": True}),
             (self.jwt(2100), {"expires_in": 0}),
@@ -233,11 +248,16 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             (mock_base.TestResponse(body, 200), GravitinoRuntimeException)
             for body in [b"client:secret", b"[]", b"null"]
         ]
+        cases.append(
+            (_StructuredRESTException(502, "POST", "auth", "secret"), RESTException)
+        )
         for index, (response, error_type) in enumerate(cases):
             with self.subTest(case=index):
                 with self.assertRaises(error_type) as caught:
                     self.provider(response)
+                self.assertIs(type(caught.exception), error_type)
                 self.assertIsNone(caught.exception.__context__)
+                self.assertIsNone(caught.exception.__cause__)
                 self.assertNotIn("secret", str(caught.exception))
 
     def test_renewal_failure_preserves_cache_and_recovers(self):
@@ -245,6 +265,11 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
             (UnauthorizedException("client:secret"), UnauthorizedException, 54),
             (UnauthorizedException("client:secret"), UnauthorizedException, 60),
             (BadRequestException("client:secret"), BadRequestException, 54),
+            (
+                _StructuredRESTException(502, "POST", "auth", "secret"),
+                RESTException,
+                54,
+            ),
             (
                 token_response("old", token_type="client:secret"),
                 IllegalArgumentException,
@@ -269,6 +294,7 @@ class TestOAuth2TokenExpiry(unittest.TestCase):
                 self.advance(elapsed)
                 with self.assertRaises(error_type) as caught:
                     provider.get_token_data()
+                self.assertIs(type(caught.exception), error_type)
                 self.assertIs(old, provider._token)
                 self.assertIsNone(caught.exception.__context__)
                 self.assertIsNone(caught.exception.__cause__)

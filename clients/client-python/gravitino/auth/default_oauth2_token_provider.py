@@ -147,10 +147,12 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
                 raise GravitinoRuntimeException("Invalid OAuth2 token response")
             oauth2_resp = OAuth2TokenResponse.from_dict(payload, infer_missing=True)
             oauth2_resp.validate()
+        except RESTException:
+            # Transport subclasses may require structured constructor arguments.
+            failure = RESTException("OAuth2 token acquisition failed")
         except (
             IllegalArgumentException,
             GravitinoRuntimeException,
-            RESTException,
             UnknownError,
         ) as error:
             failure = type(error)("OAuth2 token acquisition failed")
@@ -213,7 +215,7 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
             if not isinstance(payload, dict):
                 return None
             return DefaultOAuth2TokenProvider._finite_number(payload.get(JWT_EXPIRE))
-        except (ValueError, TypeError, OverflowError):
+        except (ValueError, TypeError, OverflowError, RecursionError):
             return None
 
     @staticmethod
