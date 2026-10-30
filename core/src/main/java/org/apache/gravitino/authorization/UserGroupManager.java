@@ -23,12 +23,20 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -37,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -94,8 +103,30 @@ class UserGroupManager {
 
   boolean removeUser(String metalake, String user) {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    NameIdentifier userIdent = AuthorizationUtils.ofUser(metalake, user);
     try {
-      return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
+      // Read the user's roles before the delete, which also removes the user's role relations.
+      UserEntity userEntity = getEntityOrNull(userIdent, Entity.EntityType.USER, UserEntity.class);
+      List<RoleEntity> roles =
+          userEntity == null
+              ? Collections.emptyList()
+              : loadRoles(metalake, userEntity.roleNames());
+
+      boolean deleted = store.delete(userIdent, Entity.EntityType.USER);
+
+      // Only after a successful delete, revoke the roles from the user in the authorization
+      // plugins, the same way PermissionManager.revokeRolesFromUser does. Otherwise the plugins,
+      // e.g. Ranger, keep the user as a member of its roles. onUserRemoved is not called: it drops
+      // the user in the underlying system, and addUser does not call onUserAdded either.
+      if (deleted && !roles.isEmpty()) {
+        revokeRolesInAuthorizationPlugins(
+            metalake,
+            "User " + user,
+            roles,
+            (authorizationPlugin, catalogRoles) ->
+                authorizationPlugin.onRevokedRolesFromUser(catalogRoles, userEntity));
+      }
+      return deleted;
     } catch (IOException ioe) {
       LOG.error(
           "Removing user {} in the metalake {} failed due to storage issues", user, metalake, ioe);
@@ -170,8 +201,30 @@ class UserGroupManager {
 
   boolean removeGroup(String metalake, String group) {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    NameIdentifier groupIdent = AuthorizationUtils.ofGroup(metalake, group);
     try {
-      return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
+      // Read the group's roles before the delete, which also removes the group's role relations.
+      GroupEntity groupEntity =
+          getEntityOrNull(groupIdent, Entity.EntityType.GROUP, GroupEntity.class);
+      List<RoleEntity> roles =
+          groupEntity == null
+              ? Collections.emptyList()
+              : loadRoles(metalake, groupEntity.roleNames());
+
+      boolean deleted = store.delete(groupIdent, Entity.EntityType.GROUP);
+
+      // Only after a successful delete, revoke the roles from the group in the authorization
+      // plugins, the same way PermissionManager.revokeRolesFromGroup does. onGroupRemoved is not
+      // called for the same reason as onUserRemoved in removeUser.
+      if (deleted && !roles.isEmpty()) {
+        revokeRolesInAuthorizationPlugins(
+            metalake,
+            "Group " + group,
+            roles,
+            (authorizationPlugin, catalogRoles) ->
+                authorizationPlugin.onRevokedRolesFromGroup(catalogRoles, groupEntity));
+      }
+      return deleted;
     } catch (IOException ioe) {
       LOG.error(
           "Removing group {} in the metalake {} failed due to storage issues",
@@ -245,6 +298,121 @@ class UserGroupManager {
     } catch (IOException ioe) {
       LOG.error("Listing group under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  @Nullable
+  private <E extends Entity & HasIdentifier> E getEntityOrNull(
+      NameIdentifier ident, Entity.EntityType type, Class<E> clazz) throws IOException {
+    try {
+      return store.get(ident, type, clazz);
+    } catch (NoSuchEntityException e) {
+      return null;
+    }
+  }
+
+  private List<RoleEntity> loadRoles(String metalake, @Nullable List<String> roleNames)
+      throws IOException {
+    List<RoleEntity> roles = Lists.newArrayList();
+    if (roleNames == null) {
+      return roles;
+    }
+
+    for (String roleName : roleNames) {
+      RoleEntity role =
+          getEntityOrNull(
+              AuthorizationUtils.ofRole(metalake, roleName),
+              Entity.EntityType.ROLE,
+              RoleEntity.class);
+      if (role == null) {
+        LOG.warn("Role {} in the metalake {} no longer exists, skip it", roleName, metalake);
+        continue;
+      }
+      roles.add(role);
+    }
+    return roles;
+  }
+
+  /**
+   * Revokes the roles of a removed user or group in the authorization plugin of every catalog the
+   * roles touch. The principal is already deleted, so a retry would not reach the plugins again: a
+   * failing catalog is logged and does not stop the remaining catalogs, and the failures are
+   * reported together at the end.
+   */
+  private static void revokeRolesInAuthorizationPlugins(
+      String metalake,
+      String principal,
+      List<RoleEntity> roles,
+      BiConsumer<AuthorizationPlugin, List<Role>> revoke) {
+    List<String> roleNames = roles.stream().map(RoleEntity::name).collect(Collectors.toList());
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+    for (RoleEntity role : roles) {
+      securableObjects.addAll(role.securableObjects());
+    }
+
+    Set<NameIdentifier> catalogs;
+    try {
+      catalogs = AuthorizationUtils.getSecurableObjectCatalogs(metalake, securableObjects);
+    } catch (RuntimeException e) {
+      LOG.error(
+          "{} was removed from the metalake {}, but the catalogs of its roles {} could not be "
+              + "listed, so the roles were not revoked in any authorization plugin",
+          principal,
+          metalake,
+          roleNames,
+          e);
+      throw new AuthorizationPluginException(
+          e,
+          "%s was removed from the metalake %s, but revoking its roles in the authorization "
+              + "plugins failed: %s",
+          principal,
+          metalake,
+          e.getMessage());
+    }
+
+    List<String> failedCatalogs = Lists.newArrayList();
+    List<RuntimeException> failures = Lists.newArrayList();
+    for (NameIdentifier catalog : catalogs) {
+      try {
+        AuthorizationUtils.callAuthorizationPluginForCatalog(
+            catalog,
+            (authorizationPlugin, catalogName) ->
+                revoke.accept(
+                    authorizationPlugin,
+                    roles.stream()
+                        .map(
+                            role ->
+                                AuthorizationUtils.filterSecurableObjects(
+                                    role, metalake, catalogName))
+                        .collect(Collectors.toList())));
+      } catch (RuntimeException e) {
+        LOG.error(
+            "{} was removed from the metalake {}, but revoking its roles {} in the authorization "
+                + "plugin of the catalog {} failed. The plugin may keep it as a member of these "
+                + "roles.",
+            principal,
+            metalake,
+            roleNames,
+            catalog.name(),
+            e);
+        failedCatalogs.add(catalog.name());
+        failures.add(e);
+      }
+    }
+
+    if (!failures.isEmpty()) {
+      AuthorizationPluginException aggregated =
+          new AuthorizationPluginException(
+              failures.get(0),
+              "%s was removed from the metalake %s, but revoking its roles in the authorization "
+                  + "plugins of the catalogs %s failed",
+              principal,
+              metalake,
+              failedCatalogs);
+      for (int i = 1; i < failures.size(); i++) {
+        aggregated.addSuppressed(failures.get(i));
+      }
+      throw aggregated;
     }
   }
 }

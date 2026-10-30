@@ -25,12 +25,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -42,11 +47,14 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -59,10 +67,12 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -88,6 +98,9 @@ public class TestAccessControlManagerForPermissions {
   private static String GROUP = "group";
 
   private static List<String> ROLE = Lists.newArrayList("role");
+
+  private static final List<Privilege> USE_CATALOG =
+      Lists.newArrayList(Privileges.UseCatalog.allow());
 
   private static AuditInfo auditInfo =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -728,5 +741,534 @@ public class TestAccessControlManagerForPermissions {
                             Assertions.assertFalse(
                                 privilege.name().name().endsWith("SEMANTIC_MODEL"))));
     reset(authorizationPlugin);
+  }
+
+  @Test
+  public void testRemoveUserRevokesRolesInAuthorizationPlugin() {
+    String user = "user_to_remove";
+    accessControlManager.addUser(METALAKE, user);
+    accessControlManager.grantRolesToUser(METALAKE, ROLE, user);
+
+    reset(authorizationPlugin);
+    Assertions.assertTrue(accessControlManager.removeUser(METALAKE, user));
+
+    ArgumentCaptor<List<Role>> roles = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<User> removedUser = ArgumentCaptor.forClass(User.class);
+    verify(authorizationPlugin).onRevokedRolesFromUser(roles.capture(), removedUser.capture());
+    Assertions.assertEquals(ROLE, roles.getValue().stream().map(Role::name).toList());
+    Assertions.assertEquals(user, removedUser.getValue().name());
+    // The plugin gets the user as it was before the delete, still listing the revoked roles.
+    Assertions.assertEquals(ROLE, removedUser.getValue().roles());
+    // The user in the underlying system was not created by Gravitino, so it is not dropped.
+    verify(authorizationPlugin, Mockito.never()).onUserRemoved(any());
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, user));
+  }
+
+  @Test
+  public void testRemoveUserWithoutRolesOrMissingDoesNotCallAuthorizationPlugin() {
+    String user = "user_without_roles";
+    accessControlManager.addUser(METALAKE, user);
+
+    reset(authorizationPlugin);
+    Assertions.assertTrue(accessControlManager.removeUser(METALAKE, user));
+    Assertions.assertFalse(accessControlManager.removeUser(METALAKE, user));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  public void testRemoveGroupRevokesRolesInAuthorizationPlugin() {
+    String group = "group_to_remove";
+    accessControlManager.addGroup(METALAKE, group);
+    accessControlManager.grantRolesToGroup(METALAKE, ROLE, group);
+
+    reset(authorizationPlugin);
+    Assertions.assertTrue(accessControlManager.removeGroup(METALAKE, group));
+
+    ArgumentCaptor<List<Role>> roles = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<Group> removedGroup = ArgumentCaptor.forClass(Group.class);
+    verify(authorizationPlugin).onRevokedRolesFromGroup(roles.capture(), removedGroup.capture());
+    Assertions.assertEquals(ROLE, roles.getValue().stream().map(Role::name).toList());
+    Assertions.assertEquals(group, removedGroup.getValue().name());
+    verify(authorizationPlugin, Mockito.never()).onGroupRemoved(any());
+
+    // A group without roles, or one that no longer exists, does not reach the plugin.
+    String emptyGroup = "group_without_roles";
+    accessControlManager.addGroup(METALAKE, emptyGroup);
+    reset(authorizationPlugin);
+    Assertions.assertTrue(accessControlManager.removeGroup(METALAKE, emptyGroup));
+    Assertions.assertFalse(accessControlManager.removeGroup(METALAKE, emptyGroup));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  public void testBulkRemoveRevokesRolesInAuthorizationPlugin() {
+    List<String> users = List.of("bulk_user_1", "bulk_user_2");
+    List<String> groups = List.of("bulk_group_1", "bulk_group_2");
+    for (int i = 0; i < 2; i++) {
+      accessControlManager.addUser(METALAKE, users.get(i));
+      accessControlManager.grantRolesToUser(METALAKE, ROLE, users.get(i));
+      accessControlManager.addGroup(METALAKE, groups.get(i));
+      accessControlManager.grantRolesToGroup(METALAKE, ROLE, groups.get(i));
+    }
+
+    reset(authorizationPlugin);
+    List<BulkItemResult<String>> userResults =
+        accessControlManager.removeUsers(METALAKE, users, Optional.empty());
+    List<BulkItemResult<String>> groupResults =
+        accessControlManager.removeGroups(METALAKE, groups, Optional.empty());
+
+    Assertions.assertEquals(2, userResults.size());
+    Assertions.assertEquals(2, groupResults.size());
+    userResults.forEach(result -> Assertions.assertTrue(result.succeeded()));
+    groupResults.forEach(result -> Assertions.assertTrue(result.succeeded()));
+    ArgumentCaptor<List<Role>> userRoles = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<User> removedUsers = ArgumentCaptor.forClass(User.class);
+    verify(authorizationPlugin, Mockito.times(2))
+        .onRevokedRolesFromUser(userRoles.capture(), removedUsers.capture());
+    Assertions.assertEquals(
+        users, removedUsers.getAllValues().stream().map(User::name).sorted().toList());
+    userRoles
+        .getAllValues()
+        .forEach(r -> Assertions.assertEquals(ROLE, r.stream().map(Role::name).toList()));
+    ArgumentCaptor<List<Role>> groupRoles = ArgumentCaptor.forClass(List.class);
+    ArgumentCaptor<Group> removedGroups = ArgumentCaptor.forClass(Group.class);
+    verify(authorizationPlugin, Mockito.times(2))
+        .onRevokedRolesFromGroup(groupRoles.capture(), removedGroups.capture());
+    Assertions.assertEquals(
+        groups, removedGroups.getAllValues().stream().map(Group::name).sorted().toList());
+    groupRoles
+        .getAllValues()
+        .forEach(r -> Assertions.assertEquals(ROLE, r.stream().map(Role::name).toList()));
+  }
+
+  @Test
+  public void testBulkRemoveUsersReportsPluginFailurePerItem() {
+    List<String> users = List.of("bulk_failure_user_1", "bulk_failure_user_2");
+    for (String user : users) {
+      accessControlManager.addUser(METALAKE, user);
+      accessControlManager.grantRolesToUser(METALAKE, ROLE, user);
+    }
+
+    reset(authorizationPlugin);
+    RuntimeException failure = new RuntimeException("plugin failed once");
+    List<BulkItemResult<String>> results;
+    try {
+      Mockito.doThrow(failure)
+          .doReturn(Boolean.TRUE)
+          .when(authorizationPlugin)
+          .onRevokedRolesFromUser(any(), any());
+      results = accessControlManager.removeUsers(METALAKE, users, Optional.empty());
+      verify(authorizationPlugin, Mockito.times(2)).onRevokedRolesFromUser(any(), any());
+    } finally {
+      reset(authorizationPlugin);
+    }
+
+    Assertions.assertEquals(2, results.size());
+    // The first user is removed, but its plugin cleanup failed, so its item is a failure.
+    Assertions.assertFalse(results.get(0).succeeded());
+    Assertions.assertTrue(results.get(1).succeeded());
+    for (String user : users) {
+      Assertions.assertThrows(
+          NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, user));
+    }
+  }
+
+  @Test
+  public void testRemoveUserReportsAuthorizationPluginFailureAfterDelete() {
+    String user = "user_plugin_failure";
+    accessControlManager.addUser(METALAKE, user);
+    accessControlManager.grantRolesToUser(METALAKE, ROLE, user);
+
+    reset(authorizationPlugin);
+    RuntimeException failure = new RuntimeException("plugin failed");
+    Mockito.doThrow(failure).when(authorizationPlugin).onRevokedRolesFromUser(any(), any());
+    try {
+      AuthorizationPluginException thrown =
+          Assertions.assertThrows(
+              AuthorizationPluginException.class,
+              () -> accessControlManager.removeUser(METALAKE, user));
+      Assertions.assertSame(failure, thrown.getCause());
+    } finally {
+      reset(authorizationPlugin);
+    }
+    // The plugin is called after the delete, so the user is removed from Gravitino.
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, user));
+    // Known limitation: a retry finds no user and does not reach the plugin again.
+    Assertions.assertFalse(accessControlManager.removeUser(METALAKE, user));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  public void testRemoveGroupReportsAuthorizationPluginFailureAfterDelete() {
+    String group = "group_plugin_failure";
+    accessControlManager.addGroup(METALAKE, group);
+    accessControlManager.grantRolesToGroup(METALAKE, ROLE, group);
+
+    reset(authorizationPlugin);
+    RuntimeException failure = new RuntimeException("plugin failed");
+    Mockito.doThrow(failure).when(authorizationPlugin).onRevokedRolesFromGroup(any(), any());
+    try {
+      AuthorizationPluginException thrown =
+          Assertions.assertThrows(
+              AuthorizationPluginException.class,
+              () -> accessControlManager.removeGroup(METALAKE, group));
+      Assertions.assertSame(failure, thrown.getCause());
+    } finally {
+      reset(authorizationPlugin);
+    }
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, group));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testFailedRemoveDoesNotCallAuthorizationPlugin(boolean group) throws IOException {
+    EntityStore store = Mockito.mock(EntityStore.class);
+    Mockito.when(store.get(Mockito.eq(NameIdentifier.of(METALAKE)), any(), any()))
+        .thenReturn(metalakeEntity);
+    String name = group ? "group_delete_fails" : "user_delete_fails";
+    NameIdentifier ident =
+        group
+            ? AuthorizationUtils.ofGroup(METALAKE, name)
+            : AuthorizationUtils.ofUser(METALAKE, name);
+    Entity.EntityType type = group ? Entity.EntityType.GROUP : Entity.EntityType.USER;
+    if (group) {
+      GroupEntity groupWithRole =
+          GroupEntity.builder()
+              .withNamespace(groupEntity.namespace())
+              .withId(100L)
+              .withName(name)
+              .withRoleNames(ROLE)
+              .withRoleIds(List.of(roleEntity.id()))
+              .withAuditInfo(auditInfo)
+              .build();
+      Mockito.when(store.get(ident, type, GroupEntity.class)).thenReturn(groupWithRole);
+    } else {
+      UserEntity userWithRole =
+          UserEntity.builder()
+              .withNamespace(userEntity.namespace())
+              .withId(100L)
+              .withName(name)
+              .withRoleNames(ROLE)
+              .withRoleIds(List.of(roleEntity.id()))
+              .withAuditInfo(auditInfo)
+              .build();
+      Mockito.when(store.get(ident, type, UserEntity.class)).thenReturn(userWithRole);
+    }
+    NameIdentifier roleIdent = AuthorizationUtils.ofRole(METALAKE, roleEntity.name());
+    Mockito.when(store.get(roleIdent, Entity.EntityType.ROLE, RoleEntity.class))
+        .thenReturn(roleEntity);
+    // Another request removed the principal between the read and the delete.
+    Mockito.when(store.delete(ident, type)).thenReturn(false);
+    UserGroupManager manager = new UserGroupManager(store, new RandomIdGenerator());
+
+    reset(authorizationPlugin);
+    Assertions.assertFalse(
+        group ? manager.removeGroup(METALAKE, name) : manager.removeUser(METALAKE, name));
+    // The remove read the principal and its role, so it reached the delete with a non-empty role
+    // list, and only the failed delete kept it from calling the plugin.
+    verify(store).get(roleIdent, Entity.EntityType.ROLE, RoleEntity.class);
+    verify(store).delete(ident, type);
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  public void testRemoveUserStoreFailuresDoNotCallAuthorizationPlugin() throws IOException {
+    String name = "user_store_fails";
+    NameIdentifier ident = AuthorizationUtils.ofUser(METALAKE, name);
+    UserEntity userWithRole =
+        UserEntity.builder()
+            .withNamespace(userEntity.namespace())
+            .withId(101L)
+            .withName(name)
+            .withRoleNames(ROLE)
+            .withRoleIds(List.of(roleEntity.id()))
+            .withAuditInfo(auditInfo)
+            .build();
+    IOException failure = new IOException("store unavailable");
+
+    // The read fails: nothing is deleted and the plugin is not called.
+    EntityStore readFails = Mockito.mock(EntityStore.class);
+    Mockito.when(readFails.get(Mockito.eq(NameIdentifier.of(METALAKE)), any(), any()))
+        .thenReturn(metalakeEntity);
+    Mockito.when(readFails.get(ident, Entity.EntityType.USER, UserEntity.class)).thenThrow(failure);
+    reset(authorizationPlugin);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                new UserGroupManager(readFails, new RandomIdGenerator())
+                    .removeUser(METALAKE, name));
+    Assertions.assertSame(failure, thrown.getCause());
+    verify(readFails, Mockito.never()).delete(any(), any());
+
+    // The delete fails: the plugin is not called.
+    EntityStore deleteFails = Mockito.mock(EntityStore.class);
+    Mockito.when(deleteFails.get(Mockito.eq(NameIdentifier.of(METALAKE)), any(), any()))
+        .thenReturn(metalakeEntity);
+    Mockito.when(deleteFails.get(ident, Entity.EntityType.USER, UserEntity.class))
+        .thenReturn(userWithRole);
+    Mockito.when(
+            deleteFails.get(
+                AuthorizationUtils.ofRole(METALAKE, roleEntity.name()),
+                Entity.EntityType.ROLE,
+                RoleEntity.class))
+        .thenReturn(roleEntity);
+    Mockito.when(deleteFails.delete(ident, Entity.EntityType.USER)).thenThrow(failure);
+    thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                new UserGroupManager(deleteFails, new RandomIdGenerator())
+                    .removeUser(METALAKE, name));
+    Assertions.assertSame(failure, thrown.getCause());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  public void testRemoveUserRevokesRolesFilteredPerCatalog() throws Exception {
+    AuthorizationPlugin pluginA = Mockito.mock(AuthorizationPlugin.class);
+    AuthorizationPlugin pluginB = Mockito.mock(AuthorizationPlugin.class);
+    RoleEntity roleA = putRole("role_on_a", SecurableObjects.ofCatalog("catalog_a", USE_CATALOG));
+    RoleEntity roleB = putRole("role_on_b", SecurableObjects.ofCatalog("catalog_b", USE_CATALOG));
+    String user = putUserWithRoles("user_two_catalogs", roleA, roleB);
+
+    withCatalogs(
+        Map.of("catalog_a", pluginA, "catalog_b", pluginB),
+        () -> Assertions.assertTrue(accessControlManager.removeUser(METALAKE, user)));
+
+    // Each plugin is called once, with each role holding only its own catalog's objects.
+    for (Map.Entry<String, AuthorizationPlugin> entry :
+        Map.of("catalog_a", pluginA, "catalog_b", pluginB).entrySet()) {
+      ArgumentCaptor<List<Role>> roles = ArgumentCaptor.forClass(List.class);
+      verify(entry.getValue()).onRevokedRolesFromUser(roles.capture(), any());
+      Assertions.assertEquals(2, roles.getValue().size());
+      for (Role role : roles.getValue()) {
+        role.securableObjects()
+            .forEach(object -> Assertions.assertEquals(entry.getKey(), object.fullName()));
+      }
+      Assertions.assertEquals(
+          1, roles.getValue().stream().mapToInt(r -> r.securableObjects().size()).sum());
+    }
+  }
+
+  @Test
+  public void testRemoveUserPluginFailureDoesNotStopOtherCatalogs() throws Exception {
+    AuthorizationPlugin pluginA = Mockito.mock(AuthorizationPlugin.class);
+    AuthorizationPlugin pluginB = Mockito.mock(AuthorizationPlugin.class);
+    AuthorizationPlugin pluginC = Mockito.mock(AuthorizationPlugin.class);
+    RuntimeException failureA = new RuntimeException("catalog_a plugin failed");
+    RuntimeException failureC = new RuntimeException("catalog_c plugin failed");
+    Mockito.doThrow(failureA).when(pluginA).onRevokedRolesFromUser(any(), any());
+    Mockito.doThrow(failureC).when(pluginC).onRevokedRolesFromUser(any(), any());
+    RoleEntity role =
+        putRole(
+            "role_on_three_catalogs",
+            SecurableObjects.ofCatalog("catalog_a", USE_CATALOG),
+            SecurableObjects.ofCatalog("catalog_b", USE_CATALOG),
+            SecurableObjects.ofCatalog("catalog_c", USE_CATALOG));
+    String user = putUserWithRoles("user_partial_failure", role);
+
+    withCatalogs(
+        Map.of("catalog_a", pluginA, "catalog_b", pluginB, "catalog_c", pluginC),
+        () -> {
+          AuthorizationPluginException thrown =
+              Assertions.assertThrows(
+                  AuthorizationPluginException.class,
+                  () -> accessControlManager.removeUser(METALAKE, user));
+          Assertions.assertSame(failureA, thrown.getCause());
+          Assertions.assertEquals(List.of(failureC), List.of(thrown.getSuppressed()));
+          Assertions.assertTrue(thrown.getMessage().contains("catalog_a"));
+          Assertions.assertTrue(thrown.getMessage().contains("catalog_c"));
+          Assertions.assertFalse(thrown.getMessage().contains("catalog_b"));
+        });
+
+    // The failing catalogs do not stop the others, and the user is removed.
+    verify(pluginA).onRevokedRolesFromUser(any(), any());
+    verify(pluginB).onRevokedRolesFromUser(any(), any());
+    verify(pluginC).onRevokedRolesFromUser(any(), any());
+    Assertions.assertFalse(
+        entityStore.exists(AuthorizationUtils.ofUser(METALAKE, user), Entity.EntityType.USER));
+  }
+
+  @Test
+  public void testRemoveUserWhenRoleCatalogCannotLoadStillRevokesOtherCatalogs() throws Exception {
+    AuthorizationPlugin pluginB = Mockito.mock(AuthorizationPlugin.class);
+    RoleEntity role =
+        putRole(
+            "role_on_broken_catalog",
+            SecurableObjects.ofCatalog("broken_catalog", USE_CATALOG),
+            SecurableObjects.ofCatalog("catalog_b", USE_CATALOG));
+    String user = putUserWithRoles("user_broken_catalog", role);
+
+    // broken_catalog is not among the catalogs, so loading it throws NoSuchCatalogException.
+    withCatalogs(
+        Map.of("catalog_b", pluginB),
+        () -> {
+          AuthorizationPluginException thrown =
+              Assertions.assertThrows(
+                  AuthorizationPluginException.class,
+                  () -> accessControlManager.removeUser(METALAKE, user));
+          Assertions.assertInstanceOf(NoSuchCatalogException.class, thrown.getCause());
+        });
+
+    verify(pluginB).onRevokedRolesFromUser(any(), any());
+    Assertions.assertFalse(
+        entityStore.exists(AuthorizationUtils.ofUser(METALAKE, user), Entity.EntityType.USER));
+  }
+
+  @Test
+  public void testRemoveGroupWithMetalakeScopedRoleRevokesInAllCatalogs() throws Exception {
+    AuthorizationPlugin pluginA = Mockito.mock(AuthorizationPlugin.class);
+    AuthorizationPlugin pluginB = Mockito.mock(AuthorizationPlugin.class);
+    RoleEntity role =
+        putRole(
+            "role_on_metalake",
+            SecurableObjects.ofMetalake(
+                METALAKE, Lists.newArrayList(Privileges.SelectTable.allow())));
+    String group = "group_metalake_role";
+    entityStore.put(
+        GroupEntity.builder()
+            .withNamespace(groupEntity.namespace())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(group)
+            .withRoleNames(List.of(role.name()))
+            .withRoleIds(List.of(role.id()))
+            .withAuditInfo(auditInfo)
+            .build(),
+        false);
+
+    withCatalogs(
+        Map.of("catalog_a", pluginA, "catalog_b", pluginB),
+        () -> Assertions.assertTrue(accessControlManager.removeGroup(METALAKE, group)));
+
+    verify(pluginA).onRevokedRolesFromGroup(any(), any());
+    verify(pluginB).onRevokedRolesFromGroup(any(), any());
+  }
+
+  @Test
+  public void testRemoveUserSkipsRolesWithoutConnectorPrivilegesOrDeleted() throws Exception {
+    AuthorizationPlugin pluginA = Mockito.mock(AuthorizationPlugin.class);
+    RoleEntity manageUsers =
+        putRole(
+            "role_manage_users",
+            SecurableObjects.ofMetalake(
+                METALAKE, Lists.newArrayList(Privileges.ManageUsers.allow())));
+    String onlyManageUsers = putUserWithRoles("user_manage_users_only", manageUsers);
+
+    withCatalogs(
+        Map.of("catalog_a", pluginA),
+        () -> Assertions.assertTrue(accessControlManager.removeUser(METALAKE, onlyManageUsers)));
+    Mockito.verifyNoInteractions(pluginA);
+
+    // A role deleted before the remove is skipped, and the existing role is still revoked.
+    RoleEntity roleA =
+        putRole("role_kept_on_a", SecurableObjects.ofCatalog("catalog_a", USE_CATALOG));
+    String user = "user_with_deleted_role";
+    entityStore.put(
+        UserEntity.builder()
+            .withNamespace(userEntity.namespace())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(user)
+            .withRoleNames(List.of("role_already_deleted", roleA.name()))
+            .withRoleIds(List.of(RandomIdGenerator.INSTANCE.nextId(), roleA.id()))
+            .withAuditInfo(auditInfo)
+            .build(),
+        false);
+
+    withCatalogs(
+        Map.of("catalog_a", pluginA),
+        () -> Assertions.assertTrue(accessControlManager.removeUser(METALAKE, user)));
+    ArgumentCaptor<List<Role>> roles = ArgumentCaptor.forClass(List.class);
+    verify(pluginA).onRevokedRolesFromUser(roles.capture(), any());
+    Assertions.assertEquals(
+        List.of(roleA.name()), roles.getValue().stream().map(Role::name).toList());
+  }
+
+  @Test
+  public void testRemoveUserWithoutAuthorizationPluginSucceeds() throws Exception {
+    RoleEntity roleA =
+        putRole("role_on_plain_catalog", SecurableObjects.ofCatalog("catalog_a", USE_CATALOG));
+    String user = putUserWithRoles("user_plain_catalog", roleA);
+    Map<String, AuthorizationPlugin> noPlugin = new HashMap<>();
+    noPlugin.put("catalog_a", null);
+
+    withCatalogs(
+        noPlugin, () -> Assertions.assertTrue(accessControlManager.removeUser(METALAKE, user)));
+    Assertions.assertFalse(
+        entityStore.exists(AuthorizationUtils.ofUser(METALAKE, user), Entity.EntityType.USER));
+  }
+
+  private static RoleEntity putRole(String name, SecurableObject... objects) throws IOException {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withNamespace(roleEntity.namespace())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withProperties(Maps.newHashMap())
+            .withSecurableObjects(Lists.newArrayList(objects))
+            .withAuditInfo(auditInfo)
+            .build();
+    entityStore.put(role, false);
+    return role;
+  }
+
+  private static String putUserWithRoles(String name, RoleEntity... roles) throws IOException {
+    entityStore.put(
+        UserEntity.builder()
+            .withNamespace(userEntity.namespace())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withRoleNames(Arrays.stream(roles).map(RoleEntity::name).toList())
+            .withRoleIds(Arrays.stream(roles).map(RoleEntity::id).toList())
+            .withAuditInfo(auditInfo)
+            .build(),
+        false);
+    return name;
+  }
+
+  /**
+   * Runs {@code action} with a catalog manager that has the given catalogs, each with its own
+   * authorization plugin (or none for a null value). Loading any other catalog throws {@link
+   * NoSuchCatalogException}. The shared catalog manager is restored afterwards.
+   */
+  private static void withCatalogs(Map<String, AuthorizationPlugin> plugins, Executable action)
+      throws Exception {
+    CatalogManager localCatalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(localCatalogManager.listCatalogs(any()))
+        .thenReturn(
+            plugins.keySet().stream()
+                .sorted()
+                .map(name -> NameIdentifier.of(METALAKE, name))
+                .toArray(NameIdentifier[]::new));
+    Mockito.doAnswer(
+            invocation -> {
+              NameIdentifier ident = invocation.getArgument(0);
+              if (!plugins.containsKey(ident.name())) {
+                throw new NoSuchCatalogException("Catalog %s does not exist", ident);
+              }
+              BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+              Mockito.when(catalog.name()).thenReturn(ident.name());
+              Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(plugins.get(ident.name()));
+              ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(localCatalogManager)
+        .doWithCatalog(any(), any());
+
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Object original = FieldUtils.readField(env, "catalogManager", true);
+    FieldUtils.writeField(env, "catalogManager", localCatalogManager, true);
+    try {
+      action.execute();
+    } catch (Throwable t) {
+      Throwables.throwIfUnchecked(t);
+      Throwables.throwIfInstanceOf(t, Exception.class);
+      throw new AssertionError(t);
+    } finally {
+      FieldUtils.writeField(env, "catalogManager", original, true);
+    }
   }
 }

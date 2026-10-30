@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -252,6 +253,49 @@ public class AuthorizationUtils {
         }
       }
     }
+  }
+
+  /**
+   * Returns the catalogs whose authorization plugins {@link
+   * #callAuthorizationPluginForSecurableObjects} would call for the given securable objects, each
+   * catalog once and in the order first reached.
+   *
+   * @param metalake the metalake of the securable objects
+   * @param securableObjects the securable objects
+   * @return the identifiers of the catalogs to call
+   */
+  static Set<NameIdentifier> getSecurableObjectCatalogs(
+      String metalake, List<SecurableObject> securableObjects) {
+    Set<NameIdentifier> catalogs = new LinkedHashSet<>();
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    for (SecurableObject securableObject : securableObjects) {
+      List<Privilege> privileges = connectorPrivileges(securableObject);
+      if (privileges.isEmpty()) {
+        continue;
+      }
+      securableObject =
+          SecurableObjects.parse(securableObject.fullName(), securableObject.type(), privileges);
+      if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
+        catalogs.addAll(Arrays.asList(catalogManager.listCatalogs(Namespace.of(metalake))));
+      } else if (needApplyAuthorization(securableObject.type())) {
+        catalogs.add(
+            NameIdentifierUtil.getCatalogIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, securableObject)));
+      }
+    }
+    return catalogs;
+  }
+
+  /**
+   * Calls the authorization plugin of one catalog, if the catalog has one.
+   *
+   * @param catalogIdent the identifier of the catalog
+   * @param consumer the call, given the plugin and the catalog name
+   */
+  static void callAuthorizationPluginForCatalog(
+      NameIdentifier catalogIdent, BiConsumer<AuthorizationPlugin, String> consumer) {
+    callAuthorizationPluginImpl(
+        consumer, GravitinoEnv.getInstance().catalogManager(), catalogIdent);
   }
 
   public static void callAuthorizationPluginForMetadataObject(
