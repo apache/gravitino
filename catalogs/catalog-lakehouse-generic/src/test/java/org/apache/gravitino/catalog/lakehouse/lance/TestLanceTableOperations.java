@@ -1255,12 +1255,20 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testAddBlobColumnChecksFileFormatVersion() {
-    String location = tempDir.resolve("add-blob").toString();
-    try (Dataset ignored =
+  public void testAddBlobV2ColumnRejectedOnLegacyFileFormatVersion() {
+    // The dataset's file format version is pinned to 2.1 through its legacy blob column rather
+    // than relying on Lance's default, which has changed across lance-core releases (it is 2.2 as
+    // of 12.0.0). What is under test is the version check, not Lance's choice of default.
+    String location = tempDir.resolve("add-blob-legacy-dataset").toString();
+    try (Dataset dataset =
         lanceTableOps.createDataset(
-            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
-      // A dataset without blob columns uses Lance's default file format version.
+            location,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("legacy_image", Types.ExternalType.of("lance.blob.legacy"))
+            },
+            Map.of())) {
+      Assertions.assertEquals("2.1", dataset.getLanceFileFormatVersion());
     }
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
@@ -1275,19 +1283,75 @@ public class TestLanceTableOperations {
                       TableChange.addColumn(
                           new String[] {"image"}, Types.ExternalType.of("lance.blob"))
                     }));
-    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+    // Both rejection messages mention 2.2, so assert the clause that tells them apart.
+    Assertions.assertTrue(
+        exception.getMessage().contains("requires Lance file format version 2.2 or later"),
+        exception.getMessage());
+    Assertions.assertTrue(
+        exception.getMessage().contains("the dataset uses 2.1"), exception.getMessage());
+  }
+
+  @Test
+  public void testAddLegacyBlobColumnRejectedOnBlobV2FileFormatVersion() {
+    // Mirror case: a 2.2 dataset rejects the legacy blob encoding. A table created without blob
+    // columns also lands on 2.2 with lance-core 12.0.0, so this is the path such a table takes.
+    String location = tempDir.resolve("add-blob-v2-dataset").toString();
+    try (Dataset dataset =
+        lanceTableOps.createDataset(
+            location,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("image", Types.ExternalType.of("lance.blob"))
+            },
+            Map.of())) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(
+                          new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+                    }));
+    // Mirror assertion: this message mentions 2.2 twice, so match the distinguishing clause.
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("is not supported by Lance file format version 2.2 or later"),
+        exception.getMessage());
+  }
+
+  @Test
+  public void testAddBlobV2ColumnSucceedsOnDefaultFileFormatVersion() {
+    // Unlike the two tests above, this one deliberately depends on Lance's default: the default is
+    // what decides whether a table created without blob columns later accepts lance.blob, and
+    // docs/lakehouse-generic-lance-table.md states that behaviour as user-facing. The version
+    // assertion is therefore a canary - if a lance-core upgrade moves the default below 2.2 this
+    // fails, and the documented behaviour has to be revisited rather than quietly flipped.
+    String location = tempDir.resolve("add-blob-default").toString();
+    try (Dataset dataset =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
 
     lanceTableOps.handleLanceTableChange(
         table,
         new TableChange[] {
-          TableChange.addColumn(
-              new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+          TableChange.addColumn(new String[] {"image"}, Types.ExternalType.of("lance.blob"))
         });
     try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
       Assertions.assertEquals(
-          Types.ExternalType.of("lance.blob.legacy"),
-          LanceDataTypeConverter.CONVERTER.toGravitino(
-              dataset.getSchema().findField("legacy_image")));
+          Types.ExternalType.of("lance.blob"),
+          LanceDataTypeConverter.CONVERTER.toGravitino(dataset.getSchema().findField("image")));
     }
   }
 

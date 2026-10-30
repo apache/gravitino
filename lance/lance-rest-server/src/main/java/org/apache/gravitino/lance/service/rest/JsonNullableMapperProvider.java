@@ -28,7 +28,7 @@ import org.openapitools.jackson.nullable.JsonNullableModule;
  * JAX-RS {@link ContextResolver} that provides an {@link ObjectMapper} with the {@link
  * JsonNullableModule} registered.
  *
- * <p>lance-namespace 0.7.5 models use {@code JsonNullable<T>} for optional fields, which requires
+ * <p>lance-namespace 0.11.1 models use {@code JsonNullable<T>} for optional fields, which requires
  * this module for correct Jackson serialization/deserialization.
  */
 @Provider

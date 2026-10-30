@@ -24,6 +24,7 @@ The following table outlines the tested compatibility between Gravitino versions
 | ------------------------------ | ------------------------------ | --------------------------------------------- |
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
 | 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 + `lance-namespace` 0.4.5; 0.3.0 and 0.4.2 + 0.7.5; 0.5.0 + 0.11.1 |
 
 :::note
 - These version entries show which versions are expected to work together.
@@ -37,9 +38,10 @@ The following table outlines the tested compatibility between Gravitino versions
   exposes — the table-declaration path was consolidated onto
   `POST /lance/v1/table/{id}/declare` (`LanceTableOperations#declareTable`)
   when the deprecated `createEmptyTable` API was removed during the
-  `lance-namespace-core` 0.7.5 upgrade. Running 0.1.x against 1.3.0 surfaces
-  as `404 Not Found` on every table-creation flow; the small set of
-  list/describe-only tests still works, but any write path will fail.
+  `lance-namespace-core` 0.7.5 upgrade. Every table-creation flow fails; the
+  small set of list/describe-only tests still works. The failure surfaces as
+  `500 Internal Server Error`, not `404 Not Found` — see the note on
+  unimplemented endpoints below, which applies to 1.3.0 as well.
 - **`lance-ray` 0.1.0 is not supported on Gravitino 1.3.0.** It exposes
   `write_lance(... namespace=<LanceNamespace>)`, whereas the 0.2.0+ test path
   uses the new `write_lance(... namespace_impl="rest",
@@ -53,6 +55,14 @@ The following table outlines the tested compatibility between Gravitino versions
   raising `ImportError: cannot import name
   'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
   `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
+- **Gravitino 2.0.0 embeds `lance-core` 12.0.0 and `lance-namespace-core` 0.11.1**, the pair
+  `lance-spark` 0.8.0 is built on. Older clients keep working: none of the 0.11.1 spec changes
+  reaches the endpoints Gravitino serves, and responses only gained an empty `context` map, which
+  older clients ignore. Lance branches and tags are not implemented, so a request setting `branch`
+  or `tag` is rejected with `400`.
+- **An unimplemented endpoint answers `500`, not `404`**, because `LanceExceptionMapper` matches
+  only Gravitino's own `NotFoundException`. A call to a removed endpoint therefore looks like an
+  internal error.
 - Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
@@ -87,18 +97,21 @@ Generic Catalog unknown-format loading errors or change the Generic Catalog's fo
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
 
-For Lance Spark, the default `test` task uses the explicitly verified `0.5.1`
+For Lance Spark, the default `test` task uses the explicitly verified `0.8.0`
 bundle, while `lanceSparkMatrixTest` uses the declared matrix
-(`0.2.0`, `0.4.0`, and `0.5.1`). Passing `-PlanceSparkBundleVersions=...` is a
-targeted diagnostic override; the supplied versions form the matrix and the
-first supplied version remains the primary for the normal `test` task.
+(`0.2.0`, `0.4.0`, `0.5.1`, `0.6.1`, `0.7.1`, and `0.8.0`), which spans every
+`lance-namespace` generation a released bundle speaks. Passing
+`-PlanceSparkBundleVersions=...` is a targeted diagnostic override; the supplied
+versions form the matrix and the first supplied version remains the primary for
+the normal `test` task.
 
 ```bash
 # lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
-# removed /create-empty endpoint and will fail with 404 against 1.3.0+.
+# removed /create-empty endpoint and will fail against 1.3.0+ (as a 500, see the
+# note on unimplemented endpoints in the Compatibility Matrix section).
 ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1 \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1,0.6.1,0.7.1,0.8.0 \
     -PskipDockerTests=true
 # Per-version JUnit reports land under
 # lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
@@ -106,9 +119,11 @@ first supplied version remains the primary for the normal `test` task.
 # lance-ray — provisions a venv per version under
 # clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
 # tests/integration/test_lance_ray.py against each. The Gradle wrapper
-# below starts / stops Gravitino automatically.
+# below starts / stops Gravitino automatically. Each entry is
+# <lance-ray-version>=<lance-namespace-version>; `lance-ray` does not bound
+# `lance-namespace` itself, so the pairing has to be given per version.
 ./gradlew :clients:client-python:lanceRayMatrixTest \
-    -PlanceRayVersions=0.4.2,0.3.0
+    -PlanceRayVersions=0.5.0=0.11.1,0.4.2=0.7.5,0.3.0=0.7.5,0.2.0=0.4.5
 ```
 
 ### Rationale
@@ -305,7 +320,8 @@ pip install lance-ray
 :::info
 - Ray will be automatically installed if not already present
 - For Gravitino 1.3.0, use a `lance-namespace` client compatible with
-  server-side `lance-namespace-core` 0.7.5 or newer.
+  server-side `lance-namespace-core` 0.7.5 or newer; Gravitino 2.0.0 serves
+  `lance-namespace-core` 0.11.1, which also accepts those older clients.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 

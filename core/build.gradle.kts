@@ -66,13 +66,19 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
     exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
     exclude(group = "org.lance", module = "lance-namespace-core") // This is unnecessary in the core module
-    // Same rationale as lance-namespace-core: lance-core 6.0.0 declares
+    // Same rationale as lance-namespace-core: lance-core 12.0.0 declares
     // lance-namespace-apache-client as a transitive, but core never calls into it.
-    // Leaving it on the main classpath shadows the lance-rest aux service's own
-    // lance-namespace-apache-client (loaded via lance-rest-server/libs/), and
-    // because the aux classloader is parent-first, the older transitive wins
-    // on request deserialization (e.g. dropping fields like `check_declared`).
+    // The aux lance-rest service loads its own copy from lance-rest-server/libs/ and
+    // its classloader is parent-first, so whatever sits on the main classpath wins.
+    // lance-core 12.0.0 happens to pin the same 0.11.1 this build declares, so today
+    // that resolves to the same jar; keeping the exclusion means the aux service's
+    // version stays authoritative if the two ever drift apart again, which is what
+    // previously broke request deserialization (fields such as `check_declared`).
     exclude(group = "org.lance", module = "lance-namespace-apache-client")
+    // lance-core 12.0.0 added io.opentelemetry:opentelemetry-api as a compile
+    // dependency. Only org.lance.otel.* uses it and instrumentation is opt-in,
+    // which Gravitino never enables, so keep it out of the distribution.
+    exclude(group = "io.opentelemetry", module = "*")
   }
   implementation(libs.mybatis)
 
