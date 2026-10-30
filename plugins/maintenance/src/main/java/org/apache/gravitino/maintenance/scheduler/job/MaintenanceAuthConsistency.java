@@ -69,7 +69,11 @@ public final class MaintenanceAuthConsistency {
     long expectedId = -1L;
 
     for (PolicyEntity policy : policies) {
-      PolicyExecutionSpec spec = executionSpec(policy.content());
+      PolicyContent content = policy.content();
+      PolicyExecutionSpec spec =
+          content instanceof ExecutablePolicyContent
+              ? ((ExecutablePolicyContent) content).executionSpec()
+              : PolicyExecutionSpec.empty();
       Map<String, String> gravitinoAuth =
           projectGravitinoAuth(
               MaintenanceAuthConfigs.overlayUpdaterOptions(gravitinoConfig, spec.updaterOptions()));
@@ -110,52 +114,47 @@ public final class MaintenanceAuthConsistency {
     Preconditions.checkNotNull(left, "left");
     Preconditions.checkNotNull(right, "right");
     Set<String> clusterIrcKeys = MaintenanceAuthConfigs.loadIrcAuth(gravitinoConfig).keySet();
-    return projectGravitinoAuth(
-                flatJson(
-                    left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY))
-            .equals(
-                projectGravitinoAuth(
-                    flatJson(
-                        right.getUpdaterOptions(),
-                        MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY)))
-        && projectIrcAuth(flatJson(left.getSparkConf(), "spark_conf"), clusterIrcKeys)
-            .equals(projectIrcAuth(flatJson(right.getSparkConf(), "spark_conf"), clusterIrcKeys));
-  }
-
-  private static Map<String, String> flatJson(@Nullable String json, String field) {
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, field);
+    Map<String, String> leftUpdater =
+        IcebergSparkConfigUtils.parseFlatJsonMap(
+            left.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
+    Map<String, String> rightUpdater =
+        IcebergSparkConfigUtils.parseFlatJsonMap(
+            right.getUpdaterOptions(), MaintenanceJobTemplates.UPDATER_OPTIONS_JOB_CONF_KEY);
+    Map<String, String> leftSpark =
+        IcebergSparkConfigUtils.parseFlatJsonMap(left.getSparkConf(), "spark_conf");
+    Map<String, String> rightSpark =
+        IcebergSparkConfigUtils.parseFlatJsonMap(right.getSparkConf(), "spark_conf");
+    return projectGravitinoAuth(leftUpdater).equals(projectGravitinoAuth(rightUpdater))
+        && projectIrcAuth(leftSpark, clusterIrcKeys)
+            .equals(projectIrcAuth(rightSpark, clusterIrcKeys));
   }
 
   /**
-   * Builds a mismatch message with ids and differing key names only — never auth values (passwords
-   * / tokens must not land in server logs).
+   * Ids and differing key names only. Auth values (passwords / tokens) must not land in server
+   * logs.
    */
-  public static String mismatchMessage(
+  private static String mismatchMessage(
       String authName,
       long expectedId,
       long actualId,
       Map<String, String> expected,
       Map<String, String> actual) {
-    return String.format(
-        "%s mismatch: policy %s vs policy %s; differing keys=%s",
-        authName, expectedId, actualId, differingKeys(expected, actual));
-  }
-
-  /** Key names that are missing, extra, or present with unequal values. */
-  public static List<String> differingKeys(Map<String, String> left, Map<String, String> right) {
     Set<String> names = new TreeSet<>();
-    names.addAll(left.keySet());
-    names.addAll(right.keySet());
+    names.addAll(expected.keySet());
+    names.addAll(actual.keySet());
     List<String> differing = new ArrayList<>();
     for (String key : names) {
-      if (!Objects.equals(left.get(key), right.get(key))) {
+      if (!Objects.equals(expected.get(key), actual.get(key))) {
         differing.add(key);
       }
     }
-    return differing;
+    return String.format(
+        "%s mismatch: policy %s vs policy %s; differing keys=%s",
+        authName, expectedId, actualId, differing);
   }
 
-  static Map<String, String> projectGravitinoAuth(@Nullable Map<String, String> updaterOptions) {
+  private static Map<String, String> projectGravitinoAuth(
+      @Nullable Map<String, String> updaterOptions) {
     Map<String, String> projected = new TreeMap<>();
     if (updaterOptions == null) {
       return projected;
@@ -173,7 +172,7 @@ public final class MaintenanceAuthConsistency {
    * Projects IRC auth-shaped keys: every cluster {@code ircAuth} key present after overlay, plus
    * any remaining jobOption / spark_conf key that looks like catalog auth.
    */
-  static Map<String, String> projectIrcAuth(
+  private static Map<String, String> projectIrcAuth(
       @Nullable Map<String, String> overlaidJobOptions, Set<String> clusterIrcKeys) {
     Map<String, String> projected = new TreeMap<>();
     if (overlaidJobOptions == null) {
@@ -191,7 +190,7 @@ public final class MaintenanceAuthConsistency {
     return projected;
   }
 
-  static boolean isIrcAuthShaped(String key) {
+  private static boolean isIrcAuthShaped(String key) {
     String lower = key.toLowerCase(Locale.ROOT);
     return lower.contains(".auth.")
         || lower.startsWith("auth.")
@@ -201,12 +200,5 @@ public final class MaintenanceAuthConsistency {
         || lower.contains("credential")
         || lower.endsWith(".token")
         || lower.endsWith(".password");
-  }
-
-  private static PolicyExecutionSpec executionSpec(@Nullable PolicyContent content) {
-    if (content instanceof ExecutablePolicyContent) {
-      return ((ExecutablePolicyContent) content).executionSpec();
-    }
-    return PolicyExecutionSpec.empty();
   }
 }
