@@ -21,30 +21,31 @@ package org.apache.gravitino.maintenance.scheduler.job.commit;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * Result of {@link CommitChainCollector#collect(long)}: ordered onCommit members plus the resolved
- * Spark table ref used to build the enqueue-time spec (single table-metadata lookup).
+ * Result of {@link CommitChainCollector#collect(long)}: onCommit policies in chain order plus the
+ * resolved Spark table ref used to build the enqueue-time spec (single table-metadata lookup).
  */
 public final class CollectedCommitChain {
 
-  private final List<CommitChainMember> members;
+  private final List<PolicyEntity> policies;
   private final ResolvedTableRef tableRef;
 
   /**
-   * @param members ordered chain members (may be empty)
+   * @param policies onCommit policies in chain order (may be empty)
    * @param tableRef resolved Spark table ref for the table id
    */
-  public CollectedCommitChain(List<CommitChainMember> members, ResolvedTableRef tableRef) {
-    this.members = List.copyOf(Preconditions.checkNotNull(members, "members"));
+  public CollectedCommitChain(List<PolicyEntity> policies, ResolvedTableRef tableRef) {
+    this.policies = List.copyOf(Preconditions.checkNotNull(policies, "policies"));
     this.tableRef = Preconditions.checkNotNull(tableRef, "tableRef");
   }
 
   /**
-   * @return ordered onCommit members
+   * @return onCommit policies in chain order
    */
-  public List<CommitChainMember> members() {
-    return members;
+  public List<PolicyEntity> policies() {
+    return policies;
   }
 
   /**

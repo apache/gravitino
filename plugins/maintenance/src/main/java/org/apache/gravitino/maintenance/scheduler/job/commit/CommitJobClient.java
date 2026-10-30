@@ -38,6 +38,7 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
@@ -65,7 +66,7 @@ public class CommitJobClient {
   private final Config gravitinoConfig;
   private final Function<Long, Optional<CollectedCommitChain>> chainCollector;
   private final CommitOccupancyGate occupancyGate;
-  private final CommitJobSpecFactory specFactory;
+  private final MaintenanceJobSpecFactory specFactory;
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
@@ -100,7 +101,7 @@ public class CommitJobClient {
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.chainCollector = Preconditions.checkNotNull(chainCollector);
     this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
-    this.specFactory = new CommitJobSpecFactory(gravitinoConfig);
+    this.specFactory = new MaintenanceJobSpecFactory(gravitinoConfig);
   }
 
   /**
@@ -152,14 +153,14 @@ public class CommitJobClient {
     if (collected.isEmpty()) {
       return Optional.empty();
     }
-    List<CommitChainMember> members = collected.get().members();
-    if (members.isEmpty()) {
+    List<PolicyEntity> policies = collected.get().policies();
+    if (policies.isEmpty()) {
       LOG.debug("Skipping commit-job enqueue for table {}: empty onCommit chain", tableId);
       return Optional.empty();
     }
 
     long nowMs = System.currentTimeMillis();
-    List<CommitChainMember> chain = filterByMinInterval(tableId, members, nowMs);
+    List<PolicyEntity> chain = filterByMinInterval(tableId, policies, nowMs);
     if (chain.isEmpty()) {
       LOG.debug(
           "Skipping commit-job enqueue for table {}: all onCommit types within minIntervalMs",
@@ -168,11 +169,7 @@ public class CommitJobClient {
     }
 
     try {
-      List<PolicyEntity> policies = new ArrayList<>(chain.size());
-      for (CommitChainMember member : chain) {
-        policies.add(member.policy());
-      }
-      MaintenanceAuthConsistency.requireSameAuth(policies, gravitinoConfig);
+      MaintenanceAuthConsistency.requireSameAuth(chain, gravitinoConfig);
     } catch (IllegalArgumentException e) {
       LOG.error("Skipping commit-job enqueue for table {}: {}", tableId, e.getMessage());
       return Optional.empty();
@@ -189,23 +186,23 @@ public class CommitJobClient {
     }
   }
 
-  private List<CommitChainMember> filterByMinInterval(
-      long tableId, List<CommitChainMember> collected, long nowMs) {
-    List<CommitChainMember> due = new ArrayList<>();
-    for (CommitChainMember member : collected) {
+  private List<PolicyEntity> filterByMinInterval(
+      long tableId, List<PolicyEntity> collected, long nowMs) {
+    List<PolicyEntity> due = new ArrayList<>();
+    for (PolicyEntity policy : collected) {
       long minIntervalMs =
           MaintenanceMinIntervalConfigs.resolve(
-              gravitinoConfig, member.policyType(), policyMinIntervalMs(member.policy().content()));
-      if (occupancyGate.withinMinInterval(tableId, member.policy().id(), minIntervalMs, nowMs)) {
+              gravitinoConfig, policy.policyType(), policyMinIntervalMs(policy.content()));
+      if (occupancyGate.withinMinInterval(tableId, policy.id(), minIntervalMs, nowMs)) {
         LOG.debug(
             "Dropping type {} policy {} from commit-job enqueue for table {} (within minIntervalMs={})",
-            member.policyType(),
-            member.policy().id(),
+            policy.policyType(),
+            policy.id(),
             tableId,
             minIntervalMs);
         continue;
       }
-      due.add(member);
+      due.add(policy);
     }
     return due;
   }

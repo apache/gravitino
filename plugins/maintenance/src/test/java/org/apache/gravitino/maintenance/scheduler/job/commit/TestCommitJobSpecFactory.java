@@ -45,16 +45,10 @@ class TestCommitJobSpecFactory {
 
   @Test
   void testForCommitBuildsPerTypeTasksAndSharedBags() {
-    CommitJobSpecFactory factory = new CommitJobSpecFactory(configWithUri());
-    CommitChainMember compaction =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_COMPACTION, compaction(202L), "rewrite_data_files");
-    CommitChainMember expire =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, expire(303L), "expire_snapshots");
+    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     MaintenanceJobSpec spec =
         factory.forCommit(
-            List.of(compaction, expire), new ResolvedTableRef(101L, "iceberg", "db.t"));
+            List.of(compaction(202L), expire(303L)), new ResolvedTableRef(101L, "iceberg", "db.t"));
 
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals(2, spec.getTasks().size());

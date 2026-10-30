@@ -106,7 +106,7 @@ public final class CommitChainCollector {
     TableContext table = ctx.get();
     NearestMaintenancePolicyResolver nearest =
         new NearestMaintenancePolicyResolver(entityStoreSupplier.get());
-    List<CommitChainMember> chain = new ArrayList<>();
+    List<PolicyEntity> chain = new ArrayList<>();
     for (Policy.BuiltInType type : CHAIN_ORDER) {
       Decision decision = nearest.resolve(table.metalake(), table.tableObject(), type);
       if (decision.kind() == Decision.Kind.CONFLICT) {
@@ -130,11 +130,10 @@ public final class CommitChainCollector {
       if (!policy.enabled() || !Boolean.TRUE.equals(commitTrigger(policy.content()))) {
         continue;
       }
-      Optional<String> wire = MaintenanceJobTemplates.maintenanceType(type);
-      if (wire.isEmpty()) {
+      if (MaintenanceJobTemplates.maintenanceType(policy.policyType()).isEmpty()) {
         continue;
       }
-      chain.add(new CommitChainMember(type, policy, wire.get()));
+      chain.add(policy);
     }
     return Optional.of(new CollectedCommitChain(chain, table.tableRef()));
   }

@@ -57,7 +57,7 @@ class TestCommitJobClient extends TestJDBCBackend {
         new CommitJobClient(
             dataSource(),
             configWithUri(),
-            fixedCollector(List.of(member(POLICY_ID))),
+            fixedCollector(List.of(policy(POLICY_ID))),
             coolingGate(POLICY_ID));
     Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID));
     Assertions.assertTrue(
@@ -75,7 +75,7 @@ class TestCommitJobClient extends TestJDBCBackend {
         new CommitJobClient(
             dataSource(),
             configWithUri(),
-            fixedCollector(List.of(member(POLICY_ID))),
+            fixedCollector(List.of(policy(POLICY_ID))),
             allowAllGate());
 
     Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID));
@@ -100,15 +100,10 @@ class TestCommitJobClient extends TestJDBCBackend {
   }
 
   private static Function<Long, Optional<CollectedCommitChain>> fixedCollector(
-      List<CommitChainMember> chain) {
+      List<PolicyEntity> policies) {
     ResolvedTableRef ref = new ResolvedTableRef(TABLE_ID, "iceberg", "db.t");
-    CollectedCommitChain collected = new CollectedCommitChain(chain, ref);
+    CollectedCommitChain collected = new CollectedCommitChain(policies, ref);
     return tableId -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
-  }
-
-  private static CommitChainMember member(long policyId) {
-    return new CommitChainMember(
-        Policy.BuiltInType.ICEBERG_COMPACTION, policy(policyId), "rewrite_data_files");
   }
 
   private static CommitOccupancyGate allowAllGate() {

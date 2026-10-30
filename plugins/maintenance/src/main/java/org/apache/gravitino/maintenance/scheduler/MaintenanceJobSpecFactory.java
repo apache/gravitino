@@ -44,8 +44,8 @@ import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * Builds enqueue-time {@link MaintenanceJobSpec} values for the cron path and helpers used by cron
- * / commit submit to assemble the flat {@code runJob} map.
+ * Builds enqueue-time {@link MaintenanceJobSpec} values for the cron and commit paths, and helpers
+ * used by submit to assemble the flat {@code runJob} map.
  */
 public final class MaintenanceJobSpecFactory {
 
@@ -129,6 +129,48 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
+   * Commit-chain spec for one table. Caller filters cooldown and checks auth before this. Shared
+   * {@code updater_options} come from the first policy. {@code spark_conf} merges across policies:
+   * larger resource values win, other keys keep the first value.
+   *
+   * @param policies onCommit policies in chain order
+   * @param ref resolved Spark table ref
+   * @return spec with one task per policy
+   */
+  public MaintenanceJobSpec forCommit(List<PolicyEntity> policies, ResolvedTableRef ref) {
+    Preconditions.checkArgument(
+        policies != null && !policies.isEmpty(), "policies must not be empty");
+    Preconditions.checkNotNull(ref, "ref");
+
+    String updaterOptions = null;
+    Map<String, String> sparkConf = new LinkedHashMap<>();
+    List<Task> tasks = new ArrayList<>(policies.size());
+    for (int i = 0; i < policies.size(); i++) {
+      PolicyEntity policy = policies.get(i);
+      Optional<String> wire = MaintenanceJobTemplates.maintenanceType(policy.policyType());
+      Preconditions.checkArgument(
+          wire.isPresent(), "unsupported policy type %s", policy.policyType());
+      Map<String, String> built = jobConfBuilder.build(policy, ref.catalogName());
+      MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, ref.catalogName());
+      JobConfParts parts = splitJobConfParts(built);
+      if (i == 0) {
+        updaterOptions = parts.updaterOptions;
+        if (parts.sparkConf != null && !parts.sparkConf.isBlank()) {
+          sparkConf.putAll(IcebergSparkConfigUtils.parseFlatJsonMap(parts.sparkConf, "spark_conf"));
+        }
+      } else {
+        mergeSparkConfMaps(sparkConf, parts.sparkConf);
+      }
+      Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
+      parameters.put("catalog_name", ref.catalogName());
+      parameters.put("table_identifier", ref.tableIdentifier());
+      tasks.add(new Task(ref.tableId(), policy.id(), wire.get(), null, parameters));
+    }
+    String sparkConfJson = sparkConf.isEmpty() ? null : writeJson(sparkConf, "spark_conf");
+    return new MaintenanceJobSpec(tasks, updaterOptions, sparkConfJson);
+  }
+
+  /**
    * Assembles the flat {@code runJob} map for one cron task: task {@code parameters} + shared
    * {@code updater_options}/{@code spark_conf} + TMS wire keys + one-element {@code tables} JSON.
    *
@@ -197,6 +239,14 @@ public final class MaintenanceJobSpecFactory {
     jobConf.remove("table_id");
     MaintenanceJobConfBuilder.applySparkConfPlaceholders(jobConf, catalogName);
     return jobConf;
+  }
+
+  private static String writeJson(Object value, String field) {
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to serialize " + field, e);
+    }
   }
 
   private static void putSharedJobConfFields(Map<String, String> jobConf, MaintenanceJobSpec spec) {
