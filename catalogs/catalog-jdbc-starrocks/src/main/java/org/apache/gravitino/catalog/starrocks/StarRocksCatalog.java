@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.starrocks;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
-import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -31,7 +30,7 @@ import org.apache.gravitino.catalog.starrocks.converter.StarRocksColumnDefaultVa
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksExceptionConverter;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksDatabaseOperations;
-import org.apache.gravitino.catalog.starrocks.operations.StarRocksTableOperations;
+import org.apache.gravitino.catalog.starrocks.operations.StarRocksViewOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -48,7 +47,7 @@ public class StarRocksCatalog extends JdbcCatalog {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
-    return new MySQLProtocolCompatibleCatalogOperations(
+    return new StarRocksCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
@@ -78,7 +77,7 @@ public class StarRocksCatalog extends JdbcCatalog {
 
   @Override
   protected JdbcTableOperations createJdbcTableOperations() {
-    return new StarRocksTableOperations();
+    return new StarRocksViewOperations();
   }
 
   @Override
