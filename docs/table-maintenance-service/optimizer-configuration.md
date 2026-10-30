@@ -50,11 +50,12 @@ Cron also injects callback identity into `updater_options`:
 
 - `metalake` — always from the policy namespace (policy `updaterOptions.metalake` cannot redirect
   sample/finish to another metalake)
-- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` when the policy does not set
-  `updaterOptions.gravitino_uri`. Submit fails closed if neither source provides a URI.
+- `gravitino_uri` — from `gravitino.maintenance.gravitinoAuth.uri` when the policy does not set
+  `updaterOptions.gravitino_uri`. A policy `updaterOptions.gravitino_uri` overrides the cluster
+  value. Submit fails closed if neither source provides a URI.
 
 ```properties
-gravitino.maintenance.gravitinoUri = http://localhost:8090
+gravitino.maintenance.gravitinoAuth.uri = http://localhost:8090
 ```
 
 ### TMS commit-job (IRC update → chained Spark)
@@ -90,6 +91,7 @@ set, `authType` is required, and `basic` / `oauth` also require their mode-speci
 
 | Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                     |
 | ----------------- | -------------------- | ----------------------- | ------------------------------------------- |
+| `uri`             | `gravitino_uri`      | any, including unset    | Gravitino callback base URI. Optional on its own. |
 | `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`       |
 | `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required) |
 | `password`        | `password`           | `basic`                 | Password or secret reference (required)     |
@@ -327,6 +329,7 @@ Four things are worth confirming before assuming a configuration problem is a co
 
 ## Related
 
+- [Using the Table Maintenance Service](./using-table-maintenance.md) for the in-process scheduler
 - [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails

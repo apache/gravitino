@@ -115,7 +115,7 @@ To manage table and partition statistics, see [Manage statistics in Gravitino](.
 
 * [**Model catalog**](./model-catalog.md)
 
-If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
+If you want to automate table maintenance workflows, see [Using the Table Maintenance Service](./table-maintenance-service/using-table-maintenance.md) for the in-process scheduler, and [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md) for the manual CLI.
 Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image.  Gravitino provides a

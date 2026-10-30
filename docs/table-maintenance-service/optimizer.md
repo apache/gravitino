@@ -23,7 +23,7 @@ Confirm your environment matches this list before starting an evaluation against
 
 - Compaction and orphan file cleanup have built-in strategies. Snapshot expiration is available as a directly submitted built-in job. Scheduling and minimum run intervals remain separate from strategy evaluation. Sort and cluster maintenance also require custom strategies.
 - Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
-- The service is driven through the CLI workflow rather than running on a schedule of its own.
+- This page is the manual CLI workflow. The in-process scheduler is covered in [Using the Table Maintenance Service](./using-table-maintenance.md).
 
 
 ## How It Works
