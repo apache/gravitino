@@ -331,9 +331,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
           Table alteredTable = catalogResult.table;
 
+          // The change is already applied in the catalog. If the result has no column list and
+          // Gravitino has no stored columns to report instead, the alter fails, because clients
+          // require one. The hook's authorization rename and the success event are then skipped,
+          // and a retried rename fails because the table already has its new name.
           if (catalogResult.managed) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(catalogResult.hiddenProperties);
+            return checkColumnsReported(
+                ident,
+                EntityCombinedTable.of(alteredTable)
+                    .withHiddenProperties(catalogResult.hiddenProperties));
           }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
@@ -344,8 +350,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               te = getEntity(ident, TABLE, TableEntity.class);
             }
             if (te == null) {
-              return EntityCombinedTable.of(alteredTable)
-                  .withHiddenProperties(catalogResult.hiddenProperties);
+              return checkColumnsReported(
+                  ident,
+                  EntityCombinedTable.of(alteredTable)
+                      .withHiddenProperties(catalogResult.hiddenProperties));
             }
           }
 
@@ -404,8 +412,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 ident, newIdent);
           }
 
-          return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-              .withHiddenProperties(catalogResult.hiddenProperties);
+          EntityCombinedTable result =
+              EntityCombinedTable.of(alteredTable, updatedTableEntity)
+                  .withHiddenProperties(catalogResult.hiddenProperties);
+          // The store kept the columns it had before this alter (see updateColumnsIfNecessary).
+          // Report them, so the alter completes, including the hook's authorization rename,
+          // instead of failing after the catalog has already applied it. A column drop or rename
+          // in this alter is not reflected in them.
+          if (alteredTable.columns() == null && updatedTableEntity != null) {
+            LOG.warn(
+                "Catalog {} returned altered table {} without a column list, reporting the stored "
+                    + "columns",
+                getCatalogIdentifier(ident),
+                ident);
+            result.withColumns(toColumns(updatedTableEntity.columns()));
+          }
+          return checkColumnsReported(ident, result);
         });
   }
 
@@ -629,6 +651,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             },
             NoSuchTableException.class);
     Table table = catalogResult.table;
+    // Fail before importing the table or updating its stored columns.
+    checkColumnsReported(ident, table);
 
     if (catalogResult.managed) {
       return EntityCombinedTable.of(table)
@@ -718,6 +742,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
     Table table = catalogResult.table;
+    // Fail before storing the table, as a missing column list failed the snapshot before.
+    checkColumnsReported(ident, table);
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
@@ -767,6 +793,34 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private TableCatalogResult snapshotTable(CatalogManager.CatalogWrapper catalog, Table table)
       throws Exception {
     return snapshotTable(catalog, table, isManagedEntity(catalog, Capability.Scope.TABLE));
+  }
+
+  private <T extends Table> T checkColumnsReported(NameIdentifier ident, T table) {
+    if (table.columns() == null) {
+      throw new IllegalStateException(
+          String.format(
+              "Catalog %s returned table %s without a column list",
+              getCatalogIdentifier(ident), ident));
+    }
+    return table;
+  }
+
+  private static Column[] toColumns(@Nullable List<ColumnEntity> columnEntities) {
+    if (columnEntities == null) {
+      return new Column[0];
+    }
+    return columnEntities.stream()
+        .sorted(Comparator.comparing(ColumnEntity::position))
+        .map(
+            c ->
+                Column.of(
+                    c.name(),
+                    c.dataType(),
+                    c.comment(),
+                    c.nullable(),
+                    c.autoIncrement(),
+                    c.defaultValue()))
+        .toArray(Column[]::new);
   }
 
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
@@ -977,12 +1031,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return Pair.of(false, Collections.emptyList());
     }
 
+    // A catalog that reports no column list says nothing about the columns, so keep the stored
+    // ones. Treating it as "all columns dropped" would delete their tags, policies and owners. Load
+    // rejects such a table before getting here, and alter keeps the columns as they were before it.
+    if (tableFromCatalog.columns() == null) {
+      LOG.warn(
+          "Table {} from the underlying source has no column list, keeping the stored columns",
+          tableFromCatalog.name());
+      return Pair.of(
+          false,
+          tableFromGravitino.columns() == null
+              ? Collections.emptyList()
+              : tableFromGravitino.columns());
+    }
+
     Map<String, Pair<Integer, Column>> columnsFromCatalogTable =
-        tableFromCatalog.columns() == null
-            ? Collections.emptyMap()
-            : IntStream.range(0, tableFromCatalog.columns().length)
-                .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
-                .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
+        IntStream.range(0, tableFromCatalog.columns().length)
+            .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
+            .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
     Map<String, ColumnEntity> columnsFromTableEntity =
         tableFromGravitino.columns() == null
             ? Collections.emptyMap()

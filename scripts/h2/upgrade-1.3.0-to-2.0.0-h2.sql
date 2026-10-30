@@ -173,33 +173,33 @@ CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_execution_time_idx` ON `sched
 CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_last_heartbeat_idx` ON `scheduled_commit_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `action_id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'maintenance action id',
     `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
-    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    `before_metrics_id` BIGINT COMMENT 'table_snapshot_metrics.metrics_id for S0 sample',
+    `after_metrics_id` BIGINT COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`)
+    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    PRIMARY KEY (`action_id`)
 ) COMMENT='table maintenance action metadata';
 CREATE INDEX IF NOT EXISTS `idx_tma_job_id` ON `table_maintenance_action`(`job_id`);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
-CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
-CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_before_metrics` ON `table_maintenance_action`(`before_metrics_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_after_metrics` ON `table_maintenance_action`(`after_metrics_id`);
 CREATE INDEX IF NOT EXISTS `idx_tma_created_at` ON `table_maintenance_action`(`created_at`);
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `metrics_id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'metrics row id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `snapshot_id` BIGINT NOT NULL COMMENT 'Iceberg snapshot id',
     `metrics_value` CLOB NOT NULL COMMENT 'metrics value as JSON',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`metrics_id`)
 ) COMMENT='table snapshot metrics metadata';
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tsm_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
 
 -- Merge duplicate live owners left by concurrent assignments: the newest live row
@@ -226,3 +226,6 @@ ALTER TABLE `fileset_meta`
 
 ALTER TABLE `policy_meta`
     ADD COLUMN IF NOT EXISTS `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version' AFTER `last_version`;
+
+-- Role deletion soft-deletes relation rows by role_id.
+CREATE INDEX IF NOT EXISTS `group_role_rel_idx_role_id` ON `group_role_rel` (`role_id`);

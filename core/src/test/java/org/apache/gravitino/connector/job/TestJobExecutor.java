@@ -25,12 +25,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestJobExecutor {
 
@@ -121,5 +124,34 @@ public class TestJobExecutor {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new JobContext(1L, " ", stagingDir));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new JobContext(1L, "m", null));
+  }
+
+  @Test
+  public void testSubmissionLookupFindsNothingByDefault() {
+    JobExecutor executor = new UriJobExecutor();
+    ShellJobTemplate template =
+        ShellJobTemplate.builder().withName("shell_job").withExecutable("/bin/echo").build();
+    Assertions.assertEquals(
+        Optional.empty(),
+        executor.findSubmittedJob(new JobContext(1L, "metalake", tempDir.toFile()), template));
+  }
+
+  @Test
+  public void testLocalizationFailureIsConfirmedRejection() {
+    JobContext context = new JobContext(1L, "metalake", tempDir.toFile());
+    ShellJobTemplate template =
+        ShellJobTemplate.builder().withName("shell_job").withExecutable("/bin/echo").build();
+    RuntimeException downloadFailure = new RuntimeException("download failed");
+    LocalPathJobExecutor executor = new LocalPathJobExecutor();
+    try (MockedStatic<JobResourceUtils> resources = Mockito.mockStatic(JobResourceUtils.class)) {
+      resources
+          .when(() -> JobResourceUtils.localizeJobTemplate(template, context.stagingDir()))
+          .thenThrow(downloadFailure);
+      JobSubmissionRejectedException failure =
+          Assertions.assertThrows(
+              JobSubmissionRejectedException.class, () -> executor.submitJob(context, template));
+      Assertions.assertSame(downloadFailure, failure.getCause());
+      Assertions.assertNull(executor.submitted);
+    }
   }
 }

@@ -22,6 +22,7 @@ from httpx import AsyncClient
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
+    extract_list_from_response,
 )
 from mcp_server.client.semantic_model_operation import SemanticModelOperation
 
@@ -40,6 +41,22 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
             self._models_path(catalog_name, schema_name)
         )
         return extract_content_from_response(response, "identifiers", [])
+
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        response = await self.rest_client.get(
+            self._metrics_path(catalog_name, schema_name),
+            params={"details": "false"},
+        )
+        return extract_list_from_response(response, "identifiers")
+
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        response = await self.rest_client.get(
+            self._metrics_path(catalog_name, schema_name),
+            params={"details": "true"},
+        )
+        return extract_list_from_response(response, "metrics")
 
     async def load_semantic_model(
         self, catalog_name: str, schema_name: str, semantic_model_name: str
@@ -95,6 +112,13 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/semantic-models"
+        )
+
+    def _metrics_path(self, catalog_name: str, schema_name: str) -> str:
+        return (
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/semantic-model-metrics"
         )
 
     def _model_path(

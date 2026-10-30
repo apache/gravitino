@@ -73,6 +73,7 @@ import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.connector.job.JobResourceUtils;
+import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -326,28 +327,28 @@ public class LocalJobExecutor implements JobExecutor {
 
   @Override
   public String submitJob(JobContext context, JobTemplate jobTemplate) {
-    // Validate the job can be launched before fetching its resources and queueing it, so that a
-    // misconfiguration is reported to the caller directly instead of only failing the job
-    // asynchronously in the worker thread.
-    if (jobTemplate instanceof SparkJobTemplate) {
-      SparkProcessBuilder.resolveSparkSubmit(configs);
-    }
-
-    // The job runs in its staging directory, next to its localized resources.
     File workingDir = context.stagingDir();
-    JobTemplate localizedJobTemplate =
-        JobResourceUtils.localizeJobTemplate(jobTemplate, workingDir);
+    JobTemplate localizedJobTemplate;
+    try {
+      // All preparation happens before accepting any work, so these failures are definitive.
+      if (jobTemplate instanceof SparkJobTemplate) {
+        SparkProcessBuilder.resolveSparkSubmit(configs);
+      }
+      localizedJobTemplate = JobResourceUtils.localizeJobTemplate(jobTemplate, workingDir);
+    } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new JobSubmissionRejectedException(
+          "Failed to prepare the local job before queueing", e);
+    }
 
     String newJobId = ownedJobIdPrefix + UUID.randomUUID();
     QueuedJob queuedJob = new QueuedJob(newJobId, localizedJobTemplate, workingDir);
-
     synchronized (lock) {
-      // Add the job to the waiting queue
       if (!waitingQueue.offer(queuedJob)) {
-        throw new IllegalStateException(
+        throw new JobSubmissionRejectedException(
             "Waiting queue is full, cannot submit job: " + localizedJobTemplate);
       }
-
       jobInfos.put(newJobId, JobExecutionInfo.of(JobHandle.Status.QUEUED));
     }
 

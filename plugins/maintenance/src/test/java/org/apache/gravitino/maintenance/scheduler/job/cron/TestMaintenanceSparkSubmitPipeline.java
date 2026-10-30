@@ -36,8 +36,8 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Operation;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.junit.jupiter.api.Assertions;
@@ -48,7 +48,7 @@ class TestMaintenanceSparkSubmitPipeline {
 
   private static final long TABLE_ID = 101L;
   private static final long POLICY_ID = 202L;
-  private static final String INSTANCE = CronJobIds.forTable(TABLE_ID, POLICY_ID);
+  private static final String INSTANCE = MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID);
   private static final long CLAIM_TIMEOUT_MS = 60_000L;
 
   @Test
@@ -83,18 +83,10 @@ class TestMaintenanceSparkSubmitPipeline {
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     CronSubmitGate gate = (tableId, policyId) -> tableId == 11L;
 
-    Map<String, String> shared = new LinkedHashMap<>();
-    shared.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "expire_snapshots");
-    shared.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
-    MaintenanceJobSpec batch =
-        new MaintenanceJobSpec(
-            List.of(
-                new TableTarget(10L, List.of("metalake", "iceberg", "db", "t1")),
-                new TableTarget(11L, List.of("metalake", "iceberg", "db", "t2"))),
-            List.of(new Operation(POLICY_ID, "expire_snapshots")),
-            shared);
+    MaintenanceJobSpec batch = batchSpec(10L, 11L, "expire_snapshots");
 
-    pipeline(gate, actions, submitter).submit(CronJobIds.forBatch(0L, POLICY_ID), batch);
+    pipeline(gate, actions, submitter)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batch);
 
     verify(actions, never()).tryAcquireInFlight(anyLong(), anyLong(), anyLong());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
@@ -204,19 +196,10 @@ class TestMaintenanceSparkSubmitPipeline {
     when(actions.tryAcquireInFlight(11L, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(claimB));
 
-    Map<String, String> shared = new LinkedHashMap<>();
-    shared.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "expire_snapshots");
-    shared.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
+    MaintenanceJobSpec batch = batchSpec(10L, 11L, "expire_snapshots");
 
-    MaintenanceJobSpec batch =
-        new MaintenanceJobSpec(
-            List.of(
-                new TableTarget(10L, List.of("metalake", "iceberg", "db", "t1")),
-                new TableTarget(11L, List.of("metalake", "iceberg", "db", "t2"))),
-            List.of(new Operation(POLICY_ID, "expire_snapshots")),
-            shared);
-
-    pipeline(mockGate(false), actions, submitter).submit(CronJobIds.forBatch(0L, POLICY_ID), batch);
+    pipeline(mockGate(false), actions, submitter)
+        .submit(MaintenanceTaskIds.forCronBatch(0L, POLICY_ID), batch);
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
@@ -250,15 +233,14 @@ class TestMaintenanceSparkSubmitPipeline {
     when(actions.tryAcquireInFlight(TABLE_ID, POLICY_ID, CLAIM_TIMEOUT_MS))
         .thenReturn(Optional.of(new OccupancyClaim(1L, 1L)));
 
-    Map<String, String> jobConf = new LinkedHashMap<>();
-    jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "rewrite_data_files");
-    jobConf.put("strategy", "binpack");
-    jobConf.put(
-        "updater_options",
-        "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"metalake\"}");
-    jobConf.put("spark_conf", "{\"spark.sql.catalog.iceberg.rest.auth.type\":\"basic\"}");
+    Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("strategy", "binpack");
+    parameters.put("catalog_name", "iceberg");
+    parameters.put("table_identifier", "db.t");
 
-    pipeline(mockGate(false), actions, submitter).submit(INSTANCE, spec(jobConf));
+    pipeline(mockGate(false), actions, submitter)
+        .submit(
+            INSTANCE, spec(parameters, "{\"spark.sql.catalog.iceberg.rest.auth.type\":\"basic\"}"));
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<String, String>> confCaptor = ArgumentCaptor.forClass(Map.class);
@@ -285,7 +267,7 @@ class TestMaintenanceSparkSubmitPipeline {
     MaintenanceJobSubmitter submitter = mock(MaintenanceJobSubmitter.class);
     TableMaintenanceActionMetaService actions = mock(TableMaintenanceActionMetaService.class);
     pipeline(mockGate(false), actions, submitter)
-        .submit(CronJobIds.forTable(TABLE_ID, POLICY_ID + 1), spec());
+        .submit(MaintenanceTaskIds.forCronTable(TABLE_ID, POLICY_ID + 1), spec());
     verify(submitter, never()).runJob(anyString(), anyString(), anyMap());
   }
 
@@ -306,16 +288,38 @@ class TestMaintenanceSparkSubmitPipeline {
   }
 
   private static MaintenanceJobSpec spec() {
-    Map<String, String> jobConf = new LinkedHashMap<>();
-    jobConf.put(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY, "rewrite_data_files");
-    jobConf.put("updater_options", "{\"gravitino_uri\":\"http://localhost:8090\"}");
-    return spec(jobConf);
+    Map<String, String> parameters = new LinkedHashMap<>();
+    parameters.put("catalog_name", "iceberg");
+    parameters.put("table_identifier", "db.t");
+    return spec(parameters, null);
   }
 
-  private static MaintenanceJobSpec spec(Map<String, String> jobConf) {
+  private static MaintenanceJobSpec spec(Map<String, String> parameters) {
+    return spec(parameters, null);
+  }
+
+  private static MaintenanceJobSpec spec(Map<String, String> parameters, String sparkConf) {
+    Map<String, String> params = new LinkedHashMap<>(parameters);
+    params.putIfAbsent("catalog_name", "iceberg");
+    params.putIfAbsent("table_identifier", "db.t");
     return new MaintenanceJobSpec(
-        List.of(new TableTarget(TABLE_ID, List.of("metalake", "iceberg", "db", "t"))),
-        List.of(new Operation(POLICY_ID, "rewrite_data_files")),
-        jobConf);
+        List.of(new Task(TABLE_ID, POLICY_ID, "rewrite_data_files", null, params)),
+        "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"metalake\"}",
+        sparkConf);
+  }
+
+  private static MaintenanceJobSpec batchSpec(long table1, long table2, String type) {
+    Map<String, String> p1 = new LinkedHashMap<>();
+    p1.put("catalog_name", "iceberg");
+    p1.put("table_identifier", "db.t1");
+    Map<String, String> p2 = new LinkedHashMap<>();
+    p2.put("catalog_name", "iceberg");
+    p2.put("table_identifier", "db.t2");
+    return new MaintenanceJobSpec(
+        List.of(
+            new Task(table1, POLICY_ID, type, null, p1),
+            new Task(table2, POLICY_ID, type, null, p2)),
+        "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"metalake\"}",
+        null);
   }
 }
