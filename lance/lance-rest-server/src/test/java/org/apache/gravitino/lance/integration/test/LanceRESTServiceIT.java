@@ -774,11 +774,12 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testRegisterTable() {
+  void testRegisterTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
     String location = tempDir + "/" + "register/";
+    LanceDatasetTestUtils.createDataset(location);
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setLocation(location);
@@ -788,9 +789,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
-    // The location should not exist yet as we do not create it in advanced.
+    // Registration retains the existing dataset.
     Assertions.assertEquals(location, response.getLocation());
-    Assertions.assertFalse(new File(location).exists());
+    Assertions.assertTrue(new File(location).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -799,19 +800,30 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertTrue(loadTable.getMetadata().containsKey("key1"));
 
+    // An existing name must report a conflict without trying to open the new location.
+    String missingLocation = tempDir + "/register-missing/";
+    registerTableRequest.setLocation(missingLocation);
+    RuntimeException conflict =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.registerTable(registerTableRequest));
+    assertLanceErrorCode(conflict, ErrorCode.TABLE_ALREADY_EXISTS);
+    Assertions.assertFalse(new File(missingLocation).exists());
+    Assertions.assertEquals(location, ns.describeTable(describeTableRequest).getLocation());
+
     // Test register again with OVERWRITE mode
     String newLocation = tempDir + "/" + "register_new/";
+    LanceDatasetTestUtils.createDataset(newLocation);
     registerTableRequest.setMode("overwrite");
     registerTableRequest.setLocation(newLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
-    // The location should not exist yet as we do not create it in advanced.
-    Assertions.assertFalse(new File(newLocation).exists());
+    // Registration retains the existing dataset.
+    Assertions.assertTrue(new File(newLocation).exists());
 
     // Register a new table with location exists
     String existingLocation = tempDir + "/" + "existing_location/";
-    new File(existingLocation).mkdirs();
+    LanceDatasetTestUtils.createDataset(existingLocation);
     Assertions.assertTrue(new File(existingLocation).exists());
     registerTableRequest.setMode("create");
     registerTableRequest.setLocation(existingLocation);
@@ -845,17 +857,19 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Test Overwrite again after deregister
     String nonExistingLocation = tempDir + "/" + "non_existing_location/";
+    LanceDatasetTestUtils.createDataset(nonExistingLocation);
     registerTableRequest.setMode("overwrite");
     registerTableRequest.setId(ids);
     registerTableRequest.setLocation(nonExistingLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(nonExistingLocation, response.getLocation());
-    Assertions.assertFalse(new File(nonExistingLocation).exists());
+    Assertions.assertTrue(new File(nonExistingLocation).exists());
 
     // Test registerTable with null mode after deregister should succeed
     registerTableRequest.setMode(null);
     String verifyNullModeLocation = tempDir + "/" + "verify_null_mode_location/";
+    LanceDatasetTestUtils.createDataset(verifyNullModeLocation);
     registerTableRequest.setLocation(verifyNullModeLocation);
     registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "verify_null_mode_location"));
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
@@ -1121,13 +1135,14 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testDropTableWhenLocationMissingOrNotCreated() {
+  void testDropTableWhenLocationMissingOrNotCreated() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
-    // Create table via register with non-existent location
+    // Register a valid dataset, then remove its location before dropping the table
     List<String> registerIds = List.of(CATALOG_NAME, SCHEMA_NAME, "register_missing_location");
     String missingLocation = tempDir + "/" + "register_missing_location/";
+    LanceDatasetTestUtils.createDataset(missingLocation);
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setId(registerIds);
     registerTableRequest.setLocation(missingLocation);
@@ -1135,6 +1150,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RegisterTableResponse registerTableResponse =
         Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertEquals(missingLocation, registerTableResponse.getLocation());
+    FileUtils.deleteQuietly(new File(missingLocation));
     Assertions.assertFalse(new File(missingLocation).exists());
 
     DropTableRequest dropRegisteredTable = new DropTableRequest();
@@ -1148,7 +1164,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Register table with an existing location, then delete the location before drop
     List<String> existingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "existing_then_deleted");
     String existingLocation = tempDir + "/" + "existing_then_deleted/";
-    new File(existingLocation).mkdirs();
+    LanceDatasetTestUtils.createDataset(existingLocation);
     Assertions.assertTrue(new File(existingLocation).exists());
 
     RegisterTableRequest existingRegisterRequest = new RegisterTableRequest();

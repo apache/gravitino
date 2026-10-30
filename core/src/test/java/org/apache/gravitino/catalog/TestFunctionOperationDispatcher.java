@@ -30,7 +30,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -73,7 +76,12 @@ public class TestFunctionOperationDispatcher {
   public void testIcebergSystemSchemaRestriction() {
     NameIdentifier icebergSystemFunc =
         NameIdentifier.of(Namespace.of(METALAKE, ICEBERG_CATALOG, "system"), "my_func");
-    FunctionDefinition[] defs = new FunctionDefinition[] {mock(FunctionDefinition.class)};
+    FunctionDefinition[] defs = {
+      FunctionDefinitions.of(
+          FunctionChange.EMPTY_PARAMS,
+          Types.StringType.get(),
+          new FunctionImpl[] {mock(FunctionImpl.class)})
+    };
 
     // All write operations on Iceberg system schema should be rejected
     Assertions.assertThrows(

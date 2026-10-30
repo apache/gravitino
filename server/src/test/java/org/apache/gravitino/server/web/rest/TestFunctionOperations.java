@@ -73,6 +73,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestFunctionOperations extends BaseOperationsTest {
 
@@ -121,6 +122,30 @@ public class TestFunctionOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  @Test
+  public void testRejectUnresolvedParameterDefaultBeforeDispatch() {
+    String request =
+        """
+        {"name":"f","functionType":"SCALAR","deterministic":true,"definitions":[{
+          "parameters":[{"name":"x","dataType":"string","defaultValue":{
+            "type":"literal","dataType":"future_type","value":null}}],
+          "returnType":"string"}]}
+        """;
+    try (Response response =
+        target(functionPath())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          response
+              .readEntity(ErrorResponse.class)
+              .getMessage()
+              .contains("definitions[0].parameters[0].defaultValue.dataType"));
+    }
+    Mockito.verifyNoInteractions(functionDispatcher);
   }
 
   @Test

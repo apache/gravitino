@@ -303,12 +303,12 @@
 
    Trino
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
-   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
+   ./trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
    ./trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00012_format.sql
-   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java
-   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java
-   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java
-   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java
+   ./trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java
+   ./trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java
+   ./trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java
+   ./trino-connector/src/common-469-481/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java
 
    Apache Arrow
    ./dev/ci/util_free_space.sh

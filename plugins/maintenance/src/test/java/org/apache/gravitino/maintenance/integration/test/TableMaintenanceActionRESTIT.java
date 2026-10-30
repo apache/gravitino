@@ -139,6 +139,8 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
                 TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10).claimTimeoutMs())
             .orElseThrow();
     assertNotNull(claim);
+    actions.bindJobId(claim, jobId);
+    long actionId = claim.actionId();
 
     String beforeBody =
         "{\"tableId\":"
@@ -146,11 +148,10 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
             + ",\"policyId\":"
             + policyId
             + ",\"snapshotId\":100,\"metricsJson\":\"{\\\"mse\\\":1}\"}";
-    HttpResponse<String> before = postJson(actionPath(jobId, "metrics/before"), beforeBody);
+    HttpResponse<String> before = postJson(actionPath(actionId, "metrics/before"), beforeBody);
     assertEquals(200, before.statusCode(), before.body());
 
-    TableMaintenanceActionPO afterBefore =
-        actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO afterBefore = actions.getById(actionId);
     assertNotNull(afterBefore);
     assertEquals(jobId, afterBefore.jobId());
     assertNotNull(afterBefore.beforeMetricsId());
@@ -173,11 +174,10 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
             + policyId
             + ",\"snapshotId\":200,\"metricsJson\":\"{\\\"mse\\\":2}\"}";
     HttpResponse<String> after =
-        postJson(actionPath(jobId, "metrics/after") + "?finish=true", afterBody);
+        postJson(actionPath(actionId, "metrics/after") + "?finish=true", afterBody);
     assertEquals(200, after.statusCode(), after.body());
 
-    TableMaintenanceActionPO finished =
-        actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO finished = actions.getById(actionId);
     assertNotNull(finished);
     assertNotNull(finished.afterMetricsId());
     assertTrue(finished.finishedAt() > 0L);
@@ -193,8 +193,8 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
             .snapshotId());
   }
 
-  private static String actionPath(long jobId, String suffix) {
-    return apiBase + "/metalakes/" + metalake + "/maintenance/actions/" + jobId + "/" + suffix;
+  private static String actionPath(long actionId, String suffix) {
+    return apiBase + "/metalakes/" + metalake + "/maintenance/actions/" + actionId + "/" + suffix;
   }
 
   private static HttpResponse<String> postJson(String url, String body) throws Exception {
