@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -43,6 +44,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
@@ -108,15 +110,20 @@ public class PolicyExpandToCronIT extends BaseIT {
             client.loadMetalake(metalake), metalake, TIME_TRIGGER, /*commitTrigger=*/ null);
 
     PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(seeded.policyId);
+    Config gravitinoConfig = new Config(false) {};
+    gravitinoConfig.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
+            "http://localhost:8090"),
+        k -> true);
     List<TableCandidate> candidates =
         new NearestPolicyTableEnumerator()
             .listTableIds(
                 policy,
                 10,
-                (tableId, policyId, minIntervalMs, nowMs) ->
-                    !new MaintenanceActionManager()
-                        .canStart(tableId, policyId, minIntervalMs, nowMs),
-                0L);
+                0L,
+                new MaintenanceActionManager(),
+                new CronJobClient(dataSource(), gravitinoConfig));
     assertEquals(
         List.of(seeded.tableId),
         candidates.stream().map(TableCandidate::tableId).toList(),

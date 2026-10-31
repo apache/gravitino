@@ -30,7 +30,6 @@ import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
-import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator.ShouldSkipTable;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
@@ -53,7 +52,7 @@ public final class PolicyExpandPlanner {
 
   private final NearestPolicyTableEnumerator tableEnumerator;
   private final CronJobClient cronJobClient;
-  private final ShouldSkipTable shouldSkip;
+  private final MaintenanceActionManager actionManager;
   private final Config config;
   private final int scheduleBatchSize;
 
@@ -74,7 +73,7 @@ public final class PolicyExpandPlanner {
       int scheduleBatchSize) {
     this.tableEnumerator = Preconditions.checkNotNull(tableEnumerator);
     this.cronJobClient = Preconditions.checkNotNull(cronJobClient);
-    this.shouldSkip = expandShouldSkip(actionManager, cronJobClient);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.config = Preconditions.checkNotNull(config);
     this.scheduleBatchSize = scheduleBatchSize;
   }
@@ -122,7 +121,8 @@ public final class PolicyExpandPlanner {
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
     List<TableCandidate> toSchedule =
-        tableEnumerator.listTableIds(policy, scheduleBatchSize, shouldSkip, minIntervalMs);
+        tableEnumerator.listTableIds(
+            policy, scheduleBatchSize, minIntervalMs, actionManager, cronJobClient);
     int scheduled = cronJobClient.scheduleNow(policy, toSchedule, scheduleBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
@@ -133,15 +133,6 @@ public final class PolicyExpandPlanner {
         minIntervalMs,
         nextDue);
     return Optional.of(nextDue);
-  }
-
-  private static ShouldSkipTable expandShouldSkip(
-      MaintenanceActionManager actionManager, CronJobClient cronJobClient) {
-    Preconditions.checkNotNull(actionManager);
-    Preconditions.checkNotNull(cronJobClient);
-    return (tableId, policyId, minIntervalMs, nowMs) ->
-        !actionManager.canStart(tableId, policyId, minIntervalMs, nowMs)
-            || cronJobClient.isTableAlreadyQueued(tableId, policyId);
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {

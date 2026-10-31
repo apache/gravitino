@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance.scheduler.policy;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -43,7 +44,9 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -82,7 +85,7 @@ public final class NearestPolicyTableEnumerator {
    * covers the table.
    */
   @FunctionalInterface
-  public interface ShouldSkipTable {
+  interface ShouldSkipTable {
 
     /**
      * @param tableId table entity id
@@ -174,6 +177,34 @@ public final class NearestPolicyTableEnumerator {
   }
 
   /**
+   * Lists up to {@code limit} tables that are nearest-policy winners and can start (not occupied /
+   * cooling) and are not already covered by a queued cron-job.
+   *
+   * @param policy loaded policy
+   * @param limit maximum schedulable candidates to return
+   * @param minIntervalMs resolved cooldown for {@link MaintenanceActionManager#canStart}
+   * @param actionManager occupancy / cooldown checks
+   * @param cronJobClient pending cron-job coverage
+   * @return distinct schedulable candidates, size at most {@code limit}
+   */
+  public List<TableCandidate> listTableIds(
+      PolicyEntity policy,
+      int limit,
+      long minIntervalMs,
+      MaintenanceActionManager actionManager,
+      CronJobClient cronJobClient) {
+    Preconditions.checkNotNull(actionManager);
+    Preconditions.checkNotNull(cronJobClient);
+    return listTableIds(
+        policy,
+        limit,
+        (tableId, policyId, intervalMs, nowMs) ->
+            !actionManager.canStart(tableId, policyId, intervalMs, nowMs)
+                || cronJobClient.isTableAlreadyQueued(tableId, policyId),
+        minIntervalMs);
+  }
+
+  /**
    * Lists up to {@code limit} tables that are nearest-policy winners and are not skipped.
    *
    * @param policy loaded policy
@@ -182,7 +213,7 @@ public final class NearestPolicyTableEnumerator {
    * @param minIntervalMs resolved cooldown for {@link ShouldSkipTable#shouldSkip}
    * @return distinct schedulable candidates, size at most {@code limit}
    */
-  public List<TableCandidate> listTableIds(
+  List<TableCandidate> listTableIds(
       PolicyEntity policy, int limit, ShouldSkipTable shouldSkip, long minIntervalMs) {
     if (limit <= 0) {
       return List.of();

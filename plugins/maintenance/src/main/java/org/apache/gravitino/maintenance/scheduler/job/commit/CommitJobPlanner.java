@@ -42,7 +42,6 @@ import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolicyResolver;
-import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolicyResolver.Decision;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -126,16 +125,7 @@ public class CommitJobPlanner {
           new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore());
       List<PolicyEntity> chain = new ArrayList<>();
       for (Policy.BuiltInType type : CHAIN_ORDER) {
-        Decision decision = nearest.resolve(metalake, tableObject, type);
-        if (decision.kind() == Decision.Kind.CONFLICT) {
-          LOG.error(
-              "Skip commit-job schedule for table {}: ambiguous {} policies {} on nearest level",
-              tableId,
-              type,
-              decision.conflictingPolicyIds());
-          return Optional.empty();
-        }
-        Optional<Long> winnerId = decision.winnerPolicyId();
+        Optional<Long> winnerId = nearest.resolveWinnerId(metalake, tableObject, type);
         if (winnerId.isEmpty()) {
           continue;
         }

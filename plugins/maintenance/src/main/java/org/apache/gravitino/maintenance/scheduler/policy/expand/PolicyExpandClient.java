@@ -26,7 +26,6 @@ import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.github.kagkarlsson.scheduler.task.schedule.CronSchedule;
 import com.github.kagkarlsson.scheduler.task.schedule.CronStyle;
 import com.github.kagkarlsson.scheduler.task.schedule.Schedule;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -95,13 +94,12 @@ public final class PolicyExpandClient {
   /**
    * Opens a client against the entity-store pool with JDBC autocommit forced on.
    *
-   * <p>Used for post-commit reads and test-only writes such as {@link #scheduleAt}. The
-   * entity-store pool often disables autocommit; without this wrap, SchedulerClient mutations would
-   * not commit and the expand pool would never observe them.
+   * <p>Used for post-commit reads and overdue writes such as {@link #scheduleAt}. The entity-store
+   * pool often disables autocommit; without this wrap, SchedulerClient mutations would not commit
+   * and the expand pool would never observe them.
    *
    * @param dataSource relational JDBC pool shared with the entity store
-   * @return registrar that can read (and test-write) expand rows after the policy transaction
-   *     commits
+   * @return client that can read and write expand rows after the policy transaction commits
    */
   public static PolicyExpandClient forReads(DataSource dataSource) {
     return new PolicyExpandClient(AutocommitDataSources.wrap(dataSource));
@@ -136,7 +134,6 @@ public final class PolicyExpandClient {
    * @param policyId persisted policy id
    * @param due execution time to store
    */
-  @VisibleForTesting
   public void scheduleAt(long policyId, Instant due) {
     runDespiteExecution(() -> scheduleOnce(policyId, due));
   }
@@ -154,7 +151,6 @@ public final class PolicyExpandClient {
    * @param policyId persisted policy id
    * @return next execution time of the expand row, or empty when the row is absent
    */
-  @VisibleForTesting
   public Optional<Instant> scheduledExecutionTime(long policyId) {
     return client()
         .getScheduledExecution(instanceId(policyId))

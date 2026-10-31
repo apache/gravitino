@@ -109,6 +109,20 @@ class TestNearestMaintenancePolicyResolver {
     Assertions.assertEquals(TABLE, decision.conflictLevel());
     Assertions.assertEquals(List.of(10L, 11L), decision.conflictingPolicyIds());
     Assertions.assertTrue(decision.winnerPolicyId().isEmpty());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
+  }
+
+  @Test
+  void testResolveWinnerIdReturnsWinner() {
+    PolicyEntity tablePolicy = policy(10L, "table-compaction");
+    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
+        .thenReturn(new Match[] {new Match(tablePolicy, List.of(TABLE))});
+
+    Assertions.assertEquals(
+        java.util.Optional.of(10L),
+        resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
   }
 
   @Test

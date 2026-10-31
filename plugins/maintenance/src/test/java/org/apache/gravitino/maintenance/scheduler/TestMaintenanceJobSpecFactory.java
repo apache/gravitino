@@ -22,6 +22,7 @@ import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.serializer.Serializer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
@@ -143,10 +144,10 @@ class TestMaintenanceJobSpecFactory {
   @Test
   void testMergeResourceKeysTakesMax() {
     Map<String, String> into =
-        MaintenanceJobSpecFactory.newLinkedMap(
+        linkedMap(
             "spark_executor_memory", "4g", "spark_executor_cores", "2", "catalog_uri", "http://a");
     Map<String, String> from =
-        MaintenanceJobSpecFactory.newLinkedMap(
+        linkedMap(
             "spark_executor_memory", "7g", "spark_executor_cores", "1", "catalog_uri", "http://b");
     MaintenanceJobSpecFactory.mergeResourceKeys(into, from);
     Assertions.assertEquals("7g", into.get("spark_executor_memory"));
@@ -156,18 +157,22 @@ class TestMaintenanceJobSpecFactory {
 
   @Test
   void testMergeResourceKeysComparesMemoryUnits() {
-    Map<String, String> into =
-        MaintenanceJobSpecFactory.newLinkedMap("spark_executor_memory", "1g");
-    Map<String, String> from =
-        MaintenanceJobSpecFactory.newLinkedMap("spark_executor_memory", "512m");
+    Map<String, String> into = linkedMap("spark_executor_memory", "1g");
+    Map<String, String> from = linkedMap("spark_executor_memory", "512m");
     MaintenanceJobSpecFactory.mergeResourceKeys(into, from);
     Assertions.assertEquals("1g", into.get("spark_executor_memory"));
 
-    Map<String, String> mixed =
-        MaintenanceJobSpecFactory.newLinkedMap("spark_executor_memory", "512m");
-    MaintenanceJobSpecFactory.mergeResourceKeys(
-        mixed, MaintenanceJobSpecFactory.newLinkedMap("spark_executor_memory", "1500m"));
+    Map<String, String> mixed = linkedMap("spark_executor_memory", "512m");
+    MaintenanceJobSpecFactory.mergeResourceKeys(mixed, linkedMap("spark_executor_memory", "1500m"));
     Assertions.assertEquals("1500m", mixed.get("spark_executor_memory"));
+  }
+
+  private static Map<String, String> linkedMap(String... kv) {
+    Map<String, String> map = new LinkedHashMap<>();
+    for (int i = 0; i + 1 < kv.length; i += 2) {
+      map.put(kv[i], kv[i + 1]);
+    }
+    return map;
   }
 
   private static TableCandidate candidate(

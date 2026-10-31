@@ -56,12 +56,33 @@ public class NearestMaintenancePolicyResolver {
   }
 
   /**
+   * Resolves the unique nearest winner policy id for {@code policyType}.
+   *
+   * @param metalake metalake name
+   * @param table table metadata object
+   * @param policyType maintenance built-in type
+   * @return winner policy id, or empty when none match
+   * @throws IllegalArgumentException when two or more same-type policies share the nearest level
+   */
+  public Optional<Long> resolveWinnerId(
+      String metalake, MetadataObject table, Policy.BuiltInType policyType) {
+    Decision decision = resolve(metalake, table, policyType);
+    if (decision.kind() == Decision.Kind.CONFLICT) {
+      throw new IllegalArgumentException(
+          String.format(
+              "ambiguous %s policies %s on nearest level %s",
+              policyType, decision.conflictingPolicyIds(), decision.conflictLevel()));
+    }
+    return decision.winnerPolicyId();
+  }
+
+  /**
    * @param metalake metalake name
    * @param table table metadata object
    * @param policyType maintenance built-in type
    * @return winner, none, or same-level conflict
    */
-  public Decision resolve(String metalake, MetadataObject table, Policy.BuiltInType policyType) {
+  Decision resolve(String metalake, MetadataObject table, Policy.BuiltInType policyType) {
     Match[] matches = objectPolicyResolver.resolveMatches(metalake, table);
     List<MetadataObject> chain = new ArrayList<>();
     chain.add(table);
@@ -88,10 +109,10 @@ public class NearestMaintenancePolicyResolver {
   }
 
   /** Result of nearest maintenance-policy resolution for one table and built-in type. */
-  public static final class Decision {
+  static final class Decision {
 
     /** Outcome of nearest-policy resolution. */
-    public enum Kind {
+    enum Kind {
       /** Exactly one matching policy on the nearest non-empty level. */
       WINNER,
       /** No matching policy on the inheritance chain. */
@@ -119,65 +140,37 @@ public class NearestMaintenancePolicyResolver {
       this.conflictingPolicyIds = conflictingPolicyIds;
     }
 
-    /**
-     * @param policyId winning policy id
-     * @param level metadata level that produced the winner
-     * @return winner decision
-     */
-    public static Decision winner(long policyId, MetadataObject level) {
+    static Decision winner(long policyId, MetadataObject level) {
       return new Decision(Kind.WINNER, policyId, level, null, List.of());
     }
 
-    /**
-     * @return none decision
-     */
-    public static Decision none() {
+    static Decision none() {
       return new Decision(Kind.NONE, null, null, null, List.of());
     }
 
-    /**
-     * @param level metadata level that produced the conflict
-     * @param policyIds conflicting policy ids
-     * @return conflict decision
-     */
-    public static Decision conflict(MetadataObject level, List<Long> policyIds) {
+    static Decision conflict(MetadataObject level, List<Long> policyIds) {
       return new Decision(Kind.CONFLICT, null, null, level, List.copyOf(policyIds));
     }
 
-    /**
-     * @return decision kind
-     */
-    public Kind kind() {
+    Kind kind() {
       return kind;
     }
 
-    /**
-     * @return winning policy id when {@link Kind#WINNER}
-     */
-    public Optional<Long> winnerPolicyId() {
+    Optional<Long> winnerPolicyId() {
       return Optional.ofNullable(winnerPolicyId);
     }
 
-    /**
-     * @return metadata level that produced the winner, or {@code null}
-     */
     @Nullable
-    public MetadataObject winnerLevel() {
+    MetadataObject winnerLevel() {
       return winnerLevel;
     }
 
-    /**
-     * @return metadata level that produced the conflict, or {@code null}
-     */
     @Nullable
-    public MetadataObject conflictLevel() {
+    MetadataObject conflictLevel() {
       return conflictLevel;
     }
 
-    /**
-     * @return conflicting policy ids when {@link Kind#CONFLICT}
-     */
-    public List<Long> conflictingPolicyIds() {
+    List<Long> conflictingPolicyIds() {
       return conflictingPolicyIds;
     }
   }
