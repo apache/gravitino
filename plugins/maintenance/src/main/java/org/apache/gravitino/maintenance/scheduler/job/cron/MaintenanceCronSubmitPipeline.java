@@ -40,10 +40,10 @@ import org.slf4j.LoggerFactory;
  * occupancy gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
- * shape; each {@link Task} becomes one Spark job. After coalesce, a {@code table:} instance may
- * still hold multiple tasks (members live in {@code task_data}); occupancy uses each task's own
- * {@code policyId}. If any task is occupied, the whole pick stops without partial submits (one-shot
- * row is still removed by the caller).
+ * shape; each {@link Task} becomes one Spark job. After merge, a {@code table:} instance may still
+ * hold multiple tasks (members live in {@code task_data}); occupancy uses each task's own {@code
+ * policyId}. If any task is occupied, the whole pick stops without partial submits (one-shot row is
+ * still removed by the caller).
  *
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from schedule-time
  * {@code rules} in task parameters).
@@ -99,7 +99,7 @@ public final class MaintenanceCronSubmitPipeline {
     }
 
     // Instance id is row identity; member tables live in task_data (a table: row may hold peers
-    // after coalesce). Soft slot stays per task.policyId.
+    // after merge). Soft slot stays per task.policyId.
     if (tableInstance.isPresent()) {
       long instanceTableId = tableInstance.get()[0];
       long instancePolicyId = tableInstance.get()[1];

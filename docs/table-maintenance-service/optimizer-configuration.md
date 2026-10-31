@@ -60,7 +60,7 @@ gravitino.maintenance.gravitinoUri = http://localhost:8090
 ### TMS commit-job (IRC update → chained Spark)
 
 When Iceberg REST runs as an auxiliary service in the same JVM, register the TMS listener so a
-successful IRC table update upserts a one-shot `commit-job` / `{table_id}` (bursts coalesce and
+successful IRC table update upserts a one-shot `commit-job` / `{table_id}` (bursts merge and
 keep the first snapshot). **At schedule**, TMS collects nearest policies with
 `commitTrigger=true` in order compaction → manifest-rewrite → snapshot-expiry, drops members
 still inside `minIntervalMs`, **fails closed when effective `gravitinoAuth` / `ircAuth` bags

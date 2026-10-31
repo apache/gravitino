@@ -56,7 +56,7 @@ public class CronJobPlanner {
 
   private static final Logger LOG = LoggerFactory.getLogger(CronJobPlanner.class);
 
-  /** Max tables in one snapshot-expiry {@code batch:} / coalesce target. */
+  /** Max tables in one snapshot-expiry {@code batch:} / merge target. */
   private static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
 
   private final Config gravitinoConfig;
@@ -134,7 +134,7 @@ public class CronJobPlanner {
                 client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
       }
     }
-    coalesceOpenExpireJobs(client, batchCapacity);
+    mergeOpenExpireJobs(client, batchCapacity);
     return scheduled;
   }
 
@@ -165,7 +165,7 @@ public class CronJobPlanner {
                   batchCapacity,
                   Set.of(target.instanceId.getId()),
                   unionTableIds(target.spec.tableIds(), tableIds(scheduleTables)));
-          if (coalesceInto(
+          if (mergeInto(
               client,
               target,
               scheduleSpec.get().getTasks(),
@@ -193,7 +193,7 @@ public class CronJobPlanner {
                   Set.of(batchJob.get().instanceId.getId()),
                   new HashSet<>(batchJob.get().spec.tableIds()));
           if (!peers.isEmpty()) {
-            coalesceInto(client, batchJob.get(), List.of(), null, peers, batchCapacity);
+            mergeInto(client, batchJob.get(), List.of(), null, peers, batchCapacity);
           }
           newRows++;
           remaining.subList(0, takeCount).clear();
@@ -209,37 +209,37 @@ public class CronJobPlanner {
     return newRows;
   }
 
-  /** Coalesces under-capacity expire rows (prefer {@code batch:}, then {@code table:}). */
-  private void coalesceOpenExpireJobs(SchedulerClient client, int batchCapacity) {
+  /** Merges under-capacity expire rows (prefer {@code batch:}, then {@code table:}). */
+  private void mergeOpenExpireJobs(SchedulerClient client, int batchCapacity) {
     Set<String> saturatedInstanceIds = new HashSet<>();
     for (; ; ) {
       Optional<QueuedExpireJob> target =
-          findCoalesceTarget(client, batchCapacity, saturatedInstanceIds);
+          findMergeTarget(client, batchCapacity, saturatedInstanceIds);
       if (target.isEmpty()) {
         return;
       }
-      QueuedExpireJob coalesceTarget = target.get();
-      int remainingCapacity = batchCapacity - coalesceTarget.spec.tableIds().size();
+      QueuedExpireJob mergeTarget = target.get();
+      int remainingCapacity = batchCapacity - mergeTarget.spec.tableIds().size();
       List<QueuedExpireJob> peers =
           selectQueuedJobsToClaim(
               client,
-              coalesceTarget.catalog,
+              mergeTarget.catalog,
               remainingCapacity,
               batchCapacity,
-              Set.of(coalesceTarget.instanceId.getId()),
-              new HashSet<>(coalesceTarget.spec.tableIds()));
+              Set.of(mergeTarget.instanceId.getId()),
+              new HashSet<>(mergeTarget.spec.tableIds()));
       if (peers.isEmpty()) {
-        saturatedInstanceIds.add(coalesceTarget.instanceId.getId());
+        saturatedInstanceIds.add(mergeTarget.instanceId.getId());
         continue;
       }
-      if (!coalesceInto(client, coalesceTarget, List.of(), null, peers, batchCapacity)) {
-        saturatedInstanceIds.add(coalesceTarget.instanceId.getId());
+      if (!mergeInto(client, mergeTarget, List.of(), null, peers, batchCapacity)) {
+        saturatedInstanceIds.add(mergeTarget.instanceId.getId());
       }
     }
   }
 
   /** Prefers the oldest under-capacity {@code batch:}, else any under-capacity {@code table:}. */
-  private static Optional<QueuedExpireJob> findCoalesceTarget(
+  private static Optional<QueuedExpireJob> findMergeTarget(
       SchedulerClient client, int batchCapacity, Set<String> saturatedInstanceIds) {
     List<QueuedExpireJob> underCapacity =
         listQueuedExpireJobs(client).stream()
@@ -274,13 +274,13 @@ public class CronJobPlanner {
   }
 
   /**
-   * Claim-first coalesce into {@code target}: cancel each unpicked peer (takes ownership), then
+   * Claim-first merge into {@code target}: cancel each unpicked peer (takes ownership), then
    * reschedule the target's {@code task_data}. Target {@code task_instance} is unchanged. Envelope
    * {@code spark_conf} is max-merged across target, optional schedule spec, and claimed peers.
    *
    * @return true when the target was updated, or when there was nothing to merge
    */
-  private boolean coalesceInto(
+  private boolean mergeInto(
       SchedulerClient client,
       QueuedExpireJob target,
       List<Task> scheduleTasks,
@@ -290,7 +290,7 @@ public class CronJobPlanner {
     if (scheduleSpec != null
         && !MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, scheduleSpec)) {
       LOG.debug(
-          "Skipping snapshot-expiry coalesce into {}: schedule auth mismatch with target",
+          "Skipping snapshot-expiry merge into {}: schedule auth mismatch with target",
           target.instanceId.getId());
       return false;
     }
@@ -299,7 +299,7 @@ public class CronJobPlanner {
     for (QueuedExpireJob peer : peersToClaim) {
       if (!MaintenanceAuthConsistency.hasSameAuth(gravitinoConfig, target.spec, peer.spec)) {
         LOG.debug(
-            "Skipping claim of cron-job {} for snapshot-expiry coalesce: auth mismatch with target {}",
+            "Skipping claim of cron-job {} for snapshot-expiry merge: auth mismatch with target {}",
             peer.instanceId.getId(),
             target.instanceId.getId());
         continue;
@@ -368,7 +368,7 @@ public class CronJobPlanner {
       client.cancel(queuedJob.instanceId);
     } catch (RuntimeException e) {
       LOG.debug(
-          "Could not claim cron-job {} for snapshot-expiry coalesce: {}",
+          "Could not claim cron-job {} for snapshot-expiry merge: {}",
           queuedJob.instanceId.getId(),
           e.toString());
       return Optional.empty();
@@ -480,7 +480,7 @@ public class CronJobPlanner {
       return client.reschedule(target.instanceId, target.executionTime, mergedSpec);
     } catch (RuntimeException e) {
       LOG.debug(
-          "Could not reschedule cron-job {} after snapshot-expiry coalesce: {}",
+          "Could not reschedule cron-job {} after snapshot-expiry merge: {}",
           target.instanceId.getId(),
           e.toString());
       return false;

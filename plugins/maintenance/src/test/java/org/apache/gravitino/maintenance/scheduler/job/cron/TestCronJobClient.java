@@ -100,7 +100,7 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testSnapshotExpiryCoalescesIntoIncompleteBatch() {
+  void testSnapshotExpiryMergesIntoIncompleteBatch() {
     DataSource dataSource = dataSource();
     CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = expirePolicy(9L);

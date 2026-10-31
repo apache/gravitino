@@ -291,8 +291,8 @@ subject as `key:value` pairs separated by `;` (`:` only inside a pair):
 | --------------- | ------------------------------------- | ----------------------------------------------- |
 | `policy-expand` | `policy:{policy_id}`                  | One long-lived lease per policy                 |
 | `cron-job`      | `table:{table_id};policy:{policy_id}` | One table + one policy                          |
-| `cron-job`      | `batch:{batch_id};policy:{policy_id}` | Snapshot-expiry coalesce; tables in `task_data` |
-| `commit-job`    | `table:{table_id}`                    | One coalesce key per table (no policy segment)  |
+| `cron-job`      | `batch:{batch_id};policy:{policy_id}` | Snapshot-expiry merge; tables in `task_data` |
+| `commit-job`    | `table:{table_id}`                    | One merge key per table (no policy segment)  |
 
 Merging extra tables into an open snapshot-expiry row **does not rename** `task_instance`; it
 updates `task_data` (or inserts a new `batch:…` row and cancels the old `table:…` rows).
@@ -428,7 +428,7 @@ builds the onCommit chain and snapshot, then inserts the row.
 3. Fail closed if effective Gravitino / IRC auth bags disagree across the remaining chain.
 4. Build a schedule-time job snapshot (table target, ordered chain steps, merged `jobConf`)
    into `task_data`.
-5. `scheduleIfNotExists` due now. Bursts coalesce: an existing row keeps its original
+5. `scheduleIfNotExists` due now. Bursts merge: an existing row keeps its original
    `task_data` (no overwrite).
 
 If the chain is empty after gates, or snapshot build fails, **skip** — do not insert a row.
@@ -616,7 +616,7 @@ Implementation checklist:
       **inside** the Spark Job; then DELETE the scheduled row.
 - [ ] Validation reads metrics per type in the run; purge unreferenced history by TTL/N.
 - [ ] Commit path: one chained Job; soft slot per chain policy (same `job_id`); full chain in
-      `maintenance_types` / `policy_ids`; orphan crontab-only; coalesce on `table:{table_id}`; Spark
+      `maintenance_types` / `policy_ids`; orphan crontab-only; merge on `table:{table_id}`; Spark
       `jobOptions` merge uses max.
 - [ ] Client auth from `gravitino.conf` only; reject credential-shaped keys in policy
       `jobOptions`.

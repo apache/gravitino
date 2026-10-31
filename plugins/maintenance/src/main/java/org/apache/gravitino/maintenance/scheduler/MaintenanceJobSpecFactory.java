@@ -332,7 +332,7 @@ public final class MaintenanceJobSpecFactory {
 
   /**
    * Merges nested {@code spark_conf} JSON into {@code into}: max resource-shaped values, otherwise
-   * first-wins {@code putIfAbsent}. Used by commit-chain build and cron snapshot-expiry coalesce.
+   * first-wins {@code putIfAbsent}. Used by commit-chain build and cron snapshot-expiry merge.
    *
    * @param into mutable flat spark conf map
    * @param fromJson candidate {@code spark_conf} JSON, or null/blank
