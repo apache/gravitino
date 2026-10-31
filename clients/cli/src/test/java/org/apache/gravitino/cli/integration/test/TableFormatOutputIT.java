@@ -58,7 +58,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.PROVIDER),
       "postgres",
       commandArg(GravitinoOptions.PROPERTIES),
-      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
+      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=mydb,jdbc-driver=org.postgresql.Driver,verify-on-create=false",
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
@@ -74,7 +74,7 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.PROVIDER),
       "postgres",
       commandArg(GravitinoOptions.PROPERTIES),
-      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
+      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=mydb,jdbc-driver=org.postgresql.Driver,verify-on-create=false",
       commandArg(GravitinoOptions.URL),
       gravitinoUrl,
       commandArg(GravitinoOptions.COMMENT),
