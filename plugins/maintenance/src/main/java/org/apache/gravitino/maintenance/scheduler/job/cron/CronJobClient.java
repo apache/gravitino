@@ -35,23 +35,12 @@ import org.apache.gravitino.meta.PolicyEntity;
  * Submits one-shot {@code cron-job} rows to db-scheduler. Schedule planning is {@link
  * CronJobPlanner}.
  *
- * <p>One instance is held by the expand path for the life of the scheduler pools. Prefer {@link
- * #forEntityStore(Config)} when the caller does not already have the entity-store pool.
+ * <p>One instance is held by the expand path for the life of the scheduler pools.
  */
 public class CronJobClient {
 
   private final SchedulerClient scheduler;
   private final CronJobPlanner planner;
-
-  /**
-   * Opens a client against the entity-store pool (SchedulerClient uses autocommit wrap).
-   *
-   * @param gravitinoConfig server config for jobConf overlay
-   * @return client bound to the cron-job table
-   */
-  public static CronJobClient forEntityStore(Config gravitinoConfig) {
-    return new CronJobClient(AutocommitDataSources.entityStore(), gravitinoConfig);
-  }
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store

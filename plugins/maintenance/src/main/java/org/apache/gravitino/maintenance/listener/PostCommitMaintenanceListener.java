@@ -23,6 +23,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +57,8 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     if (gravitinoConfig == null) {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
-    this.commitJobClient = CommitJobClient.forEntityStore(gravitinoConfig);
+    this.commitJobClient =
+        new CommitJobClient(AutocommitDataSources.entityStore(), gravitinoConfig);
     LOG.info("PostCommitMaintenanceListener started");
   }
 

@@ -40,8 +40,6 @@ import org.slf4j.LoggerFactory;
  * CommitJobPlanner}.
  *
  * <p>One instance is held by {@code PostCommitMaintenanceListener} for the listener lifetime.
- * Prefer {@link #forEntityStore(Config)} when the caller does not already have the entity-store
- * pool.
  */
 public class CommitJobClient {
 
@@ -49,16 +47,6 @@ public class CommitJobClient {
 
   private final SchedulerClient scheduler;
   private final CommitJobPlanner planner;
-
-  /**
-   * Opens a client against the entity-store pool (SchedulerClient uses autocommit wrap).
-   *
-   * @param gravitinoConfig server config
-   * @return client bound to the commit-job table
-   */
-  public static CommitJobClient forEntityStore(Config gravitinoConfig) {
-    return new CommitJobClient(AutocommitDataSources.entityStore(), gravitinoConfig);
-  }
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
