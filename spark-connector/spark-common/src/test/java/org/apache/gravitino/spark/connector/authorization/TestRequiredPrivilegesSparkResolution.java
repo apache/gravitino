@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.spark.connector.authorization;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +37,6 @@ import org.apache.spark.sql.internal.StaticSQLConf;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -61,6 +60,7 @@ public class TestRequiredPrivilegesSparkResolution {
             .appName("test-authorization-resolution")
             .config("spark.ui.enabled", "false")
             .config("spark.sql.catalog.denied", DeniedTableCatalog.class.getName())
+            .config("spark.sql.catalog.broken", BrokenTableCatalog.class.getName())
             .config(
                 StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
                 GravitinoAuthorizationSparkSessionExtensions.class.getName())
@@ -72,12 +72,6 @@ public class TestRequiredPrivilegesSparkResolution {
     if (spark != null) {
       spark.stop();
     }
-    AuthorizationTable.clear();
-  }
-
-  @AfterEach
-  void clearCollector() {
-    AuthorizationTable.clear();
   }
 
   @Test
@@ -117,16 +111,44 @@ public class TestRequiredPrivilegesSparkResolution {
   }
 
   @Test
-  void testSqlParserClearsStaleDeniedTablesBeforeNextQuery() throws Exception {
-    AuthorizationTable.deny(
-        "stale_table",
-        "catalog.schema.stale_table",
-        ImmutableSet.of(Privilege.Name.SELECT_TABLE),
-        new ForbiddenException("denied stale table"));
+  void testDescribeDeniedTableReportsForbidden() {
+    ForbiddenException failure =
+        assertThrows(ForbiddenException.class, () -> spark.sql("DESCRIBE TABLE denied.db.t1"));
 
-    spark.sessionState().sqlParser().parsePlan("SELECT 1");
+    assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+  }
 
-    assertFalse(AuthorizationTable.drainFailure().isPresent());
+  @Test
+  void testSubqueryOnDeniedTableReportsForbidden() {
+    ForbiddenException failure =
+        assertThrows(
+            ForbiddenException.class,
+            () -> spark.sql("SELECT 1 WHERE EXISTS (SELECT 1 FROM denied.db.t1)"));
+
+    assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+  }
+
+  @Test
+  void testDeniedGetTableDoesNotFailLaterQueries() throws Exception {
+    // Spark 3.5 loads the table after analysis, so no post-hoc rule sees the denied placeholder.
+    // Spark 4 resolves the table during analysis and reports the denial there.
+    try {
+      spark.catalog().getTable("denied.db.t1");
+    } catch (ForbiddenException e) {
+      assertTrue(e.getMessage().contains("denied.db.t1: SELECT_TABLE"), e.getMessage());
+    }
+
+    assertEquals(1L, spark.range(1).count());
+  }
+
+  @Test
+  void testAbortedAnalysisDoesNotFailLaterQueries() {
+    // The broken catalog throws while the join is resolved, after denied.db.t1 was loaded.
+    assertThrows(
+        RuntimeException.class,
+        () -> spark.sql("SELECT 1 FROM denied.db.t1 JOIN broken.db.t2 ON 1 = 1"));
+
+    assertEquals(1L, spark.range(1).count());
   }
 
   /** A catalog that denies every table, used to exercise the authorization resolution path. */
@@ -153,6 +175,56 @@ public class TestRequiredPrivilegesSparkResolution {
           tableIdentifier,
           ImmutableSet.of(Privilege.Name.SELECT_TABLE),
           new ForbiddenException("denied %s", tableIdentifier));
+    }
+
+    @Override
+    public Identifier[] listTables(String[] namespace) {
+      return new Identifier[0];
+    }
+
+    @Override
+    // Overriding the form deprecated in Spark 3.4 keeps this stub compiling on every supported
+    // version; the test never calls it.
+    @SuppressWarnings("deprecation")
+    public Table createTable(
+        Identifier ident, StructType schema, Transform[] partitions, Map<String, String> props) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Table alterTable(Identifier ident, TableChange... changes) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean dropTable(Identifier ident) {
+      return false;
+    }
+
+    @Override
+    public void renameTable(Identifier oldIdent, Identifier newIdent) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  /** A catalog whose loads blow up mid-resolution, to abort an analysis after a denial. */
+  public static class BrokenTableCatalog implements TableCatalog {
+
+    private String name;
+
+    @Override
+    public void initialize(String name, CaseInsensitiveStringMap options) {
+      this.name = name;
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    @Override
+    public Table loadTable(Identifier ident) {
+      throw new IllegalStateException("catalog unavailable");
     }
 
     @Override
