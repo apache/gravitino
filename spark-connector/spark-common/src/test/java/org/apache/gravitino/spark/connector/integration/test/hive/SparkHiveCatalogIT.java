@@ -188,6 +188,11 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
     Assertions.assertEquals(0, partitionInfo.size());
 
+    // A partial spec on the second partition column.
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p2='twenty two')");
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(0)[0]);
+
     String nullPartitionTableName = "hive_null_partition_ops_table";
     dropTableIfExists(nullPartitionTableName);
     sql(
@@ -198,6 +203,14 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     List<Object[]> nullPartitionInfo = getTablePartitions(nullPartitionTableName);
     Assertions.assertEquals(1, nullPartitionInfo.size());
     Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
+
+    // The null partition written by the INSERT can be dropped, and re-added through the connector.
+    sql("ALTER TABLE " + nullPartitionTableName + " DROP PARTITION (dt = null)");
+    Assertions.assertEquals(0, getTablePartitions(nullPartitionTableName).size());
+    sql("ALTER TABLE " + nullPartitionTableName + " ADD PARTITION (dt = null)");
+    Assertions.assertEquals(1, getTablePartitions(nullPartitionTableName).size());
+    sql("ALTER TABLE " + nullPartitionTableName + " DROP PARTITION (dt = null)");
+    Assertions.assertEquals(0, getTablePartitions(nullPartitionTableName).size());
 
     // Adding a partition that already exists must surface Spark's PARTITIONS_ALREADY_EXIST. Assert
     // the type rather than the message: the connector builds the exception from (table, ident,
