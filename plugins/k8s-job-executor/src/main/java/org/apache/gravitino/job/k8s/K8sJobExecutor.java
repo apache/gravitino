@@ -185,6 +185,16 @@ public class K8sJobExecutor implements JobExecutor {
         throw e;
       }
       if (REJECTED_REQUEST_CODES.contains(e.getCode())) {
+        // The client retries a request that timed out or failed with a server error, so the
+        // rejection may answer a retry while an earlier attempt created the SparkApplication, for
+        // example when that one used up a resource quota.
+        if (createdByEarlierAttempt(jobExecutionId, context.jobId(), e)) {
+          LOG.info(
+              "Submitted job {} as {}, although a retried request was rejected",
+              context.jobId(),
+              jobExecutionId);
+          return jobExecutionId.toString();
+        }
         // The cluster rejects the job as it is, for example its namespace doesn't exist or isn't
         // allowed, so the caller gets the reason rather than an internal error.
         throw new IllegalArgumentException(
@@ -570,6 +580,51 @@ public class K8sJobExecutor implements JobExecutor {
       return getExecutionInfo(id, jobId, latest);
     }
     return failed;
+  }
+
+  /**
+   * Returns whether an earlier attempt of a rejected request created the SparkApplication of a job,
+   * which then runs as submitted.
+   *
+   * @param id the job execution id of the SparkApplication
+   * @param jobId the id of the job
+   * @param rejection the rejection of the request
+   * @return whether the SparkApplication of the job exists
+   * @throws IllegalStateException if this can't be told, as the SparkApplication of the job is
+   *     being deleted, or reading it fails other than with a rejection
+   */
+  private boolean createdByEarlierAttempt(
+      K8sJobExecutionId id, long jobId, KubernetesClientException rejection) {
+    Optional<GenericKubernetesResource> existing;
+    try {
+      existing = getSparkApplication(id);
+    } catch (KubernetesClientException e) {
+      rejection.addSuppressed(e);
+      if (REJECTED_REQUEST_CODES.contains(e.getCode())) {
+        // The SparkApplication can't be read at all, so findSubmittedJob() couldn't find it
+        // either, and keeping the job wouldn't help.
+        return false;
+      }
+      throw new IllegalStateException(
+          String.format(
+              "Kubernetes rejected the SparkApplication %s/%s of job %s, but whether an earlier"
+                  + " attempt of the request created it can't be told",
+              id.namespace(), id.name(), jobId),
+          rejection);
+    }
+    if (!existing.isPresent() || !K8sJobResourceUtils.isOfJob(existing.get(), jobId)) {
+      return false;
+    }
+    if (existing.get().getMetadata().getDeletionTimestamp() != null) {
+      // Its pods may still run until the deletion finishes, and recovery finds it until it's gone.
+      throw new IllegalStateException(
+          String.format(
+              "Kubernetes rejected the SparkApplication %s/%s of job %s, which an earlier attempt"
+                  + " of the request created, but it is being deleted",
+              id.namespace(), id.name(), jobId),
+          rejection);
+    }
+    return true;
   }
 
   /**

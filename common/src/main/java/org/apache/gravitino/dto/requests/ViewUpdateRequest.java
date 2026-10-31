@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.rel.RepresentationDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to update a view. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -54,6 +55,19 @@ public interface ViewUpdateRequest extends RESTRequest {
    * @return An instance of {@link ViewChange}.
    */
   ViewChange viewChange();
+
+  /**
+   * Validates the request with a prefix for writable-type field paths.
+   *
+   * <p>The default implementation delegates to {@link #validate()} and preserves existing
+   * validation messages.
+   *
+   * @param fieldPrefix the field path prefix, including a trailing dot when nonempty
+   * @throws IllegalArgumentException if the request is invalid
+   */
+  default void validateWithPrefix(String fieldPrefix) throws IllegalArgumentException {
+    validate();
+  }
 
   /** Represents a request to rename a view. */
   @EqualsAndHashCode
@@ -222,6 +236,22 @@ public interface ViewUpdateRequest extends RESTRequest {
 
     @Override
     public void validate() throws IllegalArgumentException {
+      validateWithPrefix("");
+    }
+
+    @Override
+    public ViewChange viewChange() {
+      return ViewChange.replaceView(
+          columns == null ? new ColumnDTO[0] : columns,
+          DTOConverters.fromDTOs(representations),
+          defaultCatalog,
+          defaultSchema,
+          comment);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
       Preconditions.checkArgument(
           representations != null && representations.length > 0,
           "\"representations\" field is required and cannot be empty");
@@ -238,19 +268,10 @@ public interface ViewUpdateRequest extends RESTRequest {
                   Preconditions.checkArgument(column != null, "column must not be null");
                   column.validate();
                 });
+        WritableDataTypeValidator.validateColumns(columns, fieldPrefix + "columns");
       }
 
       ViewCreateRequest.validateNoDuplicateDialects(representations);
-    }
-
-    @Override
-    public ViewChange viewChange() {
-      return ViewChange.replaceView(
-          columns == null ? new ColumnDTO[0] : columns,
-          DTOConverters.fromDTOs(representations),
-          defaultCatalog,
-          defaultSchema,
-          comment);
     }
   }
 }

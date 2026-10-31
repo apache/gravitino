@@ -139,6 +139,8 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`          |
 | `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`          |
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
+| `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
+| `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
@@ -149,11 +151,29 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
 For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
 and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
-Use the `semantic_model` tag with `--include-tool-tags` to expose these five tools.
+Use the `semantic_model` tag with `--include-tool-tags` to expose these tools.
 They use the same per-call `metalake` selection and authentication as other tools;
-Gravitino filters listings and enforces authorization, including access to referenced source tables.
+Gravitino filters listings by visibility and checks source-table access when creating or
+replacing definitions.
 Names used in REST paths must be non-empty and cannot be `.` or `..`, which HTTP clients
 normalize as path navigation. Names must also satisfy the server's naming rules.
+
+`list_metrics` and `list_metric_infos` discover metrics across a schema with one
+REST request per call. Both accept `catalog_name`, `schema_name`, and the optional
+per-call `metalake`. For example:
+
+```json
+{"metalake": "prod", "catalog_name": "sales", "schema_name": "mart"}
+```
+
+`list_metrics` returns a JSON array of identifiers whose `namespace` is
+`[metalake, catalog, schema, semanticModel]` and whose `name` is the exact metric
+name. `list_metric_infos` returns objects with the same full `namespace` and a
+complete `metric`, including its name, expression, and optional description,
+datatype, AI context, and custom extensions. JSON number precision is preserved.
+Both modes follow containing-model visibility and sort by model identifier, then
+case-sensitive metric name. An empty result is `[]`; failures propagate as tool
+errors. These tools discover definitions and do not execute metric queries.
 
 For example, call `create_semantic_model` with the following arguments after the
 `sales.mart.orders` source table exists in the selected metalake:

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.maintenance;
 
+import java.util.Objects;
 import java.util.function.LongFunction;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
@@ -36,8 +37,8 @@ import org.slf4j.LoggerFactory;
  * parameter on metrics reports, or via {@link #finishAction} when no metrics are needed. There is
  * no job-terminal reclaim path.
  *
- * <p>Callbacks that arrive before submit-side {@code bindJobId} lazy-bind the unbound claim for the
- * reported {@code (tableId, policyId)} onto the path {@code jobId}.
+ * <p>Callbacks are keyed by {@code action_id} injected at submit time. Metrics writes require the
+ * row to be bound ({@code job_id IS NOT NULL}).
  */
 public class MaintenanceMetricsService {
 
@@ -77,122 +78,127 @@ public class MaintenanceMetricsService {
   }
 
   /**
-   * S0 report: stores metrics, records {@code before_snapshot_id}, optionally closes the soft slot
+   * S0 report: stores metrics, records {@code before_metrics_id}, optionally closes the soft slot
    * (for example snapshot drift / skip).
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id
+   * @param actionId maintenance action id
    * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request validated metrics payload
    */
   public void reportBeforeMetrics(
-      String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action =
-        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
-    metricsMetaService.insertMetrics(
-        action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
-    actionMetaService.recordBeforeSnapshot(
-        jobId, action.tableId(), action.policyId(), request.getSnapshotId());
-    maybeFinish(
-        jobId,
-        action,
-        /*afterSnapshotId=*/ null,
-        finish,
-        "before",
-        metalake,
-        request.getSnapshotId());
+      String metalake, long actionId, boolean finish, MaintenanceActionMetricsRequest request) {
+    TableMaintenanceActionPO action = loadInFlight(metalake, actionId, request);
+    long metricsId =
+        action.beforeMetricsId() != null
+            ? action.beforeMetricsId()
+            : metricsMetaService.insertMetrics(
+                action.tableId(),
+                action.policyId(),
+                request.getSnapshotId(),
+                request.getMetricsJson());
+    actionMetaService.recordBeforeMetrics(actionId, metricsId);
+    maybeFinish(actionId, action, finish, "before", metalake, metricsId);
   }
 
   /**
-   * S1 report: stores metrics and optionally closes the soft slot with {@code after_snapshot_id} =
-   * {@code snapshotId}.
+   * S1 report: stores metrics, records {@code after_metrics_id}, optionally closes the soft slot.
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id
+   * @param actionId maintenance action id
    * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request validated metrics payload
    */
   public void reportAfterMetrics(
-      String metalake, long jobId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action =
-        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
-    metricsMetaService.insertMetrics(
-        action.tableId(), action.policyId(), request.getSnapshotId(), request.getMetricsJson());
-    maybeFinish(
-        jobId, action, request.getSnapshotId(), finish, "after", metalake, request.getSnapshotId());
+      String metalake, long actionId, boolean finish, MaintenanceActionMetricsRequest request) {
+    TableMaintenanceActionPO action = loadInFlight(metalake, actionId, request);
+    long metricsId =
+        action.afterMetricsId() != null
+            ? action.afterMetricsId()
+            : metricsMetaService.insertMetrics(
+                action.tableId(),
+                action.policyId(),
+                request.getSnapshotId(),
+                request.getMetricsJson());
+    actionMetaService.recordAfterMetrics(actionId, metricsId);
+    maybeFinish(actionId, action, finish, "after", metalake, metricsId);
   }
 
   /**
-   * Closes the soft slot for one bound table/policy without writing metrics.
+   * Closes the soft slot for one bound action without writing metrics.
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id
-   * @param request finish payload ({@code tableId}, {@code policyId}, optional {@code
-   *     afterSnapshotId})
+   * @param actionId maintenance action id
+   * @param request finish payload ({@code tableId}, {@code policyId})
    */
-  public void finishAction(String metalake, long jobId, MaintenanceActionFinishRequest request) {
+  public void finishAction(String metalake, long actionId, MaintenanceActionFinishRequest request) {
     TableMaintenanceActionPO action =
-        loadInFlight(metalake, jobId, request.getTableId(), request.getPolicyId());
-    actionMetaService.markFinished(
-        jobId,
-        action.tableId(),
-        action.policyId(),
-        request.getAfterSnapshotId(),
-        System.currentTimeMillis());
+        loadInFlight(
+            metalake,
+            actionId,
+            request.getTableId(),
+            request.getPolicyId(),
+            /*requireBound=*/ true);
+    actionMetaService.markFinished(actionId, System.currentTimeMillis());
     LOG.info(
-        "action finished for job {} metalake {} table {} policy {} afterSnapshotId={}",
-        jobId,
+        "action finished for action_id {} metalake {} table {} policy {}",
+        actionId,
         metalake,
         action.tableId(),
-        action.policyId(),
-        request.getAfterSnapshotId());
+        action.policyId());
   }
 
   private void maybeFinish(
-      long jobId,
+      long actionId,
       TableMaintenanceActionPO action,
-      Long afterSnapshotId,
       boolean finish,
       String phase,
       String metalake,
-      long snapshotId) {
+      long metricsId) {
     if (!finish) {
       LOG.info(
-          "{} metrics reported for job {} metalake {} table {} policy {} snapshot {}",
+          "{} metrics reported for action_id {} metalake {} table {} policy {} metricsId {}",
           phase,
-          jobId,
+          actionId,
           metalake,
           action.tableId(),
           action.policyId(),
-          snapshotId);
+          metricsId);
       return;
     }
-    actionMetaService.markFinished(
-        jobId, action.tableId(), action.policyId(), afterSnapshotId, System.currentTimeMillis());
+    actionMetaService.markFinished(actionId, System.currentTimeMillis());
     LOG.info(
-        "{} metrics reported and action finished for job {} metalake {} table {} policy {} snapshot {}",
+        "{} metrics reported and action finished for action_id {} metalake {} table {} policy {} metricsId {}",
         phase,
-        jobId,
+        actionId,
         metalake,
         action.tableId(),
         action.policyId(),
-        snapshotId);
+        metricsId);
   }
 
   private TableMaintenanceActionPO loadInFlight(
-      String metalake, long jobId, long tableId, long policyId) {
-    TableMaintenanceActionPO action =
-        actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+      String metalake, long actionId, MaintenanceActionMetricsRequest request) {
+    return loadInFlight(
+        metalake, actionId, request.getTableId(), request.getPolicyId(), /*requireBound=*/ true);
+  }
+
+  private TableMaintenanceActionPO loadInFlight(
+      String metalake, long actionId, long tableId, long policyId, boolean requireBound) {
+    TableMaintenanceActionPO action = actionMetaService.getById(actionId);
     if (action == null) {
-      if (actionMetaService.bindJobIdIfUnbound(tableId, policyId, jobId)) {
-        action = actionMetaService.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
-      }
+      throw new NoSuchEntityException("no maintenance action for action_id=%s", actionId);
     }
-    if (action == null) {
+    if (!Objects.equals(action.tableId(), tableId)
+        || !Objects.equals(action.policyId(), policyId)) {
       throw new NoSuchEntityException(
-          "no maintenance action for job_id=%s table_id=%s policy_id=%s", jobId, tableId, policyId);
+          "action_id=%s does not match table_id=%s policy_id=%s", actionId, tableId, policyId);
     }
     requireActionInFlight(action);
+    if (requireBound && action.jobId() == null) {
+      throw new NoSuchEntityException(
+          "maintenance action action_id=%s is not bound to a job yet", actionId);
+    }
     requireActionInMetalake(action, metalake);
     return action;
   }
@@ -200,7 +206,7 @@ public class MaintenanceMetricsService {
   private static void requireActionInFlight(TableMaintenanceActionPO action) {
     if (action.finishedAt() == null || action.finishedAt() != 0L) {
       throw new NoSuchEntityException(
-          "no in-flight maintenance action for job_id=%s", action.jobId());
+          "no in-flight maintenance action for action_id=%s", action.actionId());
     }
   }
 
@@ -208,11 +214,11 @@ public class MaintenanceMetricsService {
     String actionMetalake = metalakeLookup.apply(action.tableId());
     if (actionMetalake == null) {
       throw new NoSuchEntityException(
-          "no metalake for table_id=%s (job_id=%s)", action.tableId(), action.jobId());
+          "no metalake for table_id=%s (action_id=%s)", action.tableId(), action.actionId());
     }
     if (!actionMetalake.equals(metalake)) {
       throw new NoSuchEntityException(
-          "no maintenance action for job_id=%s under metalake %s", action.jobId(), metalake);
+          "no maintenance action for action_id=%s under metalake %s", action.actionId(), metalake);
     }
   }
 }

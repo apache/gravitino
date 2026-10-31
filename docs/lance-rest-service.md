@@ -110,6 +110,12 @@ canonical form.
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
 - **CreateTable**: Creates an empty Lance dataset using the schema from the Arrow IPC stream
+
+Registration requires an existing, readable Lance dataset. A plain directory or missing dataset
+is rejected before any existing table is removed. Registration with `overwrite` replaces only an
+external table's metadata and preserves its dataset; it rejects existing managed tables. Replacing
+a managed table requires an explicit drop first, which deletes the managed dataset.
+
 :::note
 The current `CreateTable` implementation accepts schema-only Arrow streams, including zero-row
 batches. A stream containing rows returns HTTP `406` before any metadata or dataset changes,

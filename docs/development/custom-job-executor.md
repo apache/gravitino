@@ -7,9 +7,10 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-The `local` job executor that ships with Gravitino runs jobs as a process on the Gravitino server
-and is intended for testing. Running jobs anywhere else, such as against a distributed scheduler,
-means implementing your own job executor.
+Gravitino ships two job executors: the [`local` job executor](../local-job-executor.md) runs jobs
+as processes on the Gravitino server and is intended for testing, and the
+[`k8s` job executor](../k8s-job-executor.md) runs Spark jobs on Kubernetes. Running jobs anywhere
+else, such as against another distributed scheduler, means implementing your own job executor.
 
 ## Implement a Custom Job Executor
 

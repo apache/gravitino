@@ -298,7 +298,7 @@ components:
           type: array
           description: The output columns of the view
           items:
-            $ref: "./tables.yaml#/components/schemas/Column"
+            $ref: "./tables.yaml#/components/schemas/WritableColumn"
         representations:
           type: array
           description: The representations of the view, at least one is required
@@ -410,6 +410,13 @@ components:
       description: |
         Atomically replaces the body of a view. Columns, representations, default catalog, default
         schema and comment are all replaced. The view name and properties are not affected.
+
+        All supplied column types and literal types in defaults must satisfy the writable type
+        requirements, including nested types and types copied unchanged from the current view.
+        UnparsedType is rejected even when only the comment or SQL representation changes. Use
+        recognized native types or explicit ExternalType values with nonblank catalog strings.
+        Reads, imports, renames and property changes remain supported for existing views with
+        unresolved types.
       required:
         - "@type"
         - representations
@@ -422,7 +429,7 @@ components:
           type: array
           description: The new output columns of the view
           items:
-            $ref: "./tables.yaml#/components/schemas/Column"
+            $ref: "./tables.yaml#/components/schemas/WritableColumn"
         representations:
           type: array
           description: The new representations of the view, at least one is required

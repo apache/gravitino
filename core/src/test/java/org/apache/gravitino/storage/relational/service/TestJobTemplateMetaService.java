@@ -18,12 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.job.JobHandle;
@@ -31,6 +36,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -233,6 +239,66 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteJobTemplateCleansOwnersAndPrivileges() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "job_template_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    JobTemplateEntity dropped = newShellJobTemplateEntity("dropped", "", METALAKE_NAME);
+    JobTemplateEntity kept = newShellJobTemplateEntity("kept", "", METALAKE_NAME);
+    backend.insert(dropped, false);
+    backend.insert(kept, false);
+    JobEntity droppedJob = newJobEntity("dropped", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    JobEntity keptJob = newJobEntity("kept", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    backend.insert(droppedJob, false);
+    backend.insert(keptJob, false);
+
+    OwnerMetaService ownerMetaService = OwnerMetaService.getInstance();
+    for (NameIdentifier ident :
+        new NameIdentifier[] {dropped.nameIdentifier(), kept.nameIdentifier()}) {
+      ownerMetaService.setOwner(
+          ident, Entity.EntityType.JOB_TEMPLATE, user.nameIdentifier(), user.type());
+    }
+    for (JobEntity job : new JobEntity[] {droppedJob, keptJob}) {
+      ownerMetaService.setOwner(
+          NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+          Entity.EntityType.JOB,
+          user.nameIdentifier(),
+          user.type());
+    }
+    backend.insert(
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "job_template_role",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofJobTemplate(
+                    "dropped", Lists.newArrayList(Privileges.UseJobTemplate.allow())),
+                SecurableObjects.ofJobTemplate(
+                    "kept", Lists.newArrayList(Privileges.UseJobTemplate.allow()))),
+            null),
+        false);
+
+    Assertions.assertTrue(
+        JobTemplateMetaService.getInstance().deleteJobTemplate(dropped.nameIdentifier()));
+
+    Assertions.assertEquals(0, countOwnerRows(dropped.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(0, countSecurableObjectRows(dropped.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(0, countOwnerRows(droppedJob.id(), "JOB"));
+    Assertions.assertEquals(1, countOwnerRows(kept.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(1, countSecurableObjectRows(kept.id(), "JOB_TEMPLATE"));
+    Assertions.assertEquals(1, countOwnerRows(keptJob.id(), "JOB"));
+  }
+
+  @TestTemplate
   public void testUpdateJobTemplate() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -374,6 +440,19 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, jobTemplateName)),
         change.getFullName());
     Assertions.assertEquals(operateType, change.getOperateType());
+  }
+
+  private int countOwnerRows(long objectId, String objectType) {
+    return countActiveRowsWhere(
+        "owner_meta",
+        String.format(
+            "metadata_object_id = %d AND metadata_object_type = '%s'", objectId, objectType));
+  }
+
+  private int countSecurableObjectRows(long objectId, String objectType) {
+    return countActiveRowsWhere(
+        "role_meta_securable_object",
+        String.format("metadata_object_id = %d AND type = '%s'", objectId, objectType));
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {

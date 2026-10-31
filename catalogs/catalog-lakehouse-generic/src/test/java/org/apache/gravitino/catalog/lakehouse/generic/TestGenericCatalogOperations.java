@@ -208,10 +208,23 @@ public class TestGenericCatalogOperations {
   @CsvSource(
       value = {"NULL", "false", "true"},
       nullValues = "NULL")
-  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) {
+  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) throws Exception {
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
+    String location = lanceDataDir.resolve("existing").toString();
+    // Arrow Schema and Gravitino Schema share a simple name in this test class.
+    try (Dataset ignored =
+        Dataset.write()
+            .schema(
+                new org.apache.arrow.vector.types.pojo.Schema(
+                    List.of(Field.nullable("id", new ArrowType.Int(32, true)))))
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute()) {
+      // Registration now requires an existing dataset at the provider-resolved location.
+    }
+    FakeTableLocationProvider.provisionLocation(location);
     Map<String, String> properties =
         Maps.newHashMap(
             Map.of(
@@ -220,7 +233,7 @@ public class TestGenericCatalogOperations {
                 "lance.register",
                 "true",
                 Table.PROPERTY_LOCATION,
-                lanceDataDir.resolve("existing").toString()));
+                location));
     properties.putAll(
         StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(idGenerator.nextId()), null));
     if (external != null) {

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -96,10 +98,13 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
     }
 
-    for (List<File> scripts : versionScrips.values()) {
+    for (Map.Entry<String, List<File>> versionScripts : versionScrips.entrySet()) {
       dropAllTables();
-      for (File scriptFile : scripts) {
+      for (File scriptFile : versionScripts.getValue()) {
         executeScript(scriptFile);
+      }
+      if ("2.0.0".equals(versionScripts.getKey())) {
+        assertRoleRelationsIndexedByRoleId("schema " + versionScripts.getKey());
       }
     }
   }
@@ -131,6 +136,44 @@ public class TestSQLScripts extends TestJDBCBackend {
       dropAllTables();
       executeScript(sourceSchema);
       executeScript(upgradeScript);
+      if ("2.0.0".equals(upgradeMatcher.group(2))) {
+        assertRoleRelationsIndexedByRoleId(upgradeScript.getName());
+      }
+    }
+  }
+
+  /**
+   * Verifies the PostgreSQL 1.1.0-to-1.2.0 upgrade script can be re-run as a whole after a
+   * completed upgrade: every statement is guarded by IF NOT EXISTS or is naturally idempotent
+   * (COMMENT ON). The scope is limited to this script; other upgrade scripts are not claimed to be
+   * retryable. The created indexes must exist with the expected columns and uniqueness.
+   */
+  @TestTemplate
+  public void testUpgradeToOneTwoIsIdempotent() throws SQLException, IOException {
+    if (!"postgresql".equals(backendType)) {
+      return;
+    }
+    Path scriptDir = upgradeScriptDirectory();
+    File upgrade = scriptDir.resolve("upgrade-1.1.0-to-1.2.0-postgresql.sql").toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.1.0-postgresql.sql").toFile());
+    executeScript(upgrade);
+    // A retry after a completed upgrade must succeed; no statement may fail again.
+    executeScript(upgrade);
+
+    // Index entries are formatted as "table:index name:ordinal position:column:non-unique".
+    List<String> indexes = readSchemaIndexes(Set.of("function_meta", "function_version_info"));
+    List<String> expectedIndexes =
+        List.of(
+            "function_meta:idx_function_meta_catalog_id:1:catalog_id:true",
+            "function_meta:idx_function_meta_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_catalog_id:1:catalog_id:true",
+            "function_version_info:idx_function_version_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_schema_id:1:schema_id:true");
+    for (String expectedIndex : expectedIndexes) {
+      Assertions.assertTrue(
+          indexes.contains(expectedIndex),
+          "Expected index entry missing after the re-run: " + expectedIndex);
     }
   }
 
@@ -520,6 +563,31 @@ public class TestSQLScripts extends TestJDBCBackend {
           readSchemaIndexes(Set.of("table_version_info")).stream()
               .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
           "Failed conversion must preserve the existing indexes");
+    }
+  }
+
+  private void assertRoleRelationsIndexedByRoleId(String source) throws SQLException {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (String table : List.of("user_role_rel", "group_role_rel")) {
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        boolean indexed = false;
+        try (ResultSet indexes =
+            metaData.getIndexInfo(connection.getCatalog(), null, tableName, false, false)) {
+          while (indexes.next()) {
+            if (indexes.getShort("ORDINAL_POSITION") == 1
+                && "role_id".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+              indexed = true;
+              break;
+            }
+          }
+        }
+        Assertions.assertTrue(
+            indexed, "No index leading with role_id on " + table + " after " + source);
+      }
     }
   }
 

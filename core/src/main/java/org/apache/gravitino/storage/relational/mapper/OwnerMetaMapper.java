@@ -137,6 +137,11 @@ public interface OwnerMetaMapper {
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelOfJobsByTemplateId")
+  void softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId);
+
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
       method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

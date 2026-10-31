@@ -27,7 +27,8 @@ info:
     OpenAPI specification for table-maintenance metrics callbacks exposed by the TMS plugin.
     Enable them by registering `org.apache.gravitino.maintenance.web.rest.feature` in
     `gravitino.server.rest.extensionPackages`. Callers authenticate with the server
-    authenticators and must be the metalake owner or hold `RUN_JOB`.
+    authenticators and must be the metalake owner or hold `RUN_JOB`. Paths are keyed by
+    soft-slot `actionId` (not the Gravitino job run id).
 
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"
@@ -52,12 +53,12 @@ security:
   - KerberosAuth: []
 
 paths:
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1before"
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1metrics~1after"
-  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
-    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BjobId%7D~1finish"
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/before:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BactionId%7D~1metrics~1before"
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/after:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BactionId%7D~1metrics~1after"
+  /metalakes/{metalake}/maintenance/actions/{actionId}/finish:
+    $ref: "./maintenance.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1maintenance~1actions~1%7BactionId%7D~1finish"
 
 components:
   securitySchemes:

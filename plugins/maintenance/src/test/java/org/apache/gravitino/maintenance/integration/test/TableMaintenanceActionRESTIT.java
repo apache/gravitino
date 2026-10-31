@@ -135,6 +135,8 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
         actions.insertInFlight(
             tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
     assertNotNull(claim);
+    actions.bindJobId(claim, jobId);
+    long actionId = claim.actionId();
 
     String beforeBody =
         "{\"tableId\":"
@@ -142,20 +144,24 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
             + ",\"policyId\":"
             + policyId
             + ",\"snapshotId\":100,\"metricsJson\":\"{\\\"mse\\\":1}\"}";
-    HttpResponse<String> before = postJson(actionPath(jobId, "metrics/before"), beforeBody);
+    HttpResponse<String> before = postJson(actionPath(actionId, "metrics/before"), beforeBody);
     assertEquals(200, before.statusCode(), before.body());
 
-    TableMaintenanceActionPO afterBefore =
-        actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO afterBefore = actions.getById(actionId);
     assertNotNull(afterBefore);
     assertEquals(jobId, afterBefore.jobId());
-    assertEquals(100L, afterBefore.beforeSnapshotId());
+    assertNotNull(afterBefore.beforeMetricsId());
     assertEquals(0L, afterBefore.finishedAt());
     assertEquals(
         "{\"mse\":1}",
         TableSnapshotMetricsMetaService.getInstance()
-            .getMetrics(tableId, policyId, 100L)
+            .getMetrics(afterBefore.beforeMetricsId())
             .metricsValue());
+    assertEquals(
+        100L,
+        TableSnapshotMetricsMetaService.getInstance()
+            .getMetrics(afterBefore.beforeMetricsId())
+            .snapshotId());
 
     String afterBody =
         "{\"tableId\":"
@@ -164,23 +170,27 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
             + policyId
             + ",\"snapshotId\":200,\"metricsJson\":\"{\\\"mse\\\":2}\"}";
     HttpResponse<String> after =
-        postJson(actionPath(jobId, "metrics/after") + "?finish=true", afterBody);
+        postJson(actionPath(actionId, "metrics/after") + "?finish=true", afterBody);
     assertEquals(200, after.statusCode(), after.body());
 
-    TableMaintenanceActionPO finished =
-        actions.getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO finished = actions.getById(actionId);
     assertNotNull(finished);
-    assertEquals(200L, finished.afterSnapshotId());
+    assertNotNull(finished.afterMetricsId());
     assertTrue(finished.finishedAt() > 0L);
     assertEquals(
         "{\"mse\":2}",
         TableSnapshotMetricsMetaService.getInstance()
-            .getMetrics(tableId, policyId, 200L)
+            .getMetrics(finished.afterMetricsId())
             .metricsValue());
+    assertEquals(
+        200L,
+        TableSnapshotMetricsMetaService.getInstance()
+            .getMetrics(finished.afterMetricsId())
+            .snapshotId());
   }
 
-  private static String actionPath(long jobId, String suffix) {
-    return apiBase + "/metalakes/" + metalake + "/maintenance/actions/" + jobId + "/" + suffix;
+  private static String actionPath(long actionId, String suffix) {
+    return apiBase + "/metalakes/" + metalake + "/maintenance/actions/" + actionId + "/" + suffix;
   }
 
   private static HttpResponse<String> postJson(String url, String body) throws Exception {

@@ -1,0 +1,19 @@
+diff --git a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00080.txt b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00080.txt
+index 69da75bb1..fd807937e 100644
+--- a/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00080.txt
++++ b/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/tpcds/00080.txt
+@@ -93,8 +93,8 @@
+ "catalog channel","catalog_pageAAAAAAAAPJPAAAAA","1611.17","0.00","-5556.16"
+ "catalog channel","catalog_pageAAAAAAAAPOPAAAAA","4273.75","0.00","188.20"
+ "catalog channel","","286009.96","12293.74","-35412.38"
+-"store channel","storeAAAAAAAABAAAAAAA","186861.52","14258.85","-83857.30"
+-"store channel","storeAAAAAAAACAAAAAAA","115825.62","2970.78","-57289.84"
++"store channel","storeAAAAAAAABAAAAAAA       ","186861.52","14258.85","-83857.30"
++"store channel","storeAAAAAAAACAAAAAAA       ","115825.62","2970.78","-57289.84"
+ "store channel","","302687.14","17229.63","-141147.14"
+-"web channel","web_siteAAAAAAAABAAAAAAA","10859.87","0.00","719.72"
+-"web channel","web_siteAAAAAAAACAAAAAAA","17199.17","495.18","-11337.52"
+\ No newline at end of file
++"web channel","web_siteAAAAAAAABAAAAAAA    ","10859.87","0.00","719.72"
++"web channel","web_siteAAAAAAAACAAAAAAA    ","17199.17","495.18","-11337.52"
+\ No newline at end of file

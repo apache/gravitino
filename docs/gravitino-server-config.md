@@ -154,7 +154,9 @@ health check at `GET /health/ready` so a server that has lost its database stops
 Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
 that directory on storage shared by all servers, for example an NFS mount, so that a request for a
 job's output can be served by any server. Otherwise only the server that ran the job can return
-it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
+it, and the others return empty output. See [Local Job Executor](local-job-executor.md). The
+[Kubernetes job executor](k8s-job-executor.md) keeps no job state on the servers, so any server can
+return a job's output.
 
 ## Server Configuration
 

@@ -83,6 +83,7 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -1438,6 +1439,9 @@ public class ErrorHandlers {
     public void accept(ErrorResponse errorResponse) {
       if (errorResponse.getCode() == ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE) {
         throw new OptimisticLockException("%s", formatErrorMessage(errorResponse));
+      }
+      if (errorResponse.getCode() == ErrorConstants.SERVICE_UNAVAILABLE_CODE) {
+        throw new ServiceUnavailableException("%s", formatErrorMessage(errorResponse));
       }
       if (errorResponse.getCode() == ErrorConstants.CONNECTION_FAILED_CODE) {
         throw new ConnectionFailedException("%s", formatErrorMessage(errorResponse));
