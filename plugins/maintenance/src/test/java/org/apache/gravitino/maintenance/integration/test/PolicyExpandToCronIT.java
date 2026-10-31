@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Boots Gravitino with {@link TableMaintenanceRESTFeature} and exercises policy-expand → cron-job
- * enqueue through the live expand pool and nearest-policy table walk.
+ * schedule through the live expand pool and nearest-policy table walk.
  *
  * <p>Embedded mode only (same-JVM MetaService / SchedulerClient). Run with {@code -PskipITs}
  * omitted.
@@ -95,7 +95,7 @@ public class PolicyExpandToCronIT extends BaseIT {
   }
 
   @Test
-  void testExpandPoolEnqueuesCronJobForTaggedTable() throws Exception {
+  void testExpandPoolSchedulesCronJobForTaggedTable() throws Exception {
     assumeTrue(
         ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
         "Asserts cron submit capture in the same JVM as the expand pool");
@@ -156,7 +156,7 @@ public class PolicyExpandToCronIT extends BaseIT {
     assertEquals(
         expectedInstanceId,
         CAPTURED_CRON_ID.get(),
-        "expand pool did not enqueue expected cron-job within " + timeoutSeconds + "s");
+        "expand pool did not schedule expected cron-job within " + timeoutSeconds + "s");
   }
 
   private static DataSource dataSource() {

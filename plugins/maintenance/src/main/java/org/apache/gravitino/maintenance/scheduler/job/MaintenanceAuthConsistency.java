@@ -41,7 +41,7 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
  * Fail-closed checks that merged maintenance work agrees on effective Gravitino / IRC auth after
  * cluster overlay.
  *
- * <p>Used by commit-chain enqueue (one Spark job, many policies) and snapshot-expiry coalesce
+ * <p>Used by commit-chain schedule (one Spark job, many policies) and snapshot-expiry coalesce
  * (shared {@code updater_options} / {@code spark_conf} on the survivor row). Cluster-static {@code
  * gravitinoAuth} / {@code ircAuth} normally make every policy identical; when overlays are empty,
  * disagreeing policy auth must not be merged silently.
@@ -100,11 +100,11 @@ public final class MaintenanceAuthConsistency {
   }
 
   /**
-   * Compares enqueue snapshots. Spec maps are already cluster-overlaid at build time.
+   * Compares schedule snapshots. Spec maps are already cluster-overlaid at build time.
    *
    * @param gravitinoConfig server config (for cluster IRC key set)
-   * @param left enqueue snapshot
-   * @param right enqueue snapshot
+   * @param left schedule snapshot
+   * @param right schedule snapshot
    * @return true when both snapshots agree on effective gravitino/IRC auth
    */
   public static boolean hasSameAuth(

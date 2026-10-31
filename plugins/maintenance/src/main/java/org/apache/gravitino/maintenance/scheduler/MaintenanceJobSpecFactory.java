@@ -43,7 +43,7 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * Builds enqueue-time {@link MaintenanceJobSpec} values for the cron and commit paths, and helpers
+ * Builds schedule-time {@link MaintenanceJobSpec} values for the cron and commit paths, and helpers
  * used by submit to assemble the flat {@code runJob} map.
  */
 public final class MaintenanceJobSpecFactory {
@@ -94,7 +94,7 @@ public final class MaintenanceJobSpecFactory {
    * stay correct for every member of a batch.
    *
    * @param policy effective maintenance policy
-   * @param tables resolved table refs (same order as enqueue)
+   * @param tables resolved table refs (same order as schedule)
    * @return spec ready for {@code task_data}
    */
   public MaintenanceJobSpec forCron(PolicyEntity policy, List<ResolvedTableRef> tables) {
@@ -173,7 +173,7 @@ public final class MaintenanceJobSpecFactory {
    * Assembles the flat {@code runJob} map for one cron task: task {@code parameters} + shared
    * {@code updater_options}/{@code spark_conf} + TMS wire keys + one-element {@code tables} JSON.
    *
-   * @param spec enqueue spec
+   * @param spec schedule spec
    * @param task task to submit
    * @return mutable jobConf (caller resolves secrets / injects {@code action_ids})
    */
@@ -287,7 +287,7 @@ public final class MaintenanceJobSpecFactory {
     }
     Preconditions.checkArgument(
         updaterOptions != null && !updaterOptions.isBlank(),
-        "updater_options is required on enqueue jobConf");
+        "updater_options is required on schedule jobConf");
     return new JobConfParts(parameters, updaterOptions, sparkConf);
   }
 
@@ -310,7 +310,7 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
-   * Merges several enqueue-time {@code spark_conf} JSON strings. Resource-shaped keys (memory /
+   * Merges several schedule-time {@code spark_conf} JSON strings. Resource-shaped keys (memory /
    * cores / instances) take the larger magnitude; other keys are first-wins.
    *
    * @param sparkConfJsons ordered {@code spark_conf} JSON strings (earlier wins non-resource keys)
@@ -383,7 +383,7 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
-   * Union {@link MaintenanceJobTemplates#RULES_KEY} maps so each chain type keeps its enqueue-time
+   * Union {@link MaintenanceJobTemplates#RULES_KEY} maps so each chain type keeps its schedule-time
    * rules.
    */
   static void mergePolicyRulesByType(Map<String, String> into, Map<String, String> from) {

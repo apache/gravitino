@@ -60,7 +60,7 @@ public class CommitJobClient {
    *
    * @param identifier {@code metalake.catalog.schema.table} from the commit event
    */
-  public void enqueueNow(NameIdentifier identifier) {
+  public void scheduleNow(NameIdentifier identifier) {
     if (identifier == null) {
       return;
     }
@@ -75,12 +75,12 @@ public class CommitJobClient {
       if (client.scheduleIfNotExists(
           new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
           Instant.now())) {
-        LOG.info("Enqueued commit-job for table {} ({})", tableId, identifier);
+        LOG.info("Scheduled commit-job for table {} ({})", tableId, identifier);
       } else {
         LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
       }
     } catch (RuntimeException e) {
-      LOG.warn("Failed to enqueue commit-job for IRC update {}: {}", identifier, e.toString());
+      LOG.warn("Failed to schedule commit-job for IRC update {}: {}", identifier, e.toString());
     }
   }
 

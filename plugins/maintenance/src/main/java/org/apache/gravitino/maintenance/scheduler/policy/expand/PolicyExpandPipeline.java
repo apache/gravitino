@@ -43,8 +43,8 @@ import org.slf4j.LoggerFactory;
  * <p>Does not submit Spark. Returns the next expand due time, or empty when the expand row should
  * be removed (missing / disabled / blank trigger / non-maintenance).
  *
- * <p>Enumeration fills up to {@code enqueueBatchSize} tables that pass nearest-policy and can start
- * (not occupied / cooling) and are not already covered by a queued cron-job.
+ * <p>Enumeration fills up to {@code scheduleBatchSize} tables that pass nearest-policy and can
+ * start (not occupied / cooling) and are not already covered by a queued cron-job.
  */
 public final class PolicyExpandPipeline {
 
@@ -56,7 +56,7 @@ public final class PolicyExpandPipeline {
   private final CronJobClient cronJobClient;
   private final PolicyTableEnumerator.ShouldSkipTable shouldSkip;
   private final Config config;
-  private final int enqueueBatchSize;
+  private final int scheduleBatchSize;
 
   /**
    * Loads policies through {@link PolicyMetaService}.
@@ -65,21 +65,21 @@ public final class PolicyExpandPipeline {
    * @param cronJobClient writes cron-job rows
    * @param actionManager decides whether a maintenance action can start
    * @param config gravitino server config for per-type minInterval fallbacks
-   * @param enqueueBatchSize max cron-jobs per expand pick
+   * @param scheduleBatchSize max cron-jobs per expand pick
    */
   public PolicyExpandPipeline(
       PolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
       MaintenanceActionManager actionManager,
       Config config,
-      int enqueueBatchSize) {
+      int scheduleBatchSize) {
     this(
         PolicyExpandPipeline::loadPolicy,
         tableEnumerator,
         cronJobClient,
         expandShouldSkip(actionManager, cronJobClient),
         config,
-        enqueueBatchSize);
+        scheduleBatchSize);
   }
 
   /**
@@ -88,7 +88,7 @@ public final class PolicyExpandPipeline {
    * @param cronJobClient writes cron-job rows
    * @param shouldSkip skip check while scanning tables
    * @param config gravitino server config for per-type minInterval fallbacks
-   * @param enqueueBatchSize max cron-jobs per expand pick
+   * @param scheduleBatchSize max cron-jobs per expand pick
    */
   PolicyExpandPipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
@@ -96,13 +96,13 @@ public final class PolicyExpandPipeline {
       CronJobClient cronJobClient,
       PolicyTableEnumerator.ShouldSkipTable shouldSkip,
       Config config,
-      int enqueueBatchSize) {
+      int scheduleBatchSize) {
     this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.tableEnumerator = tableEnumerator;
     this.cronJobClient = cronJobClient;
     this.shouldSkip = Preconditions.checkNotNull(shouldSkip);
     this.config = config;
-    this.enqueueBatchSize = enqueueBatchSize;
+    this.scheduleBatchSize = scheduleBatchSize;
   }
 
   /**
@@ -148,14 +148,14 @@ public final class PolicyExpandPipeline {
     long minIntervalMs =
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
-    List<ExpandTableCandidate> toEnqueue =
-        tableEnumerator.listTableIds(policy, enqueueBatchSize, shouldSkip, minIntervalMs);
-    int scheduled = cronJobClient.enqueueNow(policy, toEnqueue, enqueueBatchSize);
+    List<ExpandTableCandidate> toSchedule =
+        tableEnumerator.listTableIds(policy, scheduleBatchSize, shouldSkip, minIntervalMs);
+    int scheduled = cronJobClient.scheduleNow(policy, toSchedule, scheduleBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
         policyId,
         scheduled,
-        toEnqueue.size(),
+        toSchedule.size(),
         policy.policyType(),
         minIntervalMs,
         nextDue);

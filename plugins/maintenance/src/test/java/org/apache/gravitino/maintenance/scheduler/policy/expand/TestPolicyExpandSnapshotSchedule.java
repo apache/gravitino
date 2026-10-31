@@ -46,7 +46,7 @@ import org.junit.jupiter.api.TestTemplate;
  * Expand pipeline → real {@link CronJobClient}: snapshot-expiry coalesce across two policy expands
  * (same catalog).
  */
-class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
+class TestPolicyExpandSnapshotSchedule extends TestJDBCBackend {
 
   private static final String GRAVITINO_URI = "http://localhost:8090";
   private static final String CRON = "0 0 2 * * ?";

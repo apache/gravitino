@@ -88,7 +88,7 @@ public class CommitJobPlanner {
   /**
    * @param client commit-job scheduler client (used to see if a row already exists)
    * @param identifier {@code metalake.catalog.schema.table} from the commit event
-   * @return spec to schedule, or empty when there is nothing to enqueue
+   * @return spec to schedule, or empty when there is nothing to schedule
    */
   public Optional<MaintenanceJobSpec> plan(SchedulerClient client, NameIdentifier identifier) {
     if (identifier == null) {
@@ -142,7 +142,7 @@ public class CommitJobPlanner {
         Decision decision = nearest.resolve(metalake, tableObject, type);
         if (decision.kind() == Decision.Kind.CONFLICT) {
           LOG.error(
-              "Skip commit-job enqueue for table {}: ambiguous {} policies {} on nearest level",
+              "Skip commit-job schedule for table {}: ambiguous {} policies {} on nearest level",
               tableId,
               type,
               decision.conflictingPolicyIds());
@@ -170,7 +170,7 @@ public class CommitJobPlanner {
         chain.add(policy);
       }
       if (chain.isEmpty()) {
-        LOG.debug("Skipping commit-job enqueue for table {}: empty onCommit chain", tableId);
+        LOG.debug("Skipping commit-job schedule for table {}: empty onCommit chain", tableId);
         return Optional.empty();
       }
 
@@ -187,7 +187,7 @@ public class CommitJobPlanner {
                 gravitinoConfig, policy.policyType(), contentMinInterval);
         if (actionManager.isCoolingDown(tableId, policy.id(), minIntervalMs, nowMs)) {
           LOG.debug(
-              "Dropping type {} policy {} from commit-job enqueue for table {} (within minIntervalMs={})",
+              "Dropping type {} policy {} from commit-job schedule for table {} (within minIntervalMs={})",
               policy.policyType(),
               policy.id(),
               tableId,
@@ -198,7 +198,7 @@ public class CommitJobPlanner {
       }
       if (due.isEmpty()) {
         LOG.debug(
-            "Skipping commit-job enqueue for table {}: all onCommit types within minIntervalMs",
+            "Skipping commit-job schedule for table {}: all onCommit types within minIntervalMs",
             tableId);
         return Optional.empty();
       }
@@ -209,7 +209,7 @@ public class CommitJobPlanner {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());
       return Optional.empty();
     } catch (IllegalArgumentException e) {
-      LOG.error("Skipping commit-job enqueue for {}: {}", identifier, e.getMessage());
+      LOG.error("Skipping commit-job schedule for {}: {}", identifier, e.getMessage());
       return Optional.empty();
     } catch (RuntimeException e) {
       LOG.warn("Failed to plan commit-job for IRC update {}: {}", identifier, e.toString());

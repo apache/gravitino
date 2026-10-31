@@ -55,7 +55,7 @@ class TestCronJobClient extends TestJDBCBackend {
   private static final String GRAVITINO_URI = "http://localhost:8090";
 
   @TestTemplate
-  void testEnqueueIsIdempotentAndRespectsBatchSize() {
+  void testScheduleIsIdempotentAndRespectsBatchSize() {
     DataSource dataSource = dataSource();
     CronJobClient scheduler = scheduler(dataSource);
     PolicyEntity policy = compactionPolicy(7L);
@@ -65,10 +65,10 @@ class TestCronJobClient extends TestJDBCBackend {
             candidate(1L, MetadataObject.Type.TABLE),
             candidate(2L, MetadataObject.Type.TABLE),
             candidate(3L, MetadataObject.Type.TABLE));
-    Assertions.assertEquals(2, scheduler.enqueueNow(policy, three, 2));
+    Assertions.assertEquals(2, scheduler.scheduleNow(policy, three, 2));
     Assertions.assertEquals(
         0,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(1L, MetadataObject.Type.TABLE), candidate(2L, MetadataObject.Type.TABLE)),
@@ -119,7 +119,7 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
@@ -128,7 +128,7 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         0,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
@@ -161,10 +161,10 @@ class TestCronJobClient extends TestJDBCBackend {
     int cap = 10; // CronJobClient snapshot-expiry batch capacity
 
     List<ExpandTableCandidate> full = schemaCandidates(1, cap);
-    Assertions.assertEquals(1, scheduler.enqueueNow(policy, full, 100));
+    Assertions.assertEquals(1, scheduler.scheduleNow(policy, full, 100));
     List<ExpandTableCandidate> fullPlusOne = new ArrayList<>(full);
     fullPlusOne.add(candidate(cap + 1L, MetadataObject.Type.SCHEMA));
-    Assertions.assertEquals(1, scheduler.enqueueNow(policy, fullPlusOne, 100));
+    Assertions.assertEquals(1, scheduler.scheduleNow(policy, fullPlusOne, 100));
 
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     MaintenanceJobSpec batch0 =
@@ -196,7 +196,7 @@ class TestCronJobClient extends TestJDBCBackend {
     PolicyEntity policy = expirePolicy(9L);
 
     Assertions.assertEquals(
-        1, scheduler.enqueueNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
+        1, scheduler.scheduleNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
 
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId tableJob =
@@ -206,7 +206,7 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
@@ -233,14 +233,14 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
                 candidate(11L, MetadataObject.Type.SCHEMA)),
             10));
     Assertions.assertEquals(
-        0, scheduler.enqueueNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
+        0, scheduler.scheduleNow(policy, List.of(candidate(99L, MetadataObject.Type.TABLE)), 10));
 
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId tableJob =
@@ -262,11 +262,11 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicy(9L), List.of(candidate(21L, MetadataObject.Type.TABLE)), 10));
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicy(10L), List.of(candidate(22L, MetadataObject.Type.TABLE)), 10));
 
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
@@ -302,13 +302,13 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicyWithAuth(9L, Map.of("auth_type", "none")),
             List.of(candidate(21L, MetadataObject.Type.TABLE)),
             10));
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicyWithAuth(10L, Map.of("auth_type", "simple", "username", "u")),
             List.of(candidate(22L, MetadataObject.Type.TABLE)),
             10));
@@ -338,11 +338,11 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicy(9L), List.of(candidate(1L, MetadataObject.Type.TABLE)), 10));
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicy(9L), List.of(candidate(1001L, MetadataObject.Type.TABLE)), 10));
 
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
@@ -370,10 +370,10 @@ class TestCronJobClient extends TestJDBCBackend {
     int cap = 10; // CronJobClient snapshot-expiry batch capacity
 
     // Full batch at capacity — must not be claimed into a later incomplete peer.
-    Assertions.assertEquals(1, scheduler.enqueueNow(policy, schemaCandidates(1, cap), 100));
+    Assertions.assertEquals(1, scheduler.scheduleNow(policy, schemaCandidates(1, cap), 100));
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             policy,
             List.of(
                 candidate(100L, MetadataObject.Type.SCHEMA),
@@ -409,7 +409,7 @@ class TestCronJobClient extends TestJDBCBackend {
     CronJobClient scheduler = scheduler(dataSource);
     Assertions.assertEquals(
         1,
-        scheduler.enqueueNow(
+        scheduler.scheduleNow(
             expirePolicy(9L),
             List.of(
                 candidate(10L, MetadataObject.Type.SCHEMA),
@@ -423,10 +423,10 @@ class TestCronJobClient extends TestJDBCBackend {
   @TestTemplate
   void testCronJobTaskRemovesRowAfterPick() throws Exception {
     DataSource dataSource = dataSource();
-    CronJobClient enqueue = scheduler(dataSource);
+    CronJobClient cronJobs = scheduler(dataSource);
     Assertions.assertEquals(
         1,
-        enqueue.enqueueNow(
+        cronJobs.scheduleNow(
             compactionPolicy(9L), List.of(candidate(99L, MetadataObject.Type.TABLE)), 1));
 
     TaskInstanceId instanceId =
@@ -457,7 +457,7 @@ class TestCronJobClient extends TestJDBCBackend {
 
     Assertions.assertEquals(
         1,
-        enqueue.enqueueNow(
+        cronJobs.scheduleNow(
             compactionPolicy(9L), List.of(candidate(99L, MetadataObject.Type.TABLE)), 1));
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
   }

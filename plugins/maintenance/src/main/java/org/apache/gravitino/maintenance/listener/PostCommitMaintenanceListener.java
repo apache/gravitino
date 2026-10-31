@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Wakes commit maintenance after a successful IRC table update (§5.2.3): filters the event and
- * calls {@link CommitJobClient#enqueueNow}.
+ * calls {@link CommitJobClient#scheduleNow}.
  *
  * <p>Register with {@code gravitino.eventListener.names} / {@code .{name}.class}. Uses the event
  * class name (not a compile dependency on {@code iceberg-rest-server}) so TMS can load when IRC
@@ -91,6 +91,6 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
       LOG.debug("Ignoring IcebergUpdateTableEvent; commit-job client is not started");
       return;
     }
-    client.enqueueNow(postEvent.identifier());
+    client.scheduleNow(postEvent.identifier());
   }
 }

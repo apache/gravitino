@@ -23,7 +23,7 @@ import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
 
 /**
- * One enqueueable table after nearest-policy and occupancy gating, with the metadata level where
+ * One schedulable table after nearest-policy and occupancy gating, with the metadata level where
  * the winning policy was selected and the catalog / table names already known at expand time.
  */
 public final class ExpandTableCandidate {

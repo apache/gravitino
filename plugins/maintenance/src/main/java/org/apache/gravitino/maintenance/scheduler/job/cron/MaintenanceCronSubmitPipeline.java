@@ -36,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSpec} →
+ * Cron-pool control-plane submit (§5.2.2): consume schedule-time {@link MaintenanceJobSpec} →
  * occupancy gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * {@code policyId}. If any task is occupied, the whole pick stops without partial submits (one-shot
  * row is still removed by the caller).
  *
- * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
+ * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from schedule-time
  * {@code rules} in task parameters).
  */
 public final class MaintenanceCronSubmitPipeline {
@@ -59,10 +59,10 @@ public final class MaintenanceCronSubmitPipeline {
   private final long claimTimeoutMs;
 
   /**
-   * @param actionManager occupancy checks (minInterval already applied at enqueue)
+   * @param actionManager occupancy checks (minInterval already applied at schedule)
    * @param actionMetaService soft-slot claim
    * @param jobManager runJob + bind (and orphan cancel)
-   * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
+   * @param jobConfBuilder resolves schedule-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCronSubmitPipeline(
@@ -83,7 +83,7 @@ public final class MaintenanceCronSubmitPipeline {
    * Runs one cron-job pick for {@code instanceId}.
    *
    * @param instanceId db-scheduler cron-job instance id
-   * @param spec enqueue-time payload; required
+   * @param spec schedule-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
     if (spec == null || !spec.isValid()) {
@@ -123,7 +123,7 @@ public final class MaintenanceCronSubmitPipeline {
       }
     }
 
-    // minInterval was gated at expand enqueue; pick only blocks on occupied soft slots. Any
+    // minInterval was gated at expand schedule; pick only blocks on occupied soft slots. Any
     // occupied member aborts the whole pick so a batch row is not partially submitted then deleted.
     for (Task task : spec.getTasks()) {
       if (actionManager.isOccupied(task.getTableId(), task.getPolicyId())) {

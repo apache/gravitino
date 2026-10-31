@@ -55,7 +55,7 @@ import org.apache.gravitino.policy.PolicyExecutionSpec;
  * Dot-form Spark resource keys ({@code spark.executor.memory}) become the matching underscore
  * placeholders ({@code spark_executor_memory}) instead of catalog properties.
  *
- * <p>{@link #build} is for enqueue {@code task_data}: cluster {@code gravitinoAuth} / {@code
+ * <p>{@link #build} is for schedule {@code task_data}: cluster {@code gravitinoAuth} / {@code
  * ircAuth} are stored as conf <em>keys</em> (not secret values). Call {@link #resolveForSubmit}
  * immediately before {@code runJob} to expand those keys from the live {@code gravitino.conf}.
  */
@@ -126,7 +126,7 @@ public final class MaintenanceJobConfBuilder {
   }
 
   /**
-   * Enqueue-time jobConf for db-scheduler {@code task_data}. Cluster auth overlays store conf keys
+   * Schedule-time jobConf for db-scheduler {@code task_data}. Cluster auth overlays store conf keys
    * (for example {@code gravitino.maintenance.gravitinoAuth.uri}), not secret values.
    *
    * @param policy effective maintenance policy
@@ -196,7 +196,7 @@ public final class MaintenanceJobConfBuilder {
 
   /**
    * Re-derives flat template placeholders ({@code spark_executor_memory}, {@code catalog_type}, …)
-   * from nested {@code spark_conf}. Used when enqueue {@code task_data} stores only the nested
+   * from nested {@code spark_conf}. Used when schedule {@code task_data} stores only the nested
    * {@code spark_conf} JSON.
    *
    * @param jobConf mutable runJob map that already contains {@code spark_conf}
@@ -216,7 +216,7 @@ public final class MaintenanceJobConfBuilder {
 
   /**
    * Folds flat session placeholders ({@code spark_executor_memory}, {@code catalog_type}, …) into
-   * nested {@code spark_conf} so enqueue {@code task_data} can keep only that JSON at the top
+   * nested {@code spark_conf} so schedule {@code task_data} can keep only that JSON at the top
    * level.
    *
    * @param jobConf mutable map from {@link #build}
@@ -259,15 +259,15 @@ public final class MaintenanceJobConfBuilder {
   }
 
   /**
-   * Expands {@code gravitino.maintenance.*} conf-key references in an enqueue snapshot into live
+   * Expands {@code gravitino.maintenance.*} conf-key references in a schedule snapshot into live
    * values from {@code gravitino.conf}. Call immediately before {@code runJob}.
    *
-   * @param enqueueJobConf jobConf from {@link #build} / {@code task_data}
+   * @param scheduleJobConf jobConf from {@link #build} / {@code task_data}
    * @return new map with secrets and URIs resolved
    */
-  public Map<String, String> resolveForSubmit(Map<String, String> enqueueJobConf) {
+  public Map<String, String> resolveForSubmit(Map<String, String> scheduleJobConf) {
     Map<String, String> resolved = new LinkedHashMap<>();
-    for (Map.Entry<String, String> entry : enqueueJobConf.entrySet()) {
+    for (Map.Entry<String, String> entry : scheduleJobConf.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
       if (key == null || value == null) {

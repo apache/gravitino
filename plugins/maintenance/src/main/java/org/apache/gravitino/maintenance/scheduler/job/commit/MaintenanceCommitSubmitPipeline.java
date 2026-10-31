@@ -37,13 +37,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Commit-pool control-plane submit (§5.2.3): consume enqueue-time {@link MaintenanceJobSpec} →
+ * Commit-pool control-plane submit (§5.2.3): consume schedule-time {@link MaintenanceJobSpec} →
  * abort if any step still occupies the soft slot → soft-slot claim for every chain policy → {@link
  * MaintenanceJobManager#submitAndBind} for one chained Spark job.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
- * enqueue (see {@link CommitJobPlanner}). The caller always deletes the one-shot {@code commit-job}
- * row after this method returns.
+ * schedule (see {@link CommitJobPlanner}). The caller always deletes the one-shot {@code
+ * commit-job} row after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {
 
@@ -59,7 +59,7 @@ public final class MaintenanceCommitSubmitPipeline {
    * @param actionManager occupancy checks
    * @param actionMetaService soft-slot claim
    * @param jobManager runJob + bind (and orphan cancel)
-   * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
+   * @param jobConfBuilder resolves schedule-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCommitSubmitPipeline(
@@ -80,7 +80,7 @@ public final class MaintenanceCommitSubmitPipeline {
    * Runs one commit-job pick for {@code instanceId} ({@code table:{table_id}}).
    *
    * @param instanceId db-scheduler commit-job instance id
-   * @param spec enqueue-time payload; required
+   * @param spec schedule-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
     Optional<Long> parsed = MaintenanceTaskIds.parseCommitTable(instanceId);

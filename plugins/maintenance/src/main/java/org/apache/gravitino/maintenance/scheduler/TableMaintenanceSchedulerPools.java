@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
  * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows with an
- * enqueue-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
+ * schedule-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
  * soft slot, and submit Spark.
  */
 public class TableMaintenanceSchedulerPools implements AutoCloseable {
@@ -124,7 +124,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
             new CronJobClient(dataSource, gravitinoConfig),
             actionManager,
             gravitinoConfig,
-            config.expandEnqueueBatchSize());
+            config.expandScheduleBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
 
     MaintenanceCronSubmitPipeline cronSubmit =
@@ -238,7 +238,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Cron-pool task definition. Consumes the enqueue-time spec, claims a soft slot, submits Spark,
+   * Cron-pool task definition. Consumes the schedule-time spec, claims a soft slot, submits Spark,
    * then removes the one-shot row so a later expand pick can schedule again.
    *
    * @return the {@code cron-job} task
@@ -260,7 +260,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Commit-pool task definition. Consumes the enqueue-time chain spec, claims a soft slot, submits
+   * Commit-pool task definition. Consumes the schedule-time chain spec, claims a soft slot, submits
    * Spark, then removes the one-shot row.
    *
    * @return the {@code commit-job} task

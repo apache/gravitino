@@ -25,7 +25,7 @@ import java.util.function.BiConsumer;
  * Same-package test access to {@link TableMaintenanceSchedulerPools} submit handlers.
  *
  * <p>Keeps production pools free of {@code *ForTest} APIs while still allowing BaseITs to record
- * cron/commit enqueue without a real Spark {@code runJob}.
+ * cron/commit schedule without a real Spark {@code runJob}.
  */
 public final class SchedulerPoolTestHooks {
 

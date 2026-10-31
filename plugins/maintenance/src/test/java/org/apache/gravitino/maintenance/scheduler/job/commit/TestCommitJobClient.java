@@ -38,9 +38,9 @@ import org.junit.jupiter.api.TestTemplate;
 class TestCommitJobClient extends TestJDBCBackend {
 
   @TestTemplate
-  void testEnqueueSkipsWhenTableMissing() {
+  void testScheduleSkipsWhenTableMissing() {
     CommitJobClient client = new CommitJobClient(dataSource(), configWithUri());
-    client.enqueueNow(NameIdentifier.of("missing-ml", "c", "s", "t"));
+    client.scheduleNow(NameIdentifier.of("missing-ml", "c", "s", "t"));
     Assertions.assertTrue(
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecutionsForTask(TableMaintenanceSchedulerPools.COMMIT_JOB, Object.class)
@@ -48,10 +48,10 @@ class TestCommitJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testEnqueueSkipsWhenOnCommitChainEmpty() throws IOException {
+  void testScheduleSkipsWhenOnCommitChainEmpty() throws IOException {
     TableEntity table = insertTable("plan-ml", "iceberg", "db", "t");
     CommitJobClient client = new CommitJobClient(dataSource(), configWithUri());
-    client.enqueueNow(table.nameIdentifier());
+    client.scheduleNow(table.nameIdentifier());
     Assertions.assertTrue(
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(

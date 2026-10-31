@@ -32,7 +32,7 @@ import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandi
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * Submits one-shot {@code cron-job} rows to db-scheduler. Enqueue planning is {@link
+ * Submits one-shot {@code cron-job} rows to db-scheduler. Schedule planning is {@link
  * CronJobPlanner}.
  */
 public class CronJobClient {
@@ -53,11 +53,11 @@ public class CronJobClient {
    * Plans and submits due-now cron jobs for the given expand candidates.
    *
    * @param policy effective maintenance policy
-   * @param candidates enqueueable tables with winner levels
+   * @param candidates schedulable tables with winner levels
    * @param batchCapacity max candidates considered for non-snapshot types
    * @return number of newly inserted cron-job rows
    */
-  public int enqueueNow(
+  public int scheduleNow(
       PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
     return planner.plan(
         schedulerClient(dataSource), policy, candidates, batchCapacity, Instant.now());

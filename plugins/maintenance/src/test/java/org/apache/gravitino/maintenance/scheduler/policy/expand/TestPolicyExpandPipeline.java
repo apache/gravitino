@@ -57,7 +57,7 @@ class TestPolicyExpandPipeline {
         pipeline(id -> Optional.empty(), mock(PolicyTableEnumerator.class), cronJobs, allowAll());
 
     Assertions.assertTrue(pipeline.expand(1L).isEmpty());
-    verify(cronJobs, never()).enqueueNow(any(), any(), anyInt());
+    verify(cronJobs, never()).scheduleNow(any(), any(), anyInt());
   }
 
   @Test
@@ -71,7 +71,7 @@ class TestPolicyExpandPipeline {
             allowAll());
 
     Assertions.assertTrue(pipeline.expand(2L).isEmpty());
-    verify(cronJobs, never()).enqueueNow(any(), any(), anyInt());
+    verify(cronJobs, never()).scheduleNow(any(), any(), anyInt());
   }
 
   @Test
@@ -85,11 +85,11 @@ class TestPolicyExpandPipeline {
             allowAll());
 
     Assertions.assertTrue(pipeline.expand(3L).isEmpty());
-    verify(cronJobs, never()).enqueueNow(any(), any(), anyInt());
+    verify(cronJobs, never()).scheduleNow(any(), any(), anyInt());
   }
 
   @Test
-  void testInvalidTimeTriggerRemovesExpandRowWithoutEnqueue() {
+  void testInvalidTimeTriggerRemovesExpandRowWithoutSchedule() {
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     CronJobClient cronJobs = mock(CronJobClient.class);
     PolicyExpandPipeline pipeline =
@@ -97,11 +97,11 @@ class TestPolicyExpandPipeline {
 
     Assertions.assertTrue(pipeline.expand(4L).isEmpty());
     verify(tables, never()).listTableIds(any(), anyInt(), any(), anyLong());
-    verify(cronJobs, never()).enqueueNow(any(), any(), anyInt());
+    verify(cronJobs, never()).scheduleNow(any(), any(), anyInt());
   }
 
   @Test
-  void testExpandEnqueuesCronJobsAndReturnsNextDue() {
+  void testExpandSchedulesCronJobsAndReturnsNextDue() {
     PolicyEntity policy = policy(true, CRON, null);
     ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
@@ -112,14 +112,14 @@ class TestPolicyExpandPipeline {
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L), c(11L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
-    when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(10L), c(11L))), eq(2))).thenReturn(2);
+    when(cronJobs.scheduleNow(eq(policy), eq(List.of(c(10L), c(11L))), eq(2))).thenReturn(2);
     PolicyExpandPipeline expandPipeline =
         pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 2);
 
     Optional<Instant> next = expandPipeline.expand(42L);
     Assertions.assertTrue(next.isPresent());
     Assertions.assertTrue(next.get().isAfter(Instant.now().minusSeconds(1)));
-    verify(cronJobs).enqueueNow(policy, List.of(c(10L), c(11L)), 2);
+    verify(cronJobs).scheduleNow(policy, List.of(c(10L), c(11L)), 2);
   }
 
   @Test
@@ -130,13 +130,13 @@ class TestPolicyExpandPipeline {
     when(tables.listTableIds(eq(policy), eq(10), eq(shouldSkip), eq(60_000L)))
         .thenReturn(List.of(c(11L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
-    when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(11L))), eq(10))).thenReturn(1);
+    when(cronJobs.scheduleNow(eq(policy), eq(List.of(c(11L))), eq(10))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline =
         pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
     verify(tables).listTableIds(eq(policy), eq(10), eq(shouldSkip), eq(60_000L));
-    verify(cronJobs).enqueueNow(policy, List.of(c(11L)), 10);
+    verify(cronJobs).scheduleNow(policy, List.of(c(11L)), 10);
   }
 
   @Test
@@ -151,7 +151,7 @@ class TestPolicyExpandPipeline {
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
-    when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(10L))), eq(10))).thenReturn(1);
+    when(cronJobs.scheduleNow(eq(policy), eq(List.of(c(10L))), eq(10))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline =
         pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 10);
@@ -165,7 +165,7 @@ class TestPolicyExpandPipeline {
   }
 
   @Test
-  void testSnapshotExpiryExpandEnqueuesWithBatchCapacity() {
+  void testSnapshotExpiryExpandSchedulesWithBatchCapacity() {
     PolicyEntity policy = expirePolicy(true, CRON);
     ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
@@ -180,12 +180,12 @@ class TestPolicyExpandPipeline {
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(candidates);
     CronJobClient cronJobs = mock(CronJobClient.class);
-    when(cronJobs.enqueueNow(eq(policy), eq(candidates), eq(5))).thenReturn(1);
+    when(cronJobs.scheduleNow(eq(policy), eq(candidates), eq(5))).thenReturn(1);
 
     PolicyExpandPipeline expandPipeline =
         pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 5);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
-    verify(cronJobs).enqueueNow(policy, candidates, 5);
+    verify(cronJobs).scheduleNow(policy, candidates, 5);
   }
 
   private static PolicyExpandPipeline pipeline(

@@ -63,11 +63,11 @@ import org.junit.jupiter.api.Test;
 /**
  * Boots Gravitino with {@link TableMaintenanceRESTFeature} and {@link
  * PostCommitMaintenanceListener}, then dispatches an IRC table-update event and asserts commit-job
- * enqueue.
+ * schedule.
  *
  * <p>Embedded mode only (same-JVM EventBus / MetaService). Run with {@code -PskipITs} omitted.
  */
-public class IrcToCommitEnqueueIT extends BaseIT {
+public class IrcToCommitScheduleIT extends BaseIT {
 
   private static final String LISTENER_NAME = "tmsIrc";
 
@@ -113,7 +113,7 @@ public class IrcToCommitEnqueueIT extends BaseIT {
   }
 
   @Test
-  void testIrcUpdateEventEnqueuesCommitJob() throws Exception {
+  void testIrcUpdateEventSchedulesCommitJob() throws Exception {
     assumeTrue(
         ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
         "Asserts commit submit capture in the same JVM as the EventBus listener");
@@ -172,6 +172,6 @@ public class IrcToCommitEnqueueIT extends BaseIT {
     assertEquals(
         expectedInstanceId,
         CAPTURED_COMMIT_ID.get(),
-        "IRC listener did not enqueue expected commit-job within " + timeoutSeconds + "s");
+        "IRC listener did not schedule expected commit-job within " + timeoutSeconds + "s");
   }
 }

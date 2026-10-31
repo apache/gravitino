@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
- * picks this policy and {@link PolicyTableEnumerator.ShouldSkipTable} allows enqueue. Stops after
+ * picks this policy and {@link PolicyTableEnumerator.ShouldSkipTable} allows schedule. Stops after
  * {@code limit} accepted tables (skipped cooldown / in-flight tables do not count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
@@ -225,7 +225,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     switch (objectType) {
       case TABLE:
         if (taggedObject.id() != null) {
-          tryEnqueueTable(taggedObject.id(), metadataObject, scan);
+          tryScheduleTable(taggedObject.id(), metadataObject, scan);
         }
         break;
       case SCHEMA:
@@ -356,7 +356,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           if (!importTableIfMissing(tableIdent, storedTables)) {
             continue;
           }
-          tryEnqueueTable(
+          tryScheduleTable(
               storedTables.get(tableIdent.name()).id(),
               NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE),
               scan);
@@ -383,7 +383,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       if (scan.batchFull()) {
         return;
       }
-      tryEnqueueTable(
+      tryScheduleTable(
           table.id(),
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE),
           scan);
@@ -490,9 +490,9 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
 
   /**
    * Accepts {@code tableId} into the batch when this policy is the nearest winner and occupancy
-   * allows enqueue.
+   * allows schedule.
    */
-  private static void tryEnqueueTable(long tableId, MetadataObject tableObject, ScanState scan) {
+  private static void tryScheduleTable(long tableId, MetadataObject tableObject, ScanState scan) {
     if (tableId <= 0 || !scan.visitedTableIds.add(tableId)) {
       return;
     }
@@ -518,7 +518,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     }
     if (scan.shouldSkip.shouldSkip(tableId, scan.policyId, scan.minIntervalMs, scan.nowMs)) {
       LOG.debug(
-          "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
+          "Skip cron-job schedule for table {} policy {} (in-flight or within minIntervalMs={})",
           tableId,
           scan.policyId,
           scan.minIntervalMs);
