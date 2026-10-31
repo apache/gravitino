@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.function.BiConsumer;
 
 /**
- * Same-package test access to {@link TableMaintenanceSchedulerPools} submit handlers.
+ * Same-package test access to {@link MaintenanceSchedulerPools} submit handlers.
  *
  * <p>Keeps production pools free of {@code *ForTest} APIs while still allowing BaseITs to record
  * cron/commit schedule without a real Spark {@code runJob}.
@@ -37,7 +37,7 @@ public final class SchedulerPoolTestHooks {
    * @param submitHandler handler used by the cron pool task
    */
   public static void installCronSubmit(BiConsumer<String, MaintenanceJobSpec> submitHandler) {
-    TableMaintenanceSchedulerPools.CRON_SUBMIT.set(Preconditions.checkNotNull(submitHandler));
+    MaintenanceSchedulerPools.CRON_SUBMIT.set(Preconditions.checkNotNull(submitHandler));
   }
 
   /**
@@ -46,6 +46,6 @@ public final class SchedulerPoolTestHooks {
    * @param submitHandler handler used by the commit pool task
    */
   public static void installCommitSubmit(BiConsumer<String, MaintenanceJobSpec> submitHandler) {
-    TableMaintenanceSchedulerPools.COMMIT_SUBMIT.set(Preconditions.checkNotNull(submitHandler));
+    MaintenanceSchedulerPools.COMMIT_SUBMIT.set(Preconditions.checkNotNull(submitHandler));
   }
 }

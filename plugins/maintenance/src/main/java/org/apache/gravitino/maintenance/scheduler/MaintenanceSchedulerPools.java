@@ -41,8 +41,8 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.MaintenanceExpandSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPipeline;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,9 +58,9 @@ import org.slf4j.LoggerFactory;
  * schedule-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
  * soft slot, and submit Spark.
  */
-public class TableMaintenanceSchedulerPools implements AutoCloseable {
+public class MaintenanceSchedulerPools implements AutoCloseable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TableMaintenanceSchedulerPools.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSchedulerPools.class);
 
   /** Expand-pool db-scheduler table. */
   public static final String EXPAND_TASKS_TABLE = "scheduled_expand_tasks";
@@ -84,7 +84,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    * Expand pipeline supplier used by {@link #policyExpandTask()}. {@link #start} installs the
    * relational implementation.
    */
-  private static final AtomicReference<Supplier<PolicyExpandPipeline>> EXPAND_PIPELINE =
+  private static final AtomicReference<Supplier<MaintenanceExpandSubmitPipeline>> EXPAND_PIPELINE =
       new AtomicReference<>(
           () -> {
             throw new IllegalStateException("policy-expand pipeline is not configured");
@@ -118,8 +118,8 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     MaintenanceActionManager actionManager =
         new MaintenanceActionManager(
             TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
-    PolicyExpandPipeline pipeline =
-        new PolicyExpandPipeline(
+    MaintenanceExpandSubmitPipeline pipeline =
+        new MaintenanceExpandSubmitPipeline(
             new NearestPolicyTableEnumerator(),
             new CronJobClient(dataSource, gravitinoConfig),
             actionManager,

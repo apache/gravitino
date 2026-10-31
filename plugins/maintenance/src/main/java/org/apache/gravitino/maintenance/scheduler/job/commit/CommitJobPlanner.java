@@ -36,9 +36,9 @@ import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestMaintenancePolicyResolver;
@@ -100,7 +100,7 @@ public class CommitJobPlanner {
       String instanceId = MaintenanceTaskIds.forCommitTable(tableId);
       if (client
           .getScheduledExecution(
-              TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, instanceId))
+              TaskInstanceId.of(MaintenanceSchedulerPools.COMMIT_JOB, instanceId))
           .isPresent()) {
         LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
         return Optional.empty();

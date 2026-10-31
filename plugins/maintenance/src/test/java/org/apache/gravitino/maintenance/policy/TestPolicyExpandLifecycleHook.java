@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -41,8 +42,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testEnabledMaintenancePolicyIsScheduled() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(42L, true, compaction(CRON))));
@@ -52,8 +53,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testDisabledMaintenancePolicyRemovesTheRow() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(7L, true, compaction(CRON))));
@@ -65,8 +66,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testNonMaintenancePolicyRemovesAnyStrayRow() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
     PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
@@ -80,8 +81,8 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
 
   @TestTemplate
   void testDeleteRemovesByPolicyId() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(11L, true, CRON));

@@ -35,9 +35,9 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -70,22 +70,19 @@ class TestCronJobClient extends TestJDBCBackend {
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronTable(1L, 7L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(1L, 7L)))
             .isPresent());
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronTable(2L, 7L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(2L, 7L)))
             .isPresent());
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronTable(3L, 7L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(3L, 7L)))
             .isEmpty());
 
     MaintenanceJobSpec spec =
@@ -93,7 +90,7 @@ class TestCronJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceSchedulerPools.CRON_JOB,
                         MaintenanceTaskIds.forCronTable(1L, 7L)))
                 .get()
                 .getData();
@@ -126,10 +123,10 @@ class TestCronJobClient extends TestJDBCBackend {
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId batch0 =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
     TaskInstanceId batch1 =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(1L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(1L, 9L));
     Assertions.assertTrue(client.getScheduledExecution(batch0).isPresent());
     Assertions.assertTrue(client.getScheduledExecution(batch1).isEmpty());
     MaintenanceJobSpec data =
@@ -158,7 +155,7 @@ class TestCronJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceSchedulerPools.CRON_JOB,
                         MaintenanceTaskIds.forCronBatch(0L, 9L)))
                 .get()
                 .getData();
@@ -167,7 +164,7 @@ class TestCronJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceSchedulerPools.CRON_JOB,
                         MaintenanceTaskIds.forCronBatch(1L, 9L)))
                 .get()
                 .getData();
@@ -186,7 +183,7 @@ class TestCronJobClient extends TestJDBCBackend {
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId batch0 =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
     Assertions.assertTrue(client.getScheduledExecution(batch0).isPresent());
 
     Assertions.assertEquals(
@@ -212,7 +209,7 @@ class TestCronJobClient extends TestJDBCBackend {
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId batch0 =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
     MaintenanceJobSpec data =
         (MaintenanceJobSpec) client.getScheduledExecution(batch0).get().getData();
     Assertions.assertEquals(List.of(10L, 11L, 99L), data.tableIds());
@@ -233,7 +230,7 @@ class TestCronJobClient extends TestJDBCBackend {
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     TaskInstanceId batch0 =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L));
     Assertions.assertTrue(client.getScheduledExecution(batch0).isPresent());
     MaintenanceJobSpec data =
         (MaintenanceJobSpec) client.getScheduledExecution(batch0).get().getData();
@@ -260,16 +257,14 @@ class TestCronJobClient extends TestJDBCBackend {
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronBatch(0L, 9L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L)))
             .isPresent(),
         "auth-mismatched peer must not be cancelled");
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronBatch(0L, 10L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 10L)))
             .isPresent());
   }
 
@@ -288,15 +283,13 @@ class TestCronJobClient extends TestJDBCBackend {
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronBatch(0L, 9L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 9L)))
             .isPresent());
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronBatch(1L, 9L)))
+                    MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(1L, 9L)))
             .isPresent());
   }
 
@@ -321,7 +314,7 @@ class TestCronJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceSchedulerPools.CRON_JOB,
                         MaintenanceTaskIds.forCronBatch(0L, 9L)))
                 .get()
                 .getData();
@@ -330,7 +323,7 @@ class TestCronJobClient extends TestJDBCBackend {
             client
                 .getScheduledExecution(
                     TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.CRON_JOB,
+                        MaintenanceSchedulerPools.CRON_JOB,
                         MaintenanceTaskIds.forCronBatch(1L, 9L)))
                 .get()
                 .getData();
@@ -362,16 +355,16 @@ class TestCronJobClient extends TestJDBCBackend {
 
     TaskInstanceId instanceId =
         TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(99L, 9L));
+            MaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(99L, 9L));
     SchedulerClient client = CronJobClient.schedulerClient(dataSource);
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
 
     Scheduler cronPool =
-        Scheduler.create(dataSource, TableMaintenanceSchedulerPools.cronJobTask())
+        Scheduler.create(dataSource, MaintenanceSchedulerPools.cronJobTask())
             .threads(1)
             .pollingInterval(Duration.ofMillis(100))
             .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
-            .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
+            .tableName(MaintenanceSchedulerPools.CRON_TASKS_TABLE)
             .commitWhenAutocommitDisabled(true)
             .build();
     cronPool.start();

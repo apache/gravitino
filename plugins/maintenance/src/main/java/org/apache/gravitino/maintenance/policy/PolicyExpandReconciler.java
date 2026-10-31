@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.policy;
 
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -50,17 +51,16 @@ public final class PolicyExpandReconciler {
   private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandReconciler.class);
 
   private final PolicyExpandLifecycleHook aligner;
-  private final PolicyExpandRegistrar registrar;
+  private final PolicyExpandClient registrar;
   private final MetalakeMetaService metalakeMetaService;
   private final PolicyMetaService policyMetaService;
 
   /**
    * @param aligner same expand rules as the lifecycle hook
    * @param registrar writer used for orphan cleanup; both must use {@link
-   *     PolicyExpandRegistrar#joiningCurrentTransaction()}
+   *     PolicyExpandClient#joiningCurrentTransaction()}
    */
-  public PolicyExpandReconciler(
-      PolicyExpandLifecycleHook aligner, PolicyExpandRegistrar registrar) {
+  public PolicyExpandReconciler(PolicyExpandLifecycleHook aligner, PolicyExpandClient registrar) {
     this(aligner, registrar, MetalakeMetaService.getInstance(), PolicyMetaService.getInstance());
   }
 
@@ -72,7 +72,7 @@ public final class PolicyExpandReconciler {
    */
   public PolicyExpandReconciler(
       PolicyExpandLifecycleHook aligner,
-      PolicyExpandRegistrar registrar,
+      PolicyExpandClient registrar,
       MetalakeMetaService metalakeMetaService,
       PolicyMetaService policyMetaService) {
     this.aligner = aligner;

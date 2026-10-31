@@ -39,12 +39,12 @@ import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.integration.test.MaintenanceSchedulerITSupport.SeededTable;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
@@ -124,12 +124,12 @@ public class PolicyExpandToCronIT extends BaseIT {
 
     DataSource ds = dataSource();
     assertTrue(
-        PolicyExpandRegistrar.forReads(ds).scheduledExecutionTime(seeded.policyId).isPresent(),
+        PolicyExpandClient.forReads(ds).scheduledExecutionTime(seeded.policyId).isPresent(),
         "createPolicy should register a policy-expand row via PolicyExpandLifecycleHook");
 
     // Force the expand lease overdue so the live expand pool picks it (production next fire is
     // tomorrow 02:00 for TIME_TRIGGER).
-    PolicyExpandRegistrar.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
+    PolicyExpandClient.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
 
     awaitCronCapture(MaintenanceTaskIds.forCronTable(seeded.tableId, seeded.policyId), 30L);
 

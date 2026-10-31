@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import javax.sql.DataSource;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -66,10 +67,10 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     PolicyMetaService.getInstance().insertPolicy(policy, false);
 
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
     Assertions.assertTrue(reader.scheduledExecutionTime(policy.id()).isEmpty());
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
     PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
     int aligned =
         new PolicyExpandReconciler(
@@ -98,8 +99,8 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
     // db-scheduler / JDBC timestamps are microsecond precision; truncate so round-trip equals.
     Instant overdue = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.MICROS);
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(policy.id(), overdue));
     Assertions.assertEquals(overdue, reader.scheduledExecutionTime(policy.id()).orElseThrow());
 
@@ -127,8 +128,8 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
             .build();
     PolicyMetaService.getInstance().insertPolicy(policy, false);
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     SessionUtils.doMultipleWithCommit(() -> writer.sync(policy.id(), true, LATER_CRON));
     Instant staleDue = reader.scheduledExecutionTime(policy.id()).orElseThrow();
 
@@ -162,9 +163,9 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
     Mockito.when(policies.listPoliciesByNamespace(NamespaceUtil.ofPolicy("ml")))
         .thenReturn(List.of(bad));
 
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
     SessionUtils.doMultipleWithCommit(() -> writer.sync(7L, true, CRON));
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
 
     PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(writer);
@@ -175,9 +176,9 @@ class TestPolicyExpandReconciler extends TestJDBCBackend {
 
   @TestTemplate
   void testReconcileRemovesOrphanExpandRow() {
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
     SessionUtils.doMultipleWithCommit(() -> writer.sync(99L, true, CRON));
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(entityStoreDataSource());
+    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     Assertions.assertTrue(reader.scheduledExecutionTime(99L).isPresent());
 
     MetalakeMetaService metalakes = Mockito.mock(MetalakeMetaService.class);

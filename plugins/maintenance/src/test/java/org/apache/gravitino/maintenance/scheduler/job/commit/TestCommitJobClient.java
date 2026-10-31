@@ -26,8 +26,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -43,7 +43,7 @@ class TestCommitJobClient extends TestJDBCBackend {
     client.scheduleNow(NameIdentifier.of("missing-ml", "c", "s", "t"));
     Assertions.assertTrue(
         CommitJobClient.schedulerClient(dataSource())
-            .getScheduledExecutionsForTask(TableMaintenanceSchedulerPools.COMMIT_JOB, Object.class)
+            .getScheduledExecutionsForTask(MaintenanceSchedulerPools.COMMIT_JOB, Object.class)
             .isEmpty());
   }
 
@@ -56,7 +56,7 @@ class TestCommitJobClient extends TestJDBCBackend {
         CommitJobClient.schedulerClient(dataSource())
             .getScheduledExecution(
                 TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.COMMIT_JOB,
+                    MaintenanceSchedulerPools.COMMIT_JOB,
                     MaintenanceTaskIds.forCommitTable(table.id())))
             .isEmpty());
   }

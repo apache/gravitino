@@ -27,8 +27,8 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
@@ -79,9 +79,9 @@ public class CronJobClient {
    */
   public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(
-            AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.cronJobTask())
+            AutocommitDataSources.wrap(dataSource), MaintenanceSchedulerPools.cronJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
-        .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
+        .tableName(MaintenanceSchedulerPools.CRON_TASKS_TABLE)
         .build();
   }
 }

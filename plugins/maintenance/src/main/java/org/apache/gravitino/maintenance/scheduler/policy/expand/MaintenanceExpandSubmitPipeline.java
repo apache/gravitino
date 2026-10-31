@@ -44,17 +44,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Expands a due {@code policy-expand} lease into one-shot {@code cron-job} rows (§5.2.1).
+ * Expand-pool pick handler (§5.2.1), parallel to {@code MaintenanceCronSubmitPipeline} / {@code
+ * MaintenanceCommitSubmitPipeline}: consume a due {@code policy-expand} lease, schedule {@code
+ * cron-job} rows, return the next expand due time (or empty to delete the lease).
  *
- * <p>Does not submit Spark. Returns the next expand due time, or empty when the expand row should
- * be removed (missing / disabled / blank trigger / non-maintenance).
- *
- * <p>Enumeration fills up to {@code scheduleBatchSize} tables that pass nearest-policy and can
- * start (not occupied / cooling) and are not already covered by a queued cron-job.
+ * <p>Does not submit Spark. Enumeration fills up to {@code scheduleBatchSize} tables that pass
+ * nearest-policy and can start (not occupied / cooling) and are not already covered by a queued
+ * cron-job.
  */
-public final class PolicyExpandPipeline {
+public final class MaintenanceExpandSubmitPipeline {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandPipeline.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceExpandSubmitPipeline.class);
   private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
 
   private final NearestPolicyTableEnumerator tableEnumerator;
@@ -72,7 +72,7 @@ public final class PolicyExpandPipeline {
    * @param config gravitino server config for per-type minInterval fallbacks
    * @param scheduleBatchSize max cron-jobs per expand pick
    */
-  public PolicyExpandPipeline(
+  public MaintenanceExpandSubmitPipeline(
       NearestPolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
       MaintenanceActionManager actionManager,

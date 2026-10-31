@@ -28,9 +28,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestTableMaintenanceSchedulerPools extends TestJDBCBackend {
+class TestMaintenanceSchedulerPools extends TestJDBCBackend {
 
-  private TableMaintenanceSchedulerPools pools;
+  private MaintenanceSchedulerPools pools;
 
   @AfterEach
   void tearDown() {
@@ -47,7 +47,7 @@ class TestTableMaintenanceSchedulerPools extends TestJDBCBackend {
             .getConfiguration()
             .getEnvironment()
             .getDataSource();
-    pools = new TableMaintenanceSchedulerPools();
+    pools = new MaintenanceSchedulerPools();
     Config gravitinoConfig = new Config(false) {};
     Assertions.assertDoesNotThrow(
         () ->

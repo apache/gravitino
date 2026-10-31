@@ -30,8 +30,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +75,7 @@ public class CommitJobClient {
     String id = MaintenanceTaskIds.forCommitTable(tableId);
     try {
       if (scheduler.scheduleIfNotExists(
-          new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
+          new TaskInstance<>(MaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
           Instant.now())) {
         LOG.info("Scheduled commit-job for table {} ({})", tableId, identifier);
       } else {
@@ -92,9 +92,9 @@ public class CommitJobClient {
    */
   public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(
-            AutocommitDataSources.wrap(dataSource), TableMaintenanceSchedulerPools.commitJobTask())
+            AutocommitDataSources.wrap(dataSource), MaintenanceSchedulerPools.commitJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
-        .tableName(TableMaintenanceSchedulerPools.COMMIT_TASKS_TABLE)
+        .tableName(MaintenanceSchedulerPools.COMMIT_TASKS_TABLE)
         .build();
   }
 }

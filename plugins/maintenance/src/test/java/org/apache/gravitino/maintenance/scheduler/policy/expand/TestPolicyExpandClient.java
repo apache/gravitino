@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.policy;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
-import com.github.kagkarlsson.scheduler.SchedulerClient;
-import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestPolicyExpandRegistrar extends TestJDBCBackend {
+class TestPolicyExpandClient extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
   private static final String LATER_CRON = "0 30 4 * * ?";
@@ -41,8 +39,8 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   @TestTemplate
   void testSyncInsertsReschedulesAndRemovesTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
     Instant firstDue = executionTime(reader, 42L);
@@ -65,8 +63,8 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   @TestTemplate
   void testFailedTransactionRollsBackTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalStateException.class,
@@ -83,8 +81,8 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   @TestTemplate
   void testInvalidCronFailsBeforeAnExpandRowIsWritten() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -94,41 +92,22 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testRunningPoolsRemoveExpandRowForMissingPolicy() throws Exception {
-    Instant overdue = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MICROS);
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
+  void testExpandSubmitReturnsEmptyForMissingPolicy() {
     DataSource dataSource = entityStoreDataSource();
-    SessionUtils.doMultipleWithCommit(() -> writer.scheduleAt(11L, overdue));
-
-    SchedulerClient client =
-        SchedulerClient.Builder.create(
-                dataSource, TableMaintenanceSchedulerPools.policyExpandTask())
-            .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
-            .build();
-    TaskInstanceId instanceId =
-        TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, "policy:11");
-    Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
-
-    TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
     Config gravitinoConfig = new Config(false) {};
     gravitinoConfig.loadFromMap(
         Map.of(
             MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
             "http://localhost:8090"),
         k -> true);
-    pools.start(
-        dataSource, TableMaintenanceConfig.forTest(1, 1, 1, 100L, 1_000L, 4, 10), gravitinoConfig);
-    try {
-      long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-      while (client.getScheduledExecution(instanceId).isPresent()) {
-        Assertions.assertTrue(
-            System.nanoTime() < deadline,
-            "expand row for missing policy should be removed after pick");
-        Thread.sleep(100L);
-      }
-    } finally {
-      pools.stop();
-    }
+    MaintenanceExpandSubmitPipeline pipeline =
+        new MaintenanceExpandSubmitPipeline(
+            new NearestPolicyTableEnumerator(),
+            new CronJobClient(dataSource, gravitinoConfig),
+            new MaintenanceActionManager(),
+            gravitinoConfig,
+            10);
+    Assertions.assertTrue(pipeline.expand(11L).isEmpty());
   }
 
   private static DataSource entityStoreDataSource() {
@@ -139,7 +118,7 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
         .getDataSource();
   }
 
-  private static Instant executionTime(PolicyExpandRegistrar registrar, long policyId) {
+  private static Instant executionTime(PolicyExpandClient registrar, long policyId) {
     return registrar
         .scheduledExecutionTime(policyId)
         .orElseThrow(() -> new AssertionError("missing expand row " + policyId));

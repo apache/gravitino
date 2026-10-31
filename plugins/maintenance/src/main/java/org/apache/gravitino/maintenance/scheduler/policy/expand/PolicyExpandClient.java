@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.policy;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.exceptions.TaskInstanceCurrentlyExecutingException;
@@ -42,18 +42,18 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Registers {@code policy-expand} tasks in {@link
- * TableMaintenanceSchedulerPools#EXPAND_TASKS_TABLE} through a db-scheduler client.
+ * Expand-pool counterpart of {@code CronJobClient} / {@code CommitJobClient}: writes {@code
+ * policy-expand} lease rows into {@link MaintenanceSchedulerPools#EXPAND_TASKS_TABLE}.
  *
  * <p>The instance id is the policy id. A blank {@code timeTrigger}, or a disabled policy, removes
- * the row. Handlers that fan the row out into cron jobs are out of scope here.
+ * the row. Fan-out into {@code cron-job} rows is {@link MaintenanceExpandSubmitPipeline} on pick.
  *
  * <p>{@code timeTrigger} is a six-field Quartz cron. This class decides whether the expression has
  * a next fire time; policy content does not parse cron itself.
@@ -62,9 +62,9 @@ import org.slf4j.LoggerFactory;
  * not commit or close that connection, so the policy transaction and the expand row commit
  * together.
  */
-public final class PolicyExpandRegistrar {
+public final class PolicyExpandClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandRegistrar.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandClient.class);
 
   /** Attempts while a pick still owns the expand row. */
   private static final int EXECUTING_ATTEMPTS = 10;
@@ -74,7 +74,7 @@ public final class PolicyExpandRegistrar {
 
   private final DataSource dataSource;
 
-  private PolicyExpandRegistrar(DataSource dataSource) {
+  private PolicyExpandClient(DataSource dataSource) {
     this.dataSource = dataSource;
   }
 
@@ -87,8 +87,8 @@ public final class PolicyExpandRegistrar {
    *
    * @return registrar that inserts, moves, and deletes expand rows in the caller's transaction
    */
-  public static PolicyExpandRegistrar joiningCurrentTransaction() {
-    return new PolicyExpandRegistrar(new SessionDataSource());
+  public static PolicyExpandClient joiningCurrentTransaction() {
+    return new PolicyExpandClient(new SessionDataSource());
   }
 
   /**
@@ -102,14 +102,13 @@ public final class PolicyExpandRegistrar {
    * @return registrar that can read (and test-write) expand rows after the policy transaction
    *     commits
    */
-  public static PolicyExpandRegistrar forReads(DataSource dataSource) {
-    return new PolicyExpandRegistrar(AutocommitDataSources.wrap(dataSource));
+  public static PolicyExpandClient forReads(DataSource dataSource) {
+    return new PolicyExpandClient(AutocommitDataSources.wrap(dataSource));
   }
 
   private SchedulerClient client() {
-    return SchedulerClient.Builder.create(
-            dataSource, TableMaintenanceSchedulerPools.policyExpandTask())
-        .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
+    return SchedulerClient.Builder.create(dataSource, MaintenanceSchedulerPools.policyExpandTask())
+        .tableName(MaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
         .build();
   }
 
@@ -164,11 +163,11 @@ public final class PolicyExpandRegistrar {
   /**
    * @return policy ids that currently have a {@code policy-expand} row
    */
-  Set<Long> scheduledPolicyIds() {
+  public Set<Long> scheduledPolicyIds() {
     Set<Long> ids = new HashSet<>();
     client()
         .fetchScheduledExecutionsForTask(
-            TableMaintenanceSchedulerPools.POLICY_EXPAND,
+            MaintenanceSchedulerPools.POLICY_EXPAND,
             Void.class,
             execution -> {
               MaintenanceTaskIds.parseExpandPolicy(execution.getTaskInstance().getId())
@@ -183,7 +182,7 @@ public final class PolicyExpandRegistrar {
    * @param timeTrigger six-field Quartz cron expression
    * @return next execution instant in the system default zone
    */
-  static Instant nextExecution(String timeTrigger) {
+  public static Instant nextExecution(String timeTrigger) {
     CronSchedule schedule = new CronSchedule(timeTrigger, ZoneId.systemDefault(), CronStyle.QUARTZ);
     Instant next = schedule.getNextExecutionTime(ExecutionComplete.simulatedSuccess(Instant.now()));
     if (next == null || Schedule.NEVER.equals(next)) {
@@ -194,7 +193,7 @@ public final class PolicyExpandRegistrar {
 
   private static TaskInstanceId instanceId(long policyId) {
     return TaskInstanceId.of(
-        TableMaintenanceSchedulerPools.POLICY_EXPAND, MaintenanceTaskIds.forExpandPolicy(policyId));
+        MaintenanceSchedulerPools.POLICY_EXPAND, MaintenanceTaskIds.forExpandPolicy(policyId));
   }
 
   private void scheduleOnce(long policyId, Instant due) {
@@ -202,8 +201,7 @@ public final class PolicyExpandRegistrar {
     boolean scheduled =
         client()
             .schedule(
-                new TaskInstance<>(
-                    TableMaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
+                new TaskInstance<>(MaintenanceSchedulerPools.POLICY_EXPAND, instanceId.getId()),
                 due,
                 SchedulerClient.ScheduleOptions.WHEN_EXISTS_RESCHEDULE);
     if (!scheduled) {
