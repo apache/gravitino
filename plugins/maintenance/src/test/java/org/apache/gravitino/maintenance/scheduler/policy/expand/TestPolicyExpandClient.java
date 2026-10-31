@@ -25,6 +25,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -92,7 +93,7 @@ class TestPolicyExpandClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testExpandSubmitReturnsEmptyForMissingPolicy() {
+  void testExpandPlannerReturnsEmptyForMissingPolicy() {
     DataSource dataSource = entityStoreDataSource();
     Config gravitinoConfig = new Config(false) {};
     gravitinoConfig.loadFromMap(
@@ -100,14 +101,14 @@ class TestPolicyExpandClient extends TestJDBCBackend {
             MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
             "http://localhost:8090"),
         k -> true);
-    MaintenanceExpandSubmitPipeline pipeline =
-        new MaintenanceExpandSubmitPipeline(
+    PolicyExpandPlanner planner =
+        new PolicyExpandPlanner(
             new NearestPolicyTableEnumerator(),
             new CronJobClient(dataSource, gravitinoConfig),
             new MaintenanceActionManager(),
             gravitinoConfig,
             10);
-    Assertions.assertTrue(pipeline.expand(11L).isEmpty());
+    Assertions.assertTrue(planner.plan(11L).isEmpty());
   }
 
   private static DataSource entityStoreDataSource() {

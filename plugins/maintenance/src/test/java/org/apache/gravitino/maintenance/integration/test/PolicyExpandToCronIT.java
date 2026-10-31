@@ -43,7 +43,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
 import org.apache.gravitino.maintenance.scheduler.TableCandidate;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.gravitino.meta.PolicyEntity;

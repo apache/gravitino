@@ -41,8 +41,9 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.MaintenanceExpandSubmitPipeline;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPlanner;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,11 +121,12 @@ public class MaintenanceSchedulerPools implements AutoCloseable {
             TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
     MaintenanceExpandSubmitPipeline pipeline =
         new MaintenanceExpandSubmitPipeline(
-            new NearestPolicyTableEnumerator(),
-            new CronJobClient(dataSource, gravitinoConfig),
-            actionManager,
-            gravitinoConfig,
-            config.expandScheduleBatchSize());
+            new PolicyExpandPlanner(
+                new NearestPolicyTableEnumerator(),
+                new CronJobClient(dataSource, gravitinoConfig),
+                actionManager,
+                gravitinoConfig,
+                config.expandScheduleBatchSize()));
     EXPAND_PIPELINE.set(() -> pipeline);
 
     MaintenanceCronSubmitPipeline cronSubmit =

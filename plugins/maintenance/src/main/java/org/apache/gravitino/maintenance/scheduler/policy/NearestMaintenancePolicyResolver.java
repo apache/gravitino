@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.policy.expand;
+package org.apache.gravitino.maintenance.scheduler.policy;
 
 import java.util.ArrayList;
 import java.util.List;

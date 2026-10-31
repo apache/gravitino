@@ -53,7 +53,8 @@ import org.slf4j.LoggerFactory;
  * policy-expand} lease rows into {@link MaintenanceSchedulerPools#EXPAND_TASKS_TABLE}.
  *
  * <p>The instance id is the policy id. A blank {@code timeTrigger}, or a disabled policy, removes
- * the row. Fan-out into {@code cron-job} rows is {@link MaintenanceExpandSubmitPipeline} on pick.
+ * the row. Fan-out into {@code cron-job} rows is {@link PolicyExpandPlanner} on pick (via {@link
+ * MaintenanceExpandSubmitPipeline}).
  *
  * <p>{@code timeTrigger} is a six-field Quartz cron. This class decides whether the expression has
  * a next fire time; policy content does not parse cron itself.
