@@ -26,13 +26,6 @@ import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.github.kagkarlsson.scheduler.task.schedule.CronSchedule;
 import com.github.kagkarlsson.scheduler.task.schedule.CronStyle;
 import com.github.kagkarlsson.scheduler.task.schedule.Schedule;
-import java.io.PrintWriter;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -43,7 +36,6 @@ import javax.sql.DataSource;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,7 +80,7 @@ public final class PolicyExpandClient {
    * @return registrar that inserts, moves, and deletes expand rows in the caller's transaction
    */
   public static PolicyExpandClient joiningCurrentTransaction() {
-    return new PolicyExpandClient(new SessionDataSource());
+    return new PolicyExpandClient(AutocommitDataSources.joiningCurrentSession());
   }
 
   /**
@@ -246,81 +238,6 @@ public final class PolicyExpandClient {
           throw e;
         }
       }
-    }
-  }
-
-  /**
-   * Hands db-scheduler the connection of the open SQL session. {@code close}, {@code commit}, and
-   * {@code rollback} are ignored so the session owner commits the expand row with the policy.
-   */
-  private static final class SessionDataSource implements DataSource {
-
-    @Override
-    public Connection getConnection() throws SQLException {
-      return nonClosing(SqlSessions.currentConnection());
-    }
-
-    @Override
-    public Connection getConnection(String username, String password) throws SQLException {
-      return getConnection();
-    }
-
-    @Override
-    public PrintWriter getLogWriter() {
-      return null;
-    }
-
-    @Override
-    public void setLogWriter(PrintWriter out) {}
-
-    @Override
-    public void setLoginTimeout(int seconds) {}
-
-    @Override
-    public int getLoginTimeout() {
-      return 0;
-    }
-
-    @Override
-    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-      throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-      if (iface.isInstance(this)) {
-        return iface.cast(this);
-      }
-      throw new SQLException("Not a wrapper of " + iface.getName());
-    }
-
-    @Override
-    public boolean isWrapperFor(Class<?> iface) {
-      return iface.isInstance(this);
-    }
-
-    private static Connection nonClosing(Connection connection) {
-      InvocationHandler handler =
-          (proxy, method, args) -> {
-            String name = method.getName();
-            if ("close".equals(name) || "commit".equals(name) || "rollback".equals(name)) {
-              return null;
-            }
-            if ("setAutoCommit".equals(name)) {
-              return null;
-            }
-            if ("getAutoCommit".equals(name)) {
-              return false;
-            }
-            try {
-              return method.invoke(connection, args);
-            } catch (InvocationTargetException e) {
-              throw e.getCause();
-            }
-          };
-      return (Connection)
-          Proxy.newProxyInstance(
-              Connection.class.getClassLoader(), new Class<?>[] {Connection.class}, handler);
     }
   }
 }
