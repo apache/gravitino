@@ -941,7 +941,14 @@ subprojects {
             artifact(javadocJar)
           }
 
-          artifactId = "${rootProject.name.lowercase()}-${project.name}"
+          // Internal Web and integration-test project names repeat beneath different parents.
+          val publicationName =
+            if (project.name in listOf("web", "integration-test")) {
+              project.path.removePrefix(":").replace(':', '-')
+            } else {
+              project.name
+            }
+          artifactId = "${rootProject.name.lowercase()}-$publicationName"
 
           pom {
             name.set("Gravitino")

@@ -132,6 +132,50 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+The Python client uses `DefaultOAuth2TokenProvider` with the existing client credentials flow:
+
+```python
+import os
+from gravitino import GravitinoClient
+from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+
+provider = DefaultOAuth2TokenProvider(
+    uri="https://oauth.example.com",
+    credential=os.environ["GRAVITINO_OAUTH_CREDENTIAL"],
+    scope="test",
+    path="oauth/token",
+)
+client = GravitinoClient(
+    uri="https://gravitino.example.com",
+    metalake_name="metalake",
+    auth_data_provider=provider,
+)
+try:
+    metalake = client.load_metalake("metalake")
+finally:
+    client.close()
+```
+
+The provider obtains its first token during construction. It uses the earlier of a usable
+token-response `expires_in` deadline and JWT `exp`, falling back to either when the other is
+missing or invalid. Relative lifetime is estimated from response receipt; JWT expiry also
+bounds reuse when available. Tokens with no usable expiry, a non-positive lifetime, or an
+already-expired numeric expiry are rejected. JWT payload decoding only schedules renewal;
+the server remains responsible for validation and supported token formats.
+
+Renewal happens synchronously on the first call within `min(30 seconds, 10% of the remaining
+lifetime at receipt)` of expiry. This margin allows short-lived tokens to be reused and
+reduces expiry during transport, without guaranteeing validity when a request reaches the
+server. An instance lock permits only one active acquisition per shared provider; after a
+successful renewal, waiting callers reuse the new token. This does not make the entire
+client thread-safe or coordinate separate providers or processes.
+
+Acquisition failures are reported without returning the old token or automatically replaying
+the metadata request. Existing validation and OAuth exception categories are retained; new
+expiry failures raise `GravitinoRuntimeException`. A later call can retry acquisition, so
+concurrent callers may make sequential attempts after failure. Renewal obtains another
+access token using client credentials; it does not use a refresh-token grant.
+
 ### Kerberos Mode
 
 To enable Kerberos mode, users must ensure that the server and client have the correct Kerberos configuration. On the server side, users should set `gravitino.authenticators` as `kerberos` and give
