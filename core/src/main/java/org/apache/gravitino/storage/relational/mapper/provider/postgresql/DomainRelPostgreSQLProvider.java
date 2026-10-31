@@ -32,7 +32,10 @@ public class DomainRelPostgreSQLProvider extends DomainRelBaseSQLProvider {
     return "UPDATE "
         + DOMAIN_REL_TABLE_NAME
         + " SET deleted_at = "
+        + "GREATEST("
         + DatabaseTimeSQL.POSTGRESQL
+        + ", (SELECT COALESCE(last_deleted_at, 0) + 1 FROM"
+        + " (SELECT MAX(deleted_at) AS last_deleted_at FROM domain_rel WHERE child_id = #{childId}) legacy))"
         + " WHERE child_id = #{childId} AND deleted_at = 0";
   }
 
@@ -41,7 +44,10 @@ public class DomainRelPostgreSQLProvider extends DomainRelBaseSQLProvider {
     return "UPDATE "
         + DOMAIN_REL_TABLE_NAME
         + " SET deleted_at = "
+        + "GREATEST("
         + DatabaseTimeSQL.POSTGRESQL
+        + ", (SELECT COALESCE(last_deleted_at, 0) + 1 FROM"
+        + " (SELECT MAX(deleted_at) AS last_deleted_at FROM domain_rel WHERE metalake_id = #{metalakeId}) legacy))"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

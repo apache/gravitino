@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.po.DomainRelPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Options.FlushCachePolicy;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
@@ -38,6 +40,7 @@ public interface DomainRelMapper {
    * @param childId The ID of the domain.
    * @return The edge, or null if the domain is top-level.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainRelSQLProviderFactory.class, method = "selectDomainRelByChildId")
   DomainRelPO selectDomainRelByChildId(@Param("childId") Long childId);
 
@@ -47,6 +50,7 @@ public interface DomainRelMapper {
    * @param childIds The IDs of the domains.
    * @return The edges of the domains that have a parent.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainRelSQLProviderFactory.class, method = "listDomainRelsByChildIds")
   List<DomainRelPO> listDomainRelsByChildIds(@Param("childIds") List<Long> childIds);
 
@@ -56,6 +60,7 @@ public interface DomainRelMapper {
    * @param parentId The ID of the parent domain.
    * @return The number of active edges to the domain.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainRelSQLProviderFactory.class, method = "countDomainRelsByParentId")
   int countDomainRelsByParentId(@Param("parentId") Long parentId);
 

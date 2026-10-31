@@ -22,12 +22,19 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Options.FlushCachePolicy;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** MyBatis mapper of the {@code domain_meta} table. */
+/**
+ * MyBatis mapper of the {@code domain_meta} table.
+ *
+ * <p>Reads flush the session cache so that a lookup performed after taking a domain lock observes
+ * committed state even when an enclosing transaction previously read the same row or edge.
+ */
 public interface DomainMetaMapper {
 
   /** The name of the domain table. */
@@ -39,6 +46,7 @@ public interface DomainMetaMapper {
    * @param domainId The domain ID.
    * @return The number of deleted rows with this ID.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @Select(
       "SELECT COUNT(*) FROM "
           + DOMAIN_TABLE_NAME
@@ -51,6 +59,7 @@ public interface DomainMetaMapper {
    * @param metalakeName The metalake name.
    * @return The active domains.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "listDomainPOsByMetalake")
   List<DomainPO> listDomainPOsByMetalake(@Param("metalakeName") String metalakeName);
 
@@ -61,6 +70,7 @@ public interface DomainMetaMapper {
    * @param domainName The domain name.
    * @return The domain, or null if it is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "selectDomainMetaByMetalakeAndName")
@@ -75,6 +85,7 @@ public interface DomainMetaMapper {
    * @param domainName The domain name.
    * @return The domain, or null if it is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "selectDomainMetaByMetalakeIdAndName")
@@ -89,6 +100,7 @@ public interface DomainMetaMapper {
    * @param domainName The domain name.
    * @return The locked domain, or null if the natural key is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "selectDomainMetaByMetalakeIdAndNameForUpdate")
@@ -101,6 +113,7 @@ public interface DomainMetaMapper {
    * @param domainId The domain ID.
    * @return The domain, or null if it is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "selectDomainMetaById")
   DomainPO selectDomainMetaById(@Param("domainId") Long domainId);
 
@@ -111,6 +124,7 @@ public interface DomainMetaMapper {
    * @param domainId The domain ID.
    * @return The locked domain, or null if it is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "selectDomainMetaByIdForUpdate")
@@ -123,6 +137,7 @@ public interface DomainMetaMapper {
    * @param domainId The domain ID.
    * @return The locked domain, or null if it is not active.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "selectDomainMetaByIdForShare")
@@ -135,6 +150,7 @@ public interface DomainMetaMapper {
    * @param domainIds The domain IDs.
    * @return The active domains.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "listDomainPOsByDomainIds")
   List<DomainPO> listDomainPOsByDomainIds(@Param("domainIds") List<Long> domainIds);
 
@@ -145,6 +161,7 @@ public interface DomainMetaMapper {
    * @param domainNames The domain names.
    * @return The active domains.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(
       type = DomainMetaSQLProviderFactory.class,
       method = "listDomainPOsByMetalakeAndDomainNames")
@@ -157,6 +174,7 @@ public interface DomainMetaMapper {
    * @param parentId The ID of the parent domain.
    * @return The active sub-domains.
    */
+  @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
   @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "listDomainPOsByParentId")
   List<DomainPO> listDomainPOsByParentId(@Param("parentId") Long parentId);
 

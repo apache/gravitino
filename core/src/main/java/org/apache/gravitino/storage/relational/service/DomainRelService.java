@@ -128,7 +128,7 @@ public class DomainRelService {
         SessionUtils.getWithoutCommit(
             DomainMetaMapper.class, mapper -> mapper.listDomainPOsByParentId(parentPO.domainId()));
     return subDomainPOs.stream()
-        .map(po -> DomainPO.fromDomainPO(po, parentIdent.namespace(), parentPO.domainName()))
+        .map(po -> DomainPO.fromDomainPO(po, parentIdent.namespace()))
         .collect(Collectors.toList());
   }
 
@@ -246,7 +246,7 @@ public class DomainRelService {
   }
 
   /**
-   * Removes the edges of a domain that is being deleted, in the caller's transaction. The caller
+   * Checks that a domain being deleted has no sub-domains, in the caller's transaction. The caller
    * must hold the exclusive lock on the domain row, so no sub-domain can be attached to it
    * meanwhile.
    *
@@ -258,7 +258,7 @@ public class DomainRelService {
    * @param domainId The domain ID.
    * @throws NonEmptyEntityException If the domain has sub-domains.
    */
-  void deleteDomainRelsOfDeletedDomain(NameIdentifier identifier, long domainId) {
+  void checkDomainHasNoSubDomains(NameIdentifier identifier, long domainId) {
     int subDomainCount =
         SessionUtils.getWithoutCommit(
             DomainRelMapper.class, mapper -> mapper.countDomainRelsByParentId(domainId));
@@ -266,7 +266,6 @@ public class DomainRelService {
       throw new NonEmptyEntityException(
           "The domain %s has %d sub-domain(s), remove them first", identifier, subDomainCount);
     }
-    softDeleteDomainRel(domainId);
   }
 
   private void lockMetalakeAndDomains(

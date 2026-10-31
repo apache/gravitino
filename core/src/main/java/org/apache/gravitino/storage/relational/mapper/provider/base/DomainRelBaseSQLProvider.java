@@ -139,11 +139,17 @@ public class DomainRelBaseSQLProvider {
    * @param childId The ID of the domain.
    * @return The SQL.
    */
+  // Advance beyond existing tombstones as well as database time: PostgreSQL timestamps stay
+  // constant within a transaction, and millisecond clocks can collide on every backend. The
+  // aggregate derived table also prevents MySQL from merging a read of the UPDATE target.
   public String softDeleteDomainRelByChildId(@Param("childId") Long childId) {
     return "UPDATE "
         + DOMAIN_REL_TABLE_NAME
         + " SET deleted_at = "
+        + "GREATEST("
         + DatabaseTimeSQL.MYSQL
+        + ", (SELECT COALESCE(last_deleted_at, 0) + 1 FROM"
+        + " (SELECT MAX(deleted_at) AS last_deleted_at FROM domain_rel WHERE child_id = #{childId}) legacy))"
         + " WHERE child_id = #{childId} AND deleted_at = 0";
   }
 
@@ -157,7 +163,10 @@ public class DomainRelBaseSQLProvider {
     return "UPDATE "
         + DOMAIN_REL_TABLE_NAME
         + " SET deleted_at = "
+        + "GREATEST("
         + DatabaseTimeSQL.MYSQL
+        + ", (SELECT COALESCE(last_deleted_at, 0) + 1 FROM"
+        + " (SELECT MAX(deleted_at) AS last_deleted_at FROM domain_rel WHERE metalake_id = #{metalakeId}) legacy))"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

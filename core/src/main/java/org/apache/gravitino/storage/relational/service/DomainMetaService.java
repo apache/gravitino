@@ -207,7 +207,7 @@ public class DomainMetaService {
 
     try {
       DomainPO observedDomainPO = getDomainPOByMetalakeAndName(metalakeName, identifier.name());
-      DomainPO[] storedDomainPO = new DomainPO[1];
+      DomainEntity[] storedDomain = new DomainEntity[1];
       SessionUtils.doWithCommit(
           DomainMetaMapper.class,
           mapper -> {
@@ -233,10 +233,12 @@ public class DomainMetaService {
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
             updateDomainWithVersion(identifier, mapper, lockedDomainPO, newDomainPO);
-            storedDomainPO[0] = mapper.selectDomainMetaById(lockedDomainPO.domainId());
+            storedDomain[0] =
+                DomainPO.fromDomainPO(
+                    mapper.selectDomainMetaById(lockedDomainPO.domainId()), identifier.namespace());
           });
 
-      return fromDomainPOWithParent(storedDomainPO[0], identifier.namespace());
+      return storedDomain[0];
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, identifier.toString());
       throw e;
@@ -341,9 +343,14 @@ public class DomainMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
-          () -> deleteDomainWithVersion(identifier, lockAndGetDomainPO(identifier, domainPO)),
+          () -> {
+            DomainPO lockedDomainPO = lockAndGetDomainPO(identifier, domainPO);
+            DomainRelService.getInstance().checkDomainHasNoSubDomains(identifier, domainId);
+            deleteDomainWithVersion(identifier, lockedDomainPO);
+          },
           () ->
-              DomainRelService.getInstance().deleteDomainRelsOfDeletedDomain(identifier, domainId),
+              SessionUtils.doWithoutCommit(
+                  DomainRelMapper.class, mapper -> mapper.softDeleteDomainRelByChildId(domainId)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -508,16 +515,13 @@ public class DomainMetaService {
   }
 
   private DomainEntity fromDomainPOWithParent(DomainPO domainPO, Namespace namespace) {
-    return DomainPO.fromDomainPO(
-        domainPO,
-        namespace,
-        DomainRelService.getInstance().getParentDomainName(domainPO.domainId()).orElse(null));
+    return DomainPO.fromDomainPO(domainPO, namespace);
   }
 
   private List<DomainEntity> fromDomainPOsWithParents(
       List<DomainPO> domainPOs, Namespace namespace) {
-    List<Long> domainIds = domainPOs.stream().map(DomainPO::domainId).collect(Collectors.toList());
-    return DomainPO.fromDomainPOs(
-        domainPOs, namespace, DomainRelService.getInstance().batchGetParentDomainNames(domainIds));
+    return domainPOs.stream()
+        .map(po -> DomainPO.fromDomainPO(po, namespace))
+        .collect(Collectors.toList());
   }
 }

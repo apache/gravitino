@@ -61,6 +61,7 @@ public class DomainPO {
   private String status;
   private Long backingTagId;
   private String backingTagName;
+  private String parentName;
   private String backingTagValue;
   private String properties;
   private String auditInfo;
@@ -136,16 +137,15 @@ public class DomainPO {
   }
 
   /**
-   * Converts a domain persistent object to a top-level domain entity. The parent is not stored in
-   * the domain row, so it is not set. The backing tag name is set only when the read joined the
-   * live tag.
+   * Converts a domain persistent object to a domain entity. Parent and backing tag names are
+   * populated by reads that join their live rows.
    *
    * @param domainPO The domain persistent object.
    * @param namespace The namespace of the domain.
    * @return The domain entity.
    */
   public static DomainEntity fromDomainPO(DomainPO domainPO, Namespace namespace) {
-    return fromDomainPO(domainPO, namespace, null);
+    return fromDomainPO(domainPO, namespace, domainPO.parentName());
   }
 
   /**

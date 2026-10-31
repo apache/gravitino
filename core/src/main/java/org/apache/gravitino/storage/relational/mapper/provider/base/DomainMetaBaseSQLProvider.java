@@ -48,13 +48,15 @@ public class DomainMetaBaseSQLProvider {
   // Locking reads do not join: they must lock the domain row only, and PostgreSQL rejects FOR
   // UPDATE on the nullable side of an outer join.
   private static final String DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME =
-      DOMAIN_COLUMNS + ", bt.tag_name as backingTagName";
+      DOMAIN_COLUMNS + ", bt.tag_name as backingTagName, pd.domain_name as parentName";
 
   private static final String BACKING_TAG_JOIN =
       " LEFT JOIN "
           + TagMetaMapper.TAG_TABLE_NAME
           + " bt ON dm.backing_tag_id = bt.tag_id AND dm.metalake_id = bt.metalake_id"
-          + " AND bt.deleted_at = 0";
+          + " AND bt.deleted_at = 0"
+          + " LEFT JOIN domain_rel pr ON dm.domain_id = pr.child_id AND pr.deleted_at = 0"
+          + " LEFT JOIN domain_meta pd ON pr.parent_id = pd.domain_id AND pd.deleted_at = 0";
 
   /**
    * Returns SQL that lists the active domains of a metalake.

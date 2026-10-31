@@ -26,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -52,6 +55,15 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.exceptions.PersistenceException;
+import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
+import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -464,6 +476,337 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertFalse(backend.exists(finance.nameIdentifier(), Entity.EntityType.DOMAIN));
     Assertions.assertNull(selectDomainRel(trading.id()));
     Assertions.assertEquals(0, countDomainRelRows(trading.id()));
+  }
+
+  @TestTemplate
+  public void testCaughtNonEmptyDeleteDoesNotMutateParent() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity parent = insertDomain(METALAKE_NAME, "Parent");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    insertDomainRel(child, parent);
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            Assertions.assertThrows(
+                NonEmptyEntityException.class,
+                () -> domainMetaService.deleteDomain(parent.nameIdentifier())),
+        () -> {
+          try {
+            domainMetaService.updateDomain(
+                child.nameIdentifier(),
+                entity -> ((DomainEntity) entity).toBuilder().withComment("changed").build());
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
+    Assertions.assertTrue(backend.exists(parent.nameIdentifier(), Entity.EntityType.DOMAIN));
+    Assertions.assertEquals(
+        "Parent", domainRelService.getParentDomainName(child.id()).orElse(null));
+    Assertions.assertEquals(
+        "changed", domainMetaService.getDomainByIdentifier(child.nameIdentifier()).comment());
+  }
+
+  @TestTemplate
+  public void testRepeatedDetachWithinTransaction() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity parent = insertDomain(METALAKE_NAME, "Parent");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          try {
+            for (int i = 0; i < 3; i++) {
+              insertDomainRel(child, parent);
+              Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+            }
+            insertDomainRel(child, parent);
+            Assertions.assertTrue(domainMetaService.deleteDomain(child.nameIdentifier()));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
+    Assertions.assertEquals(4, countDomainRelRows(child.id()));
+    Assertions.assertNull(selectDomainRel(child.id()));
+  }
+
+  @TestTemplate
+  public void testLockedUpdateReadsPastCachedParent() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity first = insertDomain(METALAKE_NAME, "First");
+    DomainEntity second = insertDomain(METALAKE_NAME, "Second");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    insertDomainRel(child, first);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertEquals(
+          "First",
+          domainMetaService.getDomainByIdentifier(child.nameIdentifier()).parent().orElse(null));
+      Assertions.assertEquals(
+          "First", domainRelService.getParentDomainName(child.id()).orElse(null));
+      executor
+          .submit(
+              () -> {
+                try {
+                  domainRelService.updateDomainRel(
+                      child.nameIdentifier(), second.nameIdentifier(), AUDIT_INFO);
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
+                }
+              })
+          .get(30, TimeUnit.SECONDS);
+      Assertions.assertEquals(
+          "Second", domainRelService.getParentDomainName(child.id()).orElse(null));
+      domainMetaService.updateDomain(
+          child.nameIdentifier(),
+          entity -> {
+            DomainEntity domain = (DomainEntity) entity;
+            Assertions.assertEquals("Second", domain.parent().orElse(null));
+            return entity;
+          });
+      SessionUtils.commitTransaction();
+    } finally {
+      if (SessionUtils.isInTransaction()) {
+        SessionUtils.rollbackTransaction();
+      }
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testResponseReadFailureRollsBackUpdate() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    installReadProbe();
+    AtomicBoolean written = new AtomicBoolean();
+    ReadProbe.AFTER_WRITE.set(
+        id -> {
+          if (id.endsWith(".updateDomainMeta")) {
+            written.set(true);
+          }
+        });
+    ReadProbe.BEFORE_READ.set(
+        id -> {
+          if (written.get()) {
+            throw new IllegalStateException("response read failed");
+          }
+        });
+    try {
+      Assertions.assertThrows(
+          PersistenceException.class,
+          () ->
+              domainMetaService.updateDomain(
+                  child.nameIdentifier(),
+                  entity ->
+                      ((DomainEntity) entity).toBuilder().withComment("must roll back").build()));
+    } finally {
+      ReadProbe.clear();
+    }
+    Assertions.assertTrue(written.get());
+    Assertions.assertNull(
+        domainMetaService.getDomainByIdentifier(child.nameIdentifier()).comment());
+  }
+
+  @TestTemplate
+  public void testReadPathsKeepMetadataAndParentTogether() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity first = insertDomain(METALAKE_NAME, "First");
+    DomainEntity second = insertDomain(METALAKE_NAME, "Second");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    insertDomainRel(child, first);
+    installReadProbe();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      for (String path : new String[] {"get", "list", "batch", "subdomains"}) {
+        domainRelService.updateDomainRel(
+            child.nameIdentifier(), first.nameIdentifier(), AUDIT_INFO);
+        domainMetaService.updateDomain(first.nameIdentifier(), entity -> entity);
+        domainMetaService.updateDomain(
+            child.nameIdentifier(),
+            entity -> ((DomainEntity) entity).toBuilder().withComment("old").build());
+        AtomicBoolean triggered = new AtomicBoolean();
+        String method =
+            path.equals("get")
+                ? "selectDomainMetaByMetalakeAndName"
+                : path.equals("list")
+                    ? "listDomainPOsByMetalake"
+                    : path.equals("batch")
+                        ? "listDomainPOsByMetalakeAndDomainNames"
+                        : "listDomainPOsByParentId";
+        ReadProbe.AFTER_READ.set(
+            id -> {
+              if (id.endsWith("." + method) && triggered.compareAndSet(false, true)) {
+                try {
+                  executor
+                      .submit(
+                          () ->
+                              SessionUtils.doMultipleWithCommit(
+                                  () -> {
+                                    try {
+                                      domainMetaService.updateDomain(
+                                          child.nameIdentifier(),
+                                          entity ->
+                                              ((DomainEntity) entity)
+                                                  .toBuilder().withComment("new").build());
+                                      domainRelService.updateDomainRel(
+                                          child.nameIdentifier(),
+                                          second.nameIdentifier(),
+                                          AUDIT_INFO);
+                                    } catch (IOException e) {
+                                      throw new RuntimeException(e);
+                                    }
+                                  }))
+                      .get(30, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+            });
+        DomainEntity read;
+        try {
+          if (path.equals("get")) {
+            read = domainMetaService.getDomainByIdentifier(child.nameIdentifier());
+          } else {
+            List<DomainEntity> domains =
+                path.equals("list")
+                    ? domainMetaService.listDomainsByNamespace(child.namespace())
+                    : path.equals("batch")
+                        ? domainMetaService.batchGetDomainByIdentifier(
+                            Collections.singletonList(child.nameIdentifier()))
+                        : domainRelService.listSubDomains(first.nameIdentifier());
+            read = domains.stream().filter(d -> d.id().equals(child.id())).findFirst().get();
+          }
+        } finally {
+          ReadProbe.clear();
+        }
+        Assertions.assertTrue(triggered.get(), path);
+        Assertions.assertEquals("old", read.comment(), path);
+        Assertions.assertEquals("First", read.parent().orElse(null), path);
+      }
+    } finally {
+      ReadProbe.clear();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testSubDomainReadUsesCurrentParentName() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity parent = insertDomain(METALAKE_NAME, "Parent");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    insertDomainRel(child, parent);
+    installReadProbe();
+    AtomicBoolean triggered = new AtomicBoolean();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    ReadProbe.AFTER_READ.set(
+        id -> {
+          if (id.endsWith(".selectDomainMetaByMetalakeAndName")
+              && triggered.compareAndSet(false, true)) {
+            try {
+              executor
+                  .submit(
+                      () ->
+                          SessionUtils.doMultipleWithCommit(
+                              () -> {
+                                try {
+                                  domainMetaService.updateDomain(
+                                      parent.nameIdentifier(),
+                                      entity ->
+                                          ((DomainEntity) entity)
+                                              .toBuilder().withName("Renamed").build());
+                                  domainMetaService.updateDomain(
+                                      child.nameIdentifier(),
+                                      entity ->
+                                          ((DomainEntity) entity)
+                                              .toBuilder().withComment("new").build());
+                                } catch (IOException e) {
+                                  throw new RuntimeException(e);
+                                }
+                              }))
+                  .get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          }
+        });
+    try {
+      DomainEntity read = domainRelService.listSubDomains(parent.nameIdentifier()).get(0);
+      Assertions.assertTrue(triggered.get());
+      Assertions.assertEquals("new", read.comment());
+      Assertions.assertEquals("Renamed", read.parent().orElse(null));
+    } finally {
+      ReadProbe.clear();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testRepeatedDetachThenMetalakeDelete() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity parent = insertDomain(METALAKE_NAME, "Parent");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          insertDomainRel(child, parent);
+          try {
+            Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          insertDomainRel(child, parent);
+          Assertions.assertTrue(
+              MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+        });
+    Assertions.assertEquals(2, countDomainRelRows(child.id()));
+    Assertions.assertNull(selectDomainRel(child.id()));
+  }
+
+  private void installReadProbe() {
+    var configuration =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
+    if (configuration.getInterceptors().stream().noneMatch(i -> i instanceof ReadProbe)) {
+      configuration.addInterceptor(new ReadProbe());
+    }
+  }
+
+  /** Injects controlled interleavings and failures without changing production mapper code. */
+  @Intercepts({
+    @Signature(
+        type = Executor.class,
+        method = "query",
+        args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}),
+    @Signature(
+        type = Executor.class,
+        method = "update",
+        args = {MappedStatement.class, Object.class})
+  })
+  public static class ReadProbe implements Interceptor {
+    private static final ThreadLocal<Consumer<String>> BEFORE_READ = new ThreadLocal<>();
+    private static final ThreadLocal<Consumer<String>> AFTER_READ = new ThreadLocal<>();
+    private static final ThreadLocal<Consumer<String>> AFTER_WRITE = new ThreadLocal<>();
+
+    /** Creates an inactive probe. */
+    public ReadProbe() {}
+
+    /** {@inheritDoc} */
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+      String id = ((MappedStatement) invocation.getArgs()[0]).getId();
+      boolean read = invocation.getMethod().getName().equals("query");
+      if (read && BEFORE_READ.get() != null) {
+        BEFORE_READ.get().accept(id);
+      }
+      Object result = invocation.proceed();
+      Consumer<String> after = read ? AFTER_READ.get() : AFTER_WRITE.get();
+      if (after != null) {
+        after.accept(id);
+      }
+      return result;
+    }
+
+    private static void clear() {
+      BEFORE_READ.remove();
+      AFTER_READ.remove();
+      AFTER_WRITE.remove();
+    }
   }
 
   private DomainEntity insertDomain(String metalake, String name) throws IOException {
