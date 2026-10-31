@@ -23,6 +23,7 @@ import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.google.common.base.Preconditions;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,8 +33,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
+import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -50,7 +54,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Plans schedule-time {@code cron-job} work: builds specs for non-snapshot policies, and for
  * snapshot-expiry merges same-catalog rows under a fixed batch capacity (claim-first {@code cancel}
- * then {@code reschedule} of target {@code task_data}).
+ * then {@code reschedule} of target {@code task_data} in one JDBC transaction).
  */
 public class CronJobPlanner {
 
@@ -60,13 +64,16 @@ public class CronJobPlanner {
   private static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
 
   private final Config gravitinoConfig;
+  private final DataSource dataSource;
   private final MaintenanceJobSpecFactory specFactory;
 
   /**
    * @param gravitinoConfig server config for jobConf overlay and auth checks
+   * @param dataSource entity-store pool used to open merge transactions
    */
-  public CronJobPlanner(Config gravitinoConfig) {
+  public CronJobPlanner(Config gravitinoConfig, DataSource dataSource) {
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
+    this.dataSource = Preconditions.checkNotNull(dataSource);
     this.specFactory = new MaintenanceJobSpecFactory(this.gravitinoConfig);
   }
 
@@ -166,12 +173,7 @@ public class CronJobPlanner {
                   Set.of(target.instanceId.getId()),
                   unionTableIds(target.spec.tableIds(), tableIds(scheduleTables)));
           if (mergeInto(
-              client,
-              target,
-              scheduleSpec.get().getTasks(),
-              scheduleSpec.get(),
-              peers,
-              batchCapacity)) {
+              target, scheduleSpec.get().getTasks(), scheduleSpec.get(), peers, batchCapacity)) {
             remaining.subList(0, takeCount).clear();
             continue;
           }
@@ -193,7 +195,7 @@ public class CronJobPlanner {
                   Set.of(batchJob.get().instanceId.getId()),
                   new HashSet<>(batchJob.get().spec.tableIds()));
           if (!peers.isEmpty()) {
-            mergeInto(client, batchJob.get(), List.of(), null, peers, batchCapacity);
+            mergeInto(batchJob.get(), List.of(), null, peers, batchCapacity);
           }
           newRows++;
           remaining.subList(0, takeCount).clear();
@@ -232,7 +234,7 @@ public class CronJobPlanner {
         saturatedInstanceIds.add(mergeTarget.instanceId.getId());
         continue;
       }
-      if (!mergeInto(client, mergeTarget, List.of(), null, peers, batchCapacity)) {
+      if (!mergeInto(mergeTarget, List.of(), null, peers, batchCapacity)) {
         saturatedInstanceIds.add(mergeTarget.instanceId.getId());
       }
     }
@@ -274,14 +276,13 @@ public class CronJobPlanner {
   }
 
   /**
-   * Claim-first merge into {@code target}: cancel each unpicked peer (takes ownership), then
-   * reschedule the target's {@code task_data}. Target {@code task_instance} is unchanged. Envelope
+   * Claim-first merge into {@code target}: cancel each unpicked peer then reschedule the target's
+   * {@code task_data} in one JDBC transaction. Target {@code task_instance} is unchanged. Envelope
    * {@code spark_conf} is max-merged across target, optional schedule spec, and claimed peers.
    *
    * @return true when the target was updated, or when there was nothing to merge
    */
   private boolean mergeInto(
-      SchedulerClient client,
       QueuedExpireJob target,
       List<Task> scheduleTasks,
       @Nullable MaintenanceJobSpec scheduleSpec,
@@ -318,31 +319,67 @@ public class CronJobPlanner {
       return false;
     }
 
-    List<Task> claimedTasks = new ArrayList<>();
-    List<String> sparkConfJsons = new ArrayList<>();
-    sparkConfJsons.add(target.spec.getSparkConf());
-    if (scheduleSpec != null) {
-      sparkConfJsons.add(scheduleSpec.getSparkConf());
-    }
-    for (QueuedExpireJob peer : claimable) {
-      Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(client, peer);
-      if (claimedSpec.isEmpty()) {
-        continue;
-      }
-      claimedTasks.addAll(claimedSpec.get().getTasks());
-      sparkConfJsons.add(claimedSpec.get().getSparkConf());
-    }
-
-    List<Task> tasksToAdd = new ArrayList<>(scheduleTasks);
-    tasksToAdd.addAll(claimedTasks);
-    if (tasksToAdd.isEmpty()) {
-      // No schedule tables and no successful claims (peers picked/gone/auth-skipped) — not
-      // progress.
+    if (claimable.isEmpty() && scheduleTasks.isEmpty()) {
       return peersToClaim.isEmpty();
     }
-    String mergedSparkConf =
-        MaintenanceJobSpecFactory.mergeSparkConfJson(sparkConfJsons.toArray(new String[0]));
-    return rescheduleMergedTaskData(client, target, tasksToAdd, mergedSparkConf, batchCapacity);
+
+    try {
+      Function<DataSource, Boolean> mergeWork =
+          txDs -> {
+            SchedulerClient txClient = CronJobClient.schedulerClientOn(txDs);
+            List<Task> claimedTasks = new ArrayList<>();
+            List<String> sparkConfJsons = new ArrayList<>();
+            sparkConfJsons.add(target.spec.getSparkConf());
+            if (scheduleSpec != null) {
+              sparkConfJsons.add(scheduleSpec.getSparkConf());
+            }
+            for (QueuedExpireJob peer : claimable) {
+              Optional<MaintenanceJobSpec> claimedSpec = tryClaimQueuedJob(txClient, peer);
+              if (claimedSpec.isEmpty()) {
+                continue;
+              }
+              claimedTasks.addAll(claimedSpec.get().getTasks());
+              sparkConfJsons.add(claimedSpec.get().getSparkConf());
+            }
+
+            List<Task> tasksToAdd = new ArrayList<>(scheduleTasks);
+            tasksToAdd.addAll(claimedTasks);
+            if (tasksToAdd.isEmpty()) {
+              if (peersToClaim.isEmpty()) {
+                return true;
+              }
+              throw new MergeTransactionAborted();
+            }
+            String mergedSparkConf =
+                MaintenanceJobSpecFactory.mergeSparkConfJson(sparkConfJsons.toArray(new String[0]));
+            if (!rescheduleMergedTaskData(
+                txClient, target, tasksToAdd, mergedSparkConf, batchCapacity)) {
+              throw new MergeTransactionAborted();
+            }
+            return true;
+          };
+      AutocommitDataSources.runInTransaction(dataSource, mergeWork);
+      return true;
+    } catch (MergeTransactionAborted e) {
+      return false;
+    } catch (SQLException e) {
+      LOG.warn(
+          "Snapshot-expiry merge into {} failed to open or finish JDBC transaction: {}",
+          target.instanceId.getId(),
+          e.toString());
+      return false;
+    }
+  }
+
+  /**
+   * Signals intentional merge abort so {@link AutocommitDataSources#runInTransaction} rolls back.
+   */
+  private static final class MergeTransactionAborted extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    private MergeTransactionAborted() {
+      super(null, null, false, false);
+    }
   }
 
   /**

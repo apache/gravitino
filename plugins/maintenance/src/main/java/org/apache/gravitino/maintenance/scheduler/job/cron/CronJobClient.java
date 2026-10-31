@@ -48,7 +48,7 @@ public class CronJobClient {
    */
   public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
     Preconditions.checkNotNull(dataSource);
-    this.planner = new CronJobPlanner(Preconditions.checkNotNull(gravitinoConfig));
+    this.planner = new CronJobPlanner(Preconditions.checkNotNull(gravitinoConfig), dataSource);
     this.scheduler = schedulerClient(dataSource);
   }
 
@@ -75,11 +75,21 @@ public class CronJobClient {
 
   /**
    * @param dataSource entity-store pool
-   * @return client bound to the cron-job table
+   * @return client bound to the cron-job table with JDBC autocommit forced on
    */
   public static SchedulerClient schedulerClient(DataSource dataSource) {
-    return SchedulerClient.Builder.create(
-            AutocommitDataSources.wrap(dataSource), MaintenanceSchedulerPools.cronJobTask())
+    return schedulerClientOn(AutocommitDataSources.wrap(dataSource));
+  }
+
+  /**
+   * Builds a cron-job client on {@code dataSource} without wrapping. Used when the caller supplies
+   * a transactional or session-joined data source.
+   *
+   * @param dataSource already-configured JDBC data source
+   * @return client bound to the cron-job table
+   */
+  public static SchedulerClient schedulerClientOn(DataSource dataSource) {
+    return SchedulerClient.Builder.create(dataSource, MaintenanceSchedulerPools.cronJobTask())
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
         .tableName(MaintenanceSchedulerPools.CRON_TASKS_TABLE)
         .build();

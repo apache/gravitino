@@ -24,19 +24,25 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 
 /**
  * {@link DataSource} adapters for db-scheduler clients: force JDBC autocommit on pooled
- * connections, or reuse the open MyBatis session so expand rows commit with the policy.
+ * connections, reuse the open MyBatis session so expand rows commit with the policy, or bind
+ * several SchedulerClient writes to one JDBC transaction.
  */
 public final class AutocommitDataSources {
 
   private static final Set<String> JOIN_SESSION_NOOPS =
       Set.of("close", "commit", "rollback", "setAutoCommit");
+
+  /** Ignores {@code close} so db-scheduler can reuse one transactional connection. */
+  private static final Set<String> BOUND_TX_NOOPS = Set.of("close", "setAutoCommit");
 
   private AutocommitDataSources() {}
 
@@ -76,12 +82,63 @@ public final class AutocommitDataSources {
     return new SimpleDataSource() {
       @Override
       public Connection getConnection() throws SQLException {
-        return proxyConnection(SqlSessions.currentConnection(), /*autocommit=*/ false);
+        return proxyConnection(
+            SqlSessions.currentConnection(), /*autocommit=*/ false, JOIN_SESSION_NOOPS);
       }
     };
   }
 
-  private static Connection proxyConnection(Connection connection, boolean autocommit) {
+  /**
+   * Runs {@code work} with a {@link DataSource} that always returns the same connection ({@code
+   * autoCommit=false}). Commits when {@code work} returns; rolls back when it throws. db-scheduler
+   * {@code SchedulerClient} calls on that data source share one JDBC transaction (join via a
+   * transaction-aware {@link DataSource}).
+   *
+   * @param pool entity-store pool (not the autocommit wrap)
+   * @param work receives a bound data source; return value is committed
+   * @param <T> result type
+   * @return result of {@code work}
+   * @throws SQLException if borrowing, commit, or rollback fails
+   */
+  public static <T> T runInTransaction(DataSource pool, Function<DataSource, T> work)
+      throws SQLException {
+    Objects.requireNonNull(pool, "pool");
+    Objects.requireNonNull(work, "work");
+    Connection connection = pool.getConnection();
+    boolean previousAutoCommit = connection.getAutoCommit();
+    try {
+      connection.setAutoCommit(false);
+      DataSource bound =
+          new SimpleDataSource() {
+            @Override
+            public Connection getConnection() throws SQLException {
+              return proxyConnection(connection, /*autocommit=*/ false, BOUND_TX_NOOPS);
+            }
+          };
+      try {
+        T result = work.apply(bound);
+        connection.commit();
+        return result;
+      } catch (RuntimeException e) {
+        try {
+          connection.rollback();
+        } catch (SQLException rollbackFailure) {
+          e.addSuppressed(rollbackFailure);
+        }
+        throw e;
+      }
+    } finally {
+      try {
+        connection.setAutoCommit(previousAutoCommit);
+      } catch (SQLException ignored) {
+        // best-effort restore before close
+      }
+      connection.close();
+    }
+  }
+
+  private static Connection proxyConnection(
+      Connection connection, boolean autocommit, Set<String> noops) {
     return (Connection)
         Proxy.newProxyInstance(
             Connection.class.getClassLoader(),
@@ -95,7 +152,7 @@ public final class AutocommitDataSources {
                 if ("getAutoCommit".equals(name)) {
                   return true;
                 }
-              } else if (JOIN_SESSION_NOOPS.contains(name)) {
+              } else if (noops.contains(name)) {
                 return null;
               } else if ("getAutoCommit".equals(name)) {
                 return false;
@@ -166,7 +223,7 @@ public final class AutocommitDataSources {
 
     private static Connection withAutocommit(Connection connection) throws SQLException {
       connection.setAutoCommit(true);
-      return proxyConnection(connection, /*autocommit=*/ true);
+      return proxyConnection(connection, /*autocommit=*/ true, Set.of());
     }
   }
 
