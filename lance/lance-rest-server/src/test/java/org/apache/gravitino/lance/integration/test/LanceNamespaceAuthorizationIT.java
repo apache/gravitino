@@ -167,6 +167,25 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testExistOkPreservesCreationOfAnAbsentNamespace() throws Exception {
+    // WRITER holds CREATE_SCHEMA but not USE_SCHEMA on the schemas of the visible catalog, so
+    // exist_ok on an absent schema must create it (#12955), exactly like a plain create.
+    String newSchema = id(VISIBLE_CATALOG, "lance_authz_exist_ok_new_schema");
+    assertStatus(200, create(WRITER, newSchema, "exist_ok", Map.of()));
+
+    // Creating assigns ownership, so the creator may read back and then drop what it created.
+    assertStatus(200, post(WRITER, newSchema, "describe"));
+    assertStatus(200, drop(WRITER, newSchema, null, null));
+
+    // The read-only user may read an existing schema through exist_ok but must not create one:
+    // its request resolves to an absent object and falls through to the create expression.
+    assertStatus(200, create(USER, id(VISIBLE_CATALOG, VISIBLE_SCHEMA), "exist_ok", Map.of()));
+    assertStatus(
+        403,
+        create(USER, id(VISIBLE_CATALOG, "lance_authz_user_new_schema"), "exist_ok", Map.of()));
+  }
+
+  @Test
   public void testCreatePrivilegeCannotOverwriteOrDropAnotherOwnersNamespace() throws Exception {
     Map<String, String> marker = Map.of(MARKER_PROPERTY, "overwritten");
     assertStatus(403, create(WRITER, VISIBLE_CATALOG, "overwrite", marker));
@@ -177,9 +196,13 @@ public class LanceNamespaceAuthorizationIT extends BaseIT {
     Assertions.assertFalse(
         properties(ADMIN, id(VISIBLE_CATALOG, VISIBLE_SCHEMA)).containsKey(MARKER_PROPERTY));
 
-    // exist_ok is a create, not a modification, so the create privilege is enough for it.
+    // exist_ok returns the existing object's metadata, so the caller needs read privileges.
+    // WRITER has UseCatalog so catalog-level exist_ok is allowed.
     assertStatus(200, create(WRITER, VISIBLE_CATALOG, "exist_ok", Map.of()));
     Assertions.assertFalse(properties(ADMIN, VISIBLE_CATALOG).containsKey(MARKER_PROPERTY));
+
+    // WRITER lacks UseSchema on VISIBLE_SCHEMA, so schema-level exist_ok is denied.
+    assertStatus(403, create(WRITER, id(VISIBLE_CATALOG, VISIBLE_SCHEMA), "exist_ok", Map.of()));
 
     assertStatus(403, drop(WRITER, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), null, null));
     assertStatus(200, post(ADMIN, id(VISIBLE_CATALOG, HIDDEN_SCHEMA), "exists"));

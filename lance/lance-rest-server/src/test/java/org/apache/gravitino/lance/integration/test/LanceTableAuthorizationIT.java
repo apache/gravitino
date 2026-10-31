@@ -92,6 +92,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String OWNED_SCHEMA_TABLE = "h_owned_schema_table";
   private static final String LONE_SCHEMA_TABLE = "i_lone_schema_table";
   private static final String NON_LANCE_TABLE = "j_non_lance_table";
+  private static final String EXIST_OK_TABLE = "k_exist_ok_table";
+  private static final String READER_EXIST_OK_TABLE = "l_reader_exist_ok_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -306,6 +308,26 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testExistOkCreatesAnAbsentTableButDoesNotReadAnExistingOne() throws Exception {
+    // PROBER holds CREATE_TABLE but no read privilege on the existing table, so exist_ok is
+    // denied and must not disclose the table's location or properties.
+    HttpResponse<String> denied = createTable(PROBER, SCHEMA, VISIBLE_TABLE, "exist_ok");
+    assertStatus(403, denied);
+    Assertions.assertFalse(denied.body().contains(location(VISIBLE_TABLE)), denied.body());
+
+    // exist_ok on an absent table creates it (#12955); creating assigns ownership, so the
+    // creator may describe what it created even without SELECT_TABLE.
+    assertStatus(200, createTable(PROBER, SCHEMA, EXIST_OK_TABLE, "exist_ok"));
+    assertStatus(200, table(PROBER, SCHEMA, EXIST_OK_TABLE, "describe"));
+
+    // READER holds SELECT_TABLE on the existing table but no CREATE_TABLE: exist_ok answers
+    // with the existing table's metadata, and exist_ok on an absent table is denied instead
+    // of creating one.
+    assertStatus(200, createTable(READER, SCHEMA, VISIBLE_TABLE, "exist_ok"));
+    assertStatus(403, createTable(READER, SCHEMA, READER_EXIST_OK_TABLE, "exist_ok"));
+  }
+
+  @Test
   public void testColumnMutationRequiresModifyTable() throws Exception {
     // The reader holds USE_CATALOG, USE_SCHEMA and SELECT_TABLE on this exact table, so it can
     // read the table. Asserting that first is what makes the denials below evidence that
@@ -445,18 +467,30 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
+    assertStatus(200, createTable(ADMIN, schemaName, tableName, "create"));
+  }
+
+  /**
+   * Sends a create-table request in the given mode on behalf of the given user, using the same
+   * single-column arrow stream as the admin helper.
+   */
+  private HttpResponse<String> createTable(
+      String user, String schemaName, String tableName, String mode) throws Exception {
     Schema schema =
         new Schema(
             List.of(
                 Field.nullable("id", new ArrowType.Int(32, true)),
                 Field.nullable("value", new ArrowType.Utf8())));
     HttpRequest request =
-        request(ADMIN, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+        request(
+                user,
+                "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create",
+                "&mode=" + mode)
             .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
             .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
             .build();
-    assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> registerExistingTable(String user, String schema, String tableName)
