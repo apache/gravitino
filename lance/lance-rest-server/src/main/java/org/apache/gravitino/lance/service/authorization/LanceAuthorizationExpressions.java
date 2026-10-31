@@ -51,8 +51,11 @@ public final class LanceAuthorizationExpressions {
    * CREATE_CATALOG on the metalake; a two-level namespace creates a schema and requires
    * CREATE_SCHEMA together with access to the parent catalog.
    *
-   * <p>This expression covers the {@code create} and {@code exist_ok} modes only. The {@code
-   * overwrite} mode alters an existing namespace, so it is authorized against {@link
+   * <p>This expression authorizes plain creates and the absent-object path of {@code exist_ok}: the
+   * interceptor resolves the addressed object first, and an {@code exist_ok} request that resolves
+   * to an existing namespace is authorized against the catalog and schema read privileges ({@code
+   * CAN_ACCESS_METADATA}) instead, matching a describe request. The {@code overwrite} mode alters
+   * an existing namespace, so it is authorized against {@link
    * #MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION} instead and a create privilege alone never grants
    * it.
    */
@@ -112,9 +115,12 @@ public final class LanceAuthorizationExpressions {
    * Authorizes creating a table. The identifier must address a table, and the privilege is required
    * on the schema that will hold it.
    *
-   * <p>This expression covers the {@code create} and {@code exist_ok} modes only. The {@code
-   * overwrite} mode replaces an existing table, so it is authorized against {@link
-   * #MODIFY_TABLE_AUTHORIZATION_EXPRESSION} instead and CREATE_TABLE alone never grants it.
+   * <p>This expression authorizes plain creates and the absent-object path of {@code exist_ok}: the
+   * interceptor resolves the addressed object first, and an {@code exist_ok} request that resolves
+   * to an existing table is authorized against {@link #READ_TABLE_AUTHORIZATION_EXPRESSION}
+   * instead, matching a describe request. The {@code overwrite} mode replaces an existing table, so
+   * it is authorized against {@link #MODIFY_TABLE_AUTHORIZATION_EXPRESSION} instead and
+   * CREATE_TABLE alone never grants it.
    */
   public static final String CREATE_TABLE_AUTHORIZATION_EXPRESSION =
       """
