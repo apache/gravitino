@@ -25,6 +25,9 @@ import unittest
 from email.parser import Parser
 from pathlib import Path
 
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
 
 class TestPackageMetadata(unittest.TestCase):
     """Verify the built package separates core and optional dependencies."""
@@ -36,6 +39,7 @@ class TestPackageMetadata(unittest.TestCase):
         self._assert_core_requirements(metadata)
         self._assert_source_manifest(source_files)
         self._assert_storage_extras(metadata)
+        self._assert_runtime_ranges(metadata)
 
     def _read_package_metadata(self):
         client_root = Path(__file__).resolve().parents[2]
@@ -92,7 +96,13 @@ class TestPackageMetadata(unittest.TestCase):
         )
         self.assertIn(">=3.20.1", simplejson_requirement)
         self.assertIn("<=4.2.0", simplejson_requirement)
-        self.assertIn("dataclasses-json==0.6.7", base_requirements)
+        dataclasses_requirement = next(
+            requirement
+            for requirement in base_requirements
+            if requirement.startswith("dataclasses-json")
+        )
+        self.assertIn(">=0.6.7", dataclasses_requirement)
+        self.assertIn("<0.7", dataclasses_requirement)
         for optional_name in (
             "black",
             "cachetools",
@@ -168,6 +178,38 @@ class TestPackageMetadata(unittest.TestCase):
                 {"pyarrow", "s3fs", "gcsfs", "ossfs", "adlfs"}
             ).issubset(storage_requirements)
         )
+
+    def _assert_runtime_ranges(self, metadata):
+        """Generated requirements retain the selected minimum/current points."""
+        version_points = {
+            "dataclasses-json": ("0.6.7",),
+            "simplejson": ("3.20.1", "4.2.0"),
+            "cachetools": ("7.1.4", "7.2.7"),
+            "fsspec": ("2023.12.1", "2026.9.0"),
+            "readerwriterlock": ("1.0.9", "1.0.10"),
+            "pyarrow": ("17.0.0", "26.0.0"),
+            "s3fs": ("2023.12.1", "2026.9.0"),
+            "gcsfs": ("2023.12.1", "2026.10.1"),
+            "ossfs": ("2025.5.0",),
+            "adlfs": ("2026.2.0", "2026.8.0"),
+            "ray": ("2.55.1", "2.59.0"),
+            "lance-ray": ("0.3.0", "0.5.0"),
+        }
+        requirements = [
+            Requirement(value)
+            for value in metadata.get_all("Requires-Dist", [])
+            if 'extra == "dev"' not in value
+        ]
+        self.assertEqual(
+            {canonicalize_name(requirement.name) for requirement in requirements},
+            set(version_points),
+        )
+        for requirement in requirements:
+            with self.subTest(requirement=str(requirement)):
+                for specifier in requirement.specifier:
+                    self.assertNotIn(specifier.operator, ("==", "==="))
+                for version in version_points[canonicalize_name(requirement.name)]:
+                    self.assertIn(version, requirement.specifier)
 
     @staticmethod
     def _requirement_names_for_extra(metadata, extra_name):

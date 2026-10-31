@@ -53,7 +53,7 @@ extras.
 
 ### Core client compatibility
 
-The core client keeps `dataclasses-json==0.6.7` and allows
+The core client allows `dataclasses-json>=0.6.7,<0.7` and
 `simplejson>=3.20.1,<=4.2.0`. The upper bound limits the initial reviewed release
 scope; it does not indicate a known incompatibility in later releases.
 Development and standard test dependencies remain pinned independently.
@@ -94,6 +94,43 @@ The task starts a foreground server and cleans up only that process, including
 startup and test failures. Port 8090 must be free. To use an already running server,
 invoke `scripts/run_core_compatibility_matrix.py` with `--artifact` and
 `--gravitino-uri`, omitting `--gravitino-home`; this leaves the service running.
+
+### Runtime dependency ranges
+
+Runtime requirements describe compatible dependency ranges; development and
+standard integration-test environments remain pinned independently. Each storage
+extra includes the shared GVFS requirements as well as its backend library.
+
+| Installation | Runtime requirements |
+| --- | --- |
+| Core | `dataclasses-json>=0.6.7,<0.7`, `simplejson>=3.20.1,<=4.2.0` |
+| GVFS shared | `cachetools>=7.1.4,<8`, `fsspec>=2023.12.1,<=2026.9.0`, `readerwriterlock>=1.0.9,<2` |
+| HDFS | `pyarrow>=17.0.0,<=26.0.0` |
+| S3 | `s3fs>=2023.12.1,<=2026.9.0` |
+| GCS | `gcsfs>=2023.12.1,<=2026.10.1` |
+| OSS | `ossfs>=2025.5.0` |
+| Azure | `adlfs>=2026.2.0,<=2026.8.0` |
+| Lance | `ray>=2.55.1,<=2.59.0`, `lance-ray>=0.3.0,<=0.5.0` |
+
+The dataclasses-json bound retains its pre-1.0 API line; cachetools and
+readerwriterlock retain their current major-version APIs. Calendar-versioned
+storage libraries, PyArrow, Ray and lance-ray have an initial bounded release
+window. These bounds do not claim that later releases are incompatible, or that
+every intermediate release has been tested. OSS currently has one selected
+backend release; its public filesystem interface and fsspec dependency provide
+the compatibility boundary rather than an unsubstantiated upper version limit.
+
+Backend libraries also constrain their dependencies. For example, s3fs and gcsfs
+2023.12.1 both require fsspec 2023.12.1, while their 2026.2.0 releases require
+fsspec 2026.2.0. The installer must select a coherent combination, including when
+multiple extras or `[storage]` are requested. The storage profile does not include
+`[lance]`; request both extras when both features are needed.
+
+Python package compatibility still applies: PyArrow 26 requires Python 3.11 or
+later, so Python 3.10 environments must resolve an older compatible PyArrow.
+Metadata-only Ray applications need neither the storage extras nor the Lance
+extra. The SDK does not implement Ray's Catalog provider or promise complete data
+reader compatibility solely because its dependencies can be installed.
 
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)

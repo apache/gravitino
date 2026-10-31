@@ -16,9 +16,9 @@
 # under the License.
 
 # Lance integration deps. `lance-ray` owns the compatible `lance-namespace`
-# dependency, so do not pin `lance-namespace` here separately.
+# dependency, so do not constrain `lance-namespace` here separately.
 # Installed via the `lance` extra (`pip install -e .[lance]`).
-# The same pins are also included in requirements-dev.txt so that the default
-# integration-test run works out of the box with `pip install -r requirements-dev.txt`.
-ray==2.55.1
-lance-ray==0.4.2
+# The default integration-test environment remains pinned independently in
+# requirements-dev.txt.
+ray>=2.55.1,<=2.59.0
+lance-ray>=0.3.0,<=0.5.0

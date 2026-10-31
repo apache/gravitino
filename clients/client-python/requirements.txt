@@ -17,6 +17,7 @@
 
 
 # Runtime dependencies for the core metadata client.
-dataclasses-json==0.6.7
+# Keep the reviewed pre-1.0 API line used by the DTO serializers.
+dataclasses-json>=0.6.7,<0.7
 # Initial compatibility range is limited to reviewed releases.
 simplejson>=3.20.1,<=4.2.0
