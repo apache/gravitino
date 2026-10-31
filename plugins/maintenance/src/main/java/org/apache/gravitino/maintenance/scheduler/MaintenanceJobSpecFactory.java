@@ -35,6 +35,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
@@ -86,87 +88,125 @@ public final class MaintenanceJobSpecFactory {
   }
 
   /**
-   * Cron spec for one or more tables under a single policy. Shared {@code updater_options} / {@code
-   * spark_conf} sit on the spec; each table becomes one {@link Task} with its own {@code
-   * parameters}.
+   * Cron schedule-time spec. Each {@link TableCandidate} may carry its own policy list; every
+   * (table, policy) pair becomes one {@link Task}. Shared {@code updater_options} come from the
+   * first policy encountered; {@code spark_conf} max-merges across all policies.
    *
    * <p>All tables must share the same Spark catalog name so catalog-scoped {@code spark_conf} keys
    * stay correct for every member of a batch.
    *
-   * @param policy effective maintenance policy
-   * @param tables resolved table refs (same order as schedule)
+   * @param tables table + policies units (same order as schedule)
    * @return spec ready for {@code task_data}
    */
-  public MaintenanceJobSpec forCron(PolicyEntity policy, List<ResolvedTableRef> tables) {
-    Preconditions.checkNotNull(policy, "policy");
-    Preconditions.checkArgument(tables != null && !tables.isEmpty(), "tables must not be empty");
-    Optional<String> wire = MaintenanceJobTemplates.maintenanceType(policy.policyType());
-    Preconditions.checkArgument(
-        wire.isPresent(), "unsupported policy type %s", policy.policyType());
-
-    String catalogName = tables.get(0).catalogName();
-    for (ResolvedTableRef ref : tables) {
-      Preconditions.checkArgument(
-          catalogName.equals(ref.catalogName()),
-          "cron batch tables must share catalogName; got %s and %s",
-          catalogName,
-          ref.catalogName());
-    }
-
-    Map<String, String> built = jobConfBuilder.build(policy, catalogName);
-    MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, catalogName);
-    JobConfParts parts = splitJobConfParts(built);
-
-    List<Task> tasks = new ArrayList<>(tables.size());
-    for (ResolvedTableRef ref : tables) {
-      Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
-      parameters.put("catalog_name", ref.catalogName());
-      parameters.put("table_identifier", ref.tableIdentifier());
-      tasks.add(new Task(ref.tableId(), policy.id(), wire.get(), null, parameters));
-    }
-    return new MaintenanceJobSpec(tasks, parts.updaterOptions, parts.sparkConf);
+  public MaintenanceJobSpec forCron(List<TableCandidate> tables) {
+    return build(tables);
   }
 
   /**
-   * Commit-chain spec for one table. Caller filters cooldown and checks auth before this. Shared
-   * {@code updater_options} come from the first policy. {@code spark_conf} merges across policies:
-   * larger resource values win, other keys keep the first value.
+   * Commit schedule-time spec. Same shape as {@link #forCron}: typically one {@link TableCandidate}
+   * whose {@code policies} are the onCommit chain. Caller filters cooldown and checks auth before
+   * this.
    *
-   * @param policies onCommit policies in chain order
-   * @param ref resolved Spark table ref
-   * @return spec with one task per policy
+   * @param tables table + policies units
+   * @return spec with one task per (table, policy)
    */
-  public MaintenanceJobSpec forCommit(List<PolicyEntity> policies, ResolvedTableRef ref) {
-    Preconditions.checkArgument(
-        policies != null && !policies.isEmpty(), "policies must not be empty");
-    Preconditions.checkNotNull(ref, "ref");
+  public MaintenanceJobSpec forCommit(List<TableCandidate> tables) {
+    return build(tables);
+  }
+
+  private MaintenanceJobSpec build(List<TableCandidate> tables) {
+    Preconditions.checkArgument(tables != null && !tables.isEmpty(), "tables must not be empty");
+    String catalogName = tables.get(0).catalogName();
+    for (TableCandidate table : tables) {
+      Preconditions.checkArgument(
+          catalogName.equals(table.catalogName()),
+          "tables must share catalogName; got %s and %s",
+          catalogName,
+          table.catalogName());
+    }
 
     String updaterOptions = null;
     Map<String, String> sparkConf = new LinkedHashMap<>();
-    List<Task> tasks = new ArrayList<>(policies.size());
-    for (int i = 0; i < policies.size(); i++) {
-      PolicyEntity policy = policies.get(i);
-      Optional<String> wire = MaintenanceJobTemplates.maintenanceType(policy.policyType());
-      Preconditions.checkArgument(
-          wire.isPresent(), "unsupported policy type %s", policy.policyType());
-      Map<String, String> built = jobConfBuilder.build(policy, ref.catalogName());
-      MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, ref.catalogName());
-      JobConfParts parts = splitJobConfParts(built);
-      if (i == 0) {
-        updaterOptions = parts.updaterOptions;
-        if (parts.sparkConf != null && !parts.sparkConf.isBlank()) {
-          sparkConf.putAll(IcebergSparkConfigUtils.parseFlatJsonMap(parts.sparkConf, "spark_conf"));
+    List<Task> tasks = new ArrayList<>();
+    boolean firstPolicy = true;
+    for (TableCandidate table : tables) {
+      for (PolicyEntity policy : table.policies()) {
+        Optional<String> wire = MaintenanceJobTemplates.maintenanceType(policy.policyType());
+        Preconditions.checkArgument(
+            wire.isPresent(), "unsupported policy type %s", policy.policyType());
+        Map<String, String> built = jobConfBuilder.build(policy, catalogName);
+        MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, catalogName);
+        JobConfParts parts = splitJobConfParts(built);
+        if (firstPolicy) {
+          updaterOptions = parts.updaterOptions;
+          if (parts.sparkConf != null && !parts.sparkConf.isBlank()) {
+            sparkConf.putAll(
+                IcebergSparkConfigUtils.parseFlatJsonMap(parts.sparkConf, "spark_conf"));
+          }
+          firstPolicy = false;
+        } else {
+          mergeSparkConfMaps(sparkConf, parts.sparkConf);
         }
-      } else {
-        mergeSparkConfMaps(sparkConf, parts.sparkConf);
+        Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
+        parameters.put("catalog_name", table.catalogName());
+        parameters.put("table_identifier", table.tableIdentifier());
+        tasks.add(new Task(table.tableId(), policy.id(), wire.get(), null, parameters));
       }
-      Map<String, String> parameters = new LinkedHashMap<>(parts.parameters);
-      parameters.put("catalog_name", ref.catalogName());
-      parameters.put("table_identifier", ref.tableIdentifier());
-      tasks.add(new Task(ref.tableId(), policy.id(), wire.get(), null, parameters));
     }
     String sparkConfJson = sparkConf.isEmpty() ? null : writeJson(sparkConf, "spark_conf");
     return new MaintenanceJobSpec(tasks, updaterOptions, sparkConfJson);
+  }
+
+  /**
+   * Catalog name from a table {@link NameIdentifier} ({@code namespace.level(1)}).
+   *
+   * @param identifier metalake.catalog.schema…table
+   * @return catalog name
+   */
+  public static String catalogName(NameIdentifier identifier) {
+    Namespace namespace = identifier.namespace();
+    Preconditions.checkArgument(
+        namespace != null && namespace.length() >= 2 && identifier.name() != null,
+        "identifier must be metalake.catalog.schema…table: %s",
+        identifier);
+    String catalogName = namespace.level(1);
+    Preconditions.checkArgument(
+        catalogName != null && !catalogName.isBlank(),
+        "catalog name must not be blank: %s",
+        identifier);
+    return catalogName;
+  }
+
+  /**
+   * Spark {@code schema.table} (nested schemas joined with {@code .}) from a table {@link
+   * NameIdentifier}.
+   *
+   * @param identifier metalake.catalog.schema…table
+   * @return Spark table identifier
+   */
+  public static String sparkTableIdentifier(NameIdentifier identifier) {
+    Namespace namespace = identifier.namespace();
+    Preconditions.checkArgument(
+        namespace != null && namespace.length() >= 2 && identifier.name() != null,
+        "identifier must be metalake.catalog.schema…table: %s",
+        identifier);
+    StringBuilder sparkTable = new StringBuilder();
+    for (int i = 2; i < namespace.length(); i++) {
+      String level = namespace.level(i);
+      Preconditions.checkArgument(
+          level != null && !level.isBlank(), "blank namespace on %s", identifier);
+      if (sparkTable.length() > 0) {
+        sparkTable.append('.');
+      }
+      sparkTable.append(level);
+    }
+    Preconditions.checkArgument(
+        !identifier.name().isBlank(), "table name must not be blank: %s", identifier);
+    if (sparkTable.length() > 0) {
+      sparkTable.append('.');
+    }
+    sparkTable.append(identifier.name());
+    return sparkTable.toString();
   }
 
   /**

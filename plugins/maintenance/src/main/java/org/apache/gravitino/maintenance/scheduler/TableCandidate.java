@@ -16,42 +16,44 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.policy.expand;
+package org.apache.gravitino.maintenance.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
 import java.util.Objects;
-import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.meta.PolicyEntity;
 
 /**
- * One schedulable table after nearest-policy and occupancy gating, with the metadata level where
- * the winning policy was selected and the catalog / table names already known at expand time.
+ * One table plus the maintenance policies to schedule for it. Used by both cron and commit {@code
+ * MaintenanceJobSpec} builders; each table may carry a different policy list.
  */
-public final class ExpandTableCandidate {
+public final class TableCandidate {
 
   private final long tableId;
-  private final MetadataObject.Type winnerLevel;
   private final String catalogName;
   private final String tableIdentifier;
+  private final List<PolicyEntity> policies;
 
   /**
    * @param tableId table entity id
-   * @param winnerLevel {@link MetadataObject.Type#TABLE}, {@link MetadataObject.Type#SCHEMA}, or
-   *     {@link MetadataObject.Type#CATALOG}
-   * @param catalogName catalog name from the table metadata object
+   * @param catalogName catalog name
    * @param tableIdentifier {@code schema.table} Spark identifier
+   * @param policies policies for this table (order preserved; must not be empty)
    */
-  public ExpandTableCandidate(
-      long tableId, MetadataObject.Type winnerLevel, String catalogName, String tableIdentifier) {
+  public TableCandidate(
+      long tableId, String catalogName, String tableIdentifier, List<PolicyEntity> policies) {
     Preconditions.checkArgument(tableId > 0, "tableId must be positive");
-    Preconditions.checkNotNull(winnerLevel, "winnerLevel must not be null");
     Preconditions.checkArgument(
         catalogName != null && !catalogName.isBlank(), "catalogName must not be blank");
     Preconditions.checkArgument(
         tableIdentifier != null && !tableIdentifier.isBlank(), "tableIdentifier must not be blank");
+    Preconditions.checkArgument(
+        policies != null && !policies.isEmpty(), "policies must not be empty");
     this.tableId = tableId;
-    this.winnerLevel = winnerLevel;
     this.catalogName = catalogName;
     this.tableIdentifier = tableIdentifier;
+    this.policies = ImmutableList.copyOf(policies);
   }
 
   /**
@@ -59,13 +61,6 @@ public final class ExpandTableCandidate {
    */
   public long tableId() {
     return tableId;
-  }
-
-  /**
-   * @return level where the nearest winning policy was attached
-   */
-  public MetadataObject.Type winnerLevel() {
-    return winnerLevel;
   }
 
   /**
@@ -83,10 +78,10 @@ public final class ExpandTableCandidate {
   }
 
   /**
-   * @return true when snapshot-expiry may pack this table into a {@code batch:...} cron-job
+   * @return policies for this table in schedule order
    */
-  public boolean batchableForSnapshotExpiry() {
-    return winnerLevel == MetadataObject.Type.SCHEMA || winnerLevel == MetadataObject.Type.CATALOG;
+  public List<PolicyEntity> policies() {
+    return policies;
   }
 
   @Override
@@ -94,31 +89,31 @@ public final class ExpandTableCandidate {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof ExpandTableCandidate)) {
+    if (!(o instanceof TableCandidate)) {
       return false;
     }
-    ExpandTableCandidate that = (ExpandTableCandidate) o;
+    TableCandidate that = (TableCandidate) o;
     return tableId == that.tableId
-        && winnerLevel == that.winnerLevel
         && catalogName.equals(that.catalogName)
-        && tableIdentifier.equals(that.tableIdentifier);
+        && tableIdentifier.equals(that.tableIdentifier)
+        && policies.equals(that.policies);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(tableId, winnerLevel, catalogName, tableIdentifier);
+    return Objects.hash(tableId, catalogName, tableIdentifier, policies);
   }
 
   @Override
   public String toString() {
-    return "ExpandTableCandidate{tableId="
+    return "TableCandidate{tableId="
         + tableId
-        + ", winnerLevel="
-        + winnerLevel
         + ", catalogName="
         + catalogName
         + ", tableIdentifier="
         + tableIdentifier
+        + ", policyIds="
+        + policies.stream().map(PolicyEntity::id).toList()
         + '}';
   }
 }

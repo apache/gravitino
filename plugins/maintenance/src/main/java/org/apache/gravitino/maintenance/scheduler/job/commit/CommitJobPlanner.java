@@ -37,7 +37,7 @@ import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
@@ -121,19 +121,6 @@ public class CommitJobPlanner {
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(identifier, Entity.EntityType.TABLE);
       String metalake = namespace.level(0);
-      String catalogName = namespace.level(1);
-      StringBuilder sparkTable = new StringBuilder();
-      for (int i = 2; i < namespace.length(); i++) {
-        if (sparkTable.length() > 0) {
-          sparkTable.append('.');
-        }
-        sparkTable.append(namespace.level(i));
-      }
-      if (sparkTable.length() > 0) {
-        sparkTable.append('.');
-      }
-      sparkTable.append(identifier.name());
-      ResolvedTableRef tableRef = new ResolvedTableRef(tableId, catalogName, sparkTable.toString());
 
       NearestMaintenancePolicyResolver nearest =
           new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore());
@@ -204,7 +191,14 @@ public class CommitJobPlanner {
       }
 
       MaintenanceAuthConsistency.requireSameAuth(due, gravitinoConfig);
-      return Optional.of(specFactory.forCommit(due, tableRef));
+      return Optional.of(
+          specFactory.forCommit(
+              List.of(
+                  new TableCandidate(
+                      tableId,
+                      MaintenanceJobSpecFactory.catalogName(identifier),
+                      MaintenanceJobSpecFactory.sparkTableIdentifier(identifier),
+                      due))));
     } catch (NoSuchEntityException e) {
       LOG.debug("No Gravitino table for IRC update {}: {}", identifier, e.getMessage());
       return Optional.empty();

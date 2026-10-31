@@ -43,7 +43,7 @@ import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -108,7 +108,7 @@ public class PolicyExpandToCronIT extends BaseIT {
             client.loadMetalake(metalake), metalake, TIME_TRIGGER, /*commitTrigger=*/ null);
 
     PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(seeded.policyId);
-    List<ExpandTableCandidate> candidates =
+    List<TableCandidate> candidates =
         new NearestPolicyTableEnumerator()
             .listTableIds(
                 policy,
@@ -119,7 +119,7 @@ public class PolicyExpandToCronIT extends BaseIT {
                 0L);
     assertEquals(
         List.of(seeded.tableId),
-        candidates.stream().map(ExpandTableCandidate::tableId).toList(),
+        candidates.stream().map(TableCandidate::tableId).toList(),
         "nearest enumerator should see the tagged Iceberg table");
 
     DataSource ds = dataSource();

@@ -18,17 +18,23 @@
  */
 package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
+import com.github.kagkarlsson.scheduler.task.ExecutionComplete;
+import com.github.kagkarlsson.scheduler.task.schedule.CronSchedule;
+import com.github.kagkarlsson.scheduler.task.schedule.CronStyle;
+import com.github.kagkarlsson.scheduler.task.schedule.Schedule;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator.ShouldSkipTable;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
@@ -51,10 +57,9 @@ public final class PolicyExpandPipeline {
   private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandPipeline.class);
   private static final PolicyMetaService POLICY_SERVICE = PolicyMetaService.getInstance();
 
-  private final Function<Long, Optional<PolicyEntity>> policyLoader;
-  private final PolicyTableEnumerator tableEnumerator;
+  private final NearestPolicyTableEnumerator tableEnumerator;
   private final CronJobClient cronJobClient;
-  private final PolicyTableEnumerator.ShouldSkipTable shouldSkip;
+  private final ShouldSkipTable shouldSkip;
   private final Config config;
   private final int scheduleBatchSize;
 
@@ -68,40 +73,15 @@ public final class PolicyExpandPipeline {
    * @param scheduleBatchSize max cron-jobs per expand pick
    */
   public PolicyExpandPipeline(
-      PolicyTableEnumerator tableEnumerator,
+      NearestPolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
       MaintenanceActionManager actionManager,
       Config config,
       int scheduleBatchSize) {
-    this(
-        PolicyExpandPipeline::loadPolicy,
-        tableEnumerator,
-        cronJobClient,
-        expandShouldSkip(actionManager, cronJobClient),
-        config,
-        scheduleBatchSize);
-  }
-
-  /**
-   * @param policyLoader loads the policy for the expand instance id
-   * @param tableEnumerator lists attached table ids
-   * @param cronJobClient writes cron-job rows
-   * @param shouldSkip skip check while scanning tables
-   * @param config gravitino server config for per-type minInterval fallbacks
-   * @param scheduleBatchSize max cron-jobs per expand pick
-   */
-  PolicyExpandPipeline(
-      Function<Long, Optional<PolicyEntity>> policyLoader,
-      PolicyTableEnumerator tableEnumerator,
-      CronJobClient cronJobClient,
-      PolicyTableEnumerator.ShouldSkipTable shouldSkip,
-      Config config,
-      int scheduleBatchSize) {
-    this.policyLoader = Preconditions.checkNotNull(policyLoader);
-    this.tableEnumerator = tableEnumerator;
-    this.cronJobClient = cronJobClient;
-    this.shouldSkip = Preconditions.checkNotNull(shouldSkip);
-    this.config = config;
+    this.tableEnumerator = Preconditions.checkNotNull(tableEnumerator);
+    this.cronJobClient = Preconditions.checkNotNull(cronJobClient);
+    this.shouldSkip = expandShouldSkip(actionManager, cronJobClient);
+    this.config = Preconditions.checkNotNull(config);
     this.scheduleBatchSize = scheduleBatchSize;
   }
 
@@ -112,12 +92,11 @@ public final class PolicyExpandPipeline {
    * @return next due time when the expand row should stay, or empty to delete the row
    */
   public Optional<Instant> expand(long policyId) {
-    Optional<PolicyEntity> loaded = policyLoader.apply(policyId);
-    if (loaded.isEmpty()) {
+    PolicyEntity policy = POLICY_SERVICE.getPolicyById(policyId);
+    if (policy == null) {
       LOG.info("Removing expand row for missing policy {}", policyId);
       return Optional.empty();
     }
-    PolicyEntity policy = loaded.get();
     if (!policy.enabled() || !isMaintenance(policy.content())) {
       LOG.info(
           "Removing expand row for policy {} (enabled={}, maintenance={})",
@@ -135,7 +114,7 @@ public final class PolicyExpandPipeline {
     // Resolve next due before any cron-job writes so a bad crontab cannot leave orphans.
     final Instant nextDue;
     try {
-      nextDue = PolicyExpandCrons.nextExecution(timeTrigger);
+      nextDue = nextExecution(timeTrigger);
     } catch (RuntimeException e) {
       LOG.warn(
           "Removing expand row for policy {} with invalid timeTrigger {}: {}",
@@ -148,7 +127,7 @@ public final class PolicyExpandPipeline {
     long minIntervalMs =
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
-    List<ExpandTableCandidate> toSchedule =
+    List<TableCandidate> toSchedule =
         tableEnumerator.listTableIds(policy, scheduleBatchSize, shouldSkip, minIntervalMs);
     int scheduled = cronJobClient.scheduleNow(policy, toSchedule, scheduleBatchSize);
     LOG.info(
@@ -162,7 +141,7 @@ public final class PolicyExpandPipeline {
     return Optional.of(nextDue);
   }
 
-  private static PolicyTableEnumerator.ShouldSkipTable expandShouldSkip(
+  private static ShouldSkipTable expandShouldSkip(
       MaintenanceActionManager actionManager, CronJobClient cronJobClient) {
     Preconditions.checkNotNull(actionManager);
     Preconditions.checkNotNull(cronJobClient);
@@ -171,8 +150,14 @@ public final class PolicyExpandPipeline {
             || cronJobClient.isTableAlreadyQueued(tableId, policyId);
   }
 
-  private static Optional<PolicyEntity> loadPolicy(long policyId) {
-    return Optional.ofNullable(POLICY_SERVICE.getPolicyById(policyId));
+  /** Next fire time for a Quartz cron, strictly after now. */
+  private static Instant nextExecution(String timeTrigger) {
+    CronSchedule schedule = new CronSchedule(timeTrigger, ZoneId.systemDefault(), CronStyle.QUARTZ);
+    Instant next = schedule.getNextExecutionTime(ExecutionComplete.simulatedSuccess(Instant.now()));
+    if (next == null || Schedule.NEVER.equals(next)) {
+      throw new IllegalArgumentException("timeTrigger has no next execution: " + timeTrigger);
+    }
+    return next;
   }
 
   private static boolean isMaintenance(@Nullable PolicyContent content) {

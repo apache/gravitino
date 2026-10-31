@@ -36,6 +36,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -275,7 +276,7 @@ class TestNearestPolicyTableEnumerator {
               return NearestMaintenancePolicyResolver.Decision.winner(10L, table);
             });
 
-    PolicyTableEnumerator.ShouldSkipTable gate =
+    NearestPolicyTableEnumerator.ShouldSkipTable gate =
         (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
     Assertions.assertEquals(
         List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
@@ -410,11 +411,11 @@ class TestNearestPolicyTableEnumerator {
         .build();
   }
 
-  private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {
-    return candidates.stream().map(ExpandTableCandidate::tableId).toList();
+  private static List<Long> tableIds(List<TableCandidate> candidates) {
+    return candidates.stream().map(TableCandidate::tableId).toList();
   }
 
-  private static PolicyTableEnumerator.ShouldSkipTable allowAll() {
+  private static NearestPolicyTableEnumerator.ShouldSkipTable allowAll() {
     return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 

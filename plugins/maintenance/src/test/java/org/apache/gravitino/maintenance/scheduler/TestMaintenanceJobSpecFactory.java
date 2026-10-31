@@ -47,10 +47,9 @@ class TestMaintenanceJobSpecFactory {
     PolicyEntity policy = compaction(202L);
     MaintenanceJobSpec spec =
         factory.forCron(
-            policy,
             List.of(
-                new ResolvedTableRef(10L, "iceberg", "db.t1"),
-                new ResolvedTableRef(11L, "iceberg", "db.t2")));
+                candidate(10L, "iceberg", "db.t1", policy),
+                candidate(11L, "iceberg", "db.t2", policy)));
 
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals("ml", spec.metalake());
@@ -85,24 +84,38 @@ class TestMaintenanceJobSpecFactory {
   }
 
   @Test
+  void testForCronAllowsDifferentPoliciesPerTable() {
+    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
+    PolicyEntity p1 = compaction(201L);
+    PolicyEntity p2 = compaction(202L);
+    MaintenanceJobSpec spec =
+        factory.forCron(
+            List.of(
+                candidate(10L, "iceberg", "db.t1", p1), candidate(11L, "iceberg", "db.t2", p2)));
+
+    Assertions.assertEquals(2, spec.getTasks().size());
+    Assertions.assertEquals(201L, spec.getTasks().get(0).getPolicyId());
+    Assertions.assertEquals(202L, spec.getTasks().get(1).getPolicyId());
+  }
+
+  @Test
   void testForCronRejectsMixedCatalogs() {
     MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
+    PolicyEntity policy = compaction(1L);
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             factory.forCron(
-                compaction(1L),
                 List.of(
-                    new ResolvedTableRef(10L, "iceberg", "db.t1"),
-                    new ResolvedTableRef(11L, "other", "db.t2"))));
+                    candidate(10L, "iceberg", "db.t1", policy),
+                    candidate(11L, "other", "db.t2", policy))));
   }
 
   @Test
   void testJacksonRoundTrip() {
     MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     MaintenanceJobSpec original =
-        factory.forCron(
-            compaction(1L), List.of(new ResolvedTableRef(9L, "iceberg", "schema.table")));
+        factory.forCron(List.of(candidate(9L, "iceberg", "schema.table", compaction(1L))));
     Serializer serializer = new JacksonSerializer(JsonUtils.anyFieldMapper());
     byte[] bytes = serializer.serialize(original);
     MaintenanceJobSpec restored = serializer.deserialize(MaintenanceJobSpec.class, bytes);
@@ -155,6 +168,11 @@ class TestMaintenanceJobSpecFactory {
     MaintenanceJobSpecFactory.mergeResourceKeys(
         mixed, MaintenanceJobSpecFactory.newLinkedMap("spark_executor_memory", "1500m"));
     Assertions.assertEquals("1500m", mixed.get("spark_executor_memory"));
+  }
+
+  private static TableCandidate candidate(
+      long tableId, String catalogName, String tableIdentifier, PolicyEntity policy) {
+    return new TableCandidate(tableId, catalogName, tableIdentifier, List.of(policy));
   }
 
   private static Config configWithUri() {

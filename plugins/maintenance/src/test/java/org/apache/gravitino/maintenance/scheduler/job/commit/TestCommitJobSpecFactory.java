@@ -28,7 +28,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -48,7 +48,9 @@ class TestCommitJobSpecFactory {
     MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     MaintenanceJobSpec spec =
         factory.forCommit(
-            List.of(compaction(202L), expire(303L)), new ResolvedTableRef(101L, "iceberg", "db.t"));
+            List.of(
+                new TableCandidate(
+                    101L, "iceberg", "db.t", List.of(compaction(202L), expire(303L)))));
 
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals(2, spec.getTasks().size());

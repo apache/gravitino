@@ -38,11 +38,10 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
 import org.slf4j.Logger;
@@ -84,7 +83,7 @@ public class CronJobPlanner {
   public int plan(
       SchedulerClient client,
       PolicyEntity policy,
-      List<ExpandTableCandidate> candidates,
+      List<TableCandidate> candidates,
       int expandBatchCapacity,
       Instant due) {
     if (policy == null || candidates == null || candidates.isEmpty()) {
@@ -100,8 +99,8 @@ public class CronJobPlanner {
     if (policy.policyType() != Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
       int scheduled = 0;
       int limit = Math.min(candidates.size(), Math.max(1, expandBatchCapacity));
-      for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
-        Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate));
+      for (TableCandidate candidate : candidates.subList(0, limit)) {
+        Optional<MaintenanceJobSpec> spec = buildSpec(List.of(candidate));
         if (spec.isEmpty()) {
           continue;
         }
@@ -114,106 +113,39 @@ public class CronJobPlanner {
       return scheduled;
     }
     int batchCapacity = SNAPSHOT_EXPIRY_BATCH_CAPACITY;
-    List<ExpandTableCandidate> batchable = new ArrayList<>();
-    List<ExpandTableCandidate> tableLevel = new ArrayList<>();
-    for (ExpandTableCandidate candidate : candidates) {
+    List<TableCandidate> toSchedule = new ArrayList<>();
+    for (TableCandidate candidate : candidates) {
       if (isTableAlreadyQueued(client, candidate.tableId(), policy.id())) {
         continue;
       }
-      if (candidate.batchableForSnapshotExpiry()) {
-        batchable.add(candidate);
-      } else {
-        tableLevel.add(candidate);
-      }
+      toSchedule.add(candidate);
     }
     int scheduled = 0;
-    if (!batchable.isEmpty()) {
-      Map<String, List<ExpandTableCandidate>> byCatalog = new LinkedHashMap<>();
-      for (ExpandTableCandidate candidate : batchable) {
+    if (!toSchedule.isEmpty()) {
+      Map<String, List<TableCandidate>> byCatalog = new LinkedHashMap<>();
+      for (TableCandidate candidate : toSchedule) {
         byCatalog
             .computeIfAbsent(candidate.catalogName(), ignored -> new ArrayList<>())
             .add(candidate);
       }
-      for (Map.Entry<String, List<ExpandTableCandidate>> entry : byCatalog.entrySet()) {
+      for (Map.Entry<String, List<TableCandidate>> entry : byCatalog.entrySet()) {
         scheduled +=
             scheduleSameCatalog(
                 client, policy, entry.getKey(), entry.getValue(), batchCapacity, due);
       }
     }
-    for (ExpandTableCandidate candidate : tableLevel) {
-      scheduled += scheduleTableSnapshotExpiry(client, policy, candidate, batchCapacity, due);
-    }
     coalesceOpenExpireJobs(client, batchCapacity);
     return scheduled;
-  }
-
-  /**
-   * Schedules one table-level snapshot-expiry winner: prefer coalescing into an incomplete same-
-   * catalog {@code batch:}, else schedule this {@code table:} and claim peer {@code table:}/ {@code
-   * batch:} rows into it (target instance id unchanged).
-   */
-  private int scheduleTableSnapshotExpiry(
-      SchedulerClient client,
-      PolicyEntity policy,
-      ExpandTableCandidate candidate,
-      int batchCapacity,
-      Instant due) {
-    long tableId = candidate.tableId();
-    if (isTableAlreadyQueued(client, tableId, policy.id())) {
-      return 0;
-    }
-    String catalogName = candidate.catalogName();
-    Optional<MaintenanceJobSpec> scheduleSpec = buildSpec(policy, List.of(candidate));
-    if (scheduleSpec.isEmpty()) {
-      return 0;
-    }
-    List<Task> scheduleTasks = scheduleSpec.get().getTasks();
-
-    Optional<QueuedExpireJob> incompleteBatch =
-        findIncompleteExpireBatch(client, batchCapacity, catalogName);
-    if (incompleteBatch.isPresent()) {
-      QueuedExpireJob target = incompleteBatch.get();
-      int remainingCapacity = batchCapacity - target.spec.tableIds().size() - scheduleTasks.size();
-      List<QueuedExpireJob> peers =
-          selectQueuedJobsToClaim(
-              client,
-              catalogName,
-              remainingCapacity,
-              batchCapacity,
-              Set.of(target.instanceId.getId()),
-              unionTableIds(target.spec.tableIds(), List.of(tableId)));
-      if (coalesceInto(client, target, scheduleTasks, scheduleSpec.get(), peers, batchCapacity)) {
-        return 0;
-      }
-    }
-
-    Optional<QueuedExpireJob> tableJob =
-        scheduleTableJob(client, policy, tableId, scheduleSpec.get(), due);
-    if (tableJob.isEmpty()) {
-      return 0;
-    }
-    List<QueuedExpireJob> peers =
-        selectQueuedJobsToClaim(
-            client,
-            catalogName,
-            batchCapacity - tableJob.get().spec.tableIds().size(),
-            batchCapacity,
-            Set.of(tableJob.get().instanceId.getId()),
-            new HashSet<>(tableJob.get().spec.tableIds()));
-    if (!peers.isEmpty()) {
-      coalesceInto(client, tableJob.get(), List.of(), null, peers, batchCapacity);
-    }
-    return 1;
   }
 
   private int scheduleSameCatalog(
       SchedulerClient client,
       PolicyEntity policy,
       String catalogName,
-      List<ExpandTableCandidate> tables,
+      List<TableCandidate> tables,
       int batchCapacity,
       Instant due) {
-    List<ExpandTableCandidate> remaining = new ArrayList<>(tables);
+    List<TableCandidate> remaining = new ArrayList<>(tables);
     int newRows = 0;
     while (!remaining.isEmpty()) {
       Optional<QueuedExpireJob> incompleteBatch =
@@ -222,9 +154,8 @@ public class CronJobPlanner {
         QueuedExpireJob target = incompleteBatch.get();
         int remainingCapacity = batchCapacity - target.spec.tableIds().size();
         int takeCount = Math.min(remainingCapacity, remaining.size());
-        List<ExpandTableCandidate> scheduleTables =
-            new ArrayList<>(remaining.subList(0, takeCount));
-        Optional<MaintenanceJobSpec> scheduleSpec = buildSpec(policy, scheduleTables);
+        List<TableCandidate> scheduleTables = new ArrayList<>(remaining.subList(0, takeCount));
+        Optional<MaintenanceJobSpec> scheduleSpec = buildSpec(scheduleTables);
         if (scheduleSpec.isPresent()) {
           List<QueuedExpireJob> peers =
               selectQueuedJobsToClaim(
@@ -247,8 +178,8 @@ public class CronJobPlanner {
         }
       }
       int takeCount = Math.min(batchCapacity, remaining.size());
-      List<ExpandTableCandidate> scheduleTables = new ArrayList<>(remaining.subList(0, takeCount));
-      Optional<MaintenanceJobSpec> scheduleSpec = buildSpec(policy, scheduleTables);
+      List<TableCandidate> scheduleTables = new ArrayList<>(remaining.subList(0, takeCount));
+      Optional<MaintenanceJobSpec> scheduleSpec = buildSpec(scheduleTables);
       if (scheduleSpec.isPresent()) {
         Optional<QueuedExpireJob> batchJob =
             scheduleBatchJob(client, policy, scheduleSpec.get(), due);
@@ -278,10 +209,7 @@ public class CronJobPlanner {
     return newRows;
   }
 
-  /**
-   * Coalesces under-capacity expire rows (prefer {@code batch:}, then {@code table:}) by claiming
-   * peer rows. Shared by table-level and schema/catalog schedule tails.
-   */
+  /** Coalesces under-capacity expire rows (prefer {@code batch:}, then {@code table:}). */
   private void coalesceOpenExpireJobs(SchedulerClient client, int batchCapacity) {
     Set<String> saturatedInstanceIds = new HashSet<>();
     for (; ; ) {
@@ -331,9 +259,9 @@ public class CronJobPlanner {
         .min(Comparator.comparing(job -> job.instanceId.getId()));
   }
 
-  private static List<Long> tableIds(List<ExpandTableCandidate> tables) {
+  private static List<Long> tableIds(List<TableCandidate> tables) {
     List<Long> ids = new ArrayList<>(tables.size());
-    for (ExpandTableCandidate table : tables) {
+    for (TableCandidate table : tables) {
       ids.add(table.tableId());
     }
     return ids;
@@ -559,26 +487,6 @@ public class CronJobPlanner {
     }
   }
 
-  /**
-   * Schedules a snapshot-expiry {@code table:} row and returns the queued expire view used for
-   * coalesce. Empty when the instance already exists or the row is not an expire job.
-   */
-  private Optional<QueuedExpireJob> scheduleTableJob(
-      SchedulerClient client,
-      PolicyEntity policy,
-      long tableId,
-      MaintenanceJobSpec spec,
-      Instant due) {
-    String id = MaintenanceTaskIds.forCronTable(tableId, policy.id());
-    boolean created =
-        client.scheduleIfNotExists(
-            new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec), due);
-    if (!created) {
-      return Optional.empty();
-    }
-    return findExpireJob(client, id);
-  }
-
   /** Schedules a new {@code batch:} for schedule tables only; peers are claimed afterward. */
   private Optional<QueuedExpireJob> scheduleBatchJob(
       SchedulerClient client, PolicyEntity policy, MaintenanceJobSpec spec, Instant due) {
@@ -603,18 +511,17 @@ public class CronJobPlanner {
         .findFirst();
   }
 
-  private Optional<MaintenanceJobSpec> buildSpec(
-      PolicyEntity policy, List<ExpandTableCandidate> tables) {
-    List<ResolvedTableRef> refs = new ArrayList<>(tables.size());
-    for (ExpandTableCandidate table : tables) {
-      refs.add(new ResolvedTableRef(table.tableId(), table.catalogName(), table.tableIdentifier()));
-    }
+  private Optional<MaintenanceJobSpec> buildSpec(List<TableCandidate> tables) {
     try {
-      return Optional.of(specFactory.forCron(policy, refs));
+      return Optional.of(specFactory.forCron(tables));
     } catch (RuntimeException e) {
+      long policyId =
+          tables.isEmpty() || tables.get(0).policies().isEmpty()
+              ? -1L
+              : tables.get(0).policies().get(0).id();
       LOG.warn(
           "Skipping cron-job schedule for policy {}: failed to build jobConf / MaintenanceJobSpec: {}",
-          policy.id(),
+          policyId,
           e.toString());
       return Optional.empty();
     }

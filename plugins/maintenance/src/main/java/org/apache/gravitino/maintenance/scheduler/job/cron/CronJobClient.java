@@ -27,8 +27,8 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
@@ -53,15 +53,14 @@ public class CronJobClient {
   }
 
   /**
-   * Plans and submits due-now cron jobs for the given expand candidates.
+   * Plans and submits due-now cron jobs for the given table candidates.
    *
-   * @param policy effective maintenance policy
-   * @param candidates schedulable tables with winner levels
+   * @param policy effective maintenance policy (expand context)
+   * @param candidates schedulable tables with their policies
    * @param batchCapacity max candidates considered for non-snapshot types
    * @return number of newly inserted cron-job rows
    */
-  public int scheduleNow(
-      PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
+  public int scheduleNow(PolicyEntity policy, List<TableCandidate> candidates, int batchCapacity) {
     return planner.plan(scheduler, policy, candidates, batchCapacity, Instant.now());
   }
 
