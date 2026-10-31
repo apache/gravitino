@@ -297,8 +297,9 @@ row.
   This handles dataset addition, removal, rename, reordering, and source changes without separate
   dataset operations.
 - **Explicit replacement.** Every explicit definition replacement resolves sources again, even if
-  the submitted source names or serialized definition are unchanged. This permits an explicit
-  replacement to record a different source ID when the same name now refers to a new object.
+  only a metric expression changes or the submitted definition is identical. After a source rename
+  and reuse of its old name by another object, a successful replacement records the new object's ID
+  for unchanged dataset source references.
 - **Metadata updates.** Model rename, comment, and property changes leave association rows unchanged
   and do not resolve dataset sources again.
 
@@ -468,8 +469,9 @@ are not included in the Development Plan.
    definition write and model deletion, including model deletion caused by dropping its schema,
    catalog, or metalake. Cover datasets sharing a source, dataset changes and reordering, and
    transaction rollback. Verify that replacing an identical definition updates bindings after
-   same-name source recreation, while metadata-only changes preserve bindings after source rename
-   or deletion.
+   same-name source recreation. Also cover a metric-only replacement after source rename and name
+   reuse: unchanged dataset source references bind to the new source if validation succeeds.
+   Metadata-only changes must preserve bindings after source rename or deletion.
 2. Add the indexed relation query, REST endpoint using `EntityListResponse`, source access checks,
    and full model load authorization checks. Emit pre-operation, success, and failure events and
    add dataset lookup to the existing audit operation mapping.
