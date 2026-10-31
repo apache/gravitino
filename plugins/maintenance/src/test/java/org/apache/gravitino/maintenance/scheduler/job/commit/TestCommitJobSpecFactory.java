@@ -82,26 +82,22 @@ class TestCommitJobSpecFactory {
   }
 
   @Test
-  void testMergeSparkConfMapsMergesByKey() {
+  void testMergeSparkConfMaps() throws Exception {
     Map<String, String> into = new HashMap<>();
     into.put("spark.executor.memory", "4g");
     into.put("shared", "first");
     MaintenanceJobSpecFactory.mergeSparkConfMaps(
         into,
         "{\"spark.executor.cores\":\"2\",\"shared\":\"later\",\"spark.driver.memory\":\"2g\"}");
-
     Assertions.assertEquals("4g", into.get("spark.executor.memory"));
     Assertions.assertEquals("first", into.get("shared"));
     Assertions.assertEquals("2", into.get("spark.executor.cores"));
     Assertions.assertEquals("2g", into.get("spark.driver.memory"));
-  }
 
-  @Test
-  void testMergeSparkConfMapsAddsWhenMissing() throws Exception {
-    Map<String, String> into = new HashMap<>();
+    Map<String, String> empty = new HashMap<>();
     MaintenanceJobSpecFactory.mergeSparkConfMaps(
-        into, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
-    Assertions.assertEquals("v", into.get("k"));
+        empty, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
+    Assertions.assertEquals("v", empty.get("k"));
   }
 
   private static Config configWithUri() {

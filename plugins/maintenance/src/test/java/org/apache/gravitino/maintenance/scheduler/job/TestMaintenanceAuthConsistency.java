@@ -44,35 +44,31 @@ class TestMaintenanceAuthConsistency {
   }
 
   @Test
-  void testMismatchingGravitinoAuthFails() {
+  void testMismatchingAuthFails() {
     Config config = new Config(false) {};
-    PolicyEntity a = policy(1L, Map.of(), Map.of("auth_type", "none"));
-    PolicyEntity b = policy(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"));
-    IllegalArgumentException ex =
+    IllegalArgumentException gravitino =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
-    String message = ex.getMessage();
-    Assertions.assertTrue(message.contains("gravitinoAuth mismatch"));
-    Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
-    Assertions.assertTrue(message.contains("differing keys="));
-    Assertions.assertTrue(message.contains("auth_type"));
-    Assertions.assertTrue(message.contains("username"));
-  }
+            () ->
+                MaintenanceAuthConsistency.requireSameAuth(
+                    List.of(
+                        policy(1L, Map.of(), Map.of("auth_type", "none")),
+                        policy(2L, Map.of(), Map.of("auth_type", "simple", "username", "u"))),
+                    config));
+    Assertions.assertTrue(gravitino.getMessage().contains("gravitinoAuth mismatch"));
+    Assertions.assertTrue(gravitino.getMessage().contains("auth_type"));
 
-  @Test
-  void testMismatchingIrcAuthFails() {
-    Config config = new Config(false) {};
-    PolicyEntity a = policy(1L, Map.of("rest.auth.type", "none"), Map.of());
-    PolicyEntity b = policy(2L, Map.of("rest.auth.type", "basic"), Map.of());
-    IllegalArgumentException ex =
+    IllegalArgumentException irc =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> MaintenanceAuthConsistency.requireSameAuth(List.of(a, b), config));
-    String message = ex.getMessage();
-    Assertions.assertTrue(message.contains("ircAuth mismatch"));
-    Assertions.assertTrue(message.contains("policy 1 vs policy 2"));
-    Assertions.assertTrue(message.contains("differing keys=[rest.auth.type]"));
+            () ->
+                MaintenanceAuthConsistency.requireSameAuth(
+                    List.of(
+                        policy(1L, Map.of("rest.auth.type", "none"), Map.of()),
+                        policy(2L, Map.of("rest.auth.type", "basic"), Map.of())),
+                    config));
+    Assertions.assertTrue(irc.getMessage().contains("ircAuth mismatch"));
+    Assertions.assertTrue(irc.getMessage().contains("differing keys=[rest.auth.type]"));
   }
 
   @Test

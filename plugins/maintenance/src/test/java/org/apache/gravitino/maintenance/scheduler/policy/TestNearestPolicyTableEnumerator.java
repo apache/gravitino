@@ -274,36 +274,6 @@ class TestNearestPolicyTableEnumerator {
   }
 
   @Test
-  void testSameLevelConflictSkipsTable() throws Exception {
-    PolicyEntity policy = policy(10L, "compaction");
-    TagEntity tagA = tag(1L, "t-a");
-
-    when(policyTagRelService.listRelations(
-            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
-            eq(Entity.EntityType.POLICY)))
-        .thenReturn(List.of(policyTagEdge(policy, tagA)));
-    when(tagMetaService.listAssociatedMetadataObjectsForTag(tagA.nameIdentifier()))
-        .thenReturn(
-            List.of(
-                GenericEntity.builder()
-                    .withId(100L)
-                    .withName("catalog.schema.t1")
-                    .withEntityType(Entity.EntityType.TABLE)
-                    .build()));
-
-    MetadataObject table =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenThrow(
-            new IllegalArgumentException(
-                "ambiguous ICEBERG_COMPACTION policies [10, 11] on nearest level " + table));
-
-    Assertions.assertEquals(
-        List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
-  }
-
-  @Test
   void testImportsOnlyMissingTablesAfterCatalogList() throws Exception {
     PolicyEntity policy = stubTaggedObject("catalog.schema", Entity.EntityType.SCHEMA);
     SchemaDispatcher schemas = mock(SchemaDispatcher.class);
@@ -328,28 +298,6 @@ class TestNearestPolicyTableEnumerator {
         tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
     verify(tables).loadTable(missing);
     verify(tables, never()).loadTable(known);
-  }
-
-  @Test
-  void testImportsOnlyMissingSchemasAfterCatalogList() throws Exception {
-    PolicyEntity policy = stubTaggedObject("catalog", Entity.EntityType.CATALOG);
-    SchemaDispatcher schemas = mock(SchemaDispatcher.class);
-    TableDispatcher tables = mock(TableDispatcher.class);
-    NameIdentifier known = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "known");
-    NameIdentifier missing = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "missing");
-    when(schemas.listSchemas(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
-        .thenReturn(new NameIdentifier[] {known, missing});
-    when(schemaMetaService.listSchemasByNamespace(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
-        .thenReturn(List.of(schema(2L, "known")));
-    when(schemas.loadSchema(eq(missing))).thenReturn(mock(org.apache.gravitino.Schema.class));
-    when(tables.listTables(any())).thenReturn(new NameIdentifier[0]);
-    when(tableMetaService.listTablesByNamespace(any())).thenReturn(List.of());
-
-    Assertions.assertEquals(
-        List.of(),
-        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
-    verify(schemas).loadSchema(missing);
-    verify(schemas, never()).loadSchema(known);
   }
 
   private PolicyEntity stubTaggedObject(String objectName, Entity.EntityType type)

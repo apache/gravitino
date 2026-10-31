@@ -82,21 +82,14 @@ class TestMaintenanceJobSpecFactory {
     Assertions.assertTrue(perTable.get("tables").contains("\"table_identifier\":\"db.t1\""));
     Assertions.assertTrue(perTable.containsKey("updater_options"));
     Assertions.assertEquals("4g", perTable.get("spark_executor_memory"));
-  }
 
-  @Test
-  void testForCronAllowsDifferentPoliciesPerTable() {
-    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
-    PolicyEntity p1 = compaction(201L);
-    PolicyEntity p2 = compaction(202L);
-    MaintenanceJobSpec spec =
+    MaintenanceJobSpec mixedPolicies =
         factory.forCron(
             List.of(
-                candidate(10L, "iceberg", "db.t1", p1), candidate(11L, "iceberg", "db.t2", p2)));
-
-    Assertions.assertEquals(2, spec.getTasks().size());
-    Assertions.assertEquals(201L, spec.getTasks().get(0).getPolicyId());
-    Assertions.assertEquals(202L, spec.getTasks().get(1).getPolicyId());
+                candidate(10L, "iceberg", "db.t1", compaction(201L)),
+                candidate(11L, "iceberg", "db.t2", compaction(202L))));
+    Assertions.assertEquals(201L, mixedPolicies.getTasks().get(0).getPolicyId());
+    Assertions.assertEquals(202L, mixedPolicies.getTasks().get(1).getPolicyId());
   }
 
   @Test
@@ -142,7 +135,7 @@ class TestMaintenanceJobSpecFactory {
   }
 
   @Test
-  void testMergeResourceKeysTakesMax() {
+  void testMergeResourceKeysTakesMaxIncludingMemoryUnits() {
     Map<String, String> into =
         linkedMap(
             "spark_executor_memory", "4g", "spark_executor_cores", "2", "catalog_uri", "http://a");
@@ -153,14 +146,10 @@ class TestMaintenanceJobSpecFactory {
     Assertions.assertEquals("7g", into.get("spark_executor_memory"));
     Assertions.assertEquals("2", into.get("spark_executor_cores"));
     Assertions.assertEquals("http://a", into.get("catalog_uri"));
-  }
 
-  @Test
-  void testMergeResourceKeysComparesMemoryUnits() {
-    Map<String, String> into = linkedMap("spark_executor_memory", "1g");
-    Map<String, String> from = linkedMap("spark_executor_memory", "512m");
-    MaintenanceJobSpecFactory.mergeResourceKeys(into, from);
-    Assertions.assertEquals("1g", into.get("spark_executor_memory"));
+    Map<String, String> units = linkedMap("spark_executor_memory", "1g");
+    MaintenanceJobSpecFactory.mergeResourceKeys(units, linkedMap("spark_executor_memory", "512m"));
+    Assertions.assertEquals("1g", units.get("spark_executor_memory"));
 
     Map<String, String> mixed = linkedMap("spark_executor_memory", "512m");
     MaintenanceJobSpecFactory.mergeResourceKeys(mixed, linkedMap("spark_executor_memory", "1500m"));

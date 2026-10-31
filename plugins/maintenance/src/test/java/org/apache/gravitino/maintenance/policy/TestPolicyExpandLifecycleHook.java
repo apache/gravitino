@@ -52,30 +52,26 @@ class TestPolicyExpandLifecycleHook extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDisabledMaintenancePolicyRemovesTheRow() {
+  void testDisabledOrNonMaintenancePolicyRemovesTheRow() {
     PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
     PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
     PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
 
     SessionUtils.doMultipleWithCommit(() -> hook.afterPersist(policy(7L, true, compaction(CRON))));
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isPresent());
-
     SessionUtils.doMultipleWithCommit(() -> hook.afterUpdate(policy(7L, false, compaction(CRON))));
     Assertions.assertTrue(reader.scheduledExecutionTime(7L).isEmpty());
-  }
-
-  @TestTemplate
-  void testNonMaintenancePolicyRemovesAnyStrayRow() {
-    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
-    PolicyExpandClient reader = PolicyExpandClient.forReads(entityStoreDataSource());
-    PolicyExpandLifecycleHook hook = new PolicyExpandLifecycleHook(writer);
-    PolicyContent custom = PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null);
 
     SessionUtils.doMultipleWithCommit(() -> writer.sync(1L, true, CRON));
     Assertions.assertTrue(reader.scheduledExecutionTime(1L).isPresent());
-
     SessionUtils.doMultipleWithCommit(
-        () -> hook.afterPersist(policy(1L, true, custom, Policy.BuiltInType.CUSTOM)));
+        () ->
+            hook.afterPersist(
+                policy(
+                    1L,
+                    true,
+                    PolicyContents.custom(Map.of(), Set.of(MetadataObject.Type.TABLE), null),
+                    Policy.BuiltInType.CUSTOM)));
     Assertions.assertTrue(reader.scheduledExecutionTime(1L).isEmpty());
   }
 
