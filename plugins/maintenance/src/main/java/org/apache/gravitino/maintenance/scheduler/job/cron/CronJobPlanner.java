@@ -49,17 +49,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Merges same-catalog snapshot-expiry cron-job rows under a fixed batch capacity, and packs new
- * expand winners into incomplete {@code batch:} / {@code table:} rows before allocating a new
- * instance.
- *
- * <p>Claim-first: {@code cancel} each unpicked peer, then {@code reschedule} the target {@code
- * task_data} (target {@code task_instance} unchanged). {@code spark_conf} is max-merged. Auth
- * mismatch skips peers without cancelling them. Picked rows are never claimed.
+ * Plans enqueue-time {@code cron-job} work: builds specs for non-snapshot policies, and for
+ * snapshot-expiry merges same-catalog rows under a fixed batch capacity (claim-first {@code cancel}
+ * then {@code reschedule} of target {@code task_data}).
  */
-public class CronJobMerger {
+public class CronJobPlanner {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CronJobMerger.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CronJobPlanner.class);
 
   /** Max tables in one snapshot-expiry {@code batch:} / coalesce target. */
   private static final int SNAPSHOT_EXPIRY_BATCH_CAPACITY = 10;
@@ -70,25 +66,53 @@ public class CronJobMerger {
   /**
    * @param gravitinoConfig server config for jobConf overlay and auth checks
    */
-  public CronJobMerger(Config gravitinoConfig) {
+  public CronJobPlanner(Config gravitinoConfig) {
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.specFactory = new MaintenanceJobSpecFactory(this.gravitinoConfig);
   }
 
   /**
-   * Enqueues and/or merges snapshot-expiry cron jobs for the given expand candidates.
+   * Plans and writes due-now cron-job rows for the given expand candidates.
    *
    * @param client cron-job scheduler client
-   * @param policy snapshot-expiry policy
+   * @param policy effective maintenance policy
    * @param candidates enqueueable tables
+   * @param expandBatchCapacity max candidates for non-snapshot types
    * @param due execution time for newly inserted rows
    * @return number of newly inserted cron-job rows (merges into existing rows do not count)
    */
-  public int merge(
+  public int plan(
       SchedulerClient client,
       PolicyEntity policy,
       List<ExpandTableCandidate> candidates,
+      int expandBatchCapacity,
       Instant due) {
+    if (policy == null || candidates == null || candidates.isEmpty()) {
+      return 0;
+    }
+    if (MaintenanceJobTemplates.templateName(policy.policyType()).isEmpty()) {
+      LOG.warn(
+          "Skipping cron-job enqueue for policy {} with unsupported type {}",
+          policy.id(),
+          policy.policyType());
+      return 0;
+    }
+    if (policy.policyType() != Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
+      int scheduled = 0;
+      int limit = Math.min(candidates.size(), Math.max(1, expandBatchCapacity));
+      for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
+        Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate));
+        if (spec.isEmpty()) {
+          continue;
+        }
+        String id = MaintenanceTaskIds.forCronTable(candidate.tableId(), policy.id());
+        if (client.scheduleIfNotExists(
+            new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due)) {
+          scheduled++;
+        }
+      }
+      return scheduled;
+    }
     int batchCapacity = SNAPSHOT_EXPIRY_BATCH_CAPACITY;
     List<ExpandTableCandidate> batchable = new ArrayList<>();
     List<ExpandTableCandidate> tableLevel = new ArrayList<>();

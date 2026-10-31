@@ -21,7 +21,6 @@ package org.apache.gravitino.maintenance.scheduler.job.commit;
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
 import com.github.kagkarlsson.scheduler.task.TaskInstance;
-import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.util.Optional;
@@ -33,95 +32,61 @@ import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Enqueues one-shot {@code commit-job} rows. Chain collection, cool-down filter, auth, and spec
- * build are handled by {@link CommitJobMerger}.
- *
- * <p>Instance id is {@code table:{table_id}}; bursts of commits on the same table coalesce via
- * {@code scheduleIfNotExists}. Coalesce leaves an existing row's {@code task_data} untouched.
+ * Submits one-shot {@code commit-job} rows to db-scheduler. Planning is done by {@link
+ * CommitJobPlanner}.
  */
 public class CommitJobClient {
 
-  /**
-   * Outcome of {@link #enqueueNow(long, NameIdentifier)}.
-   *
-   * <p>Distinguishes coalesce ({@link #ALREADY_QUEUED}) from enqueue gate skips ({@link #SKIPPED})
-   * so callers do not log "already queued" when no spec was written.
-   */
-  public enum EnqueueResult {
-
-    /** A new {@code commit-job} row was inserted with a MaintenanceJobSpec. */
-    INSERTED,
-
-    /**
-     * A {@code commit-job} row already exists for the table (coalesced; {@code task_data} kept).
-     */
-    ALREADY_QUEUED,
-
-    /**
-     * Nothing written: empty / cooled-down chain, auth failure, unresolved table, or jobConf build
-     * failure.
-     */
-    SKIPPED
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(CommitJobClient.class);
 
   private final DataSource dataSource;
-  private final CommitJobMerger merger;
+  private final CommitJobPlanner planner;
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
-   * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
+   * @param gravitinoConfig server config
    */
   public CommitJobClient(DataSource dataSource, Config gravitinoConfig) {
-    this(dataSource, new CommitJobMerger(gravitinoConfig));
-  }
-
-  /**
-   * @param dataSource JDBC pool
-   * @param merger builds the enqueue-time chain spec
-   */
-  CommitJobClient(DataSource dataSource, CommitJobMerger merger) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
-    this.merger = Preconditions.checkNotNull(merger);
+    this.planner = new CommitJobPlanner(Preconditions.checkNotNull(gravitinoConfig));
   }
 
   /**
-   * Builds an enqueue-time spec and schedules a {@code commit-job} when one is not already queued
-   * and the spec is non-empty.
+   * Plans then schedules a {@code commit-job} for the table in {@code identifier}.
    *
-   * @param tableId table entity id
    * @param identifier {@code metalake.catalog.schema.table} from the commit event
-   * @return insert / coalesce / skip outcome
    */
-  public EnqueueResult enqueueNow(long tableId, NameIdentifier identifier) {
-    Preconditions.checkArgument(tableId > 0, "tableId must be positive");
-    Preconditions.checkNotNull(identifier, "identifier must not be null");
+  public void enqueueNow(NameIdentifier identifier) {
+    if (identifier == null) {
+      return;
+    }
     SchedulerClient client = schedulerClient(dataSource);
-    String id = MaintenanceTaskIds.forCommitTable(tableId);
-    // Coalesce without rebuilding task_data: keep the first enqueue-time spec.
-    if (client
-        .getScheduledExecution(TaskInstanceId.of(TableMaintenanceSchedulerPools.COMMIT_JOB, id))
-        .isPresent()) {
-      return EnqueueResult.ALREADY_QUEUED;
-    }
-    Optional<MaintenanceJobSpec> spec = merger.merge(tableId, identifier);
+    Optional<MaintenanceJobSpec> spec = planner.plan(client, identifier);
     if (spec.isEmpty()) {
-      return EnqueueResult.SKIPPED;
+      return;
     }
-    boolean inserted =
-        client.scheduleIfNotExists(
-            new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
-            Instant.now());
-    return inserted ? EnqueueResult.INSERTED : EnqueueResult.ALREADY_QUEUED;
+    long tableId = spec.get().tableIds().get(0);
+    String id = MaintenanceTaskIds.forCommitTable(tableId);
+    try {
+      if (client.scheduleIfNotExists(
+          new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
+          Instant.now())) {
+        LOG.info("Enqueued commit-job for table {} ({})", tableId, identifier);
+      } else {
+        LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
+      }
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to enqueue commit-job for IRC update {}: {}", identifier, e.toString());
+    }
   }
 
   /**
-   * Builds a db-scheduler {@link SchedulerClient} that can commit against the entity-store
-   * DataSource.
-   *
    * @param dataSource entity-store pool
-   * @return client bound to {@link TableMaintenanceSchedulerPools#COMMIT_TASKS_TABLE}
+   * @return client bound to the commit-job table
    */
   public static SchedulerClient schedulerClient(DataSource dataSource) {
     return SchedulerClient.Builder.create(

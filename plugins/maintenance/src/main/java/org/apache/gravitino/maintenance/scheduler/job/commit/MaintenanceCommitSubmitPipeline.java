@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * MaintenanceJobManager#submitAndBind} for one chained Spark job.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
- * enqueue (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job}
+ * enqueue (see {@link CommitJobPlanner}). The caller always deletes the one-shot {@code commit-job}
  * row after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {

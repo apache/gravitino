@@ -20,39 +20,25 @@ package org.apache.gravitino.maintenance.scheduler.job.cron;
 
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.serializer.JacksonSerializer;
-import com.github.kagkarlsson.scheduler.task.TaskInstance;
 import com.google.common.base.Preconditions;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.Policy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Enqueues one-shot {@code cron-job} rows. Snapshot-expiry table merge is handled by {@link
- * CronJobMerger}.
+ * Submits one-shot {@code cron-job} rows to db-scheduler. Enqueue planning is {@link
+ * CronJobPlanner}.
  */
 public class CronJobClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CronJobClient.class);
-
   private final DataSource dataSource;
-  private final MaintenanceJobSpecFactory specFactory;
-  private final CronJobMerger merger;
+  private final CronJobPlanner planner;
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
@@ -60,13 +46,11 @@ public class CronJobClient {
    */
   public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
-    Preconditions.checkNotNull(gravitinoConfig);
-    this.specFactory = new MaintenanceJobSpecFactory(gravitinoConfig);
-    this.merger = new CronJobMerger(gravitinoConfig);
+    this.planner = new CronJobPlanner(Preconditions.checkNotNull(gravitinoConfig));
   }
 
   /**
-   * Enqueues due-now cron jobs for the given expand candidates.
+   * Plans and submits due-now cron jobs for the given expand candidates.
    *
    * @param policy effective maintenance policy
    * @param candidates enqueueable tables with winner levels
@@ -75,35 +59,8 @@ public class CronJobClient {
    */
   public int enqueueNow(
       PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
-    if (policy == null || candidates == null || candidates.isEmpty()) {
-      return 0;
-    }
-    if (MaintenanceJobTemplates.templateName(policy.policyType()).isEmpty()) {
-      LOG.warn(
-          "Skipping cron-job enqueue for policy {} with unsupported type {}",
-          policy.id(),
-          policy.policyType());
-      return 0;
-    }
-    SchedulerClient client = schedulerClient(dataSource);
-    Instant due = Instant.now();
-    if (policy.policyType() == Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION) {
-      return merger.merge(client, policy, candidates, due);
-    }
-    int scheduled = 0;
-    int limit = Math.min(candidates.size(), Math.max(1, batchCapacity));
-    for (ExpandTableCandidate candidate : candidates.subList(0, limit)) {
-      Optional<MaintenanceJobSpec> spec = buildSpec(policy, List.of(candidate));
-      if (spec.isEmpty()) {
-        continue;
-      }
-      String id = MaintenanceTaskIds.forCronTable(candidate.tableId(), policy.id());
-      if (client.scheduleIfNotExists(
-          new TaskInstance<>(TableMaintenanceSchedulerPools.CRON_JOB, id, spec.get()), due)) {
-        scheduled++;
-      }
-    }
-    return scheduled;
+    return planner.plan(
+        schedulerClient(dataSource), policy, candidates, batchCapacity, Instant.now());
   }
 
   /**
@@ -124,23 +81,6 @@ public class CronJobClient {
    * @return true when a queued cron-job already covers the table
    */
   public boolean isTableAlreadyQueued(long tableId, long policyId) {
-    return merger.isTableAlreadyQueued(schedulerClient(dataSource), tableId, policyId);
-  }
-
-  private Optional<MaintenanceJobSpec> buildSpec(
-      PolicyEntity policy, List<ExpandTableCandidate> tables) {
-    List<ResolvedTableRef> refs = new ArrayList<>(tables.size());
-    for (ExpandTableCandidate table : tables) {
-      refs.add(new ResolvedTableRef(table.tableId(), table.catalogName(), table.tableIdentifier()));
-    }
-    try {
-      return Optional.of(specFactory.forCron(policy, refs));
-    } catch (RuntimeException e) {
-      LOG.warn(
-          "Skipping cron-job enqueue for policy {}: failed to build jobConf / MaintenanceJobSpec: {}",
-          policy.id(),
-          e.toString());
-      return Optional.empty();
-    }
+    return planner.isTableAlreadyQueued(schedulerClient(dataSource), tableId, policyId);
   }
 }
