@@ -15,6 +15,41 @@
 # specific language governing permissions and limitations
 # under the License.
 
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apache-gravitino"
+requires-python = ">=3.10"
+# Keep setup.py and requirements*.txt as the package metadata source.
+dynamic = [
+    "version",
+    "description",
+    "readme",
+    "license",
+    "authors",
+    "maintainers",
+    "keywords",
+    "classifiers",
+    "urls",
+    "dependencies",
+    "optional-dependencies",
+]
+
+[dependency-groups]
+# Existing package metadata tests execute setup.py directly.
+dev = ["setuptools>=61"]
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "setup.py" },
+    { file = "setup.cfg" },
+    { file = "README.md" },
+    { file = "requirements*.txt" },
+]
+
 [tool.ruff]
 line-length = 88
 
