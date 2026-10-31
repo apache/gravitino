@@ -106,6 +106,39 @@ Use any IDE to develop Gravitino Python Client. Directly open the client-python 
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
+### Develop with uv
+
+The Python client also provides an optional [uv](https://docs.astral.sh/uv/) development
+workflow. The existing Gradle build, CI, and release commands continue to use their existing
+environment setup.
+
+Install uv, then run the following commands from `clients/client-python`:
+
+```shell
+uv sync --locked --extra dev --python 3.12
+uv run --locked --extra dev python scripts/generate_version.py
+uv run --locked --extra dev black --check gravitino tests scripts
+uv run --locked --extra dev pylint gravitino tests scripts
+PYTHONPATH="$PWD" uv run --locked --extra dev --directory tests/unittests python -m unittest
+```
+
+The version-generation command is required after a fresh checkout. Configure your IDE to use
+`clients/client-python/.venv/bin/python` (or `.venv/Scripts/python.exe` on Windows).
+For another supported Python version, select it with `--python`. Use a separate environment
+when switching between Python versions or dependency combinations.
+The unit-test command sets `PYTHONPATH` to make the existing shared test helpers importable,
+as the Gradle test task does.
+
+`setup.py` and the existing `requirements*.txt` files continue to declare package metadata
+and dependencies. `uv.lock` records the resolved development environment; SDK users can
+continue installing the published package with pip. After changing a requirement file,
+run `uv lock`, review the lockfile changes, and verify `uv lock --check`. Use
+`uv sync --locked --all-extras` to install all existing optional extras in the
+development environment.
+
+The uv workflow above runs unit tests. Integration tests still use the existing Gradle
+commands below and their server or storage prerequisites.
+
 ### Build and Test
 
 1. Clone the Gravitino project.

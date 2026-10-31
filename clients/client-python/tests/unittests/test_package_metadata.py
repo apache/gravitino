@@ -30,6 +30,8 @@ class TestPackageMetadata(unittest.TestCase):
     def test_core_requirements_and_storage_extras(self):
         metadata, source_files = self._read_package_metadata()
 
+        self.assertEqual(metadata["Name"], "apache-gravitino")
+        self.assertEqual(metadata["Requires-Python"], ">=3.10")
         self._assert_core_requirements(metadata)
         self._assert_source_manifest(source_files)
         self._assert_storage_extras(metadata)
@@ -115,6 +117,7 @@ class TestPackageMetadata(unittest.TestCase):
 
     def _assert_source_manifest(self, source_files):
         for requirements_file in (
+            "pyproject.toml",
             "requirements.txt",
             "requirements-dev.txt",
             "requirements-gvfs.txt",
