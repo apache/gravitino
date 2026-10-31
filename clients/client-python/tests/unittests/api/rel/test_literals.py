@@ -48,6 +48,35 @@ class TestLiterals(unittest.TestCase):
         self.assertEqual(decimal_val.value(), Decimal("0.00"))
         self.assertEqual(decimal_val.data_type(), Types.DecimalType.of(2, 2))
 
+    def test_decimal_literal_positive_exponent(self) -> None:
+        for text, precision in (
+            ("1E+3", 4),
+            ("-1.23E+4", 5),
+            ("0E+3", 4),
+            ("1E+37", 38),
+        ):
+            with self.subTest(value=text):
+                value = Decimal(text)
+                literal = Literals.decimal_literal(value)
+                self.assertIs(literal.value(), value)
+                self.assertEqual(
+                    literal.data_type(), Types.DecimalType.of(precision, 0)
+                )
+
+    def test_decimal_literal_positive_exponent_precision_limit(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Decimal precision must be in range"):
+            Literals.decimal_literal(Decimal("1E+38"))
+
+    def test_decimal_literal_retains_fractional_scale(self) -> None:
+        for text, precision, scale in (("1E-3", 3, 3), ("123.40", 5, 2)):
+            with self.subTest(value=text):
+                value = Decimal(text)
+                literal = Literals.decimal_literal(value)
+                self.assertIs(literal.value(), value)
+                self.assertEqual(
+                    literal.data_type(), Types.DecimalType.of(precision, scale)
+                )
+
     def test_date_literal(self):
         date_val = Literals.date_literal(date(2023, 1, 1))
         self.assertEqual(date_val.value(), date(2023, 1, 1))
