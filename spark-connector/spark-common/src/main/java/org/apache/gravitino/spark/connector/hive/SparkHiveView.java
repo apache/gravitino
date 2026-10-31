@@ -20,10 +20,12 @@
 package org.apache.gravitino.spark.connector.hive;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
@@ -33,9 +35,13 @@ import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.parser.ParseException;
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
+import org.apache.spark.sql.connector.catalog.CatalogManager;
 import org.apache.spark.sql.connector.read.LocalScan;
 import org.apache.spark.sql.connector.read.Scan;
 import org.apache.spark.sql.connector.read.ScanBuilder;
+import org.apache.spark.sql.execution.CommandExecutionMode;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.MetadataBuilder;
@@ -44,6 +50,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.collection.JavaConverters;
 
 /**
  * Wraps a Hive view stored in HMS with Gravitino view metadata. Overrides newScanBuilder to execute
@@ -63,22 +70,30 @@ public class SparkHiveView extends HiveTable {
 
   private final View gravitinoView;
   private final SparkTypeConverter sparkTypeConverter;
+  private final String catalogName;
+  private final String schemaName;
 
   /**
    * Creates a SparkHiveView that wraps a Gravitino view with Hive HMS backing.
    *
    * @param gravitinoView the Gravitino view metadata
+   * @param catalogName the Spark catalog name the view was loaded from
+   * @param schemaName the view's schema (database) name
    * @param hiveTable the backing Kyuubi HiveTable from HMS
    * @param hiveTableCatalog the Kyuubi HiveTableCatalog for HMS access
    * @param sparkTypeConverter converter for Gravitino-to-Spark type mapping
    */
   public SparkHiveView(
       View gravitinoView,
+      String catalogName,
+      String schemaName,
       HiveTable hiveTable,
       HiveTableCatalog hiveTableCatalog,
       SparkTypeConverter sparkTypeConverter) {
     super(SparkSession.active(), hiveTable.catalogTable(), hiveTableCatalog);
     this.gravitinoView = gravitinoView;
+    this.catalogName = catalogName;
+    this.schemaName = schemaName;
     this.sparkTypeConverter = sparkTypeConverter;
   }
 
@@ -147,9 +162,35 @@ public class SparkHiveView extends HiveTable {
                       "View '{}' has no Spark SQL representation; falling back to Hive SQL. "
                           + "Results may differ if the SQL uses Hive-specific syntax.",
                       gravitinoView.name());
-                  return hiveSql;
+                  // For a view created by Hive, the expanded text has its table names qualified.
+                  String expandedText = catalogTable().viewText().getOrElse(() -> "");
+                  return StringUtils.isNotBlank(expandedText) ? expandedText : hiveSql;
                 });
-    return new ViewScanBuilder(spark, viewSql, schema());
+    return new ViewScanBuilder(spark, viewSql, schema(), relationQualifier(spark));
+  }
+
+  /**
+   * Builds the qualifier for the namespace the view SQL resolves in: the catalog and namespace
+   * Spark recorded when it created the view, or else the view's own catalog and schema. A recorded
+   * session catalog means Spark created the view in this metastore through its session catalog, so
+   * it maps to the catalog the view was loaded from.
+   */
+  @SuppressWarnings("deprecation") // JavaConverters is deprecated on Scala 2.13 but needed on 2.12
+  private ViewRelationQualifier relationQualifier(SparkSession spark) {
+    CatalogManager catalogManager = spark.sessionState().catalogManager();
+    List<String> recorded = JavaConverters.seqAsJavaList(catalogTable().viewCatalogAndNamespace());
+    String viewCatalog = catalogName;
+    List<String> viewNamespace = new ArrayList<>();
+    if (recorded.isEmpty()) {
+      viewNamespace.add(schemaName);
+    } else {
+      if (!CatalogManager.SESSION_CATALOG_NAME().equalsIgnoreCase(recorded.get(0))) {
+        viewCatalog = recorded.get(0);
+      }
+      viewNamespace.addAll(recorded.subList(1, recorded.size()));
+    }
+    return new ViewRelationQualifier(
+        viewCatalog, viewNamespace, catalogManager::isCatalogRegistered);
   }
 
   /**
@@ -161,11 +202,17 @@ public class SparkHiveView extends HiveTable {
     private final SparkSession spark;
     private final String viewSql;
     private final StructType schema;
+    private final ViewRelationQualifier relationQualifier;
 
-    ViewScanBuilder(SparkSession spark, String viewSql, StructType schema) {
+    ViewScanBuilder(
+        SparkSession spark,
+        String viewSql,
+        StructType schema,
+        ViewRelationQualifier relationQualifier) {
       this.spark = spark;
       this.viewSql = viewSql;
       this.schema = schema;
+      this.relationQualifier = relationQualifier;
     }
 
     @Override
@@ -182,8 +229,16 @@ public class SparkHiveView extends HiveTable {
     public InternalRow[] rows() {
       // executeCollect() pulls all rows to driver memory — see class-level Javadoc for why.
       try {
-        return spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
-      } catch (RuntimeException e) {
+        // Qualify the table names instead of switching the session's current namespace, so the
+        // session and other queries running on it are not affected.
+        LogicalPlan plan =
+            relationQualifier.qualify(spark.sessionState().sqlParser().parsePlan(viewSql));
+        return spark
+            .sessionState()
+            .executePlan(plan, CommandExecutionMode.ALL())
+            .executedPlan()
+            .executeCollect();
+      } catch (ParseException | RuntimeException e) {
         throw new RuntimeException(
             String.format("Failed to execute view SQL [%s]: %s", viewSql, e.getMessage()), e);
       }
