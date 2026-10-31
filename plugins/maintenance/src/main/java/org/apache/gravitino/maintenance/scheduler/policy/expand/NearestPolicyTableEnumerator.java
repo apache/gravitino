@@ -65,8 +65,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
- * picks this policy and {@link ExpandOccupancyGate} allows enqueue. Stops after {@code limit}
- * accepted tables (skipped cooldown / in-flight tables do not count).
+ * picks this policy and {@link PolicyTableEnumerator.ShouldSkipTable} allows enqueue. Stops after
+ * {@code limit} accepted tables (skipped cooldown / in-flight tables do not count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
  * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
@@ -155,7 +155,10 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
 
   @Override
   public List<ExpandTableCandidate> listTableIds(
-      PolicyEntity policy, int limit, ExpandOccupancyGate occupancyGate, long minIntervalMs) {
+      PolicyEntity policy,
+      int limit,
+      PolicyTableEnumerator.ShouldSkipTable shouldSkip,
+      long minIntervalMs) {
     if (limit <= 0) {
       return List.of();
     }
@@ -171,7 +174,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
             policy.id(),
             policy.policyType(),
             nearestResolverSupplier.get(),
-            occupancyGate,
+            shouldSkip,
             minIntervalMs,
             System.currentTimeMillis(),
             new LinkedHashSet<>(),
@@ -513,7 +516,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     if (winnerLevel == null) {
       return;
     }
-    if (scan.occupancyGate.shouldSkip(tableId, scan.policyId, scan.minIntervalMs, scan.nowMs)) {
+    if (scan.shouldSkip.shouldSkip(tableId, scan.policyId, scan.minIntervalMs, scan.nowMs)) {
       LOG.debug(
           "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
           tableId,
@@ -539,7 +542,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     private final long policyId;
     private final Policy.BuiltInType policyType;
     private final NearestMaintenancePolicyResolver nearestResolver;
-    private final ExpandOccupancyGate occupancyGate;
+    private final PolicyTableEnumerator.ShouldSkipTable shouldSkip;
     private final long minIntervalMs;
     private final long nowMs;
     private final Set<Long> visitedTableIds;
@@ -551,7 +554,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
         long policyId,
         Policy.BuiltInType policyType,
         NearestMaintenancePolicyResolver nearestResolver,
-        ExpandOccupancyGate occupancyGate,
+        PolicyTableEnumerator.ShouldSkipTable shouldSkip,
         long minIntervalMs,
         long nowMs,
         Set<Long> visitedTableIds,
@@ -561,7 +564,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       this.policyId = policyId;
       this.policyType = policyType;
       this.nearestResolver = nearestResolver;
-      this.occupancyGate = occupancyGate;
+      this.shouldSkip = shouldSkip;
       this.minIntervalMs = minIntervalMs;
       this.nowMs = nowMs;
       this.visitedTableIds = visitedTableIds;

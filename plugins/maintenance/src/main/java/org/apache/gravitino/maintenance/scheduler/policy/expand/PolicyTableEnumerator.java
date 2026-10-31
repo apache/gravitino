@@ -26,22 +26,40 @@ import org.apache.gravitino.meta.PolicyEntity;
  *
  * <p>Implementations expand tag-bound catalog/schema/table attachments and keep tables for which
  * the policy is the nearest winner of its {@link org.apache.gravitino.policy.Policy.BuiltInType}.
- * {@code limit} is the max number of <em>enqueueable</em> tables after occupancy / cooldown gating.
- * Each candidate carries the winner attachment level for snapshot-expiry batching.
+ * {@code limit} is the max number of <em>enqueueable</em> tables after skip checks. Each candidate
+ * carries the winner attachment level for snapshot-expiry batching.
  */
 @FunctionalInterface
 public interface PolicyTableEnumerator {
 
   /**
-   * Lists up to {@code limit} tables that are nearest-policy winners and pass {@code
-   * occupancyGate}.
+   * Skip check used while scanning for enqueueable tables.
+   *
+   * <p>Production expand skips when the action cannot start or a pending {@code cron-job} already
+   * covers the table.
+   */
+  @FunctionalInterface
+  interface ShouldSkipTable {
+
+    /**
+     * @param tableId table entity id
+     * @param policyId policy entity id
+     * @param minIntervalMs resolved cooldown for the policy type
+     * @param nowMs current epoch millis
+     * @return true when expand must not enqueue a cron-job for this pair
+     */
+    boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs);
+  }
+
+  /**
+   * Lists up to {@code limit} tables that are nearest-policy winners and are not skipped.
    *
    * @param policy loaded policy
    * @param limit maximum enqueueable candidates to return
-   * @param occupancyGate skip in-flight / cooldown / already-queued tables while scanning
-   * @param minIntervalMs resolved cooldown for {@link ExpandOccupancyGate#shouldSkip}
+   * @param shouldSkip skip occupied / cooling / already-queued tables while scanning
+   * @param minIntervalMs resolved cooldown for {@link ShouldSkipTable#shouldSkip}
    * @return distinct enqueueable candidates, size at most {@code limit}
    */
   List<ExpandTableCandidate> listTableIds(
-      PolicyEntity policy, int limit, ExpandOccupancyGate occupancyGate, long minIntervalMs);
+      PolicyEntity policy, int limit, ShouldSkipTable shouldSkip, long minIntervalMs);
 }

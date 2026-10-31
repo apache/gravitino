@@ -41,8 +41,6 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
-import org.apache.gravitino.maintenance.scheduler.job.cron.PendingCronExpandOccupancyGate;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPipeline;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -120,16 +118,11 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     MaintenanceActionManager actionManager =
         new MaintenanceActionManager(
             TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
-    ExpandOccupancyGate expandGate =
-        new PendingCronExpandOccupancyGate(
-            (tableId, policyId, minIntervalMs, nowMs) ->
-                !actionManager.canStart(tableId, policyId, minIntervalMs, nowMs),
-            dataSource);
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new NearestPolicyTableEnumerator(),
             new CronJobClient(dataSource, gravitinoConfig),
-            expandGate,
+            actionManager,
             gravitinoConfig,
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);

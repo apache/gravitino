@@ -404,7 +404,7 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testPendingCronGateSkipsQueuedTables() {
+  void testIsTableAlreadyQueuedSkipsQueuedTables() {
     DataSource dataSource = dataSource();
     CronJobClient scheduler = scheduler(dataSource);
     Assertions.assertEquals(
@@ -416,10 +416,8 @@ class TestCronJobClient extends TestJDBCBackend {
                 candidate(11L, MetadataObject.Type.SCHEMA)),
             10));
 
-    PendingCronExpandOccupancyGate gate =
-        new PendingCronExpandOccupancyGate((t, p, m, n) -> false, dataSource);
-    Assertions.assertTrue(gate.shouldSkip(10L, 9L, 0L, System.currentTimeMillis()));
-    Assertions.assertFalse(gate.shouldSkip(12L, 9L, 0L, System.currentTimeMillis()));
+    Assertions.assertTrue(scheduler.isTableAlreadyQueued(10L, 9L));
+    Assertions.assertFalse(scheduler.isTableAlreadyQueued(12L, 9L));
   }
 
   @TestTemplate

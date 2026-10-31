@@ -747,6 +747,17 @@ public class CronJobClient {
   }
 
   /**
+   * True when the table should not be enqueued again for this policy.
+   *
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return true when a queued cron-job already covers the table
+   */
+  public boolean isTableAlreadyQueued(long tableId, long policyId) {
+    return isTableAlreadyQueued(schedulerClient(dataSource), tableId, policyId);
+  }
+
+  /**
    * True when the table should not be enqueued again: a {@code table:} row already exists for this
    * policy, any queued snapshot-expiry cron-job (any policy) already covers the table, or a
    * non-expire {@code batch:} for this policy already includes the table.

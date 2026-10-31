@@ -275,7 +275,8 @@ class TestNearestPolicyTableEnumerator {
               return NearestMaintenancePolicyResolver.Decision.winner(10L, table);
             });
 
-    ExpandOccupancyGate gate = (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
+    PolicyTableEnumerator.ShouldSkipTable gate =
+        (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
     Assertions.assertEquals(
         List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
   }
@@ -413,7 +414,7 @@ class TestNearestPolicyTableEnumerator {
     return candidates.stream().map(ExpandTableCandidate::tableId).toList();
   }
 
-  private static ExpandOccupancyGate allowAll() {
+  private static PolicyTableEnumerator.ShouldSkipTable allowAll() {
     return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 

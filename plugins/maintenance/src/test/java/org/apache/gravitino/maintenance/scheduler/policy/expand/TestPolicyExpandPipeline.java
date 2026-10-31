@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyTableEnumerator.ShouldSkipTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -102,17 +103,18 @@ class TestPolicyExpandPipeline {
   @Test
   void testExpandEnqueuesCronJobsAndReturnsNextDue() {
     PolicyEntity policy = policy(true, CRON, null);
-    ExpandOccupancyGate gate = allowAll();
+    ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     when(tables.listTableIds(
             eq(policy),
             eq(2),
-            eq(gate),
+            eq(shouldSkip),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L), c(11L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(10L), c(11L))), eq(2))).thenReturn(2);
-    PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 2);
+    PolicyExpandPipeline expandPipeline =
+        pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 2);
 
     Optional<Instant> next = expandPipeline.expand(42L);
     Assertions.assertTrue(next.isPresent());
@@ -123,47 +125,49 @@ class TestPolicyExpandPipeline {
   @Test
   void testPassesResolvedMinIntervalToEnumerator() {
     PolicyEntity policy = policy(true, CRON, 60_000L);
-    ExpandOccupancyGate gate = allowAll();
+    ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
-    when(tables.listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L)))
+    when(tables.listTableIds(eq(policy), eq(10), eq(shouldSkip), eq(60_000L)))
         .thenReturn(List.of(c(11L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(11L))), eq(10))).thenReturn(1);
 
-    PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 10);
+    PolicyExpandPipeline expandPipeline =
+        pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
-    verify(tables).listTableIds(eq(policy), eq(10), eq(gate), eq(60_000L));
+    verify(tables).listTableIds(eq(policy), eq(10), eq(shouldSkip), eq(60_000L));
     verify(cronJobs).enqueueNow(policy, List.of(c(11L)), 10);
   }
 
   @Test
   void testUsesServerDefaultMinIntervalWhenPolicyOmits() {
     PolicyEntity policy = policy(true, CRON, null);
-    ExpandOccupancyGate gate = allowAll();
+    ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     when(tables.listTableIds(
             eq(policy),
             eq(10),
-            eq(gate),
+            eq(shouldSkip),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(List.of(c(10L)));
     CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueNow(eq(policy), eq(List.of(c(10L))), eq(10))).thenReturn(1);
 
-    PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 10);
+    PolicyExpandPipeline expandPipeline =
+        pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 10);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
     verify(tables)
         .listTableIds(
             eq(policy),
             eq(10),
-            eq(gate),
+            eq(shouldSkip),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS));
   }
 
   @Test
   void testSnapshotExpiryExpandEnqueuesWithBatchCapacity() {
     PolicyEntity policy = expirePolicy(true, CRON);
-    ExpandOccupancyGate gate = allowAll();
+    ShouldSkipTable shouldSkip = allowAll();
     PolicyTableEnumerator tables = mock(PolicyTableEnumerator.class);
     List<ExpandTableCandidate> candidates =
         List.of(
@@ -172,13 +176,14 @@ class TestPolicyExpandPipeline {
     when(tables.listTableIds(
             eq(policy),
             eq(5),
-            eq(gate),
+            eq(shouldSkip),
             eq(MaintenanceMinIntervalConfigs.DEFAULT_HOURLY_MIN_INTERVAL_MS)))
         .thenReturn(candidates);
     CronJobClient cronJobs = mock(CronJobClient.class);
     when(cronJobs.enqueueNow(eq(policy), eq(candidates), eq(5))).thenReturn(1);
 
-    PolicyExpandPipeline expandPipeline = pipeline(lookup(42L, policy), tables, cronJobs, gate, 5);
+    PolicyExpandPipeline expandPipeline =
+        pipeline(lookup(42L, policy), tables, cronJobs, shouldSkip, 5);
     Assertions.assertTrue(expandPipeline.expand(42L).isPresent());
     verify(cronJobs).enqueueNow(policy, candidates, 5);
   }
@@ -187,18 +192,18 @@ class TestPolicyExpandPipeline {
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tables,
       CronJobClient cronJobs,
-      ExpandOccupancyGate gate) {
-    return pipeline(policyLoader, tables, cronJobs, gate, 100);
+      ShouldSkipTable shouldSkip) {
+    return pipeline(policyLoader, tables, cronJobs, shouldSkip, 100);
   }
 
   private static PolicyExpandPipeline pipeline(
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tables,
       CronJobClient cronJobs,
-      ExpandOccupancyGate gate,
+      ShouldSkipTable shouldSkip,
       int batchSize) {
     return new PolicyExpandPipeline(
-        policyLoader, tables, cronJobs, gate, new Config(false) {}, batchSize);
+        policyLoader, tables, cronJobs, shouldSkip, new Config(false) {}, batchSize);
   }
 
   private static ExpandTableCandidate c(long tableId) {
@@ -206,7 +211,7 @@ class TestPolicyExpandPipeline {
         tableId, MetadataObject.Type.TABLE, "iceberg", "db.t" + tableId);
   }
 
-  private static ExpandOccupancyGate allowAll() {
+  private static ShouldSkipTable allowAll() {
     return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 

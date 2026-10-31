@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
 import java.time.Instant;
@@ -30,11 +34,13 @@ import java.util.function.BiFunction;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -109,36 +115,26 @@ class TestCommitJobClient extends TestJDBCBackend {
     return (tableId, identifier) -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
   }
 
-  private static CommitOccupancyGate allowAllGate() {
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isOccupied(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return false;
-      }
-    };
+  private static MaintenanceActionManager allowAllGate() {
+    TableMaintenanceActionMetaService meta = mock(TableMaintenanceActionMetaService.class);
+    when(meta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong())).thenReturn(false);
+    when(meta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
+    when(meta.maxFinishedAt(anyLong(), anyLong())).thenReturn(null);
+    return new MaintenanceActionManager(meta, 60_000L);
   }
 
-  private static CommitOccupancyGate coolingGate(long... policyIds) {
+  private static MaintenanceActionManager coolingGate(long... policyIds) {
     Set<Long> cooling = new HashSet<>();
     for (long id : policyIds) {
       cooling.add(id);
     }
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isOccupied(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return cooling.contains(policyId);
-      }
-    };
+    TableMaintenanceActionMetaService meta = mock(TableMaintenanceActionMetaService.class);
+    when(meta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong())).thenReturn(false);
+    when(meta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
+    when(meta.maxFinishedAt(anyLong(), anyLong()))
+        .thenAnswer(
+            inv -> cooling.contains((Long) inv.getArgument(1)) ? System.currentTimeMillis() : null);
+    return new MaintenanceActionManager(meta, 60_000L);
   }
 
   private static DataSource dataSource() {

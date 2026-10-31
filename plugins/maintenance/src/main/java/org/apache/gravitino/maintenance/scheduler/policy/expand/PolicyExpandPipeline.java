@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.policy.MaintenancePolicyDefinitions;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
@@ -42,8 +43,8 @@ import org.slf4j.LoggerFactory;
  * <p>Does not submit Spark. Returns the next expand due time, or empty when the expand row should
  * be removed (missing / disabled / blank trigger / non-maintenance).
  *
- * <p>Enumeration fills up to {@code enqueueBatchSize} tables that pass nearest-policy and {@code
- * minIntervalMs} / in-flight gating (policy content → server conf → code default).
+ * <p>Enumeration fills up to {@code enqueueBatchSize} tables that pass nearest-policy and can start
+ * (not occupied / cooling) and are not already covered by a queued cron-job.
  */
 public final class PolicyExpandPipeline {
 
@@ -53,7 +54,7 @@ public final class PolicyExpandPipeline {
   private final Function<Long, Optional<PolicyEntity>> policyLoader;
   private final PolicyTableEnumerator tableEnumerator;
   private final CronJobClient cronJobClient;
-  private final ExpandOccupancyGate occupancyGate;
+  private final PolicyTableEnumerator.ShouldSkipTable shouldSkip;
   private final Config config;
   private final int enqueueBatchSize;
 
@@ -62,21 +63,21 @@ public final class PolicyExpandPipeline {
    *
    * @param tableEnumerator lists attached table ids
    * @param cronJobClient writes cron-job rows
-   * @param occupancyGate in-flight / minInterval gate
+   * @param actionManager decides whether a maintenance action can start
    * @param config gravitino server config for per-type minInterval fallbacks
    * @param enqueueBatchSize max cron-jobs per expand pick
    */
   public PolicyExpandPipeline(
       PolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
-      ExpandOccupancyGate occupancyGate,
+      MaintenanceActionManager actionManager,
       Config config,
       int enqueueBatchSize) {
     this(
         PolicyExpandPipeline::loadPolicy,
         tableEnumerator,
         cronJobClient,
-        occupancyGate,
+        expandShouldSkip(actionManager, cronJobClient),
         config,
         enqueueBatchSize);
   }
@@ -85,7 +86,7 @@ public final class PolicyExpandPipeline {
    * @param policyLoader loads the policy for the expand instance id
    * @param tableEnumerator lists attached table ids
    * @param cronJobClient writes cron-job rows
-   * @param occupancyGate in-flight / minInterval gate
+   * @param shouldSkip skip check while scanning tables
    * @param config gravitino server config for per-type minInterval fallbacks
    * @param enqueueBatchSize max cron-jobs per expand pick
    */
@@ -93,13 +94,13 @@ public final class PolicyExpandPipeline {
       Function<Long, Optional<PolicyEntity>> policyLoader,
       PolicyTableEnumerator tableEnumerator,
       CronJobClient cronJobClient,
-      ExpandOccupancyGate occupancyGate,
+      PolicyTableEnumerator.ShouldSkipTable shouldSkip,
       Config config,
       int enqueueBatchSize) {
     this.policyLoader = Preconditions.checkNotNull(policyLoader);
     this.tableEnumerator = tableEnumerator;
     this.cronJobClient = cronJobClient;
-    this.occupancyGate = occupancyGate;
+    this.shouldSkip = Preconditions.checkNotNull(shouldSkip);
     this.config = config;
     this.enqueueBatchSize = enqueueBatchSize;
   }
@@ -148,7 +149,7 @@ public final class PolicyExpandPipeline {
         MaintenanceMinIntervalConfigs.resolve(
             config, policy.policyType(), policyMinIntervalMs(policy.content()));
     List<ExpandTableCandidate> toEnqueue =
-        tableEnumerator.listTableIds(policy, enqueueBatchSize, occupancyGate, minIntervalMs);
+        tableEnumerator.listTableIds(policy, enqueueBatchSize, shouldSkip, minIntervalMs);
     int scheduled = cronJobClient.enqueueNow(policy, toEnqueue, enqueueBatchSize);
     LOG.info(
         "Expanded policy {}: scheduled {} cron-job rows for {} tables (type={}, minIntervalMs={}); next expand due {}",
@@ -159,6 +160,15 @@ public final class PolicyExpandPipeline {
         minIntervalMs,
         nextDue);
     return Optional.of(nextDue);
+  }
+
+  private static PolicyTableEnumerator.ShouldSkipTable expandShouldSkip(
+      MaintenanceActionManager actionManager, CronJobClient cronJobClient) {
+    Preconditions.checkNotNull(actionManager);
+    Preconditions.checkNotNull(cronJobClient);
+    return (tableId, policyId, minIntervalMs, nowMs) ->
+        !actionManager.canStart(tableId, policyId, minIntervalMs, nowMs)
+            || cronJobClient.isTableAlreadyQueued(tableId, policyId);
   }
 
   private static Optional<PolicyEntity> loadPolicy(long policyId) {
