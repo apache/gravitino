@@ -19,13 +19,11 @@
 package org.apache.gravitino.maintenance.listener;
 
 import java.util.Map;
-import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,20 +52,11 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
 
   @Override
   public void start() throws RuntimeException {
-    Object raw =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    if (!(raw instanceof DataSource)) {
-      throw new IllegalStateException("Entity store data source is not available");
-    }
     Config gravitinoConfig = GravitinoEnv.getInstance().config();
     if (gravitinoConfig == null) {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
-    this.commitJobClient = new CommitJobClient((DataSource) raw, gravitinoConfig);
+    this.commitJobClient = CommitJobClient.forEntityStore(gravitinoConfig);
     LOG.info("PostCommitMaintenanceListener started");
   }
 

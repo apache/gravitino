@@ -34,19 +34,33 @@ import org.apache.gravitino.meta.PolicyEntity;
 /**
  * Submits one-shot {@code cron-job} rows to db-scheduler. Schedule planning is {@link
  * CronJobPlanner}.
+ *
+ * <p>One instance is held by the expand path for the life of the scheduler pools. Prefer {@link
+ * #forEntityStore(Config)} when the caller does not already have the entity-store pool.
  */
 public class CronJobClient {
 
-  private final DataSource dataSource;
+  private final SchedulerClient scheduler;
   private final CronJobPlanner planner;
+
+  /**
+   * Opens a client against the entity-store pool (SchedulerClient uses autocommit wrap).
+   *
+   * @param gravitinoConfig server config for jobConf overlay
+   * @return client bound to the cron-job table
+   */
+  public static CronJobClient forEntityStore(Config gravitinoConfig) {
+    return new CronJobClient(AutocommitDataSources.entityStore(), gravitinoConfig);
+  }
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config for jobConf overlay
    */
   public CronJobClient(DataSource dataSource, Config gravitinoConfig) {
-    this.dataSource = Preconditions.checkNotNull(dataSource);
+    Preconditions.checkNotNull(dataSource);
     this.planner = new CronJobPlanner(Preconditions.checkNotNull(gravitinoConfig));
+    this.scheduler = schedulerClient(dataSource);
   }
 
   /**
@@ -59,8 +73,16 @@ public class CronJobClient {
    */
   public int scheduleNow(
       PolicyEntity policy, List<ExpandTableCandidate> candidates, int batchCapacity) {
-    return planner.plan(
-        schedulerClient(dataSource), policy, candidates, batchCapacity, Instant.now());
+    return planner.plan(scheduler, policy, candidates, batchCapacity, Instant.now());
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return true when a queued cron-job already covers the table
+   */
+  public boolean isTableAlreadyQueued(long tableId, long policyId) {
+    return planner.isTableAlreadyQueued(scheduler, tableId, policyId);
   }
 
   /**
@@ -73,14 +95,5 @@ public class CronJobClient {
         .serializer(new JacksonSerializer(JsonUtils.anyFieldMapper()))
         .tableName(TableMaintenanceSchedulerPools.CRON_TASKS_TABLE)
         .build();
-  }
-
-  /**
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @return true when a queued cron-job already covers the table
-   */
-  public boolean isTableAlreadyQueued(long tableId, long policyId) {
-    return planner.isTableAlreadyQueued(schedulerClient(dataSource), tableId, policyId);
   }
 }

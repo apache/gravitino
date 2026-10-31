@@ -38,21 +38,36 @@ import org.slf4j.LoggerFactory;
 /**
  * Submits one-shot {@code commit-job} rows to db-scheduler. Planning is done by {@link
  * CommitJobPlanner}.
+ *
+ * <p>One instance is held by {@code PostCommitMaintenanceListener} for the listener lifetime.
+ * Prefer {@link #forEntityStore(Config)} when the caller does not already have the entity-store
+ * pool.
  */
 public class CommitJobClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(CommitJobClient.class);
 
-  private final DataSource dataSource;
+  private final SchedulerClient scheduler;
   private final CommitJobPlanner planner;
+
+  /**
+   * Opens a client against the entity-store pool (SchedulerClient uses autocommit wrap).
+   *
+   * @param gravitinoConfig server config
+   * @return client bound to the commit-job table
+   */
+  public static CommitJobClient forEntityStore(Config gravitinoConfig) {
+    return new CommitJobClient(AutocommitDataSources.entityStore(), gravitinoConfig);
+  }
 
   /**
    * @param dataSource relational JDBC pool shared with the entity store
    * @param gravitinoConfig server config
    */
   public CommitJobClient(DataSource dataSource, Config gravitinoConfig) {
-    this.dataSource = Preconditions.checkNotNull(dataSource);
+    Preconditions.checkNotNull(dataSource);
     this.planner = new CommitJobPlanner(Preconditions.checkNotNull(gravitinoConfig));
+    this.scheduler = schedulerClient(dataSource);
   }
 
   /**
@@ -64,20 +79,19 @@ public class CommitJobClient {
     if (identifier == null) {
       return;
     }
-    SchedulerClient client = schedulerClient(dataSource);
-    Optional<MaintenanceJobSpec> spec = planner.plan(client, identifier);
+    Optional<MaintenanceJobSpec> spec = planner.plan(scheduler, identifier);
     if (spec.isEmpty()) {
       return;
     }
     long tableId = spec.get().tableIds().get(0);
     String id = MaintenanceTaskIds.forCommitTable(tableId);
     try {
-      if (client.scheduleIfNotExists(
+      if (scheduler.scheduleIfNotExists(
           new TaskInstance<>(TableMaintenanceSchedulerPools.COMMIT_JOB, id, spec.get()),
           Instant.now())) {
         LOG.info("Scheduled commit-job for table {} ({})", tableId, identifier);
       } else {
-        LOG.debug("commit-job already queued for table {} ({})", tableId, identifier);
+        LOG.debug("commit-job already scheduled for table {} ({})", tableId, identifier);
       }
     } catch (RuntimeException e) {
       LOG.warn("Failed to schedule commit-job for IRC update {}: {}", identifier, e.toString());

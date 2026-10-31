@@ -30,11 +30,11 @@ import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
 import org.apache.gravitino.maintenance.policy.PolicyExpandReconciler;
 import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceActionOperations;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceBinder;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
 import org.glassfish.jersey.server.monitoring.RequestEvent;
@@ -84,7 +84,7 @@ public class TableMaintenanceRESTFeature implements Feature {
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
-    DataSource dataSource = resolveEntityStoreDataSource();
+    DataSource dataSource = AutocommitDataSources.entityStore();
     TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
     pools.start(dataSource, TableMaintenanceConfig.from(config), config);
     if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {
@@ -146,19 +146,6 @@ public class TableMaintenanceRESTFeature implements Feature {
     if (hook != null) {
       PolicyLifecycleHooks.unregister(hook);
     }
-  }
-
-  private static DataSource resolveEntityStoreDataSource() {
-    Object dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    if (!(dataSource instanceof DataSource)) {
-      throw new IllegalStateException("Entity store data source is not available");
-    }
-    return (DataSource) dataSource;
   }
 
   /**

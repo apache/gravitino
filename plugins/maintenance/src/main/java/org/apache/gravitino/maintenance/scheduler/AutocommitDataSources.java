@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import javax.sql.DataSource;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
 /**
  * Wraps the entity-store {@link DataSource} so db-scheduler {@code SchedulerClient} calls commit
@@ -34,6 +35,24 @@ import javax.sql.DataSource;
 public final class AutocommitDataSources {
 
   private AutocommitDataSources() {}
+
+  /**
+   * Resolves the relational entity-store JDBC pool from the open MyBatis environment.
+   *
+   * @return entity-store {@link DataSource}
+   */
+  public static DataSource entityStore() {
+    Object dataSource =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .getEnvironment()
+            .getDataSource();
+    if (!(dataSource instanceof DataSource)) {
+      throw new IllegalStateException("Entity store data source is not available");
+    }
+    return (DataSource) dataSource;
+  }
 
   /**
    * @param delegate entity-store pool
