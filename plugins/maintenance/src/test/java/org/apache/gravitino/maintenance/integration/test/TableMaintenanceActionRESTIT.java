@@ -42,9 +42,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.mapper.provider.MaintenanceMapperPackageProvider;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
@@ -132,8 +132,12 @@ public class TableMaintenanceActionRESTIT extends BaseIT {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     OccupancyClaim claim =
-        actions.insertInFlight(
-            tableId, policyId, TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10));
+        actions
+            .tryAcquireInFlight(
+                tableId,
+                policyId,
+                TableMaintenanceConfig.forTest(1, 1, 1, 500L, 1_000L, 4, 10).claimTimeoutMs())
+            .orElseThrow();
     assertNotNull(claim);
     actions.bindJobId(claim, jobId);
     long actionId = claim.actionId();

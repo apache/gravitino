@@ -29,12 +29,12 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
 import org.apache.gravitino.maintenance.policy.PolicyExpandReconciler;
-import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceActionOperations;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceBinder;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
 import org.glassfish.jersey.server.monitoring.RequestEvent;
@@ -65,7 +65,7 @@ public class TableMaintenanceRESTFeature implements Feature {
   /** Package name for {@link Configs#REST_API_EXTENSION_PACKAGES}. */
   public static final String EXTENSION_PACKAGE = TableMaintenanceRESTFeature.class.getPackageName();
 
-  private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
+  private static final AtomicReference<MaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
 
   private static final AtomicReference<PolicyExpandLifecycleHook> LIFECYCLE_HOOK =
@@ -84,8 +84,8 @@ public class TableMaintenanceRESTFeature implements Feature {
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
-    DataSource dataSource = resolveEntityStoreDataSource();
-    TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
+    DataSource dataSource = AutocommitDataSources.entityStore();
+    MaintenanceSchedulerPools pools = new MaintenanceSchedulerPools();
     pools.start(dataSource, TableMaintenanceConfig.from(config), config);
     if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {
       pools.stop();
@@ -121,7 +121,7 @@ public class TableMaintenanceRESTFeature implements Feature {
    */
   public static void stopSchedulers() {
     unregisterLifecycleHook();
-    TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
+    MaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
       LOG.info("Table maintenance scheduler pools stopped");
@@ -130,13 +130,13 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static void registerLifecycleHook() {
     PolicyExpandLifecycleHook hook =
-        new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
+        new PolicyExpandLifecycleHook(PolicyExpandClient.joiningCurrentTransaction());
     PolicyLifecycleHooks.register(hook);
     LIFECYCLE_HOOK.set(hook);
   }
 
   private static void reconcileExistingPolicies() {
-    PolicyExpandRegistrar registrar = PolicyExpandRegistrar.joiningCurrentTransaction();
+    PolicyExpandClient registrar = PolicyExpandClient.joiningCurrentTransaction();
     PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(registrar);
     new PolicyExpandReconciler(aligner, registrar).reconcileAll();
   }
@@ -146,19 +146,6 @@ public class TableMaintenanceRESTFeature implements Feature {
     if (hook != null) {
       PolicyLifecycleHooks.unregister(hook);
     }
-  }
-
-  private static DataSource resolveEntityStoreDataSource() {
-    Object dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    if (!(dataSource instanceof DataSource)) {
-      throw new IllegalStateException("Entity store data source is not available");
-    }
-    return (DataSource) dataSource;
   }
 
   /**

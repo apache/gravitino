@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -48,12 +49,12 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
 
   private static final Logger LOG = LoggerFactory.getLogger(PolicyExpandLifecycleHook.class);
 
-  private final PolicyExpandRegistrar registrar;
+  private final PolicyExpandClient registrar;
 
   /**
    * @param registrar registers policy-expand task rows on the current SQL session
    */
-  public PolicyExpandLifecycleHook(PolicyExpandRegistrar registrar) {
+  public PolicyExpandLifecycleHook(PolicyExpandClient registrar) {
     this.registrar = registrar;
   }
 
@@ -94,7 +95,7 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
     }
     Instant expectedNext;
     try {
-      expectedNext = PolicyExpandRegistrar.nextExecution(trigger);
+      expectedNext = PolicyExpandClient.nextExecution(trigger);
     } catch (IllegalArgumentException e) {
       registrar.remove(policy.id());
       LOG.error(
@@ -146,7 +147,7 @@ public final class PolicyExpandLifecycleHook implements PolicyLifecycleHook {
       return;
     }
     try {
-      operations.reschedule(complete, PolicyExpandRegistrar.nextExecution(trigger));
+      operations.reschedule(complete, PolicyExpandClient.nextExecution(trigger));
     } catch (IllegalArgumentException e) {
       LOG.error(
           "Removing policy-expand {} after invalid timeTrigger on policy {}",

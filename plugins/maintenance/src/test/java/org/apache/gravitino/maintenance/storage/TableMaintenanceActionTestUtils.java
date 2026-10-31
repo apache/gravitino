@@ -20,7 +20,7 @@ package org.apache.gravitino.maintenance.storage;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;

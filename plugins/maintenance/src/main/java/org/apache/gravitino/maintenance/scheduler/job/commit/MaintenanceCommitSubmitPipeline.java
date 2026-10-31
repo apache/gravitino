@@ -24,53 +24,53 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Commit-pool control-plane submit (§5.2.3): consume enqueue-time {@link MaintenanceJobSpec} →
- * abort if any step is in-flight → soft-slot claim for every chain policy → one chained {@code
- * runJob} → bind the same job id on every claim.
+ * Commit-pool control-plane submit (§5.2.3): consume schedule-time {@link MaintenanceJobSpec} →
+ * abort if any step still occupies the soft slot → soft-slot claim for every chain policy → {@link
+ * MaintenanceJobManager#submitAndBind} for one chained Spark job.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
- * enqueue (see {@link CommitJobClient}). The caller always deletes the one-shot {@code commit-job}
- * row after this method returns.
+ * schedule (see {@link CommitJobPlanner}). The caller always deletes the one-shot {@code
+ * commit-job} row after this method returns.
  */
 public final class MaintenanceCommitSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCommitSubmitPipeline.class);
 
-  private final CommitOccupancyGate occupancyGate;
+  private final MaintenanceActionManager actionManager;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitter jobSubmitter;
+  private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
-   * @param occupancyGate in-flight checks
-   * @param actionMetaService soft-slot claim / bind
-   * @param jobSubmitter Gravitino Job submitter
-   * @param jobConfBuilder resolves enqueue-time conf-key refs before {@code runJob}
+   * @param actionManager occupancy checks
+   * @param actionMetaService soft-slot claim
+   * @param jobManager runJob + bind (and orphan cancel)
+   * @param jobConfBuilder resolves schedule-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCommitSubmitPipeline(
-      CommitOccupancyGate occupancyGate,
+      MaintenanceActionManager actionManager,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitter jobSubmitter,
+      MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
-    this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
-    this.jobSubmitter = Preconditions.checkNotNull(jobSubmitter);
+    this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
@@ -80,7 +80,7 @@ public final class MaintenanceCommitSubmitPipeline {
    * Runs one commit-job pick for {@code instanceId} ({@code table:{table_id}}).
    *
    * @param instanceId db-scheduler commit-job instance id
-   * @param spec enqueue-time payload; required
+   * @param spec schedule-time payload; required
    */
   public void submit(String instanceId, @Nullable MaintenanceJobSpec spec) {
     Optional<Long> parsed = MaintenanceTaskIds.parseCommitTable(instanceId);
@@ -106,11 +106,11 @@ public final class MaintenanceCommitSubmitPipeline {
       return;
     }
 
-    // Design §5.2.3: any remaining type in-flight → delete commit-job and stop.
+    // Design §5.2.3: any remaining type still occupied → delete commit-job and stop.
     for (Task task : spec.getTasks()) {
-      if (occupancyGate.isInFlight(tableId, task.getPolicyId())) {
+      if (actionManager.isOccupied(tableId, task.getPolicyId())) {
         LOG.info(
-            "Skipping commit-job submit for table {} (type {} policy {} still in-flight)",
+            "Skipping commit-job submit for table {} (type {} policy {} still occupied)",
             tableId,
             task.getMaintenanceType(),
             task.getPolicyId());
@@ -130,58 +130,25 @@ public final class MaintenanceCommitSubmitPipeline {
       return;
     }
 
-    runAndBind(spec, claims.get(), tableId);
-  }
-
-  private void runAndBind(MaintenanceJobSpec spec, List<OccupancyClaim> claims, long tableId) {
-    String metalake = spec.metalake();
     Map<String, String> jobConf;
     try {
       jobConf =
           jobConfBuilder.resolveForSubmit(MaintenanceJobSpecFactory.jobConfForCommitChain(spec));
     } catch (RuntimeException e) {
-      actionMetaService.deleteClaims(claims);
+      actionMetaService.deleteClaims(claims.get());
       LOG.warn(
           "Skipping commit-job submit for table {}: invalid task_data: {}", tableId, e.toString());
       return;
     }
-    jobConf.put(
-        MaintenanceJobTemplates.ACTION_IDS_KEY,
-        claims.stream().map(c -> Long.toString(c.actionId())).collect(Collectors.joining(",")));
-    Long jobId = null;
-    try {
-      jobId =
-          jobSubmitter.runJob(
-              metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
-      actionMetaService.bindJobIds(claims, jobId);
+
+    Optional<Long> jobId = jobManager.submitAndBind(spec.metalake(), jobConf, claims.get());
+    if (jobId.isPresent()) {
       LOG.info(
           "Submitted commit-job for table {} as job {} (chain={}, policies={})",
           tableId,
-          jobId,
+          jobId.get(),
           spec.getTasks().stream().map(Task::getMaintenanceType).collect(Collectors.toList()),
-          spec.getTasks().stream().map(Task::getPolicyId).collect(Collectors.toList()));
-    } catch (RuntimeException e) {
-      if (jobId != null) {
-        cancelJobQuietly(metalake, jobId);
-      }
-      actionMetaService.deleteClaims(claims);
-      LOG.warn(
-          "Failed commit-job submit for table {} policies={}: {}",
-          tableId,
-          spec.getTasks().stream().map(Task::getPolicyId).collect(Collectors.toList()),
-          e.toString());
-    }
-  }
-
-  private void cancelJobQuietly(String metalake, long jobId) {
-    try {
-      jobSubmitter.cancelJob(metalake, jobId);
-    } catch (RuntimeException cancelError) {
-      LOG.warn(
-          "Failed to cancel orphaned commit Spark job {} under metalake {} after bind failure",
-          jobId,
-          metalake,
-          cancelError);
+          policyIds);
     }
   }
 }

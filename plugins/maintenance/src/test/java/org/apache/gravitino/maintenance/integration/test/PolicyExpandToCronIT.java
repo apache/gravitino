@@ -32,19 +32,21 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.integration.test.MaintenanceSchedulerITSupport.SeededTable;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
@@ -54,7 +56,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Boots Gravitino with {@link TableMaintenanceRESTFeature} and exercises policy-expand → cron-job
- * enqueue through the live expand pool and nearest-policy table walk.
+ * schedule through the live expand pool and nearest-policy table walk.
  *
  * <p>Embedded mode only (same-JVM MetaService / SchedulerClient). Run with {@code -PskipITs}
  * omitted.
@@ -95,7 +97,7 @@ public class PolicyExpandToCronIT extends BaseIT {
   }
 
   @Test
-  void testExpandPoolEnqueuesCronJobForTaggedTable() throws Exception {
+  void testExpandPoolSchedulesCronJobForTaggedTable() throws Exception {
     assumeTrue(
         ITUtils.EMBEDDED_TEST_MODE.equals(testMode),
         "Asserts cron submit capture in the same JVM as the expand pool");
@@ -108,22 +110,33 @@ public class PolicyExpandToCronIT extends BaseIT {
             client.loadMetalake(metalake), metalake, TIME_TRIGGER, /*commitTrigger=*/ null);
 
     PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(seeded.policyId);
-    List<ExpandTableCandidate> candidates =
+    Config gravitinoConfig = new Config(false) {};
+    gravitinoConfig.loadFromMap(
+        Map.of(
+            MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
+            "http://localhost:8090"),
+        k -> true);
+    List<TableCandidate> candidates =
         new NearestPolicyTableEnumerator()
-            .listTableIds(policy, 10, new OccupancyGate()::shouldSkip, 0L);
+            .listTableIds(
+                policy,
+                10,
+                0L,
+                new MaintenanceActionManager(),
+                new CronJobClient(dataSource(), gravitinoConfig));
     assertEquals(
         List.of(seeded.tableId),
-        candidates.stream().map(ExpandTableCandidate::tableId).toList(),
+        candidates.stream().map(TableCandidate::tableId).toList(),
         "nearest enumerator should see the tagged Iceberg table");
 
     DataSource ds = dataSource();
     assertTrue(
-        PolicyExpandRegistrar.forReads(ds).scheduledExecutionTime(seeded.policyId).isPresent(),
+        PolicyExpandClient.forReads(ds).scheduledExecutionTime(seeded.policyId).isPresent(),
         "createPolicy should register a policy-expand row via PolicyExpandLifecycleHook");
 
     // Force the expand lease overdue so the live expand pool picks it (production next fire is
     // tomorrow 02:00 for TIME_TRIGGER).
-    PolicyExpandRegistrar.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
+    PolicyExpandClient.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
 
     awaitCronCapture(MaintenanceTaskIds.forCronTable(seeded.tableId, seeded.policyId), 30L);
 
@@ -150,7 +163,7 @@ public class PolicyExpandToCronIT extends BaseIT {
     assertEquals(
         expectedInstanceId,
         CAPTURED_CRON_ID.get(),
-        "expand pool did not enqueue expected cron-job within " + timeoutSeconds + "s");
+        "expand pool did not schedule expected cron-job within " + timeoutSeconds + "s");
   }
 
   private static DataSource dataSource() {

@@ -18,27 +18,17 @@
  */
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
-import com.github.kagkarlsson.scheduler.SchedulerClient;
 import com.github.kagkarlsson.scheduler.task.TaskInstanceId;
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
+import java.io.IOException;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -47,102 +37,41 @@ import org.junit.jupiter.api.TestTemplate;
 
 class TestCommitJobClient extends TestJDBCBackend {
 
-  private static final long TABLE_ID = 101L;
-  private static final long POLICY_ID = 202L;
-  private static final String GRAVITINO_URI = "http://localhost:8090";
-
   @TestTemplate
-  void testEnqueueSkipsWhenAllWithinMinInterval() {
-    CommitJobClient scheduler =
-        new CommitJobClient(
-            dataSource(),
-            configWithUri(),
-            fixedCollector(List.of(member(POLICY_ID))),
-            coolingGate(POLICY_ID));
-    Assertions.assertEquals(CommitJobEnqueueResult.SKIPPED, scheduler.enqueueNow(TABLE_ID));
+  void testScheduleSkipsWhenTableMissing() {
+    CommitJobClient client = new CommitJobClient(dataSource(), configWithUri());
+    client.scheduleNow(NameIdentifier.of("missing-ml", "c", "s", "t"));
     Assertions.assertTrue(
         CommitJobClient.schedulerClient(dataSource())
-            .getScheduledExecution(
-                TaskInstanceId.of(
-                    TableMaintenanceSchedulerPools.COMMIT_JOB,
-                    MaintenanceTaskIds.forCommitTable(TABLE_ID)))
+            .getScheduledExecutionsForTask(MaintenanceSchedulerPools.COMMIT_JOB, Object.class)
             .isEmpty());
   }
 
   @TestTemplate
-  void testEnqueueWritesSpecAndIsIdempotent() {
-    CommitJobClient scheduler =
-        new CommitJobClient(
-            dataSource(),
-            configWithUri(),
-            fixedCollector(List.of(member(POLICY_ID))),
-            allowAllGate());
-
-    Assertions.assertEquals(CommitJobEnqueueResult.INSERTED, scheduler.enqueueNow(TABLE_ID));
-    Assertions.assertEquals(CommitJobEnqueueResult.ALREADY_QUEUED, scheduler.enqueueNow(TABLE_ID));
-
-    SchedulerClient client = CommitJobClient.schedulerClient(dataSource());
-    MaintenanceJobSpec spec =
-        (MaintenanceJobSpec)
-            client
-                .getScheduledExecution(
-                    TaskInstanceId.of(
-                        TableMaintenanceSchedulerPools.COMMIT_JOB,
-                        MaintenanceTaskIds.forCommitTable(TABLE_ID)))
-                .get()
-                .getData();
-    Assertions.assertTrue(spec.isValid());
-    Assertions.assertEquals(List.of(TABLE_ID), spec.tableIds());
-    Assertions.assertEquals(POLICY_ID, spec.getTasks().get(0).getPolicyId());
-    Assertions.assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
-    Assertions.assertEquals("iceberg", spec.getTasks().get(0).catalogName());
-    Assertions.assertFalse(spec.getTasks().get(0).getParameters().containsKey("updater_options"));
+  void testScheduleSkipsWhenOnCommitChainEmpty() throws IOException {
+    TableEntity table = insertTable("plan-ml", "iceberg", "db", "t");
+    CommitJobClient client = new CommitJobClient(dataSource(), configWithUri());
+    client.scheduleNow(table.nameIdentifier());
+    Assertions.assertTrue(
+        CommitJobClient.schedulerClient(dataSource())
+            .getScheduledExecution(
+                TaskInstanceId.of(
+                    MaintenanceSchedulerPools.COMMIT_JOB,
+                    MaintenanceTaskIds.forCommitTable(table.id())))
+            .isEmpty());
   }
 
-  private static Function<Long, Optional<CollectedCommitChain>> fixedCollector(
-      List<CommitChainMember> chain) {
-    ResolvedTableRef ref = new ResolvedTableRef(TABLE_ID, "iceberg", "db.t");
-    CollectedCommitChain collected = new CollectedCommitChain(chain, ref);
-    return tableId -> tableId == TABLE_ID ? Optional.of(collected) : Optional.empty();
-  }
-
-  private static CommitChainMember member(long policyId) {
-    return new CommitChainMember(
-        Policy.BuiltInType.ICEBERG_COMPACTION, policy(policyId), "rewrite_data_files");
-  }
-
-  private static CommitOccupancyGate allowAllGate() {
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return false;
-      }
-    };
-  }
-
-  private static CommitOccupancyGate coolingGate(long... policyIds) {
-    Set<Long> cooling = new HashSet<>();
-    for (long id : policyIds) {
-      cooling.add(id);
-    }
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return cooling.contains(policyId);
-      }
-    };
+  private TableEntity insertTable(String metalake, String catalog, String schema, String tableName)
+      throws IOException {
+    backend.insert(createBaseMakeLake(1L, metalake, AUDIT_INFO), false);
+    backend.insert(createCatalog(2L, Namespace.of(metalake), catalog, AUDIT_INFO), false);
+    backend.insert(
+        createSchemaEntity(3L, Namespace.of(metalake, catalog), schema, AUDIT_INFO), false);
+    TableEntity table =
+        createTableEntity(
+            101L, NamespaceUtil.ofTable(metalake, catalog, schema), tableName, AUDIT_INFO);
+    backend.insert(table, false);
+    return table;
   }
 
   private static DataSource dataSource() {
@@ -158,35 +87,8 @@ class TestCommitJobClient extends TestJDBCBackend {
     config.loadFromMap(
         Map.of(
             MaintenanceAuthConfigs.GRAVITINO_MAINTENANCE_GRAVITINO_AUTH_URI.getKey(),
-            GRAVITINO_URI),
+            "http://localhost:8090"),
         t -> true);
     return config;
-  }
-
-  private static PolicyEntity policy(long id) {
-    return PolicyEntity.builder()
-        .withId(id)
-        .withName("p-" + id)
-        .withNamespace(NamespaceUtil.ofPolicy("ml"))
-        .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
-        .withContent(
-            PolicyContents.icebergDataCompaction(
-                IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
-                IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
-                IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
-                IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
-                IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
-                "binpack",
-                "",
-                Map.of(),
-                null,
-                true,
-                null,
-                Map.of("spark_executor_memory", "4g"),
-                Map.of("gravitino_uri", GRAVITINO_URI)))
-        .withEnabled(true)
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
-        .build();
   }
 }

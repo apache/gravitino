@@ -28,8 +28,8 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.maintenance.scheduler.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -45,16 +45,12 @@ class TestCommitJobSpecFactory {
 
   @Test
   void testForCommitBuildsPerTypeTasksAndSharedBags() {
-    CommitJobSpecFactory factory = new CommitJobSpecFactory(configWithUri());
-    CommitChainMember compaction =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_COMPACTION, compaction(202L), "rewrite_data_files");
-    CommitChainMember expire =
-        new CommitChainMember(
-            Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, expire(303L), "expire_snapshots");
+    MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     MaintenanceJobSpec spec =
         factory.forCommit(
-            List.of(compaction, expire), new ResolvedTableRef(101L, "iceberg", "db.t"));
+            List.of(
+                new TableCandidate(
+                    101L, "iceberg", "db.t", List.of(compaction(202L), expire(303L)))));
 
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals(2, spec.getTasks().size());
@@ -86,26 +82,22 @@ class TestCommitJobSpecFactory {
   }
 
   @Test
-  void testMergeSparkConfMapsMergesByKey() {
+  void testMergeSparkConfMaps() throws Exception {
     Map<String, String> into = new HashMap<>();
     into.put("spark.executor.memory", "4g");
     into.put("shared", "first");
-    CommitJobSpecFactory.mergeSparkConfMaps(
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
         into,
         "{\"spark.executor.cores\":\"2\",\"shared\":\"later\",\"spark.driver.memory\":\"2g\"}");
-
     Assertions.assertEquals("4g", into.get("spark.executor.memory"));
     Assertions.assertEquals("first", into.get("shared"));
     Assertions.assertEquals("2", into.get("spark.executor.cores"));
     Assertions.assertEquals("2g", into.get("spark.driver.memory"));
-  }
 
-  @Test
-  void testMergeSparkConfMapsAddsWhenMissing() throws Exception {
-    Map<String, String> into = new HashMap<>();
-    CommitJobSpecFactory.mergeSparkConfMaps(
-        into, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
-    Assertions.assertEquals("v", into.get("k"));
+    Map<String, String> empty = new HashMap<>();
+    MaintenanceJobSpecFactory.mergeSparkConfMaps(
+        empty, JsonUtils.anyFieldMapper().writeValueAsString(Map.of("k", "v")));
+    Assertions.assertEquals("v", empty.get("k"));
   }
 
   private static Config configWithUri() {
