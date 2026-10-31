@@ -139,6 +139,16 @@ development environment.
 The uv workflow above runs unit tests. Integration tests still use the existing Gradle
 commands below and their server or storage prerequisites.
 
+For an independent lock, metadata-equivalence and cache-invalidation check, run:
+
+```shell
+uv run --locked python scripts/check_uv_workflow.py
+```
+
+This lightweight check needs only the core client and the default setuptools development
+tool. It changes README and requirements only in temporary source copies, reuses the uv
+cache, and does not run server or engine integration tests. A failed check exits nonzero.
+
 ### Build and Test
 
 1. Clone the Gravitino project.
