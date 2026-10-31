@@ -118,8 +118,8 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, table));
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -167,14 +167,11 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table2 =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t2"), MetadataObject.Type.TABLE);
-    MetadataObject schema =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
 
-    when(nearest.resolve(METALAKE, table1, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(11L, table1));
-    when(nearest.resolve(METALAKE, table2, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, schema));
+    when(nearest.resolveWinnerId(METALAKE, table1, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(11L));
+    when(nearest.resolveWinnerId(METALAKE, table2, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
@@ -217,10 +214,8 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "a:b", "t1"), MetadataObject.Type.TABLE);
-    MetadataObject parentSchema =
-        MetadataObjects.of(java.util.Arrays.asList("catalog", "a"), MetadataObject.Type.SCHEMA);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, parentSchema));
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -268,13 +263,9 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
         .thenReturn(List.of(t1, t2, t3));
 
-    when(nearest.resolve(
+    when(nearest.resolveWinnerId(
             eq(METALAKE), any(MetadataObject.class), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenAnswer(
-            invocation -> {
-              MetadataObject table = invocation.getArgument(1);
-              return NearestMaintenancePolicyResolver.Decision.winner(10L, table);
-            });
+        .thenReturn(java.util.Optional.of(10L));
 
     NearestPolicyTableEnumerator.ShouldSkipTable gate =
         (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
@@ -303,8 +294,10 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.conflict(table, List.of(10L, 11L)));
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenThrow(
+            new IllegalArgumentException(
+                "ambiguous ICEBERG_COMPACTION policies [10, 11] on nearest level " + table));
 
     Assertions.assertEquals(
         List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -327,11 +320,8 @@ class TestNearestPolicyTableEnumerator {
             EntityCombinedTable.of(Mockito.mock(Table.class), table(501L, "missing"))
                 .withImported(true));
 
-    MetadataObject schemaObj =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
-    stubWinner(tableMeta("catalog", "schema", "known"), schemaObj);
-    stubWinner(tableMeta("catalog", "schema", "missing"), schemaObj);
+    stubWinner(tableMeta("catalog", "schema", "known"));
+    stubWinner(tableMeta("catalog", "schema", "missing"));
 
     Assertions.assertEquals(
         List.of(500L, 501L),
@@ -381,9 +371,9 @@ class TestNearestPolicyTableEnumerator {
     return policy;
   }
 
-  private void stubWinner(MetadataObject table, MetadataObject nearestObject) {
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, nearestObject));
+  private void stubWinner(MetadataObject table) {
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
   }
 
   private NearestPolicyTableEnumerator catalogEnumerator(

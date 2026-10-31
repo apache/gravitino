@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
@@ -553,22 +554,18 @@ public final class NearestPolicyTableEnumerator {
     }
 
     Policy.BuiltInType policyType = scan.policy.policyType();
-    NearestMaintenancePolicyResolver.Decision decision =
-        scan.nearestResolver.resolve(scan.metalake, tableObject, policyType);
-    if (decision.kind() == NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT) {
+    final Optional<Long> winnerId;
+    try {
+      winnerId = scan.nearestResolver.resolveWinnerId(scan.metalake, tableObject, policyType);
+    } catch (IllegalArgumentException e) {
       LOG.error(
-          "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
+          "Skip table {} for maintenance type {}: {}",
           tableObject.fullName(),
           policyType,
-          decision.conflictingPolicyIds(),
-          decision.conflictLevel() == null ? "?" : decision.conflictLevel().type(),
-          decision.conflictLevel() == null ? "?" : decision.conflictLevel().fullName());
+          e.getMessage());
       return;
     }
-    if (decision.winnerPolicyId().orElse(-1L).longValue() != scan.policy.id()) {
-      return;
-    }
-    if (decision.winnerLevel() == null) {
+    if (winnerId.isEmpty() || winnerId.get().longValue() != scan.policy.id()) {
       return;
     }
     if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id(), scan.minIntervalMs, scan.nowMs)) {
