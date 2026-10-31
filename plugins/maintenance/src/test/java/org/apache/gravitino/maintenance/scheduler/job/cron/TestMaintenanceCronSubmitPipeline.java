@@ -36,9 +36,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -206,13 +206,16 @@ class TestMaintenanceCronSubmitPipeline {
         CLAIM_TIMEOUT_MS);
   }
 
-  /** Real gate over a stub meta service — {@link OccupancyGate} is final and not mockable. */
-  private static OccupancyGate occupancyGate(BiPredicate<Long, Long> inFlight) {
+  /**
+   * Real manager over a stub meta service — {@link MaintenanceActionManager} is final and not
+   * mockable.
+   */
+  private static MaintenanceActionManager occupancyGate(BiPredicate<Long, Long> inFlight) {
     TableMaintenanceActionMetaService meta = mock(TableMaintenanceActionMetaService.class);
     when(meta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong()))
         .thenAnswer(inv -> inFlight.test(inv.getArgument(0), inv.getArgument(1)));
     when(meta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
-    return new OccupancyGate(meta, CLAIM_TIMEOUT_MS);
+    return new MaintenanceActionManager(meta, CLAIM_TIMEOUT_MS);
   }
 
   private static MaintenanceJobSpec spec() {

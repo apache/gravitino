@@ -34,9 +34,9 @@ import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
@@ -117,10 +117,14 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig must not be null");
 
-    OccupancyGate occupancyGate =
-        new OccupancyGate(TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
+    MaintenanceActionManager actionManager =
+        new MaintenanceActionManager(
+            TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
     ExpandOccupancyGate expandGate =
-        new PendingCronExpandOccupancyGate(occupancyGate::shouldSkip, dataSource);
+        new PendingCronExpandOccupancyGate(
+            (tableId, policyId, minIntervalMs, nowMs) ->
+                !actionManager.canStart(tableId, policyId, minIntervalMs, nowMs),
+            dataSource);
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new NearestPolicyTableEnumerator(),
@@ -132,7 +136,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
     MaintenanceCronSubmitPipeline cronSubmit =
         new MaintenanceCronSubmitPipeline(
-            occupancyGate,
+            actionManager,
             TableMaintenanceActionMetaService.getInstance(),
             MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
@@ -141,7 +145,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
 
     MaintenanceCommitSubmitPipeline commitSubmit =
         new MaintenanceCommitSubmitPipeline(
-            occupancyGate,
+            actionManager,
             TableMaintenanceActionMetaService.getInstance(),
             MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),

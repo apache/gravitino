@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.occupancy;
+package org.apache.gravitino.maintenance;
 
 import static org.apache.gravitino.maintenance.storage.TableMaintenanceActionTestUtils.expireClaim;
 
@@ -25,7 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -34,7 +34,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestOccupancyGate extends TestJDBCBackend {
+class TestMaintenanceActionManager extends TestJDBCBackend {
 
   @TestTemplate
   void testUnboundClaimAndBoundSlotOccupyUntilMarkFinished() throws IOException {
@@ -45,26 +45,26 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    OccupancyGate gate = new OccupancyGate(actions);
+    MaintenanceActionManager actionManager = new MaintenanceActionManager(actions);
     long policyId = insertPolicy(metalakeName, "occ-policy").id();
 
-    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertFalse(actionManager.isOccupied(table.id(), policyId));
 
     OccupancyClaim claim =
         actions
             .tryAcquireInFlight(
                 table.id(), policyId, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS)
             .orElseThrow();
-    Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(actionManager.isOccupied(table.id(), policyId));
 
     actions.bindJobId(claim, 7001L);
-    Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
-    Assertions.assertTrue(
-        gate.shouldSkip(table.id(), policyId, 3_600_000L, System.currentTimeMillis()));
+    Assertions.assertTrue(actionManager.isOccupied(table.id(), policyId));
+    Assertions.assertFalse(
+        actionManager.canStart(table.id(), policyId, 3_600_000L, System.currentTimeMillis()));
 
     long finishedAt = System.currentTimeMillis();
     actions.markFinished(claim.actionId(), finishedAt);
-    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertFalse(actionManager.isOccupied(table.id(), policyId));
     Assertions.assertEquals(
         finishedAt, actions.getByJobIdAndTableId(7001L, table.id()).finishedAt());
   }
@@ -78,7 +78,7 @@ class TestOccupancyGate extends TestJDBCBackend {
     TableEntity table = createAndInsertTableEntity(Namespace.of(metalakeName, "cat", "sch"), "tbl");
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
-    OccupancyGate gate = new OccupancyGate(actions);
+    MaintenanceActionManager actionManager = new MaintenanceActionManager(actions);
     long policyId = insertPolicy(metalakeName, "occ-policy-2").id();
 
     OccupancyClaim claim =
@@ -92,9 +92,9 @@ class TestOccupancyGate extends TestJDBCBackend {
     actions.markFinished(claim.actionId(), finishedAt);
 
     Assertions.assertTrue(
-        gate.withinMinInterval(table.id(), policyId, 60_000L, finishedAt + 1_000L));
+        actionManager.isCoolingDown(table.id(), policyId, 60_000L, finishedAt + 1_000L));
     Assertions.assertFalse(
-        gate.withinMinInterval(table.id(), policyId, 60_000L, finishedAt + 120_000L));
+        actionManager.isCoolingDown(table.id(), policyId, 60_000L, finishedAt + 120_000L));
   }
 
   @TestTemplate
@@ -107,20 +107,20 @@ class TestOccupancyGate extends TestJDBCBackend {
 
     TableMaintenanceActionMetaService actions = TableMaintenanceActionMetaService.getInstance();
     long claimTimeoutMs = TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS;
-    OccupancyGate gate = new OccupancyGate(actions, claimTimeoutMs);
+    MaintenanceActionManager actionManager = new MaintenanceActionManager(actions, claimTimeoutMs);
     long policyId = insertPolicy(metalakeName, "occ-policy-3").id();
 
     OccupancyClaim claim =
         actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).orElseThrow();
     Assertions.assertTrue(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
-    Assertions.assertTrue(gate.isInFlight(table.id(), policyId));
+    Assertions.assertTrue(actionManager.isOccupied(table.id(), policyId));
 
     expireClaim(claim, claimTimeoutMs);
 
-    // Unbound TTL is evaluated in the DAO against the database clock, so OccupancyGate agrees with
+    // Unbound TTL is evaluated in the DAO against the database clock, so the manager agrees with
     // acquire/reclaim even when the JVM clock would disagree (multi-node skew).
     Assertions.assertFalse(actions.hasLiveUnboundClaim(table.id(), policyId, claimTimeoutMs));
-    Assertions.assertFalse(gate.isInFlight(table.id(), policyId));
+    Assertions.assertFalse(actionManager.isOccupied(table.id(), policyId));
     Assertions.assertTrue(
         actions.tryAcquireInFlight(table.id(), policyId, claimTimeoutMs).isPresent());
     Assertions.assertEquals(claim.actionId(), actions.getById(claim.actionId()).actionId());

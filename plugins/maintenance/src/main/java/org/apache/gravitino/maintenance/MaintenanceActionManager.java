@@ -16,46 +16,47 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.occupancy;
+package org.apache.gravitino.maintenance;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 
 /**
- * Expand / submit occupancy checks against {@code table_maintenance_action} (§5.2).
+ * Decides whether a maintenance action for one table and policy can start.
  *
- * <p>Unbound rows ({@code job_id} null, {@code finished_at = 0}) are a short claim: occupied while
- * still within TTL on the <strong>database</strong> clock. Bound rows occupy the soft slot until
- * Spark closes them via before/after metrics with {@code ?finish=true}. This gate does not reclaim
- * on Gravitino job terminal state.
+ * <p>Reads {@code table_maintenance_action} through {@link TableMaintenanceActionMetaService}.
+ * Unbound rows ({@code job_id} null, {@code finished_at = 0}) occupy the soft slot while still
+ * within TTL on the database clock. Bound rows stay occupied until Spark closes them via
+ * before/after metrics with {@code ?finish=true}. This manager does not reclaim on Gravitino job
+ * terminal state, and it does not acquire or release the slot.
  */
-public final class OccupancyGate {
+public final class MaintenanceActionManager {
 
   private final TableMaintenanceActionMetaService actionMetaService;
   private final long claimTimeoutMs;
 
   /**
-   * @param actionMetaService maintenance action DAO
+   * @param actionMetaService maintenance action store
    * @param claimTimeoutMs unbound claim TTL
    */
-  public OccupancyGate(TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
+  public MaintenanceActionManager(
+      TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
     this.claimTimeoutMs = claimTimeoutMs;
   }
 
   /**
-   * @param actionMetaService maintenance action DAO
+   * @param actionMetaService maintenance action store
    */
-  public OccupancyGate(TableMaintenanceActionMetaService actionMetaService) {
+  public MaintenanceActionManager(TableMaintenanceActionMetaService actionMetaService) {
     this(actionMetaService, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
   }
 
-  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and default claim timeout. */
-  public OccupancyGate() {
+  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and the default claim timeout. */
+  public MaintenanceActionManager() {
     this(TableMaintenanceActionMetaService.getInstance());
   }
 
@@ -64,7 +65,7 @@ public final class OccupancyGate {
    * @param policyId policy entity id
    * @return true when any open row is a live unbound claim or a still-bound soft-slot row
    */
-  public boolean isInFlight(long tableId, long policyId) {
+  public boolean isOccupied(long tableId, long policyId) {
     if (actionMetaService.hasLiveUnboundClaim(tableId, policyId, claimTimeoutMs)) {
       return true;
     }
@@ -83,7 +84,7 @@ public final class OccupancyGate {
    * @param nowMs current epoch millis used only for cooldown (not unbound TTL)
    * @return true when the last known finish is still inside the cooldown window
    */
-  public boolean withinMinInterval(long tableId, long policyId, long minIntervalMs, long nowMs) {
+  public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
     if (minIntervalMs <= 0) {
       return false;
     }
@@ -92,17 +93,15 @@ public final class OccupancyGate {
   }
 
   /**
-   * Expand / submit should skip when occupied or still cooling down.
-   *
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param minIntervalMs resolved minimum interval
    * @param nowMs current epoch millis used only for cooldown (not unbound TTL)
-   * @return true when enqueue / submit must be skipped
+   * @return true when the soft slot is free and the cooldown has elapsed
    */
-  public boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs) {
-    return isInFlight(tableId, policyId)
-        || withinMinInterval(tableId, policyId, minIntervalMs, nowMs);
+  public boolean canStart(long tableId, long policyId, long minIntervalMs, long nowMs) {
+    return !isOccupied(tableId, policyId)
+        && !isCoolingDown(tableId, policyId, minIntervalMs, nowMs);
   }
 
   @Nullable

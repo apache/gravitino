@@ -24,9 +24,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Commit-pool control-plane submit (§5.2.3): consume enqueue-time {@link MaintenanceJobSpec} →
- * abort if any step is in-flight → soft-slot claim for every chain policy → {@link
+ * abort if any step still occupies the soft slot → soft-slot claim for every chain policy → {@link
  * MaintenanceJobManager#submitAndBind} for one chained Spark job.
  *
  * <p>Chain collection, cooldown filtering, auth consistency, and task_data assembly happen at
@@ -49,26 +49,26 @@ public final class MaintenanceCommitSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCommitSubmitPipeline.class);
 
-  private final OccupancyGate occupancyGate;
+  private final MaintenanceActionManager actionManager;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
-   * @param occupancyGate in-flight checks
+   * @param actionManager occupancy checks
    * @param actionMetaService soft-slot claim
    * @param jobManager runJob + bind (and orphan cancel)
    * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCommitSubmitPipeline(
-      OccupancyGate occupancyGate,
+      MaintenanceActionManager actionManager,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
-    this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
     this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
@@ -106,11 +106,11 @@ public final class MaintenanceCommitSubmitPipeline {
       return;
     }
 
-    // Design §5.2.3: any remaining type in-flight → delete commit-job and stop.
+    // Design §5.2.3: any remaining type still occupied → delete commit-job and stop.
     for (Task task : spec.getTasks()) {
-      if (occupancyGate.isInFlight(tableId, task.getPolicyId())) {
+      if (actionManager.isOccupied(tableId, task.getPolicyId())) {
         LOG.info(
-            "Skipping commit-job submit for table {} (type {} policy {} still in-flight)",
+            "Skipping commit-job submit for table {} (type {} policy {} still occupied)",
             tableId,
             task.getMaintenanceType(),
             task.getPolicyId());

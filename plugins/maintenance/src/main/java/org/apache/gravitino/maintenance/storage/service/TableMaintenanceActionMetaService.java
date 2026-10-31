@@ -67,8 +67,10 @@ public class TableMaintenanceActionMetaService {
    * action_id}; Spark must be injected with the new id.
    *
    * <p><b>Submit contract:</b> {@link #bindJobId} only fences the DB bind. It cannot undo a {@code
-   * runJob} that already succeeded. OccupancyGate / submit follow-ups must cancel orphaned Spark
-   * work when bind fails so a crash between submit and bind cannot leave dual runners.
+   * runJob} that already succeeded. {@link
+   * org.apache.gravitino.maintenance.MaintenanceActionManager} / submit follow-ups must cancel
+   * orphaned Spark work when bind fails so a crash between submit and bind cannot leave dual
+   * runners.
    *
    * @param tableId table entity id
    * @param policyId policy entity id

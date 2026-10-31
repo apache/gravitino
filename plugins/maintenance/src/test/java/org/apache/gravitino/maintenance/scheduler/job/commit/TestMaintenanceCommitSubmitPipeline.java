@@ -34,9 +34,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
@@ -116,10 +116,15 @@ class TestMaintenanceCommitSubmitPipeline {
     when(gateMeta.hasLiveUnboundClaim(anyLong(), anyLong(), anyLong()))
         .thenAnswer(inv -> inFlightPolicies.contains((Long) inv.getArgument(1)));
     when(gateMeta.listInFlight(anyLong(), anyLong())).thenReturn(List.of());
-    // OccupancyGate is final; drive isInFlight via a stub meta service.
-    OccupancyGate gate = new OccupancyGate(gateMeta, CLAIM_TIMEOUT_MS);
+    // MaintenanceActionManager is final; drive isOccupied via a stub meta service.
+    MaintenanceActionManager actionManager =
+        new MaintenanceActionManager(gateMeta, CLAIM_TIMEOUT_MS);
     return new MaintenanceCommitSubmitPipeline(
-        gate, actions, mgr, new MaintenanceJobConfBuilder(new Config(false) {}), CLAIM_TIMEOUT_MS);
+        actionManager,
+        actions,
+        mgr,
+        new MaintenanceJobConfBuilder(new Config(false) {}),
+        CLAIM_TIMEOUT_MS);
   }
 
   private static MaintenanceJobSpec spec() {

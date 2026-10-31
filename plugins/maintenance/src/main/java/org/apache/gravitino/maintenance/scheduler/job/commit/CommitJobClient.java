@@ -34,8 +34,8 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
@@ -79,7 +79,7 @@ public class CommitJobClient {
         gravitinoConfig,
         new CommitChainCollector()::collect,
         CommitOccupancyGate.of(
-            new OccupancyGate(
+            new MaintenanceActionManager(
                 TableMaintenanceActionMetaService.getInstance(),
                 TableMaintenanceConfig.from(gravitinoConfig).claimTimeoutMs())));
   }
@@ -196,7 +196,7 @@ public class CommitJobClient {
       long minIntervalMs =
           MaintenanceMinIntervalConfigs.resolve(
               gravitinoConfig, policy.policyType(), policyMinIntervalMs(policy.content()));
-      if (occupancyGate.withinMinInterval(tableId, policy.id(), minIntervalMs, nowMs)) {
+      if (occupancyGate.isCoolingDown(tableId, policy.id(), minIntervalMs, nowMs)) {
         LOG.debug(
             "Dropping type {} policy {} from commit-job enqueue for table {} (within minIntervalMs={})",
             policy.policyType(),

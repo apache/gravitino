@@ -21,8 +21,9 @@ package org.apache.gravitino.maintenance.scheduler.policy.expand;
 /**
  * Gate used by expand before inserting a {@code cron-job} row.
  *
- * <p>Production expand wires {@link org.apache.gravitino.maintenance.occupancy.OccupancyGate} and
- * may also skip when a pending {@code cron-job} row already covers the same table/policy pair.
+ * <p>Production expand skips when {@link
+ * org.apache.gravitino.maintenance.MaintenanceActionManager#canStart} is false, and may also skip
+ * when a pending {@code cron-job} row already covers the same table/policy pair.
  */
 @FunctionalInterface
 public interface ExpandOccupancyGate {

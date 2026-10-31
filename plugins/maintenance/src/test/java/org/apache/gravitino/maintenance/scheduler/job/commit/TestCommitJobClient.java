@@ -112,13 +112,12 @@ class TestCommitJobClient extends TestJDBCBackend {
   private static CommitOccupancyGate allowAllGate() {
     return new CommitOccupancyGate() {
       @Override
-      public boolean isInFlight(long tableId, long policyId) {
+      public boolean isOccupied(long tableId, long policyId) {
         return false;
       }
 
       @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
+      public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
         return false;
       }
     };
@@ -131,13 +130,12 @@ class TestCommitJobClient extends TestJDBCBackend {
     }
     return new CommitOccupancyGate() {
       @Override
-      public boolean isInFlight(long tableId, long policyId) {
+      public boolean isOccupied(long tableId, long policyId) {
         return false;
       }
 
       @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
+      public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
         return cooling.contains(policyId);
       }
     };

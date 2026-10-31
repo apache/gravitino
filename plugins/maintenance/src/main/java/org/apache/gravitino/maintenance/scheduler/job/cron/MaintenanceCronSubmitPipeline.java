@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
@@ -37,13 +37,13 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSpec} →
- * in-flight gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
+ * occupancy gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
  * shape; each {@link Task} becomes one Spark job. After coalesce, a {@code table:} instance may
  * still hold multiple tasks (members live in {@code task_data}); occupancy uses each task's own
- * {@code policyId}. If any task is in-flight, the whole pick stops without partial submits
- * (one-shot row is still removed by the caller).
+ * {@code policyId}. If any task is occupied, the whole pick stops without partial submits (one-shot
+ * row is still removed by the caller).
  *
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
  * {@code rules} in task parameters).
@@ -52,26 +52,26 @@ public final class MaintenanceCronSubmitPipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCronSubmitPipeline.class);
 
-  private final OccupancyGate occupancyGate;
+  private final MaintenanceActionManager actionManager;
   private final TableMaintenanceActionMetaService actionMetaService;
   private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
-   * @param occupancyGate in-flight gate (minInterval already applied at enqueue)
+   * @param actionManager occupancy checks (minInterval already applied at enqueue)
    * @param actionMetaService soft-slot claim
    * @param jobManager runJob + bind (and orphan cancel)
    * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
   public MaintenanceCronSubmitPipeline(
-      OccupancyGate occupancyGate,
+      MaintenanceActionManager actionManager,
       TableMaintenanceActionMetaService actionMetaService,
       MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
-    this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
     this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
@@ -123,12 +123,12 @@ public final class MaintenanceCronSubmitPipeline {
       }
     }
 
-    // minInterval was gated at expand enqueue; pick only blocks on in-flight. Any in-flight
-    // member aborts the whole pick so a batch row is not partially submitted then deleted.
+    // minInterval was gated at expand enqueue; pick only blocks on occupied soft slots. Any
+    // occupied member aborts the whole pick so a batch row is not partially submitted then deleted.
     for (Task task : spec.getTasks()) {
-      if (occupancyGate.isInFlight(task.getTableId(), task.getPolicyId())) {
+      if (actionManager.isOccupied(task.getTableId(), task.getPolicyId())) {
         LOG.info(
-            "Skipping cron-job {} entirely (table {} in-flight for policy {})",
+            "Skipping cron-job {} entirely (table {} occupied for policy {})",
             instanceId,
             task.getTableId(),
             task.getPolicyId());

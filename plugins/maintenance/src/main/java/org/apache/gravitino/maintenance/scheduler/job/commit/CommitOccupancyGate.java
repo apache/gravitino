@@ -18,13 +18,13 @@
  */
 package org.apache.gravitino.maintenance.scheduler.job.commit;
 
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 
 /**
  * Occupancy checks for commit-job paths.
  *
- * <p>{@link #withinMinInterval} gates enqueue (drops cooled-down chain members before spec build).
- * {@link #isInFlight} gates pick (any chain type still in-flight aborts submit).
+ * <p>{@link #isCoolingDown} gates enqueue (drops cooled-down chain members before spec build).
+ * {@link #isOccupied} gates pick (any chain type still occupying the soft slot aborts submit).
  */
 public interface CommitOccupancyGate {
 
@@ -33,7 +33,7 @@ public interface CommitOccupancyGate {
    * @param policyId policy entity id
    * @return true when that policy still holds a soft slot
    */
-  boolean isInFlight(long tableId, long policyId);
+  boolean isOccupied(long tableId, long policyId);
 
   /**
    * @param tableId table entity id
@@ -42,23 +42,22 @@ public interface CommitOccupancyGate {
    * @param nowMs current epoch millis
    * @return true when still inside {@code minIntervalMs} after the last finish
    */
-  boolean withinMinInterval(long tableId, long policyId, long minIntervalMs, long nowMs);
+  boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs);
 
   /**
-   * @param gate production occupancy gate
+   * @param actionManager production maintenance action manager
    * @return adapter
    */
-  static CommitOccupancyGate of(OccupancyGate gate) {
+  static CommitOccupancyGate of(MaintenanceActionManager actionManager) {
     return new CommitOccupancyGate() {
       @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return gate.isInFlight(tableId, policyId);
+      public boolean isOccupied(long tableId, long policyId) {
+        return actionManager.isOccupied(tableId, policyId);
       }
 
       @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return gate.withinMinInterval(tableId, policyId, minIntervalMs, nowMs);
+      public boolean isCoolingDown(long tableId, long policyId, long minIntervalMs, long nowMs) {
+        return actionManager.isCoolingDown(tableId, policyId, minIntervalMs, nowMs);
       }
     };
   }
