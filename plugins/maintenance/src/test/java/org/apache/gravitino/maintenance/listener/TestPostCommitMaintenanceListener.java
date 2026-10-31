@@ -32,7 +32,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobEnqueueResult;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient.EnqueueResult;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -64,7 +64,7 @@ class TestPostCommitMaintenanceListener {
     PostCommitMaintenanceListener listener = new PostCommitMaintenanceListener();
     CommitJobClient scheduler = mock(CommitJobClient.class);
     NameIdentifier identifier = NameIdentifier.of("ml", "c", "s", "t");
-    when(scheduler.enqueueNow(eq(42L), eq(identifier))).thenReturn(CommitJobEnqueueResult.INSERTED);
+    when(scheduler.enqueueNow(eq(42L), eq(identifier))).thenReturn(EnqueueResult.INSERTED);
     listener.setCommitJobClient(scheduler);
     listener.setTableLookup(
         ident ->

@@ -29,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobEnqueueResult;
+import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient.EnqueueResult;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -109,7 +109,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     }
     try {
       long tableId = resolveTableId(identifier);
-      CommitJobEnqueueResult result = client.enqueueNow(tableId, identifier);
+      EnqueueResult result = client.enqueueNow(tableId, identifier);
       switch (result) {
         case INSERTED:
           LOG.info("Enqueued commit-job for table {} ({})", tableId, identifier);
