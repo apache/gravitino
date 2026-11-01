@@ -754,25 +754,21 @@ public class IcebergTableOperations {
    * requesting credential vending. Package-private and static so that {@link
    * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
    * package.
+   *
+   * <p>The header is a comma-separated list of the mechanisms the client supports, and the server
+   * may serve the request with any or none of them, so mechanisms this server does not offer (such
+   * as remote-signing) are ignored.
    */
   static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
+    for (String mechanism : accessDelegation.split(",")) {
+      if ("vended-credentials".equalsIgnoreCase(mechanism.trim())) {
+        return true;
+      }
     }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
-    }
+    return false;
   }
 
   private NameIdentifier[] toNameIdentifiers(
