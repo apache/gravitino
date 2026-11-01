@@ -39,6 +39,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -46,6 +48,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -400,5 +403,34 @@ public class TestIcebergNamespaceOperationExecutor {
             Collections.emptyMap());
     Files.writeString(metadataFile, TableMetadataParser.toJson(metadata), StandardCharsets.UTF_8);
     return metadataFile.toUri().toString();
+  }
+
+  @Test
+  public void testCreateNamespaceRefusesSchemaSeparatorInLevelWithAuthorization() {
+    IcebergConfigProvider provider = mock(IcebergConfigProvider.class);
+    when(provider.getMetalakeName()).thenReturn("metalake");
+    when(provider.getDefaultCatalogName()).thenReturn("test_catalog");
+    when(mockContext.userName()).thenReturn("user");
+    when(mockCatalogWrapper.createNamespace(any())).thenReturn(mock(CreateNamespaceResponse.class));
+    try {
+      IcebergRESTServerContext.create(provider, true, false, false, mockWrapperManager);
+      CreateNamespaceRequest colliding =
+          CreateNamespaceRequest.builder().withNamespace(Namespace.of("x:y")).build();
+      Assertions.assertThrows(
+          BadRequestException.class, () -> executor.createNamespace(mockContext, colliding));
+      verify(mockCatalogWrapper, never()).createNamespace(any());
+
+      // The nested namespace the level would collide with is still accepted.
+      executor.createNamespace(
+          mockContext,
+          CreateNamespaceRequest.builder().withNamespace(Namespace.of("x", "y")).build());
+      verify(mockCatalogWrapper).createNamespace(any());
+
+      // Without authorization there is no Gravitino schema to collide with.
+      IcebergRESTServerContext.create(provider, false, false, false, mockWrapperManager);
+      Assertions.assertDoesNotThrow(() -> executor.createNamespace(mockContext, colliding));
+    } finally {
+      IcebergRESTServerContext.create(provider, false, false, false, null);
+    }
   }
 }
