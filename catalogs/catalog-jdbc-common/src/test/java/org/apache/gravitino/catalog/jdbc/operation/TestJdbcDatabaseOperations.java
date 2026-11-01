@@ -163,4 +163,71 @@ public class TestJdbcDatabaseOperations {
     Assertions.assertFalse(
         JDBC_DATABASE_OPERATIONS.delete(database1), "database should be non-existent");
   }
+
+  @Test
+  public void testGenerateDropDatabaseSqlValidatesDatabaseName() {
+    TestableJdbcDatabaseOperations operations = new TestableJdbcDatabaseOperations();
+
+    Assertions.assertEquals(
+        "DROP DATABASE `test_db-1$/=`", operations.buildDropSql("test_db-1$/=", true));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> operations.buildDropSql(null, true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> operations.buildDropSql("", true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildDropSql("test`; DROP TABLE users; --", true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> operations.buildDropSql("test schema", true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> operations.buildDropSql("a".repeat(65), true));
+  }
+
+  @Test
+  public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
+    TestableJdbcDatabaseOperations operations = new TestableJdbcDatabaseOperations();
+
+    Assertions.assertEquals(
+        "CREATE DATABASE `test_db-1$/=`",
+        operations.buildCreateSql("test_db-1$/=", null, Collections.emptyMap()));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql(null, null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.buildCreateSql("test`; DROP TABLE users; --", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("test schema", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("a".repeat(65), null, Collections.emptyMap()));
+  }
+
+  private static class TestableJdbcDatabaseOperations extends JdbcDatabaseOperations {
+    private String buildDropSql(String databaseName, boolean cascade) {
+      return generateDropDatabaseSql(databaseName, cascade);
+    }
+
+    private String buildCreateSql(
+        String databaseName, String comment, Map<String, String> properties) {
+      return generateCreateDatabaseSql(databaseName, comment, properties);
+    }
+
+    @Override
+    protected boolean supportSchemaComment() {
+      return false;
+    }
+
+    @Override
+    protected Set<String> createSysDatabaseNameSet() {
+      return Collections.emptySet();
+    }
+  }
 }

@@ -36,4 +36,26 @@ class TestDorisDatabaseOperationsSqlGeneration {
         sql.contains("\"comment\"=\"owner's \"\"comment\"\" C:\\\\tmp; DROP DATABASE marker; --\""),
         sql);
   }
+
+  @Test
+  public void testGenerateDropDatabaseSqlValidatesDatabaseName() {
+    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+
+    Assertions.assertEquals(
+        "DROP DATABASE `test_db` FORCE", operations.generateDropDatabaseSql("test_db", true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.generateDropDatabaseSql("db`; DROP TABLE users; --", true));
+  }
+
+  @Test
+  public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
+    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.generateCreateDatabaseSql(
+                "db`; DROP TABLE users; --", null, Collections.emptyMap()));
+  }
 }
