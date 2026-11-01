@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
@@ -240,6 +241,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL,
             HADOOP_SECURITY_KEYTAB,
             GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB,
+            HADOOP_KRB5_CONF,
+            GRAVITINO_BYPASS + HADOOP_KRB5_CONF,
             CONFIG_RESOURCES);
 
     /**
