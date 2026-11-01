@@ -248,6 +248,7 @@ public class IcebergNamespaceOperations {
       @IcebergAuthorizationMetadata(
               type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
           CreateNamespaceRequest createNamespaceRequest) {
+    IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
@@ -281,6 +282,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -322,6 +325,7 @@ public class IcebergNamespaceOperations {
           String namespace,
       RegisterTableRequest registerTableRequest,
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -363,6 +367,7 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       RegisterViewRequest registerViewRequest) {
+    IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -428,6 +433,8 @@ public class IcebergNamespaceOperations {
 
   private String SerializeUpdateNamespacePropertiesRequest(
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     try {
       return icebergObjectMapper.writeValueAsString(updateNamespacePropertiesRequest);
     } catch (JsonProcessingException e) {

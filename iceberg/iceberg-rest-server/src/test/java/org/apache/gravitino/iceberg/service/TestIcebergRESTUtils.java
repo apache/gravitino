@@ -43,9 +43,11 @@ import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -469,5 +471,35 @@ public class TestIcebergRESTUtils {
     } finally {
       IcebergRESTUtils.setIncludeErrorStackTrace(true);
     }
+  }
+
+  @Test
+  void testValidateRequestRejectsMissingOrInvalidBody() {
+    BadRequestException missing =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(null, "CreateTableRequest"));
+    Assertions.assertTrue(missing.getMessage().contains("CreateTableRequest"));
+
+    RESTRequest invalid =
+        () -> {
+          throw new IllegalArgumentException("Invalid name: null");
+        };
+    BadRequestException invalidBody =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(invalid, "CreateTableRequest"));
+    Assertions.assertTrue(invalidBody.getMessage().contains("Invalid name: null"));
+
+    RESTRequest npe =
+        () -> {
+          throw new NullPointerException();
+        };
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> IcebergRESTUtils.validateRequest(npe, "UpdateTableRequest"));
+
+    RESTRequest valid = () -> {};
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.validateRequest(valid, "X"));
   }
 }
