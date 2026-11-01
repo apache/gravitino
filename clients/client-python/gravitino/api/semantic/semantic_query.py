@@ -22,24 +22,21 @@ from gravitino.utils.precondition import Precondition
 
 
 class SemanticQuery:
-    """An immutable semantic query that a query planner compiles to SQL for an engine.
+    """An immutable, dialect-neutral query over a Semantic Model.
 
-    A query selects metrics and dimensions and may restrict them with filters.
-    The dialect is a non-empty identifier chosen by the caller; Gravitino
-    preserves it without implicit conversion so consumers can use engines and
-    custom dialect names the server does not know about.
+    A query selects metrics and dimensions and may restrict them with filters
+    and a row limit. Gravitino resolves the query into a
+    `SemanticQueryPlan`; a consumer then materializes SQL or an engine plan
+    with a `SemanticQueryPlanConverter`.
     """
 
     def __init__(
         self,
-        dialect: str,
         metrics: Optional[list[str]] = None,
         dimensions: Optional[list[str]] = None,
         filters: Optional[list[SemanticQueryFilter]] = None,
+        limit: Optional[int] = None,
     ):
-        Precondition.check_string_not_empty(
-            dialect, "dialect must not be null or empty"
-        )
         metrics = [] if metrics is None else metrics
         dimensions = [] if dimensions is None else dimensions
         filters = [] if filters is None else filters
@@ -51,13 +48,18 @@ class SemanticQuery:
                 f"filters[{index}] must not be null",
             )
         Precondition.check_argument(
+            limit is None
+            or (isinstance(limit, int) and not isinstance(limit, bool) and limit >= 0),
+            "limit must be null or non-negative",
+        )
+        Precondition.check_argument(
             len(metrics) > 0 or len(dimensions) > 0,
             "a semantic query must select at least one metric or dimension",
         )
         self._metrics = tuple(metrics)
         self._dimensions = tuple(dimensions)
         self._filters = tuple(filters)
-        self._dialect = dialect
+        self._limit = limit
 
     def metrics(self) -> list[str]:
         """Returns the selected metric names."""
@@ -71,9 +73,9 @@ class SemanticQuery:
         """Returns the filters applied to the query."""
         return list(self._filters)
 
-    def dialect(self) -> str:
-        """Returns the target engine dialect."""
-        return self._dialect
+    def limit(self) -> Optional[int]:
+        """Returns the row limit, or `None` for no limit."""
+        return self._limit
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, SemanticQuery):
@@ -82,17 +84,17 @@ class SemanticQuery:
             self._metrics == other._metrics
             and self._dimensions == other._dimensions
             and self._filters == other._filters
-            and self._dialect == other._dialect
+            and self._limit == other._limit
         )
 
     def __hash__(self) -> int:
-        return hash((self._metrics, self._dimensions, self._filters, self._dialect))
+        return hash((self._metrics, self._dimensions, self._filters, self._limit))
 
     def __repr__(self) -> str:
         return (
             f"SemanticQuery(metrics={list(self._metrics)!r}, "
             f"dimensions={list(self._dimensions)!r}, "
-            f"filters={list(self._filters)!r}, dialect={self._dialect!r})"
+            f"filters={list(self._filters)!r}, limit={self._limit!r})"
         )
 
     @staticmethod

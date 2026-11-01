@@ -1036,10 +1036,14 @@ class TestErrorHandler(unittest.TestCase):
             )
 
         plan_response = ErrorResponse.from_json(
-            '{"code":1013,"type":"SemanticQueryPlanException",'
-            '"message":"Unsupported dialect","stack":null}'
+            '{"code":1014,"type":"SemanticQueryPlanException",'
+            '"message":"Metric revenue does not exist in the Semantic Model",'
+            '"stack":null}'
         )
-        with self.assertRaisesRegex(SemanticQueryPlanException, "Unsupported dialect"):
+        with self.assertRaisesRegex(
+            SemanticQueryPlanException,
+            "Metric revenue does not exist in the Semantic Model",
+        ):
             SEMANTIC_MODEL_ERROR_HANDLER.handle(plan_response)
 
         with self.assertRaises(RESTException):

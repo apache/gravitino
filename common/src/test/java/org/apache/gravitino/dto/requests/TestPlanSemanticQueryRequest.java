@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,7 +43,7 @@ public class TestPlanSemanticQueryRequest {
             + "\"metrics\":[\"order_amount\"],"
             + "\"dimensions\":[\"region\"],"
             + "\"filters\":[{\"field\":\"order_date\",\"operator\":\"ge\",\"value\":\"2024-01-01\"}],"
-            + "\"dialect\":\"trino\""
+            + "\"limit\":1000"
             + "}";
 
     PlanSemanticQueryRequest request =
@@ -55,21 +56,20 @@ public class TestPlanSemanticQueryRequest {
     assertEquals(
         Collections.singletonList(SemanticQueryFilter.of("order_date", Operator.GE, "2024-01-01")),
         query.filters());
-    assertEquals("trino", query.dialect());
+    assertEquals(1000L, query.limit());
   }
 
   @Test
   public void testOmittedCollectionsAreAccepted() throws JsonProcessingException {
     PlanSemanticQueryRequest request =
         JsonUtils.objectMapper()
-            .readValue(
-                "{\"metrics\":[\"order_amount\"],\"dialect\":\"spark\"}",
-                PlanSemanticQueryRequest.class);
+            .readValue("{\"metrics\":[\"order_amount\"]}", PlanSemanticQueryRequest.class);
     request.validate();
 
     SemanticQuery query = request.toQuery();
     assertTrue(query.dimensions().isEmpty());
     assertTrue(query.filters().isEmpty());
+    assertNull(query.limit());
   }
 
   @Test
@@ -81,7 +81,7 @@ public class TestPlanSemanticQueryRequest {
             .withFilters(
                 Collections.singletonList(
                     SemanticQueryFilter.of("order_date", Operator.GE, "2024-01-01")))
-            .withDialect("trino")
+            .withLimit(250L)
             .build();
 
     JsonNode serialized =
@@ -92,7 +92,8 @@ public class TestPlanSemanticQueryRequest {
 
     assertEquals("order_amount", serialized.path("metrics").get(0).asText());
     assertEquals("ge", serialized.path("filters").get(0).path("operator").asText());
-    assertEquals("trino", serialized.path("dialect").asText());
+    assertEquals(250L, serialized.path("limit").asLong());
+    assertTrue(serialized.path("dialect").isMissingNode());
   }
 
   @Test
@@ -104,22 +105,19 @@ public class TestPlanSemanticQueryRequest {
         IllegalArgumentException.class,
         () ->
             new PlanSemanticQueryRequest(
-                    Collections.emptyList(), Collections.emptyList(), null, "trino")
+                    Collections.emptyList(), Collections.emptyList(), null, null)
                 .validate());
     assertThrows(
         IllegalArgumentException.class,
         () ->
             new PlanSemanticQueryRequest(
-                    Collections.singletonList(" "), Collections.emptyList(), null, "trino")
+                    Collections.singletonList(" "), Collections.emptyList(), null, null)
                 .validate());
     assertThrows(
         IllegalArgumentException.class,
         () ->
             new PlanSemanticQueryRequest(
-                    Collections.singletonList("metric"),
-                    Collections.singletonList(""),
-                    null,
-                    "trino")
+                    Collections.singletonList("metric"), Collections.singletonList(""), null, null)
                 .validate());
     assertThrows(
         IllegalArgumentException.class,
@@ -128,7 +126,7 @@ public class TestPlanSemanticQueryRequest {
                     Collections.singletonList("metric"),
                     Collections.emptyList(),
                     Collections.singletonList(null),
-                    "trino")
+                    null)
                 .validate());
     assertThrows(
         IllegalArgumentException.class,
@@ -137,7 +135,13 @@ public class TestPlanSemanticQueryRequest {
                     Collections.singletonList("metric"),
                     Collections.emptyList(),
                     Collections.singletonList(new SemanticQueryFilterDTO("field", "between", "v")),
-                    "trino")
+                    null)
+                .validate());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new PlanSemanticQueryRequest(
+                    Collections.singletonList("metric"), Collections.emptyList(), null, -1L)
                 .validate());
   }
 }

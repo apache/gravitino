@@ -213,23 +213,25 @@ class SemanticModelCatalog(ABC):
     def plan_semantic_query(
         self, identifier: NameIdentifier, query: SemanticQuery
     ) -> SemanticQueryPlan:
-        """Compile a Semantic Model query to SQL without executing it.
+        """Resolve a Semantic Model query into a dialect-neutral logical plan.
 
-        The configured query planner compiles the query for the requested
-        dialect and returns the SQL with any non-fatal warnings. Planning is
-        read-only and does not cache the generated SQL.
+        The server resolves the query against the current committed definition
+        and returns the required sources, joins, selections, filters, grouping
+        set, row limit and the Semantic Model version the plan was resolved
+        against. Resolution is read-only and never executes the query. A plan is
+        not authorization to execute it; the caller remains responsible for
+        access control on the underlying sources.
 
         Args:
             identifier (NameIdentifier): The Semantic Model identifier.
-            query (SemanticQuery): The query to compile.
+            query (SemanticQuery): The query to resolve.
 
         Returns:
-            SemanticQueryPlan: The compiled SQL, dialect, planner name, and warnings.
+            SemanticQueryPlan: The resolved plan.
 
         Raises:
             NoSuchSemanticModelException: If the model does not exist.
-            SemanticQueryPlanException: If the planner cannot compile the query.
-            UnsupportedOperationException: If no query planner is configured.
+            SemanticQueryPlanException: If the query cannot be satisfied.
         """
         raise UnsupportedOperationException("Semantic query planning is not supported")
 

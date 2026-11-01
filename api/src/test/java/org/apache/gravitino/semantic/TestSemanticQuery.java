@@ -20,8 +20,8 @@ package org.apache.gravitino.semantic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +35,10 @@ import org.junit.jupiter.api.Test;
 
 public class TestSemanticQuery {
 
+  private static final NameIdentifier MODEL =
+      NameIdentifier.of("metalake", "catalog", "schema", "model");
+  private static final NameIdentifier ORDERS = NameIdentifier.of("catalog", "db", "orders");
+
   @Test
   public void testBuildQuery() {
     SemanticQueryFilter filter = SemanticQueryFilter.of("order_date", Operator.GE, "2024-01-01");
@@ -43,13 +47,18 @@ public class TestSemanticQuery {
             .withMetrics(Arrays.asList("order_amount", "order_count"))
             .withDimensions(Collections.singletonList("region"))
             .withFilters(Collections.singletonList(filter))
-            .withDialect("trino")
+            .withLimit(1000L)
             .build();
 
     assertEquals(Arrays.asList("order_amount", "order_count"), query.metrics());
     assertEquals(Collections.singletonList("region"), query.dimensions());
     assertEquals(Collections.singletonList(filter), query.filters());
-    assertEquals("trino", query.dialect());
+    assertEquals(1000L, query.limit());
+  }
+
+  @Test
+  public void testQueryWithoutLimit() {
+    assertNull(query("metric", null).limit());
   }
 
   @Test
@@ -61,7 +70,6 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.emptyList())
                 .withDimensions(Collections.emptyList())
                 .withFilters(Collections.emptyList())
-                .withDialect("trino")
                 .build());
   }
 
@@ -74,7 +82,6 @@ public class TestSemanticQuery {
                 .withMetrics(null)
                 .withDimensions(Collections.emptyList())
                 .withFilters(Collections.emptyList())
-                .withDialect("trino")
                 .build());
     assertThrows(
         IllegalArgumentException.class,
@@ -83,7 +90,6 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList("metric"))
                 .withDimensions(null)
                 .withFilters(Collections.emptyList())
-                .withDialect("trino")
                 .build());
     assertThrows(
         IllegalArgumentException.class,
@@ -92,12 +98,11 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList("metric"))
                 .withDimensions(Collections.emptyList())
                 .withFilters(null)
-                .withDialect("trino")
                 .build());
   }
 
   @Test
-  public void testQueryRejectsBlankDialect() {
+  public void testQueryRejectsNegativeLimit() {
     assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -105,16 +110,7 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList("metric"))
                 .withDimensions(Collections.emptyList())
                 .withFilters(Collections.emptyList())
-                .withDialect(" ")
-                .build());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            SemanticQuery.builder()
-                .withMetrics(Collections.singletonList("metric"))
-                .withDimensions(Collections.emptyList())
-                .withFilters(Collections.emptyList())
-                .withDialect(null)
+                .withLimit(-1L)
                 .build());
   }
 
@@ -127,7 +123,6 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList(" "))
                 .withDimensions(Collections.emptyList())
                 .withFilters(Collections.emptyList())
-                .withDialect("trino")
                 .build());
     assertThrows(
         IllegalArgumentException.class,
@@ -136,7 +131,6 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList("metric"))
                 .withDimensions(Collections.singletonList(" "))
                 .withFilters(Collections.emptyList())
-                .withDialect("trino")
                 .build());
     List<SemanticQueryFilter> filters = new ArrayList<>();
     filters.add(null);
@@ -147,7 +141,6 @@ public class TestSemanticQuery {
                 .withMetrics(Collections.singletonList("metric"))
                 .withDimensions(Collections.emptyList())
                 .withFilters(filters)
-                .withDialect("trino")
                 .build());
   }
 
@@ -158,7 +151,6 @@ public class TestSemanticQuery {
             .withMetrics(new ArrayList<>(Collections.singletonList("metric")))
             .withDimensions(Collections.emptyList())
             .withFilters(Collections.emptyList())
-            .withDialect("trino")
             .build();
 
     assertThrows(UnsupportedOperationException.class, () -> query.metrics().add("other"));
@@ -166,14 +158,14 @@ public class TestSemanticQuery {
 
   @Test
   public void testQueryEquality() {
-    SemanticQuery first = query("metric", "trino");
-    SemanticQuery same = query("metric", "trino");
-    SemanticQuery otherDialect = query("metric", "spark");
+    SemanticQuery first = query("metric", 10L);
+    SemanticQuery same = query("metric", 10L);
+    SemanticQuery otherLimit = query("metric", 20L);
 
     assertEquals(first, first);
     assertEquals(first, same);
     assertEquals(first.hashCode(), same.hashCode());
-    assertNotEquals(first, otherDialect);
+    assertNotEquals(first, otherLimit);
     assertNotEquals(first, null);
     assertNotEquals(first, "not a query");
   }
@@ -205,90 +197,150 @@ public class TestSemanticQuery {
   }
 
   @Test
-  public void testPlanValidation() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> SemanticQueryPlan.of("", "trino", "planner", Collections.emptyList()));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> SemanticQueryPlan.of("SELECT 1", " ", "planner", Collections.emptyList()));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> SemanticQueryPlan.of("SELECT 1", "trino", null, Collections.emptyList()));
-    assertThrows(
-        IllegalArgumentException.class, () -> SemanticQueryPlan.of("SELECT 1", "trino", "p", null));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> SemanticQueryPlan.of("SELECT 1", "trino", "p", Collections.singletonList(" ")));
-  }
-
-  @Test
   public void testPlanBuildAndEquality() {
-    SemanticQueryPlan plan =
-        SemanticQueryPlan.of("SELECT 1", "trino", "planner", Collections.singletonList("warning"));
+    SemanticQueryPlan plan = plan(1000L);
 
-    assertEquals("SELECT 1", plan.sql());
-    assertEquals("trino", plan.dialect());
-    assertEquals("planner", plan.planner());
+    assertEquals(MODEL, plan.semanticModel());
+    assertEquals(3L, plan.semanticModelVersion());
+    assertEquals(2, plan.sources().size());
+    assertEquals("orders", plan.sources().get(0).dataset());
+    assertEquals("regions", plan.sources().get(1).dataset());
+    assertEquals(ORDERS, plan.sources().get(0).source());
+    assertEquals(1, plan.joins().size());
+    assertEquals(Collections.singletonList("Region"), plan.groupBy());
+    assertEquals(1000L, plan.limit());
     assertEquals(Collections.singletonList("warning"), plan.warnings());
     assertThrows(UnsupportedOperationException.class, () -> plan.warnings().add("other"));
+    assertThrows(UnsupportedOperationException.class, () -> plan.sources().add(null));
 
-    assertEquals(
-        plan,
-        SemanticQueryPlan.of("SELECT 1", "trino", "planner", Collections.singletonList("warning")));
-    assertEquals(
-        plan.hashCode(),
-        SemanticQueryPlan.of("SELECT 1", "trino", "planner", Collections.singletonList("warning"))
-            .hashCode());
-    assertNotEquals(
-        plan, SemanticQueryPlan.of("SELECT 2", "trino", "planner", Collections.singletonList("w")));
+    assertEquals(plan, plan(1000L));
+    assertEquals(plan.hashCode(), plan(1000L).hashCode());
+    assertNotEquals(plan, plan(2000L));
   }
 
   @Test
-  public void testPlanningContext() {
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "model");
+  public void testPlanRequiresPositiveVersion() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> planBuilder(1000L).withSemanticModelVersion(0).build());
+  }
 
-    PlanningContext empty = PlanningContext.of(ident);
-    assertEquals(ident, empty.semanticModel());
-    assertTrue(empty.properties().isEmpty());
+  @Test
+  public void testPlanValidatesSourcesAndSelections() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> planBuilder(1000L).withSources(Collections.emptyList()).build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> planBuilder(1000L).withSelections(Collections.emptyList()).build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> planBuilder(1000L).withGroupBy(Collections.singletonList("Missing")).build());
+  }
+
+  @Test
+  public void testPlanValidatesJoinOrder() {
+    PlanJoin reversed =
+        PlanJoin.of(
+            PlanJoin.Type.INNER,
+            "orders_to_regions",
+            "regions",
+            new String[] {"id"},
+            "orders",
+            new String[] {"region_id"});
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> planBuilder(1000L).withJoins(Collections.singletonList(reversed)).build());
+  }
+
+  @Test
+  public void testFieldReferenceRequiresExactlyOneRepresentation() {
+    Expression expression = expression("orders.amount");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> PlanFieldRef.ofExpression("orders", null, DataType.DECIMAL));
+    assertThrows(IllegalArgumentException.class, () -> PlanFieldRef.ofColumn("orders", " ", null));
+    assertEquals(
+        expression, PlanFieldRef.ofExpression("orders", expression, DataType.DECIMAL).expression());
+  }
+
+  @Test
+  public void testConversionContext() {
+    ConversionContext empty = ConversionContext.of(Collections.emptyMap());
+    assertEquals(Collections.emptyMap(), empty.properties());
 
     Map<String, String> properties = new LinkedHashMap<>();
-    properties.put("timezone", "UTC");
-    PlanningContext withProperties = PlanningContext.of(ident, properties);
-    assertEquals(Collections.singletonMap("timezone", "UTC"), withProperties.properties());
-    assertEquals(
-        withProperties, PlanningContext.of(ident, Collections.singletonMap("timezone", "UTC")));
-    assertEquals(
-        withProperties.hashCode(),
-        PlanningContext.of(ident, Collections.singletonMap("timezone", "UTC")).hashCode());
-    assertNotEquals(empty, withProperties);
-  }
+    properties.put("catalog.orders", "hive.orders");
+    ConversionContext context = ConversionContext.of(properties);
+    assertEquals(Collections.singletonMap("catalog.orders", "hive.orders"), context.properties());
+    assertThrows(UnsupportedOperationException.class, () -> context.properties().put("a", "b"));
 
-  @Test
-  public void testPlanningContextValidation() {
-    assertThrows(IllegalArgumentException.class, () -> PlanningContext.of(null));
-    assertThrows(
-        IllegalArgumentException.class, () -> PlanningContext.of(NameIdentifier.of("model"), null));
-
+    assertThrows(IllegalArgumentException.class, () -> ConversionContext.of(null));
     Map<String, String> nullValue = new LinkedHashMap<>();
     nullValue.put("key", null);
+    assertThrows(IllegalArgumentException.class, () -> ConversionContext.of(nullValue));
     assertThrows(
         IllegalArgumentException.class,
-        () -> PlanningContext.of(NameIdentifier.of("model"), nullValue));
-
-    Map<String, String> emptyKey = new LinkedHashMap<>();
-    emptyKey.put("", "value");
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> PlanningContext.of(NameIdentifier.of("model"), emptyKey));
+        () -> ConversionContext.of(Collections.singletonMap("", "value")));
   }
 
-  private static SemanticQuery query(String metric, String dialect) {
+  private static SemanticQuery query(String metric, Long limit) {
     return SemanticQuery.builder()
         .withMetrics(Collections.singletonList(metric))
         .withDimensions(Collections.emptyList())
         .withFilters(Collections.emptyList())
-        .withDialect(dialect)
+        .withLimit(limit)
+        .build();
+  }
+
+  private static SemanticQueryPlan plan(Long limit) {
+    return planBuilder(limit).build();
+  }
+
+  private static SemanticQueryPlan.Builder planBuilder(Long limit) {
+    PlanJoin join =
+        PlanJoin.of(
+            PlanJoin.Type.INNER,
+            "orders_to_regions",
+            "orders",
+            new String[] {"region_id"},
+            "regions",
+            new String[] {"id"});
+    return SemanticQueryPlan.builder()
+        .withSemanticModel(MODEL)
+        .withSemanticModelVersion(3L)
+        .withSources(
+            Arrays.asList(PlanSource.of("orders", ORDERS), PlanSource.of("regions", ORDERS)))
+        .withJoins(Collections.singletonList(join))
+        .withSelections(
+            Arrays.asList(
+                PlanSelection.of(
+                    "Gross_Revenue",
+                    PlanSelection.Role.METRIC,
+                    true,
+                    PlanFieldRef.ofExpression(
+                        "orders", expression("SUM(orders.amount)"), DataType.DECIMAL)),
+                PlanSelection.of(
+                    "Region",
+                    PlanSelection.Role.DIMENSION,
+                    false,
+                    PlanFieldRef.ofExpression(
+                        "regions", expression("regions.name"), DataType.STRING))))
+        .withFilters(Collections.emptyList())
+        .withGroupBy(Collections.singletonList("Region"))
+        .withLimit(limit)
+        .withWarnings(Collections.singletonList("warning"));
+  }
+
+  private static Expression expression(String text) {
+    return Expression.builder()
+        .withDialects(
+            new DialectExpression[] {
+              DialectExpression.builder()
+                  .withDialect(Dialects.ANSI_SQL)
+                  .withExpression(text)
+                  .build()
+            })
         .build();
   }
 }

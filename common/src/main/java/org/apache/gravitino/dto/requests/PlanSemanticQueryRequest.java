@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -37,14 +38,14 @@ import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.semantic.SemanticQuery;
 import org.apache.gravitino.semantic.SemanticQueryFilter;
 
-/** Represents a request to plan a Semantic Model query without executing it. */
+/** Represents a request to resolve a Semantic Model query without executing it. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"metrics", "dimensions", "filters", "dialect"})
+@JsonPropertyOrder({"metrics", "dimensions", "filters", "limit"})
 public class PlanSemanticQueryRequest implements RESTRequest {
 
   @JsonProperty("metrics")
@@ -56,8 +57,9 @@ public class PlanSemanticQueryRequest implements RESTRequest {
   @JsonProperty("filters")
   private final List<SemanticQueryFilterDTO> filters;
 
-  @JsonProperty("dialect")
-  private final String dialect;
+  @Nullable
+  @JsonProperty("limit")
+  private final Long limit;
 
   /** Default constructor for Jackson deserialization. */
   public PlanSemanticQueryRequest() {
@@ -70,23 +72,21 @@ public class PlanSemanticQueryRequest implements RESTRequest {
    * @param metrics The selected metric names, or {@code null} for none.
    * @param dimensions The selected dimension names, or {@code null} for none.
    * @param filters The filters, or {@code null} for none.
-   * @param dialect The target engine dialect.
+   * @param limit The row limit, or {@code null} for no limit.
    */
   public PlanSemanticQueryRequest(
       List<String> metrics,
       List<String> dimensions,
       List<SemanticQueryFilterDTO> filters,
-      String dialect) {
+      @Nullable Long limit) {
     this.metrics = metrics;
     this.dimensions = dimensions;
     this.filters = filters;
-    this.dialect = dialect;
+    this.limit = limit;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(dialect), "\"dialect\" field is required and cannot be empty");
     if (metrics != null) {
       for (int index = 0; index < metrics.size(); index++) {
         Preconditions.checkArgument(
@@ -111,6 +111,8 @@ public class PlanSemanticQueryRequest implements RESTRequest {
       }
     }
     Preconditions.checkArgument(
+        limit == null || limit >= 0, "\"limit\" field must be null or non-negative");
+    Preconditions.checkArgument(
         (metrics != null && !metrics.isEmpty()) || (dimensions != null && !dimensions.isEmpty()),
         "At least one metric or dimension must be selected");
   }
@@ -131,7 +133,7 @@ public class PlanSemanticQueryRequest implements RESTRequest {
         .withMetrics(metrics == null ? Collections.emptyList() : new ArrayList<>(metrics))
         .withDimensions(dimensions == null ? Collections.emptyList() : new ArrayList<>(dimensions))
         .withFilters(queryFilters)
-        .withDialect(dialect)
+        .withLimit(limit)
         .build();
   }
 
@@ -148,6 +150,6 @@ public class PlanSemanticQueryRequest implements RESTRequest {
         query.filters().stream()
             .map(SemanticQueryFilterDTO::fromFilter)
             .collect(Collectors.toList()),
-        query.dialect());
+        query.limit());
   }
 }

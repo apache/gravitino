@@ -23,15 +23,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * An immutable semantic query that a {@link SemanticQueryPlanner} compiles to SQL for an engine.
+ * An immutable, dialect-neutral semantic query.
  *
- * <p>A query selects metrics and dimensions and may restrict them with filters. The dialect is a
- * non-blank identifier chosen by the caller; Gravitino preserves it without implicit conversion so
- * consumers can use engines and custom dialect names the server does not know about.
+ * <p>A query selects metrics and dimensions and may restrict them with filters. The server resolves
+ * the query into a {@link SemanticQueryPlan}; a {@link SemanticQueryPlanConverter} materializes
+ * that plan for a specific engine. The query itself never names an engine or a dialect.
  */
 @Evolving
 public final class SemanticQuery {
@@ -39,11 +40,10 @@ public final class SemanticQuery {
   private final List<String> metrics;
   private final List<String> dimensions;
   private final List<SemanticQueryFilter> filters;
-  private final String dialect;
+
+  @Nullable private final Long limit;
 
   private SemanticQuery(Builder builder) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(builder.dialect), "dialect must not be null or blank");
     Preconditions.checkArgument(
         builder.metrics != null, "metrics must not be null; use an empty list to omit them");
     Preconditions.checkArgument(
@@ -59,11 +59,13 @@ public final class SemanticQuery {
     Preconditions.checkArgument(
         !builder.metrics.isEmpty() || !builder.dimensions.isEmpty(),
         "a semantic query must select at least one metric or dimension");
+    Preconditions.checkArgument(
+        builder.limit == null || builder.limit >= 0, "limit must be null or non-negative");
 
     this.metrics = Collections.unmodifiableList(new ArrayList<>(builder.metrics));
     this.dimensions = Collections.unmodifiableList(new ArrayList<>(builder.dimensions));
     this.filters = Collections.unmodifiableList(new ArrayList<>(builder.filters));
-    this.dialect = builder.dialect;
+    this.limit = builder.limit;
   }
 
   /**
@@ -76,7 +78,7 @@ public final class SemanticQuery {
   }
 
   /**
-   * Returns the selected metric names.
+   * Returns the selected metric names, in output order.
    *
    * @return An unmodifiable list of metric names; empty if no metrics are selected.
    */
@@ -85,7 +87,7 @@ public final class SemanticQuery {
   }
 
   /**
-   * Returns the selected dimension names.
+   * Returns the selected dimension names, in output order.
    *
    * @return An unmodifiable list of dimension names; empty if no dimensions are selected.
    */
@@ -94,7 +96,7 @@ public final class SemanticQuery {
   }
 
   /**
-   * Returns the filters applied to the query.
+   * Returns the filters applied to the query, ANDed together in request order.
    *
    * @return An unmodifiable list of filters; empty if the query has no filters.
    */
@@ -103,12 +105,13 @@ public final class SemanticQuery {
   }
 
   /**
-   * Returns the target engine dialect.
+   * Returns the maximum number of rows to return.
    *
-   * @return The non-blank dialect identifier.
+   * @return The non-negative row limit, or {@code null} for no limit.
    */
-  public String dialect() {
-    return dialect;
+  @Nullable
+  public Long limit() {
+    return limit;
   }
 
   @Override
@@ -123,12 +126,12 @@ public final class SemanticQuery {
     return metrics.equals(that.metrics)
         && dimensions.equals(that.dimensions)
         && filters.equals(that.filters)
-        && dialect.equals(that.dialect);
+        && Objects.equals(limit, that.limit);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(metrics, dimensions, filters, dialect);
+    return Objects.hash(metrics, dimensions, filters, limit);
   }
 
   @Override
@@ -140,9 +143,8 @@ public final class SemanticQuery {
         + dimensions
         + ", filters="
         + filters
-        + ", dialect='"
-        + dialect
-        + '\''
+        + ", limit="
+        + limit
         + '}';
   }
 
@@ -162,12 +164,13 @@ public final class SemanticQuery {
     private List<String> metrics;
     private List<String> dimensions;
     private List<SemanticQueryFilter> filters;
-    private String dialect;
+
+    @Nullable private Long limit;
 
     private Builder() {}
 
     /**
-     * Sets the selected metric names.
+     * Sets the selected metric names, in output order.
      *
      * @param metrics The metric names, or an empty list to select none.
      * @return This builder.
@@ -178,7 +181,7 @@ public final class SemanticQuery {
     }
 
     /**
-     * Sets the selected dimension names.
+     * Sets the selected dimension names, in output order.
      *
      * @param dimensions The dimension names, or an empty list to select none.
      * @return This builder.
@@ -200,13 +203,13 @@ public final class SemanticQuery {
     }
 
     /**
-     * Sets the target engine dialect.
+     * Sets the maximum number of rows to return.
      *
-     * @param dialect The non-blank dialect identifier.
+     * @param limit The non-negative row limit, or {@code null} for no limit.
      * @return This builder.
      */
-    public Builder withDialect(String dialect) {
-      this.dialect = dialect;
+    public Builder withLimit(@Nullable Long limit) {
+      this.limit = limit;
       return this;
     }
 

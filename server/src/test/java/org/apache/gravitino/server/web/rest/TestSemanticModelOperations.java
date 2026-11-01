@@ -112,14 +112,11 @@ import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
-import org.apache.gravitino.semantic.PlanningContext;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
-import org.apache.gravitino.semantic.SemanticQuery;
 import org.apache.gravitino.semantic.SemanticQueryFilter;
 import org.apache.gravitino.semantic.SemanticQueryPlan;
-import org.apache.gravitino.semantic.SemanticQueryPlanner;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -167,7 +164,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   private final EventBus eventBus = mock(EventBus.class);
   private final TableDispatcher tables = mock(TableDispatcher.class);
   private final ViewDispatcher views = mock(ViewDispatcher.class);
-  private final SemanticQueryPlanner queryPlanner = mock(SemanticQueryPlanner.class);
   private boolean tablesSupported = true;
   private boolean viewsSupported = true;
   private GravitinoAuthorizer sourceAuthorizer = new PassThroughAuthorizer();
@@ -206,7 +202,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                       return types;
                     }))
                 .to(SemanticModelSourceValidator.class);
-            bind(queryPlanner).to(SemanticQueryPlanner.class);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -215,7 +210,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @BeforeEach
   void resetDispatcher() {
-    reset(dispatcher, tables, views, eventBus, queryPlanner);
+    reset(dispatcher, tables, views, eventBus);
     tablesSupported = true;
     viewsSupported = true;
     sourceAuthorizer = new PassThroughAuthorizer();
@@ -266,8 +261,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                 tables,
                 views,
                 () -> sourceAuthorizer,
-                ident -> EnumSet.of(EntityType.TABLE, EntityType.VIEW)),
-            queryPlanner);
+                ident -> EnumSet.of(EntityType.TABLE, EntityType.VIEW)));
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
     try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class)) {
       helper
@@ -402,44 +396,42 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
-  void testPlanSemanticQueryReturnsCompiledSql() {
+  void testPlanSemanticQueryReturnsPlan() {
     NameIdentifier ident = semanticModelIdentifier("sales");
-    SemanticModel semanticModel = semanticModel("sales", null);
-    when(dispatcher.loadSemanticModel(ident)).thenReturn(semanticModel);
-    SemanticQueryPlan plan =
-        SemanticQueryPlan.of(
-            "SELECT region, SUM(orders.amount) FROM orders GROUP BY region",
-            "trino",
-            "custom",
-            List.of("approximate"));
-    when(queryPlanner.plan(eq(semanticModel), any(SemanticQuery.class), any())).thenReturn(plan);
+    when(dispatcher.loadSemanticModel(ident)).thenReturn(semanticModel("sales", null));
     PlanSemanticQueryRequest request =
         new PlanSemanticQueryRequest(
             List.of("order_total"),
-            List.of("region"),
-            List.of(new SemanticQueryFilterDTO("region", "eq", "EMEA")),
-            "trino");
+            List.of("order_id"),
+            List.of(new SemanticQueryFilterDTO("order_id", "eq", "o-1")),
+            5L);
 
     Response response = postPlan(semanticModelPath() + "/sales/plan", request);
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     SemanticQueryPlanResponse body = response.readEntity(SemanticQueryPlanResponse.class);
     body.validate();
-    Assertions.assertEquals(plan.sql(), body.getSql());
-    Assertions.assertEquals("trino", body.getDialect());
-    Assertions.assertEquals("custom", body.getPlanner());
-    Assertions.assertArrayEquals(new String[] {"approximate"}, body.getWarnings());
-
-    ArgumentCaptor<SemanticQuery> queryCaptor = ArgumentCaptor.forClass(SemanticQuery.class);
-    verify(queryPlanner)
-        .plan(eq(semanticModel), queryCaptor.capture(), eq(PlanningContext.of(ident)));
-    SemanticQuery query = queryCaptor.getValue();
-    Assertions.assertEquals(List.of("order_total"), query.metrics());
-    Assertions.assertEquals(List.of("region"), query.dimensions());
-    Assertions.assertEquals("trino", query.dialect());
+    SemanticQueryPlan plan = body.toPlan();
+    Assertions.assertEquals(ident, plan.semanticModel());
+    Assertions.assertEquals(1L, plan.semanticModelVersion());
+    Assertions.assertEquals(1, plan.sources().size());
+    Assertions.assertEquals("orders", plan.sources().get(0).dataset());
     Assertions.assertEquals(
-        SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA"),
-        query.filters().get(0));
+        NameIdentifier.of(catalog, schema, "orders"), plan.sources().get(0).source());
+    Assertions.assertTrue(plan.joins().isEmpty());
+    Assertions.assertEquals(2, plan.selections().size());
+    Assertions.assertEquals("order_total", plan.selections().get(0).name());
+    Assertions.assertEquals("METRIC", plan.selections().get(0).role().name());
+    Assertions.assertTrue(plan.selections().get(0).aggregate());
+    Assertions.assertEquals("order_id", plan.selections().get(1).name());
+    Assertions.assertEquals("DIMENSION", plan.selections().get(1).role().name());
+    Assertions.assertFalse(plan.selections().get(1).aggregate());
+    Assertions.assertEquals(List.of("order_id"), plan.groupBy());
+    Assertions.assertEquals(1, plan.filters().size());
+    Assertions.assertEquals(SemanticQueryFilter.Operator.EQ, plan.filters().get(0).operator());
+    Assertions.assertEquals(5L, plan.limit());
+    Assertions.assertTrue(plan.warnings().isEmpty());
+
     verify(dispatcher).loadSemanticModel(ident);
     verifyNoMoreInteractions(dispatcher);
   }
@@ -455,24 +447,24 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     assertError(
         postPlan(
             semanticModelPath() + "/sales/plan",
-            new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), "")),
-        Response.Status.BAD_REQUEST,
-        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
-        IllegalArgumentException.class.getSimpleName(),
-        "\"dialect\" field is required");
-    assertError(
-        postPlan(
-            semanticModelPath() + "/sales/plan",
             new PlanSemanticQueryRequest(
                 List.of(),
                 List.of(),
                 List.of(new SemanticQueryFilterDTO("region", "eq", "EMEA")),
-                "trino")),
+                null)),
         Response.Status.BAD_REQUEST,
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
         IllegalArgumentException.class.getSimpleName(),
         "At least one metric or dimension");
-    verifyNoInteractions(dispatcher, queryPlanner);
+    assertError(
+        postPlan(
+            semanticModelPath() + "/sales/plan",
+            new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), -1L)),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "\"limit\" field must be null or non-negative");
+    verifyNoInteractions(dispatcher);
   }
 
   @Test
@@ -481,7 +473,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     SemanticModel semanticModel = semanticModel("sales", null);
     when(dispatcher.loadSemanticModel(ident)).thenReturn(semanticModel);
     PlanSemanticQueryRequest request =
-        new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), "trino");
+        new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), null);
 
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
@@ -494,24 +486,14 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "sales does not exist");
 
     doReturn(semanticModel).when(dispatcher).loadSemanticModel(ident);
-    when(queryPlanner.plan(eq(semanticModel), any(SemanticQuery.class), any()))
-        .thenThrow(new SemanticQueryPlanException("metric order_total has no trino expression"));
     assertError(
-        postPlan(semanticModelPath() + "/sales/plan", request),
+        postPlan(
+            semanticModelPath() + "/sales/plan",
+            new PlanSemanticQueryRequest(List.of("missing_metric"), List.of(), List.of(), null)),
         422,
         ErrorConstants.UNPROCESSABLE_ENTITY_CODE,
         SemanticQueryPlanException.class.getSimpleName(),
-        "metric order_total has no trino expression");
-
-    doThrow(new UnsupportedOperationException("No query planner is configured"))
-        .when(queryPlanner)
-        .plan(eq(semanticModel), any(SemanticQuery.class), any());
-    assertError(
-        postPlan(semanticModelPath() + "/sales/plan", request),
-        Response.Status.NOT_IMPLEMENTED,
-        ErrorConstants.UNSUPPORTED_OPERATION_CODE,
-        UnsupportedOperationException.class.getSimpleName(),
-        "No query planner is configured");
+        "Metric 'missing_metric' does not exist");
   }
 
   @Test
@@ -1543,6 +1525,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)
+        .withVersion(1L)
         .withComment(comment)
         .withDefinition(semanticModelDefinition())
         .withProperties(Map.of("domain", "sales"))

@@ -17,6 +17,13 @@
 
 import unittest
 
+from gravitino.api.semantic.data_type import DataType
+from gravitino.api.semantic.dialect_expression import DialectExpression
+from gravitino.api.semantic.expression import Expression
+from gravitino.api.semantic.plan_field_ref import PlanFieldRef
+from gravitino.api.semantic.plan_filter import PlanFilter
+from gravitino.api.semantic.plan_selection import PlanSelection
+from gravitino.api.semantic.plan_source import PlanSource
 from gravitino.api.semantic.semantic_query import SemanticQuery
 from gravitino.api.semantic.semantic_query_filter import SemanticQueryFilter
 from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
@@ -26,7 +33,53 @@ from gravitino.dto.requests.plan_semantic_query_request import (
 from gravitino.dto.responses.semantic_query_plan_response import (
     SemanticQueryPlanResponse,
 )
+from gravitino.dto.semantic.plan_field_ref_dto import PlanFieldRefDTO
+from gravitino.dto.semantic.plan_filter_dto import PlanFilterDTO
+from gravitino.dto.semantic.plan_join_dto import PlanJoinDTO
+from gravitino.dto.semantic.plan_selection_dto import PlanSelectionDTO
+from gravitino.dto.semantic.plan_source_dto import PlanSourceDTO
 from gravitino.dto.semantic.semantic_query_filter_dto import SemanticQueryFilterDTO
+from gravitino.dto.semantic.semantic_query_plan_dto import SemanticQueryPlanDTO
+from gravitino.name_identifier import NameIdentifier
+
+PLAN_JSON = (
+    '{"semanticModel":["metalake","catalog","schema","sales_model"],'
+    '"semanticModelVersion":3,'
+    '"sources":[{"dataset":"orders",'
+    '"source":["catalog","schema","orders_table"]}],'
+    '"joins":[],'
+    '"selections":[{"name":"revenue","role":"METRIC","aggregate":true,'
+    '"field":{"dataset":"orders",'
+    '"expression":{"ANSI_SQL":"SUM(orders.amount)"},"datatype":"DECIMAL"}}],'
+    '"filters":[],"groupBy":[],"limit":10,"warnings":[]}'
+)
+
+
+def expression(text: str) -> Expression:
+    return Expression([DialectExpression("ANSI_SQL", text)])
+
+
+def plan() -> SemanticQueryPlan:
+    revenue = PlanFieldRef.of_expression(
+        "orders", expression("SUM(orders.amount)"), DataType.DECIMAL
+    )
+    return SemanticQueryPlan(
+        semantic_model=NameIdentifier.of(
+            "metalake", "catalog", "schema", "sales_model"
+        ),
+        semantic_model_version=3,
+        sources=[
+            PlanSource("orders", NameIdentifier.of("catalog", "schema", "orders_table"))
+        ],
+        joins=[],
+        selections=[
+            PlanSelection.of("revenue", PlanSelection.Role.METRIC, True, revenue)
+        ],
+        filters=[],
+        group_by=[],
+        limit=10,
+        warnings=[],
+    )
 
 
 class TestSemanticQueryFilterDTO(unittest.TestCase):
@@ -81,7 +134,6 @@ class TestSemanticQueryFilterDTO(unittest.TestCase):
 class TestPlanSemanticQueryRequest(unittest.TestCase):
     def test_from_query_and_json_wire_names(self):
         query = SemanticQuery(
-            dialect="trino",
             metrics=["revenue"],
             dimensions=["region"],
             filters=[
@@ -89,6 +141,7 @@ class TestPlanSemanticQueryRequest(unittest.TestCase):
                     "order_date", SemanticQueryFilter.Operator.GE, "2024-01-01"
                 )
             ],
+            limit=100,
         )
 
         request = PlanSemanticQueryRequest.from_query(query)
@@ -100,7 +153,7 @@ class TestPlanSemanticQueryRequest(unittest.TestCase):
                 "filters": [
                     {"field": "order_date", "operator": "ge", "value": "2024-01-01"}
                 ],
-                "dialect": "trino",
+                "limit": 100,
             },
             request.to_dict(),
         )
@@ -109,7 +162,7 @@ class TestPlanSemanticQueryRequest(unittest.TestCase):
 
     def test_from_json_and_omitted_collections(self):
         request = PlanSemanticQueryRequest.from_json(
-            '{"metrics":["revenue"],"dialect":"spark"}', infer_missing=True
+            '{"metrics":["revenue"],"limit":25}', infer_missing=True
         )
         request.validate()
 
@@ -117,99 +170,185 @@ class TestPlanSemanticQueryRequest(unittest.TestCase):
         self.assertEqual(["revenue"], query.metrics())
         self.assertEqual([], query.dimensions())
         self.assertEqual([], query.filters())
-        self.assertEqual("spark", query.dialect())
+        self.assertEqual(25, query.limit())
 
     def test_validation(self):
         with self.assertRaisesRegex(
-            ValueError, '"dialect" field is required and cannot be empty'
-        ):
-            PlanSemanticQueryRequest(_metrics=["revenue"]).validate()
-        with self.assertRaisesRegex(
             ValueError, '"metrics"\\[0\\] field cannot be null or empty'
         ):
-            PlanSemanticQueryRequest(_metrics=[""], _dialect="trino").validate()
+            PlanSemanticQueryRequest(_metrics=[""]).validate()
         with self.assertRaisesRegex(
             ValueError, '"dimensions"\\[0\\] field cannot be null or empty'
         ):
-            PlanSemanticQueryRequest(_dimensions=[" "], _dialect="trino").validate()
+            PlanSemanticQueryRequest(_dimensions=[" "]).validate()
         with self.assertRaisesRegex(
             ValueError, '"filters"\\[0\\] field cannot be null'
         ):
-            PlanSemanticQueryRequest(_filters=[None], _dialect="trino").validate()
+            PlanSemanticQueryRequest(_filters=[None]).validate()
+        with self.assertRaisesRegex(
+            ValueError, '"limit" field must be null or non-negative'
+        ):
+            PlanSemanticQueryRequest(_metrics=["revenue"], _limit=-1).validate()
         with self.assertRaisesRegex(
             ValueError, "At least one metric or dimension must be selected"
         ):
-            PlanSemanticQueryRequest(_dialect="trino").validate()
+            PlanSemanticQueryRequest().validate()
+
+
+class TestSemanticQueryPlanDTO(unittest.TestCase):
+    def test_from_json_and_to_plan(self):
+        dto = SemanticQueryPlanDTO.from_json(PLAN_JSON, infer_missing=True)
+        dto.validate()
+
+        self.assertEqual(plan(), dto.to_plan())
+
+    def test_from_plan_and_round_trip(self):
+        dto = SemanticQueryPlanDTO.from_plan(plan())
+
+        self.assertEqual(
+            {
+                "semanticModel": ["metalake", "catalog", "schema", "sales_model"],
+                "semanticModelVersion": 3,
+                "sources": [
+                    {
+                        "dataset": "orders",
+                        "source": ["catalog", "schema", "orders_table"],
+                    }
+                ],
+                "joins": [],
+                "selections": [
+                    {
+                        "name": "revenue",
+                        "role": "METRIC",
+                        "aggregate": True,
+                        "field": {
+                            "dataset": "orders",
+                            "expression": {"ANSI_SQL": "SUM(orders.amount)"},
+                            "datatype": "DECIMAL",
+                        },
+                    }
+                ],
+                "filters": [],
+                "groupBy": [],
+                "limit": 10,
+                "warnings": [],
+            },
+            dto.to_dict(),
+        )
+        self.assertEqual(plan(), dto.to_plan())
+
+    def test_validation(self):
+        cases = [
+            ({"_semantic_model": None}, '"semanticModel" field is required'),
+            ({"_semantic_model_version": 0}, '"semanticModelVersion" must be positive'),
+            ({"_sources": []}, '"sources" field is required'),
+            ({"_joins": None}, '"joins" field is required'),
+            ({"_selections": []}, '"selections" field is required'),
+            ({"_filters": None}, '"filters" field is required'),
+            ({"_group_by": None}, '"groupBy" field is required'),
+            ({"_limit": -1}, '"limit" must be null or non-negative'),
+            ({"_warnings": None}, '"warnings" field is required'),
+        ]
+        for fields, message in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    _dto_with(fields).validate()
+
+    def test_join_and_filter_wire_types(self):
+        join = PlanJoinDTO.from_json(
+            '{"type":"INNER","relationship":"orders_to_regions",'
+            '"fromDataset":"orders","fromColumns":["region_id"],'
+            '"toDataset":"regions","toColumns":["id"]}',
+            infer_missing=True,
+        )
+        self.assertEqual("orders_to_regions", join.to_plan_join().relationship())
+        self.assertEqual(
+            join,
+            PlanJoinDTO.from_plan_join(join.to_plan_join()),
+        )
+
+        field_ref = plan().selections()[0].field()
+        self.assertEqual(
+            field_ref,
+            PlanFieldRefDTO.from_plan_field_ref(field_ref).to_plan_field_ref(),
+        )
+        selection = plan().selections()[0]
+        self.assertEqual(
+            selection,
+            PlanSelectionDTO.from_plan_selection(selection).to_plan_selection(),
+        )
+        query_filter = PlanFilter.of(
+            field_ref,
+            SemanticQueryFilter.Operator.GE,
+            "1",
+        )
+        self.assertEqual(
+            query_filter,
+            PlanFilterDTO.from_plan_filter(query_filter).to_plan_filter(),
+        )
 
 
 class TestSemanticQueryPlanResponse(unittest.TestCase):
     def test_from_json_and_to_plan(self):
         response = SemanticQueryPlanResponse.from_json(
-            '{"code":0,"sql":"SELECT 1","dialect":"trino",'
-            '"planner":"test-planner","warnings":["warning"]}',
-            infer_missing=True,
+            '{"code":0,"plan":' + PLAN_JSON + "}", infer_missing=True
         )
         response.validate()
 
-        plan = response.to_plan()
-        self.assertEqual(
-            SemanticQueryPlan("SELECT 1", "trino", "test-planner", ["warning"]), plan
-        )
+        self.assertEqual(plan(), response.to_plan())
 
     def test_round_trip(self):
         response = SemanticQueryPlanResponse(
-            _code=0,
-            _sql="SELECT 1",
-            _dialect="spark",
-            _planner="planner",
-            _warnings=[],
+            _code=0, _plan=SemanticQueryPlanDTO.from_plan(plan())
         )
 
-        self.assertEqual(
-            {
-                "code": 0,
-                "sql": "SELECT 1",
-                "dialect": "spark",
-                "planner": "planner",
-                "warnings": [],
-            },
-            response.to_dict(),
-        )
+        data = response.to_dict()
+        self.assertEqual(0, data["code"])
+        self.assertEqual(3, data["plan"]["semanticModelVersion"])
+        self.assertNotIn("sql", data)
+        self.assertNotIn("dialect", data)
         response.validate()
-        self.assertEqual(
-            SemanticQueryPlan("SELECT 1", "spark", "planner", []),
-            response.to_plan(),
-        )
+        self.assertEqual(plan(), response.to_plan())
 
     def test_validation(self):
-        cases = [
-            ({"_sql": None}, "sql must not be null or empty"),
-            ({"_sql": "SELECT 1", "_dialect": ""}, "dialect must not be null or empty"),
-            (
-                {"_sql": "SELECT 1", "_dialect": "trino"},
-                "planner must not be null or empty",
-            ),
-            (
-                {"_sql": "SELECT 1", "_dialect": "trino", "_planner": "planner"},
-                "warnings must not be null",
-            ),
-            (
-                {
-                    "_sql": "SELECT 1",
-                    "_dialect": "trino",
-                    "_planner": "planner",
-                    "_warnings": [" "],
-                },
-                "warnings\\[0\\] must not be null or empty",
-            ),
-        ]
-        for fields, message in cases:
-            with self.subTest(message=message):
-                with self.assertRaisesRegex(ValueError, message):
-                    SemanticQueryPlanResponse(
-                        _code=0,
-                        _sql=fields.get("_sql"),
-                        _dialect=fields.get("_dialect"),
-                        _planner=fields.get("_planner"),
-                        _warnings=fields.get("_warnings"),
-                    ).validate()
+        with self.assertRaisesRegex(ValueError, "plan must not be null"):
+            SemanticQueryPlanResponse(_code=0, _plan=None).validate()
+        with self.assertRaisesRegex(
+            ValueError, '"semanticModelVersion" must be positive'
+        ):
+            SemanticQueryPlanResponse(
+                _code=0,
+                _plan=_dto_with({"_semantic_model_version": 0}),
+            ).validate()
+
+
+def _dto_with(fields: dict) -> SemanticQueryPlanDTO:
+    values = {
+        "_semantic_model": ["metalake", "catalog", "schema", "sales_model"],
+        "_semantic_model_version": 3,
+        "_sources": [
+            PlanSourceDTO(
+                _dataset="orders",
+                _source=["catalog", "schema", "orders_table"],
+            )
+        ],
+        "_joins": [],
+        "_selections": [
+            PlanSelectionDTO(
+                _name="revenue",
+                _role="METRIC",
+                _aggregate=True,
+                _field=PlanFieldRefDTO(
+                    _dataset="orders",
+                    _expression={"ANSI_SQL": "SUM(orders.amount)"},
+                    _datatype="DECIMAL",
+                ),
+            )
+        ],
+        "_filters": [],
+        "_group_by": [],
+        "_limit": 10,
+        "_warnings": [],
+    }
+    values.update(fields)
+    return SemanticQueryPlanDTO(**values)

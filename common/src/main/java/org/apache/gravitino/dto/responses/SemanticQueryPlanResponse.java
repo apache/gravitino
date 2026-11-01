@@ -20,76 +20,52 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.semantic.SemanticQueryPlanDTO;
 import org.apache.gravitino.semantic.SemanticQueryPlan;
 
-/** Represents the SQL compiled from a Semantic Model query. */
+/** Represents the dialect-neutral logical plan resolved from a Semantic Model query. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
 public class SemanticQueryPlanResponse extends BaseResponse {
 
-  @JsonProperty("sql")
-  private final String sql;
-
-  @JsonProperty("dialect")
-  private final String dialect;
-
-  @JsonProperty("planner")
-  private final String planner;
-
-  @JsonProperty("warnings")
-  private final String[] warnings;
+  @JsonProperty("plan")
+  private final SemanticQueryPlanDTO plan;
 
   /** Default constructor for Jackson deserialization. */
   public SemanticQueryPlanResponse() {
     super();
-    this.sql = null;
-    this.dialect = null;
-    this.planner = null;
-    this.warnings = null;
+    this.plan = null;
   }
 
   /**
    * Creates a successful query plan response.
    *
-   * @param plan The generated plan.
+   * @param plan The resolved plan.
    */
   public SemanticQueryPlanResponse(SemanticQueryPlan plan) {
     super(0);
-    this.sql = plan.sql();
-    this.dialect = plan.dialect();
-    this.planner = plan.planner();
-    this.warnings = plan.warnings().toArray(new String[0]);
+    this.plan = SemanticQueryPlanDTO.fromPlan(plan);
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    Preconditions.checkArgument(StringUtils.isNotBlank(sql), "sql must not be null or empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(dialect), "dialect must not be null or empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(planner), "planner must not be null or empty");
-    Preconditions.checkArgument(warnings != null, "warnings must not be null");
-    for (int index = 0; index < warnings.length; index++) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(warnings[index]), "warnings[%s] must not be null or empty", index);
-    }
+    Preconditions.checkArgument(plan != null, "plan must not be null");
+    plan.validate();
   }
 
   /**
    * Converts this response to an API plan.
    *
-   * @return The generated plan.
+   * @return The resolved plan.
    * @throws IllegalArgumentException If the response is invalid.
    */
   public SemanticQueryPlan toPlan() {
     validate();
-    return SemanticQueryPlan.of(sql, dialect, planner, Arrays.asList(warnings));
+    return plan.toPlan();
   }
 }

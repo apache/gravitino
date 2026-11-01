@@ -348,10 +348,12 @@ paths:
         - semantic-model
       summary: Plan a Semantic Model query
       description: >-
-        Compiles a Semantic Model query to SQL without executing it. The configured query planner
-        compiles the query for the requested dialect. The dialect is a free-form identifier that
-        the server preserves without validation or normalization. Planning is read-only and the
-        generated SQL is not cached. A query must select at least one metric or dimension.
+        Resolves a Semantic Model query into a dialect-neutral logical plan without rendering SQL
+        or executing it. The plan names the physical sources, join structure, selections, filters,
+        grouping set and row limit, and records the committed semanticModelVersion it was resolved
+        against. Resolution is read-only and the plan is not cached. A plan is not authorization to
+        execute the query; the consumer remains responsible for access control on the underlying
+        sources. A query must select at least one metric or dimension.
       operationId: planSemanticQuery
       requestBody:
         required: true
@@ -373,8 +375,6 @@ paths:
           $ref: "#/components/responses/SemanticModelNotFoundResponse"
         "422":
           $ref: "#/components/responses/SemanticQueryPlanUnprocessableResponse"
-        "501":
-          $ref: "#/components/responses/SemanticQueryPlanUnsupportedResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -1033,6 +1033,7 @@ components:
       description: A schema-scoped analytical Semantic Model with a nested semantic definition
       required:
         - name
+        - version
         - definition
         - properties
         - audit
@@ -1041,6 +1042,14 @@ components:
           type: string
           minLength: 1
           description: The Semantic Model name
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            The current committed definition version. It increases monotonically whenever the model
+            is altered, including comment-only edits, and is recorded in resolved query plans so
+            consumers can detect definition drift.
         comment:
           type: string
           nullable: true
@@ -1121,18 +1130,23 @@ components:
     PlanSemanticQueryRequest:
       type: object
       description: >-
-        A query to compile for a Semantic Model. At least one metric or dimension must be selected.
-      required:
-        - dialect
+        A query to resolve for a Semantic Model. At least one metric or dimension must be selected.
+      anyOf:
+        - required:
+            - metrics
+        - required:
+            - dimensions
       properties:
         metrics:
           type: array
+          minItems: 1
           description: Metric names to select; omitted or empty selects none
           items:
             type: string
             minLength: 1
         dimensions:
           type: array
+          minItems: 1
           description: Dimension names to select; omitted or empty selects none
           items:
             type: string
@@ -1142,41 +1156,238 @@ components:
           description: Filters applied to the query; omitted or empty applies none
           items:
             $ref: "#/components/schemas/SemanticQueryFilter"
-        dialect:
-          type: string
-          minLength: 1
-          description: >-
-            The target engine dialect, for example trino or ANSI_SQL. The server preserves it
-            without validation or normalization.
+        limit:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: The maximum number of rows to return; omitted or null applies no limit
       additionalProperties: false
 
     SemanticQueryPlan:
       type: object
-      description: The SQL compiled from a Semantic Model query
+      description: >-
+        A dialect-neutral logical plan resolved from a Semantic Model query. The plan contains no
+        SQL text, aliases, quoting, literal syntax or dialect choice, and is not authorization to
+        execute the query.
       required:
-        - sql
-        - dialect
-        - planner
+        - semanticModel
+        - semanticModelVersion
+        - sources
+        - joins
+        - selections
+        - filters
+        - groupBy
         - warnings
       properties:
-        sql:
-          type: string
-          minLength: 1
-          description: The generated SQL
-        dialect:
-          type: string
-          minLength: 1
-          description: The dialect the SQL targets
-        planner:
-          type: string
-          minLength: 1
-          description: The name of the planner that generated the SQL
-        warnings:
+        semanticModel:
           type: array
-          description: Non-fatal warnings produced while planning; empty when there are none
+          minItems: 1
+          description: The complete metalake.catalog.schema.name identifier of the model
           items:
             type: string
             minLength: 1
+        semanticModelVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          description: The committed definition version the plan was resolved against
+        sources:
+          type: array
+          minItems: 1
+          description: The datasets the query needs, in join order
+          items:
+            $ref: "#/components/schemas/PlanSource"
+        joins:
+          type: array
+          description: The joins that connect the sources; each one adds a dataset already in scope
+          items:
+            $ref: "#/components/schemas/PlanJoin"
+        selections:
+          type: array
+          minItems: 1
+          description: The selected metrics then dimensions, in request order
+          items:
+            $ref: "#/components/schemas/PlanSelection"
+        filters:
+          type: array
+          description: The resolved filters, ANDed together in request order
+          items:
+            $ref: "#/components/schemas/PlanFilter"
+        groupBy:
+          type: array
+          description: The non-aggregate selection names, in selection order
+          items:
+            type: string
+            minLength: 1
+        limit:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+          description: The row limit, or null for no limit
+        warnings:
+          type: array
+          description: Non-fatal warnings raised while resolving; empty when there are none
+          items:
+            type: string
+            minLength: 1
+      additionalProperties: false
+
+    PlanSource:
+      type: object
+      description: A dataset required by a plan and the physical source that provides it
+      required:
+        - dataset
+        - source
+      properties:
+        dataset:
+          type: string
+          minLength: 1
+          description: The dataset name declared by the Semantic Model
+        source:
+          type: array
+          minItems: 1
+          description: The complete physical source identifier as namespace levels followed by the name
+          items:
+            type: string
+            minLength: 1
+      additionalProperties: false
+
+    PlanJoin:
+      type: object
+      description: >-
+        A join between two datasets. Join columns are positional: fromColumns[i] joins to
+        toColumns[i], and both arrays have the same non-zero length.
+      required:
+        - type
+        - fromDataset
+        - fromColumns
+        - toDataset
+        - toColumns
+      properties:
+        type:
+          type: string
+          enum:
+            - INNER
+          description: The supported join type
+        relationship:
+          type: string
+          nullable: true
+          description: The Semantic Model relationship this join came from; omitted when implied
+        fromDataset:
+          type: string
+          minLength: 1
+          description: The dataset already in scope
+        fromColumns:
+          type: array
+          minItems: 1
+          description: The join columns of fromDataset
+          items:
+            type: string
+            minLength: 1
+        toDataset:
+          type: string
+          minLength: 1
+          description: The dataset this join brings into scope
+        toColumns:
+          type: array
+          minItems: 1
+          description: The join columns of toDataset, pairwise with fromColumns
+          items:
+            type: string
+            minLength: 1
+      additionalProperties: false
+
+    PlanFieldRef:
+      type: object
+      description: >-
+        A field of a dataset. Exactly one of expression and column is set: a declared field
+        carries its per-dialect expression, while a physical column the model does not expose
+        carries only its name.
+      required:
+        - dataset
+      properties:
+        dataset:
+          type: string
+          minLength: 1
+          description: The dataset that provides the field
+        expression:
+          type: object
+          minProperties: 1
+          additionalProperties:
+            type: string
+            minLength: 1
+          description: The declared field expression keyed by dialect
+        column:
+          type: string
+          minLength: 1
+          description: The physical column name, when the model exposes no declared field
+        datatype:
+          type: string
+          enum:
+            - STRING
+            - INTEGER
+            - DECIMAL
+            - FLOAT
+            - BOOLEAN
+            - DATE
+            - TIME
+            - DATE_TIME
+            - DATE_TIME_TZ
+            - OPAQUE
+          description: The logical data type; omitted when the model declares none
+      additionalProperties: false
+
+    PlanSelection:
+      type: object
+      description: A selected metric or dimension
+      required:
+        - name
+        - role
+        - aggregate
+        - field
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The metric or field name as requested; unique within the plan
+        role:
+          type: string
+          enum:
+            - METRIC
+            - DIMENSION
+          description: The selection role
+        aggregate:
+          type: boolean
+          description: Whether this selection aggregates; true exactly when role is METRIC
+        field:
+          $ref: "#/components/schemas/PlanFieldRef"
+      additionalProperties: false
+
+    PlanFilter:
+      type: object
+      description: A resolved filter in a plan
+      required:
+        - field
+        - operator
+        - value
+      properties:
+        field:
+          $ref: "#/components/schemas/PlanFieldRef"
+        operator:
+          type: string
+          enum:
+            - EQ
+            - NE
+            - GT
+            - GE
+            - LT
+            - LE
+          description: The comparison operator
+        value:
+          type: string
+          description: The compared value as untyped text; an empty string is valid
       additionalProperties: false
 
     SemanticModelUpdateRequest:
@@ -1524,17 +1735,14 @@ components:
               $ref: "#/components/examples/ConnectionFailedException"
 
     SemanticQueryPlanResponse:
-      description: Returns the compiled SQL with the dialect, planner name, and warnings
+      description: Returns the resolved dialect-neutral plan with the model version and warnings
       content:
         application/vnd.gravitino.v1+json:
           schema:
             type: object
             required:
               - code
-              - sql
-              - dialect
-              - planner
-              - warnings
+              - plan
             properties:
               code:
                 type: integer
@@ -1542,24 +1750,8 @@ components:
                 description: Status code of the response
                 enum:
                   - 0
-              sql:
-                type: string
-                minLength: 1
-                description: The generated SQL
-              dialect:
-                type: string
-                minLength: 1
-                description: The dialect the SQL targets
-              planner:
-                type: string
-                minLength: 1
-                description: The name of the planner that generated the SQL
-              warnings:
-                type: array
-                description: Non-fatal warnings produced while planning
-                items:
-                  type: string
-                  minLength: 1
+              plan:
+                $ref: "#/components/schemas/SemanticQueryPlan"
             additionalProperties: false
           examples:
             SemanticQueryPlanResponse:
@@ -1567,8 +1759,8 @@ components:
 
     SemanticQueryPlanUnprocessableResponse:
       description: >-
-        Unprocessable Entity - The query is well-formed but the configured planner cannot compile
-        it
+        Unprocessable Entity - The query is well-formed but the Semantic Model cannot satisfy it,
+        for example an unknown metric or no join path between the requested datasets
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -1576,24 +1768,6 @@ components:
           examples:
             SemanticQueryPlanException:
               $ref: "#/components/examples/SemanticQueryPlanException"
-
-    SemanticQueryPlanUnsupportedResponse:
-      description: Not Implemented - No Semantic Model query planner is configured
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-          examples:
-            UnsupportedOperationException:
-              value: {
-                "code": 1006,
-                "type": "UnsupportedOperationException",
-                "message": "No Semantic Model query planner is configured; set gravitino.semanticModel.queryPlanner to a planner name",
-                "stack": [
-                  "java.lang.UnsupportedOperationException: No Semantic Model query planner is configured; set gravitino.semanticModel.queryPlanner to a planner name",
-                  "..."
-                ]
-              }
 
   examples:
     OssieSemanticModelDocument:
@@ -1813,6 +1987,7 @@ components:
         "code": 0,
         "semanticModel": {
           "name": "sales_model",
+          "version": 3,
           "comment": "Governed sales definitions",
           "definition": {
             "aiContext": "Use certified sales definitions",
@@ -1930,25 +2105,83 @@ components:
             "value": "EMEA"
           }
         ],
-        "dialect": "trino"
+        "limit": 100
       }
 
     SemanticQueryPlanResponse:
       value: {
         "code": 0,
-        "sql": "SELECT region, SUM(orders.order_amount) AS total_revenue FROM sales.mart.orders WHERE region = 'EMEA' GROUP BY region",
-        "dialect": "trino",
-        "planner": "custom",
-        "warnings": []
+        "plan": {
+          "semanticModel": ["metalake", "catalog", "schema", "sales_model"],
+          "semanticModelVersion": 3,
+          "sources": [
+            {
+              "dataset": "orders",
+              "source": ["metalake", "catalog", "schema", "orders"]
+            },
+            {
+              "dataset": "regions",
+              "source": ["metalake", "catalog", "schema", "regions"]
+            }
+          ],
+          "joins": [
+            {
+              "type": "INNER",
+              "relationship": "orders_to_regions",
+              "fromDataset": "orders",
+              "fromColumns": ["region_id"],
+              "toDataset": "regions",
+              "toColumns": ["region_id"]
+            }
+          ],
+          "selections": [
+            {
+              "name": "total_revenue",
+              "role": "METRIC",
+              "aggregate": true,
+              "field": {
+                "dataset": "orders",
+                "expression": {
+                  "ANSI_SQL": "SUM(orders.order_amount)"
+                },
+                "datatype": "DECIMAL"
+              }
+            },
+            {
+              "name": "region",
+              "role": "DIMENSION",
+              "aggregate": false,
+              "field": {
+                "dataset": "regions",
+                "column": "region",
+                "datatype": "STRING"
+              }
+            }
+          ],
+          "filters": [
+            {
+              "field": {
+                "dataset": "regions",
+                "column": "region",
+                "datatype": "STRING"
+              },
+              "operator": "EQ",
+              "value": "EMEA"
+            }
+          ],
+          "groupBy": ["region"],
+          "limit": 100,
+          "warnings": []
+        }
       }
 
     SemanticQueryPlanException:
       value: {
-        "code": 1013,
+        "code": 1014,
         "type": "SemanticQueryPlanException",
-        "message": "Metric total_revenue has no expression for dialect trino",
+        "message": "Metric 'total_revenue' does not exist in Semantic Model metalake.catalog.schema.sales_model",
         "stack": [
-          "org.apache.gravitino.exceptions.SemanticQueryPlanException: Metric total_revenue has no expression for dialect trino",
+          "org.apache.gravitino.exceptions.SemanticQueryPlanException: Metric 'total_revenue' does not exist in Semantic Model metalake.catalog.schema.sales_model",
           "..."
         ]
       }

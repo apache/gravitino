@@ -22,6 +22,7 @@ from dataclasses_json import config
 
 from gravitino.api.semantic.semantic_query import SemanticQuery
 from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
+from gravitino.dto.semantic.semantic_dto_utils import is_none
 from gravitino.dto.semantic.semantic_query_filter_dto import SemanticQueryFilterDTO
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.utils.precondition import Precondition
@@ -29,7 +30,7 @@ from gravitino.utils.precondition import Precondition
 
 @dataclass
 class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
-    """Represents a request to plan a Semantic Model query without executing it."""
+    """Represents a request to resolve a Semantic Model query into a plan."""
 
     _metrics: Optional[list[str]] = field(
         default=None, metadata=config(field_name="metrics")
@@ -40,7 +41,9 @@ class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
     _filters: Optional[list[SemanticQueryFilterDTO]] = field(
         default=None, metadata=config(field_name="filters")
     )
-    _dialect: Optional[str] = field(default=None, metadata=config(field_name="dialect"))
+    _limit: Optional[int] = field(
+        default=None, metadata=config(field_name="limit", exclude=is_none)
+    )
 
     def validate(self) -> None:
         """Validates the request.
@@ -48,9 +51,6 @@ class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
         Raises:
             IllegalArgumentException: If the request is incomplete or invalid.
         """
-        Precondition.check_string_not_empty(
-            self._dialect, '"dialect" field is required and cannot be empty'
-        )
         if self._metrics is not None:
             for index, metric in enumerate(self._metrics):
                 Precondition.check_string_not_empty(
@@ -71,6 +71,15 @@ class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
                 )
                 query_filter.validate()
         Precondition.check_argument(
+            self._limit is None
+            or (
+                isinstance(self._limit, int)
+                and not isinstance(self._limit, bool)
+                and self._limit >= 0
+            ),
+            '"limit" field must be null or non-negative',
+        )
+        Precondition.check_argument(
             bool(self._metrics) or bool(self._dimensions),
             "At least one metric or dimension must be selected",
         )
@@ -83,10 +92,10 @@ class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
         """
         self.validate()
         return SemanticQuery(
-            dialect=self._dialect,
             metrics=list(self._metrics or []),
             dimensions=list(self._dimensions or []),
             filters=[query_filter.to_filter() for query_filter in self._filters or []],
+            limit=self._limit,
         )
 
     @staticmethod
@@ -99,5 +108,5 @@ class PlanSemanticQueryRequest(SemanticJsonMixin, RESTRequest):
                 SemanticQueryFilterDTO.from_filter(query_filter)
                 for query_filter in query.filters()
             ],
-            _dialect=query.dialect(),
+            _limit=query.limit(),
         )

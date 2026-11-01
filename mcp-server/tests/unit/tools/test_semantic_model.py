@@ -401,24 +401,39 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(result, dropped)
                 self._assert_request("DELETE", f"{_MODELS_PATH}/sales_model")
 
-    async def test_compile_semantic_query(self):
+    async def test_plan_semantic_query(self):
         plan = {
-            "sql": "SELECT SUM(amount) FROM orders",
-            "dialect": "trino",
-            "planner": "custom",
+            "semanticModel": [
+                "test_metalake",
+                "catalog",
+                "schema",
+                "sales_model",
+            ],
+            "semanticModelVersion": 2,
+            "sources": [
+                {
+                    "dataset": "orders",
+                    "source": ["catalog", "schema", "orders"],
+                }
+            ],
+            "joins": [],
+            "selections": [],
+            "filters": [],
+            "groupBy": [],
+            "limit": 10,
             "warnings": [],
         }
-        self.response = {"code": 0, **plan}
+        self.response = {"code": 0, "plan": plan}
         result = await self._call(
-            "compile_semantic_query",
+            "plan_semantic_query",
             {
                 **_MODEL_ARGS,
-                "dialect": "trino",
                 "metrics": ["total_revenue"],
                 "dimensions": ["region"],
                 "filters": [
                     {"field": "region", "operator": "eq", "value": "EMEA"}
                 ],
+                "limit": 10,
             },
         )
         self.assertEqual(result, plan)
@@ -426,32 +441,43 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             "POST",
             f"{_MODELS_PATH}/sales_model/plan",
             {
-                "dialect": "trino",
                 "metrics": ["total_revenue"],
                 "dimensions": ["region"],
                 "filters": [
                     {"field": "region", "operator": "eq", "value": "EMEA"}
                 ],
+                "limit": 10,
             },
         )
 
-    async def test_compile_semantic_query_omits_unset_fields(self):
+    async def test_plan_semantic_query_omits_unset_fields(self):
         self.response = {
             "code": 0,
-            "sql": "SELECT COUNT(*) FROM orders",
-            "dialect": "trino",
-            "planner": "custom",
-            "warnings": ["approximate"],
+            "plan": {
+                "semanticModel": [
+                    "test_metalake",
+                    "catalog",
+                    "schema",
+                    "sales_model",
+                ],
+                "semanticModelVersion": 2,
+                "sources": [],
+                "joins": [],
+                "selections": [],
+                "filters": [],
+                "groupBy": [],
+                "warnings": ["approximate"],
+            },
         }
         result = await self._call(
-            "compile_semantic_query",
-            {**_MODEL_ARGS, "dialect": "trino", "metrics": ["order_count"]},
+            "plan_semantic_query",
+            {**_MODEL_ARGS, "metrics": ["order_count"]},
         )
         self.assertEqual(result["warnings"], ["approximate"])
         self._assert_request(
             "POST",
             f"{_MODELS_PATH}/sales_model/plan",
-            {"dialect": "trino", "metrics": ["order_count"]},
+            {"metrics": ["order_count"]},
         )
 
     async def test_all_operations_encode_each_path_segment(self):
@@ -494,11 +520,10 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "/sales%20%25",
             ),
             (
-                "compile_semantic_query",
+                "plan_semantic_query",
                 "POST",
                 {
                     "semantic_model_name": model_name,
-                    "dialect": "trino",
                     "metrics": ["m"],
                 },
                 "/sales%20%25/plan",
@@ -598,10 +623,9 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             ("drop_semantic_model", _MODEL_ARGS, 409, "NotInUseException"),
             ("drop_semantic_model", _MODEL_ARGS, 403, "ForbiddenException"),
             (
-                "compile_semantic_query",
+                "plan_semantic_query",
                 {
                     **_MODEL_ARGS,
-                    "dialect": "trino",
                     "metrics": ["total_revenue"],
                 },
                 422,
@@ -642,7 +666,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "create_semantic_model",
                 "alter_semantic_model",
                 "drop_semantic_model",
-                "compile_semantic_query",
+                "plan_semantic_query",
             },
         )
         for tool in tools.values():
@@ -672,12 +696,11 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             {"catalog_name", "schema_name", "semantic_model_name"},
         )
         self.assertEqual(
-            set(tools["compile_semantic_query"].inputSchema["required"]),
+            set(tools["plan_semantic_query"].inputSchema["required"]),
             {
                 "catalog_name",
                 "schema_name",
                 "semantic_model_name",
-                "dialect",
             },
         )
 
@@ -711,16 +734,18 @@ class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
             ),
             ("drop_semantic_model", model_args, True),
             (
-                "compile_semantic_query",
+                "plan_semantic_query",
                 {
                     **model_args,
-                    "dialect": "trino",
                     "metrics": ["total_revenue"],
                 },
                 {
-                    "sql": "SELECT 1",
-                    "dialect": "trino",
-                    "planner": "mock",
+                    "semanticModelVersion": 1,
+                    "sources": [],
+                    "joins": [],
+                    "selections": [],
+                    "filters": [],
+                    "groupBy": [],
                     "warnings": [],
                 },
             ),

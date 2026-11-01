@@ -56,13 +56,12 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
-import org.apache.gravitino.semantic.PlanningContext;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticQuery;
 import org.apache.gravitino.semantic.SemanticQueryPlan;
-import org.apache.gravitino.semantic.SemanticQueryPlanner;
+import org.apache.gravitino.semantic.SemanticQueryResolver;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -85,7 +84,6 @@ public class SemanticModelOperations {
 
   private final SemanticModelDispatcher dispatcher;
   private final SemanticModelSourceValidator sourceValidator;
-  private final SemanticQueryPlanner queryPlanner;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -94,16 +92,12 @@ public class SemanticModelOperations {
    *
    * @param dispatcher The Semantic Model dispatcher.
    * @param sourceValidator The caller-facing source validator.
-   * @param queryPlanner The configured Semantic Model query planner.
    */
   @Inject
   public SemanticModelOperations(
-      SemanticModelDispatcher dispatcher,
-      SemanticModelSourceValidator sourceValidator,
-      SemanticQueryPlanner queryPlanner) {
+      SemanticModelDispatcher dispatcher, SemanticModelSourceValidator sourceValidator) {
     this.dispatcher = dispatcher;
     this.sourceValidator = sourceValidator;
-    this.queryPlanner = queryPlanner;
   }
 
   /**
@@ -316,18 +310,22 @@ public class SemanticModelOperations {
   }
 
   /**
-   * Plans a Semantic Model query without executing it.
+   * Resolves a Semantic Model query into a dialect-neutral logical plan without executing it.
    *
-   * <p>The current committed definition is used. The configured query planner generates the SQL;
-   * the server validates the query, authorizes the caller, resolves the model, and returns the
-   * plan. The SQL is never executed or cached.
+   * <p>The current committed definition is used. The server authorizes the caller and resolves the
+   * query to the sources, joins, selections, filters, grouping set and limit of a single relational
+   * plan. The response records the Semantic Model version the plan was resolved against. The server
+   * never renders SQL or executes the plan, and a returned plan is not an authorization to execute
+   * it: the caller materializes the plan with a {@code SemanticQueryPlanConverter} and remains
+   * responsible for enforcing access to the physical sources.
    *
    * @param metalake The metalake name.
    * @param catalog The catalog name.
    * @param schema The schema name.
    * @param semanticModel The Semantic Model name.
-   * @param request The query to plan.
-   * @return A response containing the generated SQL, dialect, planner name, and warnings.
+   * @param request The query to resolve.
+   * @return A response containing the dialect-neutral plan, the Semantic Model version, and
+   *     warnings.
    */
   @POST
   @Path("{semanticModel}/plan")
@@ -363,14 +361,14 @@ public class SemanticModelOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
             SemanticModel model = dispatcher.loadSemanticModel(ident);
-            SemanticQueryPlan plan = queryPlanner.plan(model, query, PlanningContext.of(ident));
+            SemanticQueryPlan plan = SemanticQueryResolver.resolve(ident, model, query);
             LOG.info(
-                "Planned Semantic Model query: {}.{}.{}.{} using planner {}",
+                "Resolved Semantic Model query: {}.{}.{}.{} against version {}",
                 metalake,
                 catalog,
                 schema,
                 semanticModel,
-                plan.planner());
+                plan.semanticModelVersion());
             return Utils.ok(new SemanticQueryPlanResponse(plan));
           });
     } catch (Exception e) {

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.dto.responses;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,30 +25,56 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collections;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.semantic.DataType;
+import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Dialects;
+import org.apache.gravitino.semantic.Expression;
+import org.apache.gravitino.semantic.PlanFieldRef;
+import org.apache.gravitino.semantic.PlanSelection;
+import org.apache.gravitino.semantic.PlanSource;
 import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.junit.jupiter.api.Test;
 
 public class TestSemanticQueryPlanResponse {
 
+  private static final String SOURCES_JSON =
+      "\"sources\":[{\"dataset\":\"orders\","
+          + "\"source\":[\"catalog\",\"schema\",\"orders_table\"]}],";
+
+  private static final String PLAN_JSON =
+      "{\"semanticModel\":[\"metalake\",\"catalog\",\"schema\",\"sales_model\"],"
+          + "\"semanticModelVersion\":3,"
+          + SOURCES_JSON
+          + "\"joins\":[],"
+          + "\"selections\":[{\"name\":\"revenue\",\"role\":\"METRIC\",\"aggregate\":true,"
+          + "\"field\":{\"dataset\":\"orders\","
+          + "\"expression\":{\"ANSI_SQL\":\"SUM(orders.amount)\"},\"datatype\":\"DECIMAL\"}}],"
+          + "\"filters\":[],\"groupBy\":[],\"limit\":10,\"warnings\":[]}";
+
   @Test
   public void testSerDeAndConvert() throws JsonProcessingException {
-    SemanticQueryPlan plan =
-        SemanticQueryPlan.of(
-            "SELECT region, SUM(amount) FROM orders GROUP BY region",
-            "trino",
-            "test-planner",
-            Collections.singletonList("amount treated as decimal"));
+    SemanticQueryPlan plan = plan();
 
     SemanticQueryPlanResponse response = new SemanticQueryPlanResponse(plan);
     String json = JsonUtils.objectMapper().writeValueAsString(response);
     JsonNode root = JsonUtils.objectMapper().readTree(json);
 
     assertEquals(0, root.path("code").asInt());
-    assertEquals(plan.sql(), root.path("sql").asText());
-    assertEquals("trino", root.path("dialect").asText());
-    assertEquals("test-planner", root.path("planner").asText());
-    assertEquals(1, root.path("warnings").size());
+    JsonNode planNode = root.path("plan");
+    assertEquals(3, planNode.path("semanticModelVersion").asInt());
+    assertEquals(
+        "SUM(orders.amount)",
+        planNode
+            .path("selections")
+            .get(0)
+            .path("field")
+            .path("expression")
+            .path("ANSI_SQL")
+            .asText());
+    assertTrue(root.path("sql").isMissingNode());
+    assertTrue(root.path("dialect").isMissingNode());
 
     SemanticQueryPlanResponse deserialized =
         JsonUtils.objectMapper().readValue(json, SemanticQueryPlanResponse.class);
@@ -58,49 +83,74 @@ public class TestSemanticQueryPlanResponse {
   }
 
   @Test
-  public void testValidation() throws JsonProcessingException {
-    assertThrows(IllegalArgumentException.class, new SemanticQueryPlanResponse()::validate);
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            read("{\"code\":0,\"dialect\":\"trino\",\"planner\":\"p\",\"warnings\":[]}")
-                .validate());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            read("{\"code\":0,\"sql\":\"SELECT 1\",\"planner\":\"p\",\"warnings\":[]}").validate());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            read("{\"code\":0,\"sql\":\"SELECT 1\",\"dialect\":\"trino\",\"warnings\":[]}")
-                .validate());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            read("{\"code\":0,\"sql\":\"SELECT 1\",\"dialect\":\"trino\",\"planner\":\"p\"}")
-                .validate());
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            read("{\"code\":0,\"sql\":\"SELECT 1\",\"dialect\":\"trino\",\"planner\":\"p\","
-                    + "\"warnings\":[\" \"]}")
-                .validate());
+  public void testDeserializeWireContract() throws JsonProcessingException {
+    SemanticQueryPlanResponse response = read("{\"code\":0,\"plan\":" + PLAN_JSON + "}");
+    response.validate();
+
+    assertEquals(plan(), response.toPlan());
   }
 
   @Test
-  public void testEmptyWarnings() throws JsonProcessingException {
-    SemanticQueryPlan plan =
-        SemanticQueryPlan.of("SELECT 1", "spark", "planner", Collections.emptyList());
+  public void testValidation() throws JsonProcessingException {
+    assertThrows(IllegalArgumentException.class, new SemanticQueryPlanResponse()::validate);
+    assertThrows(IllegalArgumentException.class, () -> read("{\"code\":0}").validate());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> read("{\"code\":0,\"plan\":" + PLAN_JSON.replace(":3,", ":0,") + "}").validate());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            read("{\"code\":0,\"plan\":" + PLAN_JSON.replace(SOURCES_JSON, "\"sources\":[],") + "}")
+                .validate());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            read("{\"code\":0,\"plan\":"
+                    + PLAN_JSON.replace("\"groupBy\":[]", "\"groupBy\":[\"revenue\"]")
+                    + "}")
+                .toPlan());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            read("{\"code\":0,\"plan\":" + PLAN_JSON.replace("\"limit\":10", "\"limit\":-1") + "}")
+                .validate());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            read("{\"code\":0,\"plan\":"
+                    + PLAN_JSON.replace("\"warnings\":[]", "\"warnings\":[null]")
+                    + "}")
+                .validate());
+  }
 
-    SemanticQueryPlanResponse deserialized =
-        JsonUtils.objectMapper()
-            .readValue(
-                JsonUtils.objectMapper().writeValueAsString(new SemanticQueryPlanResponse(plan)),
-                SemanticQueryPlanResponse.class);
-    deserialized.validate();
+  private static SemanticQueryPlan plan() {
+    PlanFieldRef revenue =
+        PlanFieldRef.ofExpression("orders", expression("SUM(orders.amount)"), DataType.DECIMAL);
+    return SemanticQueryPlan.builder()
+        .withSemanticModel(NameIdentifier.of("metalake", "catalog", "schema", "sales_model"))
+        .withSemanticModelVersion(3)
+        .withSources(
+            Collections.singletonList(
+                PlanSource.of("orders", NameIdentifier.of("catalog", "schema", "orders_table"))))
+        .withSelections(
+            Collections.singletonList(
+                PlanSelection.of("revenue", PlanSelection.Role.METRIC, true, revenue)))
+        .withGroupBy(Collections.emptyList())
+        .withLimit(10L)
+        .withWarnings(Collections.emptyList())
+        .build();
+  }
 
-    assertArrayEquals(new String[0], deserialized.getWarnings());
-    assertTrue(deserialized.toPlan().warnings().isEmpty());
+  private static Expression expression(String text) {
+    return Expression.builder()
+        .withDialects(
+            new DialectExpression[] {
+              DialectExpression.builder()
+                  .withDialect(Dialects.ANSI_SQL)
+                  .withExpression(text)
+                  .build()
+            })
+        .build();
   }
 
   private static SemanticQueryPlanResponse read(String json) throws JsonProcessingException {

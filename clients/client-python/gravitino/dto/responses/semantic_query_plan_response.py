@@ -23,40 +23,32 @@ from dataclasses_json import config
 from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
+from gravitino.dto.semantic.semantic_query_plan_dto import SemanticQueryPlanDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
 class SemanticQueryPlanResponse(SemanticJsonMixin, BaseResponse):
-    """Represents the SQL compiled from a Semantic Model query."""
+    """Represents the dialect-neutral plan resolved for a Semantic Model query."""
 
-    _sql: Optional[str] = field(default=None, metadata=config(field_name="sql"))
-    _dialect: Optional[str] = field(default=None, metadata=config(field_name="dialect"))
-    _planner: Optional[str] = field(default=None, metadata=config(field_name="planner"))
-    _warnings: Optional[list[str]] = field(
-        default=None, metadata=config(field_name="warnings")
+    _plan: Optional[SemanticQueryPlanDTO] = field(
+        default=None, metadata=config(field_name="plan")
     )
+
+    def plan(self) -> Optional[SemanticQueryPlanDTO]:
+        """Returns the plan DTO."""
+        return self._plan
 
     def validate(self) -> None:
         """Validates the response data.
 
         Raises:
-            IllegalArgumentException: If a required value is missing or invalid.
+            IllegalArgumentException: If the plan is missing or invalid.
         """
         super().validate()
-        if self._sql is None or not self._sql.strip():
-            raise IllegalArgumentException("sql must not be null or empty")
-        if self._dialect is None or not self._dialect.strip():
-            raise IllegalArgumentException("dialect must not be null or empty")
-        if self._planner is None or not self._planner.strip():
-            raise IllegalArgumentException("planner must not be null or empty")
-        if self._warnings is None:
-            raise IllegalArgumentException("warnings must not be null")
-        for index, warning in enumerate(self._warnings):
-            if warning is None or not warning.strip():
-                raise IllegalArgumentException(
-                    f"warnings[{index}] must not be null or empty"
-                )
+        if self._plan is None:
+            raise IllegalArgumentException("plan must not be null")
+        self._plan.validate()
 
     def to_plan(self) -> SemanticQueryPlan:
         """Converts this response to an API plan.
@@ -65,9 +57,4 @@ class SemanticQueryPlanResponse(SemanticJsonMixin, BaseResponse):
             IllegalArgumentException: If the response is invalid.
         """
         self.validate()
-        return SemanticQueryPlan(
-            sql=self._sql,
-            dialect=self._dialect,
-            planner=self._planner,
-            warnings=list(self._warnings),
-        )
+        return self._plan.to_plan()

@@ -169,18 +169,22 @@ public interface SemanticModelCatalog {
   /**
    * Plans a semantic query against a Semantic Model without executing it.
    *
-   * <p>The current committed definition is used; version pinning is not part of this contract.
-   * Gravitino validates the query, authorizes the caller, resolves the model, and returns the
-   * generated SQL. The configured {@link SemanticQueryPlanner} owns SQL generation and dialect
-   * semantics. The server never executes the SQL or caches the plan.
+   * <p>Gravitino validates the query, authorizes the caller, loads the current committed
+   * definition, and resolves it into a dialect-neutral {@link SemanticQueryPlan}. The plan records
+   * the {@code semanticModelVersion} it was resolved against so that a consumer can detect
+   * definition drift. Engine-specific materialization happens in a {@link
+   * SemanticQueryPlanConverter} outside the server. The server never generates SQL, executes the
+   * query, or caches the plan.
+   *
+   * <p>Plan authorization is not execution authorization: the converter and the engine that
+   * executes the plan are responsible for their own credentials and row or column policies.
    *
    * @param ident The Semantic Model identifier.
-   * @param query The semantic query to compile.
-   * @return The generated plan.
+   * @param query The semantic query to resolve.
+   * @return The resolved plan.
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    * @throws IllegalArgumentException If the query is malformed.
-   * @throws SemanticQueryPlanException If the query cannot be compiled for the requested dialect.
-   * @throws UnsupportedOperationException If no query planner is configured.
+   * @throws SemanticQueryPlanException If the model cannot satisfy the query.
    */
   default SemanticQueryPlan planSemanticQuery(NameIdentifier ident, SemanticQuery query)
       throws NoSuchSemanticModelException {

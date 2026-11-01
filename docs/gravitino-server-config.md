@@ -661,23 +661,18 @@ server, are documented with those services. See
 | `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
 | `gravitino.job.outputMaxBytes`         | Maximum number of bytes returned from the tail of a job's stdout/stderr when fetching its output.                                                              | `262144` (256KB)              |
 
-#### Semantic query planner
+#### Semantic query planning
 
-The Semantic Model `/plan` endpoint compiles a query to SQL through a query planner. The built-in
-`none` planner is a placeholder that returns `501 Not Implemented`, so planning is disabled until a
-planner is configured. Implement `SemanticQueryPlanner`, put the jar on the server classpath, and
-register it under a name.
+The Semantic Model `/plan` endpoint has no server configuration. The server resolves a query
+against the committed model definition into a dialect-neutral logical plan and returns that plan;
+it does not render SQL, choose a dialect, or execute anything. Plan resolution is read-only and the
+plan is not cached.
 
-| Configuration Item                                | Description                                                                                                     | Default Value |
-|---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|---------------|
-| `gravitino.semanticModel.queryPlanner`            | Name of the planner used to compile Semantic Model queries. Use `none` to disable planning.                    | `none`        |
-| `gravitino.semanticModelQueryPlanner.{name}.class` | Fully qualified class name of the planner registered under `{name}`. The class needs a public no-arg constructor. | (none)        |
-
-The name selected by `gravitino.semanticModel.queryPlanner` needs a matching `{name}.class`, or the
-server fails to initialize. A planner receives the loaded Semantic Model, the parsed query, and
-the planning context, and returns the SQL, the dialect, and any non-fatal warnings. Throwing
-`SemanticQueryPlanException` reports the query as unprocessable with `422`; planning never
-executes the SQL or caches it.
+Consumers materialize SQL or an engine plan themselves. The `api` module defines a
+`SemanticQueryPlanConverter` SPI to turn a resolved `SemanticQueryPlan` into a target
+representation; `SqlSemanticQueryPlanConverter` is the subtype for engines that consume statement
+text. A `SemanticQueryPlanException` reports a query the model cannot satisfy as unprocessable with
+`422`.
 
 #### Table maintenance cooldowns
 

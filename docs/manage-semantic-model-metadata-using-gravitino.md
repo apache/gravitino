@@ -515,14 +515,17 @@ model through the native API; the reserved extension is for Ossie exchange.
 
 ## Plan a Semantic Query
 
-A Semantic Model describes metrics and dimensions; compiling a query to SQL for a specific engine
-is a separate step. The server asks its configured query planner to compile a `SemanticQuery` and
-returns the SQL without executing it. Planning is read-only and the generated SQL is not cached.
+A Semantic Model describes metrics and dimensions. Resolving a query against that description is a
+separate, read-only step that produces a dialect-neutral logical plan; the server does not render
+SQL, choose a dialect, or execute anything. The plan names the physical sources, join structure,
+selections, filters, grouping set, and row limit, and records the committed
+`semanticModelVersion` it was resolved against, so a consumer can detect definition drift. Plans
+are not cached. A plan is not authorization to execute the query: the consumer remains responsible
+for access control on the underlying sources.
 
 A query must select at least one metric or dimension. Filters compare a field with a string value
-using `eq`, `ne`, `gt`, `ge`, `lt`, or `le`. The dialect is a free-form identifier such as `trino`
-or `ANSI_SQL`; the server preserves it without validation or normalization, so custom engine names
-are valid.
+using `eq`, `ne`, `gt`, `ge`, `lt`, or `le`. `limit` caps the number of rows the consumer should
+return.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -532,8 +535,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
   -d '{
     "metrics": ["total_revenue"],
+    "dimensions": ["region"],
     "filters": [{"field": "region", "operator": "eq", "value": "EMEA"}],
-    "dialect": "trino"
+    "limit": 100
   }' \
   http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-models/sales_model/plan
 ```
@@ -544,13 +548,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 SemanticQuery query = SemanticQuery.builder()
     .withMetrics(List.of("total_revenue"))
-    .withDimensions(List.of())
+    .withDimensions(List.of("region"))
     .withFilters(List.of(
         SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")))
-    .withDialect("trino")
+    .withLimit(100L)
     .build();
 SemanticQueryPlan plan = models.planSemanticQuery(ident, query);
-String sql = plan.sql();
+long version = plan.semanticModelVersion();
+List<PlanSource> sources = plan.sources();
 ```
 
 </TabItem>
@@ -560,24 +565,31 @@ String sql = plan.sql();
 plan = models.plan_semantic_query(
     ident,
     SemanticQuery(
-        dialect="trino",
         metrics=["total_revenue"],
+        dimensions=["region"],
         filters=[
             SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")
         ],
+        limit=100,
     ),
 )
-sql = plan.sql()
+version = plan.semantic_model_version()
+sources = plan.sources()
 ```
 
 </TabItem>
 </Tabs>
 
-The response contains `sql`, the requested `dialect`, the `planner` that compiled it, and any
-non-fatal `warnings`. A malformed query is rejected with `400`. A well-formed query that the
-planner cannot compile returns `422` with a `SemanticQueryPlanException`. When no planner is
-configured, the endpoint returns `501`; set `gravitino.semanticModel.queryPlanner` on the server to
-enable planning (see [Server Configuration](./gravitino-server-config.md#semantic-query-planner)).
+The response contains a `plan` with the model identifier, `semanticModelVersion`, `sources`,
+`joins`, `selections`, `filters`, `groupBy`, `limit`, and any non-fatal `warnings`. A malformed
+query is rejected with `400`. A well-formed query that the model cannot satisfy, for example an
+unknown metric or no join path between the requested datasets, returns `422` with a
+`SemanticQueryPlanException`. A caller without access to the model returns `403`, and one without
+access to a referenced source returns `403` as well.
+
+Consumers turn the plan into SQL or an engine-native plan. The `api` module defines a
+`SemanticQueryPlanConverter` SPI; `SqlSemanticQueryPlanConverter` is its subtype for engines that
+consume statement text.
 
 ## Ownership and Privileges
 

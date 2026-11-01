@@ -69,7 +69,6 @@ public class TestSemanticModelCatalog {
             .withMetrics(Collections.singletonList("order_amount"))
             .withDimensions(Collections.emptyList())
             .withFilters(Collections.emptyList())
-            .withDialect("trino")
             .build();
     assertThrows(
         UnsupportedOperationException.class,
