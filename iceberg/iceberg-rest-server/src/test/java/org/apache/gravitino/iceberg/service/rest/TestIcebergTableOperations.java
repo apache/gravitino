@@ -93,6 +93,7 @@ import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
@@ -534,6 +535,100 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
         loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testInvalidRequestBodiesReturnBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "bad_body_tbl");
+
+    // Malformed JSON must get an Iceberg ErrorModel, not Jackson's text/plain message.
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity("{\"name\": \"t\", ", MediaType.APPLICATION_JSON_TYPE)),
+        "malformed JSON");
+    // An empty object is valid JSON but not a valid CreateTableRequest.
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity("{}", MediaType.APPLICATION_JSON_TYPE)),
+        null);
+    // An update action the server does not know is a client error, with Iceberg's own message.
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.of("bad_body_tbl"))
+            .post(
+                Entity.entity(
+                    "{\"requirements\": [], \"updates\": [{\"action\": \"no-such-action\"}]}",
+                    MediaType.APPLICATION_JSON_TYPE)),
+        "no-such-action");
+    // A transform the column type does not support: day() on a string column.
+    assertBadRequest(
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(
+                Entity.entity(
+                    "{\"name\": \"bad_transform_tbl\", \"schema\": {\"type\": \"struct\","
+                        + " \"schema-id\": 0, \"fields\": [{\"id\": 1, \"name\": \"s\","
+                        + " \"required\": true, \"type\": \"string\"}]}, \"partition-spec\":"
+                        + " {\"spec-id\": 0, \"fields\": [{\"name\": \"s_day\", \"transform\":"
+                        + " \"day\", \"source-id\": 1, \"field-id\": 1000}]}}",
+                    MediaType.APPLICATION_JSON_TYPE)),
+        null);
+    // A format version that is not a number, or not one the table spec defines.
+    for (String version : new String[] {"abc", "0", "4"}) {
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("bad_version_tbl")
+              .withSchema(tableSchema)
+              .setProperties(ImmutableMap.of("format-version", version))
+              .build();
+      assertBadRequest(
+          getTableClientBuilder(namespace, Optional.empty())
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE)),
+          version);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testSetDefaultToUnknownSpecOrSortOrderReturnsBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "bad_default_tbl");
+
+    for (MetadataUpdate update :
+        new MetadataUpdate[] {
+          new MetadataUpdate.SetDefaultPartitionSpec(42), new MetadataUpdate.SetDefaultSortOrder(42)
+        }) {
+      UpdateTableRequest request =
+          new UpdateTableRequest(ImmutableList.of(), ImmutableList.of(update));
+      assertBadRequest(
+          getTableClientBuilder(namespace, Optional.of("bad_default_tbl"))
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE)),
+          "42");
+    }
+    // The table must still load: the rejected updates were not committed.
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        getTableClientBuilder(namespace, Optional.of("bad_default_tbl")).get().getStatus());
+  }
+
+  private static void assertBadRequest(Response response, String expectedInMessage) {
+    Assertions.assertTrue(
+        response.getMediaType().isCompatible(MediaType.APPLICATION_JSON_TYPE),
+        "Expected a JSON error body, got " + response.getMediaType());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(),
+        response.getStatus(),
+        () -> error.type() + ": " + error.message() + "\n" + String.join("\n", error.stack()));
+    Assertions.assertEquals(400, error.code());
+    Assertions.assertTrue(
+        ImmutableSet.of("BadRequestException", "IllegalArgumentException").contains(error.type()),
+        "Unexpected error type " + error.type());
+    if (expectedInMessage != null) {
+      Assertions.assertTrue(
+          error.message().contains(expectedInMessage),
+          "Expected '" + expectedInMessage + "' in: " + error.message());
+    }
   }
 
   private Response doCreateTableWithCredentialVending(Namespace ns, String name, String location) {

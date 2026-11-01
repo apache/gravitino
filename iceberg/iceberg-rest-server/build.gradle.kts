@@ -121,6 +121,8 @@ dependencies {
     exclude("org.ow2.asm")
   }
   testImplementation(libs.asm)
+  // Compile-time access to the AWS SDK exception types; at runtime the iceberg-aws-bundle supplies them.
+  testCompileOnly(libs.aws.s3)
   testImplementation(libs.testcontainers.postgresql)
 
   // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
