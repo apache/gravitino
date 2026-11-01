@@ -109,7 +109,8 @@ public class IcebergConfigOperations {
     ConfigResponse.Builder builder = ConfigResponse.builder();
     builder
         .withDefaults(getDefaultConfig(catalogName))
-        .withEndpoints(getEndpoints(supportsView, supportsScanPlan));
+        .withEndpoints(
+            getEndpoints(supportsView, supportsScanPlan, catalogWrapper.supportsFetchScanTasks()));
     if (StringUtils.isNotBlank(warehouse)) {
       builder.withDefault("prefix", warehouse);
     }
@@ -117,10 +118,15 @@ public class IcebergConfigOperations {
   }
 
   private List<Endpoint> getEndpoints(
-      boolean supportsViewOperations, boolean supportsScanPlanOperations) {
+      boolean supportsViewOperations,
+      boolean supportsScanPlanOperations,
+      boolean supportsFetchScanTasks) {
     Stream<Endpoint> endpoints = DEFAULT_ENDPOINTS.stream();
     if (supportsScanPlanOperations) {
       endpoints = Stream.concat(endpoints, SCAN_PLAN_ENDPOINTS.stream());
+    }
+    if (supportsFetchScanTasks) {
+      endpoints = Stream.concat(endpoints, Stream.of(Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS));
     }
     if (supportsViewOperations) {
       endpoints = Stream.concat(endpoints, DEFAULT_VIEW_ENDPOINTS.stream());

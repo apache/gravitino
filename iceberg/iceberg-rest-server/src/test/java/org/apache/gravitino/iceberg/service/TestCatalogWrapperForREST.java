@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -47,11 +48,18 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseFileScanTask;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
@@ -66,6 +74,8 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.ResidualEvaluator;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.PlanStatus;
@@ -73,12 +83,15 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.apache.iceberg.rest.responses.ConfigResponseParser;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponseParser;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponseParser;
@@ -87,6 +100,8 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCatalogWrapperForREST {
 
@@ -549,6 +564,120 @@ public class TestCatalogWrapperForREST {
       Assertions.assertEquals(
           "v1/local/namespaces/db/tables/tbl/credentials",
           credential.config().get("client.refresh-credentials-endpoint"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @SuppressWarnings("deprecation")
+  @ParameterizedTest
+  @ValueSource(strings = {"case-insensitive", "case-sensitive", "no-tasks", "no-residual"})
+  void testFederatedFetchScanTasksDelegatesToRemote(String responseKind) throws Exception {
+    boolean exactCase = responseKind.equals("case-sensitive");
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/tasks";
+
+    List<Types.NestedField> fields = new ArrayList<>();
+    fields.add(Types.NestedField.required(1, "partition", Types.IntegerType.get()));
+    fields.add(Types.NestedField.required(2, "data", Types.StringType.get()));
+    if (exactCase) {
+      // Both spellings are legal when the upstream scan is case sensitive. Forcing false would
+      // make the residual ambiguous, just as forcing true breaks a case-insensitive DATA filter.
+      fields.add(Types.NestedField.required(3, "DATA", Types.StringType.get()));
+    }
+    Schema schema = new Schema(fields);
+    PartitionSpec spec = PartitionSpec.builderFor(schema).identity("partition").build();
+    DataFile file =
+        DataFiles.builder(spec)
+            .withPath("s3://bucket/data.parquet")
+            .withPartitionPath("partition=1")
+            .withRecordCount(10)
+            .withFileSizeInBytes(100)
+            .build();
+    DeleteFile delete =
+        FileMetadata.deleteFileBuilder(spec)
+            .ofPositionDeletes()
+            .withPath("s3://bucket/delete.parquet")
+            .withPartitionPath("partition=1")
+            .withRecordCount(1)
+            .withFileSizeInBytes(10)
+            .build();
+    BaseFileScanTask task =
+        new BaseFileScanTask(
+            file,
+            new DeleteFile[] {delete},
+            SchemaParser.toJson(schema),
+            PartitionSpecParser.toJson(spec),
+            ResidualEvaluator.unpartitioned(
+                responseKind.equals("no-residual") ? null : Expressions.equal("DATA", "value")));
+    FetchScanTasksResponse.Builder upstreamBuilder =
+        FetchScanTasksResponse.builder()
+            .withPlanTasks(Collections.singletonList("upstream-next-token"))
+            .withSpecsById(ImmutableMap.of(spec.specId(), spec));
+    if (!responseKind.equals("no-tasks")) {
+      upstreamBuilder.withFileScanTasks(Collections.singletonList(task));
+    }
+    FetchScanTasksResponse upstreamResponse = upstreamBuilder.build();
+    String upstreamJson = FetchScanTasksResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          requestBody.set(
+              new String(
+                  ByteStreams.toByteArray(exchange.getRequestBody()), StandardCharsets.UTF_8));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+      Table mockTable = mock(Table.class);
+      when(mockTable.specs()).thenReturn(ImmutableMap.of(spec.specId(), spec));
+      when(restCatalog.loadTable(table)).thenReturn(mockTable);
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      FetchScanTasksResponse response =
+          wrapper.fetchScanTasks(table, new FetchScanTasksRequest("upstream-token"));
+
+      Assertions.assertEquals(expectedPath, requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertTrue(
+          requestBody.get().contains("upstream-token"),
+          "The remote catalog's plan task must be forwarded untouched, but sent: "
+              + requestBody.get());
+      Assertions.assertEquals(
+          Collections.singletonList("upstream-next-token"), response.planTasks());
+      Assertions.assertEquals(upstreamJson, FetchScanTasksResponseParser.toJson(response));
     } finally {
       server.stop(0);
     }
@@ -1736,6 +1865,7 @@ public class TestCatalogWrapperForREST {
     // Gravitino plans the scan locally for non-REST backends, so it always supports the endpoint.
     CatalogWrapperForREST wrapper = new CatalogWrapperForREST("local-catalog", config);
     Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+    Assertions.assertTrue(wrapper.supportsFetchScanTasks());
   }
 
   @Test
@@ -1749,6 +1879,25 @@ public class TestCatalogWrapperForREST {
     withRemoteConfigServer(
         remoteConfig,
         (wrapper, requests) -> Assertions.assertTrue(wrapper.supportsScanPlanOperations()));
+  }
+
+  @Test
+  void testFetchScanTasksSupportMatchesRemoteEndpoints() throws Exception {
+    for (boolean supportsTasks : new boolean[] {false, true}) {
+      List<Endpoint> endpoints = new ArrayList<>();
+      endpoints.add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
+      if (supportsTasks) {
+        endpoints.add(Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS);
+      }
+      withRemoteConfigServer(
+          ConfigResponse.builder().withEndpoints(endpoints).build(),
+          (wrapper, requests) -> {
+            Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+            Assertions.assertEquals(supportsTasks, wrapper.supportsFetchScanTasks());
+            Assertions.assertEquals(supportsTasks, wrapper.supportsFetchScanTasks());
+            Assertions.assertEquals(1, requests.size());
+          });
+    }
   }
 
   @Test
