@@ -415,36 +415,30 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   }
 
   @Test
-  void testRegisterTableRemoteSigningNotSupported() {
+  void testRegisterTableWithOtherAccessDelegationIsNotRefused() {
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder()
             .name("remote_signing_test")
             .metadataLocation("mock")
             .build();
-    Response response =
+    // A delegation mechanism the server does not offer does not change the outcome: the request
+    // is handled exactly as without the header.
+    int withoutHeader =
         getNamespaceClientBuilder(
                 Optional.of(Namespace.of("register_remote_ns")),
                 Optional.of("register"),
                 Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(406, response.getStatus());
-  }
-
-  @Test
-  void testRegisterTableInvalidAccessDelegation() {
-    RegisterTableRequest request =
-        ImmutableRegisterTableRequest.builder()
-            .name("invalid_delegation_test")
-            .metadataLocation("mock")
-            .build();
-    Response response =
-        getNamespaceClientBuilder(
-                Optional.of(Namespace.of("register_invalid_ns")),
-                Optional.of("register"),
-                Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(400, response.getStatus());
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))
+            .getStatus();
+    for (String header : new String[] {"remote-signing", "invalid-value"}) {
+      Response response =
+          getNamespaceClientBuilder(
+                  Optional.of(Namespace.of("register_remote_ns")),
+                  Optional.of("register"),
+                  Optional.empty())
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, header)
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(withoutHeader, response.getStatus(), header);
+    }
   }
 }

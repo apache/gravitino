@@ -813,27 +813,36 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testRemoteSigningNotSupported(Namespace namespace) {
+  void testAccessDelegationListIsServed(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
 
-    // Attempt to create table with "remote-signing" access delegation
-    // This should fail with UnsupportedOperationException -> 406 Not Acceptable
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName("test_remote_signing")
-            .withSchema(tableSchema)
-            .build();
+    // The header lists the mechanisms the client supports; the server serves the request with the
+    // ones it offers, or none. remote-signing alone, a comma-separated list in either order, and an
+    // unknown mechanism are all served.
+    String[] headers = {
+      "remote-signing",
+      "vended-credentials,remote-signing",
+      "remote-signing, vended-credentials",
+      "invalid-value"
+    };
+    for (int i = 0; i < headers.length; i++) {
+      CreateTableRequest createTableRequest =
+          CreateTableRequest.builder()
+              .withName("delegation_list_" + i)
+              .withSchema(tableSchema)
+              .build();
+      Response create =
+          getTableClientBuilder(namespace, Optional.empty())
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, headers[i])
+              .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Status.OK.getStatusCode(), create.getStatus(), headers[i]);
 
-    Response response =
-        getTableClientBuilder(namespace, Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(406, response.getStatus());
-    String errorBody = response.readEntity(String.class);
-    Assertions.assertTrue(
-        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
-        "Error message should mention remote signing: " + errorBody);
+      Response load =
+          getTableClientBuilder(namespace, Optional.of("delegation_list_" + i))
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, headers[i])
+              .get();
+      Assertions.assertEquals(Status.OK.getStatusCode(), load.getStatus(), headers[i]);
+    }
   }
 
   @ParameterizedTest
@@ -870,29 +879,18 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyDropNamespaceSucc(namespace);
   }
 
-  @ParameterizedTest
-  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testInvalidAccessDelegation(Namespace namespace) {
-    verifyCreateNamespaceSucc(namespace);
-
-    // Attempt to create table with invalid access delegation value
-    // This should fail with IllegalArgumentException -> 400 Bad Request
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName("test_invalid_delegation")
-            .withSchema(tableSchema)
-            .build();
-
-    Response response =
-        getTableClientBuilder(namespace, Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(400, response.getStatus());
-    String errorBody = response.readEntity(String.class);
+  @Test
+  void testIsCredentialVendingParsesTheMechanismList() {
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending(null));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending(" "));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending("remote-signing"));
+    Assertions.assertFalse(IcebergTableOperations.isCredentialVending("invalid-value"));
+    Assertions.assertTrue(IcebergTableOperations.isCredentialVending("vended-credentials"));
+    Assertions.assertTrue(IcebergTableOperations.isCredentialVending("VENDED-CREDENTIALS"));
     Assertions.assertTrue(
-        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
-        "Error message should mention valid values: " + errorBody);
+        IcebergTableOperations.isCredentialVending("vended-credentials,remote-signing"));
+    Assertions.assertTrue(
+        IcebergTableOperations.isCredentialVending("remote-signing , vended-credentials"));
   }
 
   @ParameterizedTest
@@ -1465,5 +1463,27 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             Mockito.mock(IcebergRequestContext.class),
             NameIdentifier.of("metalake", "catalog", "schema"));
     Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanWithOtherAccessDelegationIsServed(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "scan_remote_signing");
+    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
+    for (String header : new String[] {"remote-signing", "invalid-value"}) {
+      Response response =
+          getTableClientBuilder(namespace, Optional.of("scan_remote_signing/plan"))
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, header)
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus(), header);
+    }
+  }
+
+  private Response doPlanTableScanWithCredentialVending(
+      Namespace ns, String tableName, PlanTableScanRequest request) {
+    return getTableClientBuilder(ns, Optional.of(tableName + "/plan"))
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 }

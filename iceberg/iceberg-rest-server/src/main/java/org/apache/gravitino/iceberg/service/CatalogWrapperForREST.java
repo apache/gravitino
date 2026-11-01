@@ -337,7 +337,27 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     validateCredentialLocation(loadTableResponse.tableMetadata().location());
-    return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
+    return canVendCredentials(loadTableResponse.tableMetadata().location());
+  }
+
+  /**
+   * Whether this catalog can vend credentials for a location. The access-delegation header only
+   * tells the server what the client supports, and the server may supply none of the mechanisms, so
+   * a location no configured provider covers is served without credentials instead of failing the
+   * request.
+   */
+  private boolean canVendCredentials(String location) {
+    if (isLocalOrHdfsLocation(location)) {
+      return false;
+    }
+    if (!catalogCredentialManager.supportsPath(location)) {
+      LOG.debug(
+          "No credential provider of catalog {} covers {}, serving without vended credentials",
+          catalogCredentialManager.catalogName(),
+          location);
+      return false;
+    }
+    return true;
   }
 
   private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {
