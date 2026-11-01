@@ -48,6 +48,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
@@ -200,6 +201,50 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createNamespace(mockContext, mockRequest);
     verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateNamespaceWithDottedLevelIsRejectedBeforeCreating() {
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(Namespace.of("gi_n2l.dot"));
+
+    Assertions.assertThrows(
+        BadRequestException.class, () -> hookDispatcher.createNamespace(mockContext, request));
+    verify(mockDispatcher, never()).createNamespace(any(), any());
+  }
+
+  @Test
+  public void testCreateNamespaceWithTooLongNameIsRejectedBeforeCreating() {
+    // Ten levels of 20 characters: each level is short, the full name is 209 characters.
+    String[] levels = new String[10];
+    for (int i = 0; i < levels.length; i++) {
+      levels[i] = String.format("level_%014d", i);
+    }
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(Namespace.of(levels));
+
+    Assertions.assertThrows(
+        BadRequestException.class, () -> hookDispatcher.createNamespace(mockContext, request));
+    verify(mockDispatcher, never()).createNamespace(any(), any());
+  }
+
+  @Test
+  public void testCreateNamespaceIsDroppedWhenImportFails() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(namespace);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+    RuntimeException importFailure =
+        new RuntimeException("Failed to import schema entity to the store");
+    when(mockInternalSchemaDispatcher.loadSchema(any())).thenThrow(importFailure);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, request));
+    Assertions.assertSame(importFailure, thrown);
+    verify(mockDispatcher).dropNamespace(mockContext, namespace);
+    verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
   }
 
   @Test

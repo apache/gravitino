@@ -57,6 +57,7 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
@@ -64,6 +65,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -132,6 +134,36 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
     return loadTableResponse;
+  }
+
+  /**
+   * Registers a table. An overwrite with a metadata file that belongs to a different table (another
+   * table UUID) is refused before anything is written: Iceberg would replace the table and then
+   * fail the request when it reads the replaced table back.
+   *
+   * @param namespace the namespace of the table
+   * @param request the register request
+   * @return the registered table
+   */
+  @Override
+  public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    checkOverwriteKeepsTableUuid(namespace, request);
+    return super.registerTable(namespace, request);
+  }
+
+  /**
+   * Commits table updates, with {@link IcebergCommitValidation} checking the updates against the
+   * metadata they are applied to.
+   *
+   * @param tableIdentifier the table to update
+   * @param updateTableRequest the updates and requirements
+   * @return the updated table
+   */
+  @Override
+  public LoadTableResponse updateTable(
+      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    return super.updateTable(
+        tableIdentifier, IcebergCommitValidation.withValidation(updateTableRequest));
   }
 
   public LoadTableResponse registerTable(
@@ -622,6 +654,30 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       LOG.warn("{} is deprecated, please use {} instead.", deprecatedProperty, newProperty);
       properties.remove(deprecatedProperty);
       properties.put(newProperty, deprecatedValue);
+    }
+  }
+
+  private void checkOverwriteKeepsTableUuid(Namespace namespace, RegisterTableRequest request) {
+    if (request == null || !request.overwrite() || request.metadataLocation() == null) {
+      return;
+    }
+    TableIdentifier identifier = TableIdentifier.of(namespace, request.name());
+    if (!tableExists(identifier)) {
+      return;
+    }
+    String currentUuid = super.loadTable(identifier).tableMetadata().uuid();
+    String newUuid;
+    try {
+      newUuid = loadTableMetadataFromLocation(request.metadataLocation()).uuid();
+    } catch (RuntimeException e) {
+      // A metadata file that cannot be read is reported by the register itself.
+      return;
+    }
+    if (currentUuid != null && newUuid != null && !currentUuid.equals(newUuid)) {
+      throw new BadRequestException(
+          "Cannot overwrite table %s with metadata of a different table: current table UUID %s,"
+              + " metadata location %s has table UUID %s",
+          identifier, currentUuid, request.metadataLocation(), newUuid);
     }
   }
 }

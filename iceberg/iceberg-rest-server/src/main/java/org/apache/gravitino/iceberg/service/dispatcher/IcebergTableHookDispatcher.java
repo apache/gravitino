@@ -37,6 +37,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -71,7 +72,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
     if (!createTableRequest.stageCreate()) {
-      importTableAndSetOwner(context, namespace, createTableRequest.name());
+      importNewTableAndSetOwner(context, TableIdentifier.of(namespace, createTableRequest.name()));
     }
 
     return response;
@@ -91,7 +92,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
     if (isStagedCreateCommit) {
-      importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+      importNewTableAndSetOwner(context, tableIdentifier);
     }
     return response;
   }
@@ -203,17 +204,39 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
-  private void importTableAndSetOwner(
-      IcebergRequestContext context, Namespace namespace, String tableName) {
-    // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
-    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
-    // entity is registered. Surface the failure so the caller can react.
-    importTableEntity(context.catalogName(), namespace, tableName);
+  /**
+   * Imports a table this request has just created and makes the caller its owner. When Gravitino
+   * cannot import the table, for example because it does not support one of its column types, the
+   * table is dropped again so the request leaves nothing behind, and the failure is reported to the
+   * client. Without the rollback the client is told the create failed while the table exists in the
+   * Iceberg catalog with no Gravitino entity and no owner.
+   */
+  private void importNewTableAndSetOwner(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    try {
+      importTableEntity(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
+    } catch (RuntimeException e) {
+      try {
+        dispatcher.dropTable(context, tableIdentifier, false);
+      } catch (RuntimeException dropFailure) {
+        e.addSuppressed(dropFailure);
+        LOG.warn(
+            "Failed to drop table {} after Gravitino could not import it",
+            tableIdentifier,
+            dropFailure);
+      }
+      if (e instanceof UnsupportedOperationException) {
+        // A table definition Gravitino cannot represent is a problem with the request.
+        throw new BadRequestException(
+            "Table %s cannot be created: %s", tableIdentifier, e.getMessage());
+      }
+      throw e;
+    }
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),
-        namespace,
-        tableName,
+        tableIdentifier.namespace(),
+        tableIdentifier.name(),
         context.userName(),
         GravitinoEnv.getInstance().internalOwnerDispatcher());
   }
