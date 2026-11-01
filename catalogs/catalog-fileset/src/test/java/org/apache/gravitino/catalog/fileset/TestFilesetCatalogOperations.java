@@ -47,6 +47,9 @@ import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.FILESET_PR
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
@@ -65,6 +68,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -2623,43 +2627,49 @@ public class TestFilesetCatalogOperations {
 
   @Test
   public void testFileSystemCacheSeparatesAuthenticationSettings() throws Exception {
+    File resourceA = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/a-site.xml");
+    File resourceB = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/b-site.xml");
+    FileUtils.writeStringToFile(resourceA, "<configuration/>", StandardCharsets.UTF_8);
+    FileUtils.writeStringToFile(resourceB, "<configuration/>", StandardCharsets.UTF_8);
+    // Listed here, not read from FileSystemCacheKey, so that removing a key there fails this test.
+    Map<String, String[]> settings =
+        ImmutableMap.<String, String[]>builder()
+            .put(AuthenticationConfig.AUTH_TYPE_KEY, new String[] {"simple", "kerberos"})
+            .put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, new String[] {"false", "true"})
+            .put(KerberosConfig.PRINCIPAL_KEY, new String[] {"svc@A.COM", "svc@B.COM"})
+            .put(
+                KerberosConfig.KEY_TAB_URI_KEY,
+                new String[] {"file:///a.keytab", "file:///b.keytab"})
+            .put(HADOOP_SECURITY_AUTHENTICATION, new String[] {"simple", "kerberos"})
+            .put(
+                GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION,
+                new String[] {"simple", "kerberos"})
+            .put(HADOOP_SECURITY_PRINCIPAL, new String[] {"svc@A.COM", "svc@B.COM"})
+            .put(
+                GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL,
+                new String[] {"svc@A.COM", "svc@B.COM"})
+            .put(HADOOP_SECURITY_KEYTAB, new String[] {"/a.keytab", "/b.keytab"})
+            .put(GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB, new String[] {"/a.keytab", "/b.keytab"})
+            .put(
+                CONFIG_RESOURCES,
+                new String[] {resourceA.getAbsolutePath(), resourceB.getAbsolutePath()})
+            .build();
+
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
-      Map<String, String> kerberosA =
-          ImmutableMap.of(
-              AuthenticationConfig.AUTH_TYPE_KEY,
-              "kerberos",
-              KerberosConfig.PRINCIPAL_KEY,
-              "svc@A.COM");
-      Map<String, String> kerberosB =
-          ImmutableMap.of(
-              AuthenticationConfig.AUTH_TYPE_KEY,
-              "kerberos",
-              KerberosConfig.PRINCIPAL_KEY,
-              "svc@B.COM");
-      Map<String, String> simpleA =
-          ImmutableMap.of(
-              AuthenticationConfig.AUTH_TYPE_KEY,
-              "simple",
-              KerberosConfig.PRINCIPAL_KEY,
-              "svc@A.COM");
-      Map<String, String> hadoopKerberos =
-          ImmutableMap.of(GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-
       for (Path path :
           new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
-        FileSystem fs = ops.getFileSystemWithCache(path, kerberosA);
-        Assertions.assertSame(fs, ops.getFileSystemWithCache(path, kerberosA));
-        Assertions.assertSame(
-            fs,
-            ops.getFileSystemWithCache(
-                path,
-                ImmutableMap.<String, String>builder().putAll(kerberosA).put("k", "v").build()));
-        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, kerberosB));
-        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, simpleA));
-        Assertions.assertNotSame(
-            ops.getFileSystemWithCache(path, ImmutableMap.of()),
-            ops.getFileSystemWithCache(path, hadoopKerberos));
+        for (Map.Entry<String, String[]> setting : settings.entrySet()) {
+          Map<String, String> first = ImmutableMap.of(setting.getKey(), setting.getValue()[0]);
+          Map<String, String> second = ImmutableMap.of(setting.getKey(), setting.getValue()[1]);
+          FileSystem fs = ops.getFileSystemWithCache(path, first);
+          Assertions.assertSame(
+              fs,
+              ops.getFileSystemWithCache(
+                  path, ImmutableMap.<String, String>builder().putAll(first).put("k", "v").build()),
+              setting.getKey());
+          Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second), setting.getKey());
+        }
       }
     }
   }
