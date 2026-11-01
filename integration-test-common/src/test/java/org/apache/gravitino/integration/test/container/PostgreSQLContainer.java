@@ -120,18 +120,24 @@ public class PostgreSQLContainer extends DatabaseContainer {
       if (e.getMessage()
           .equals(String.format("ERROR: database \"%s\" already exists", testDatabaseName))) {
         LOG.info("PostgreSQL Database {} already exists, skipping", testDatabaseName);
-      } else throw new RuntimeException(e);
+      } else {
+        throw new RuntimeException(e);
+      }
     }
   }
 
   /** getJdbcUrl without database name. */
   public String getJdbcUrl() {
-    return format("jdbc:postgresql://%s:%d/", getContainerIpAddress(), PG_PORT);
+    return format(
+        "jdbc:postgresql://%s:%d/?connectTimeout=30&socketTimeout=30",
+        container.getHost(), getMappedPort(PG_PORT));
   }
 
   /** getJdbcUrl with database name. */
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
-    return format("jdbc:postgresql://%s:%d/%s", getContainerIpAddress(), PG_PORT, testDatabaseName);
+    return format(
+        "jdbc:postgresql://%s:%d/%s?connectTimeout=30&socketTimeout=30",
+        container.getHost(), getMappedPort(PG_PORT), testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
