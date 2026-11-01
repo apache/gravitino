@@ -63,6 +63,9 @@ public class ErrorConstants {
   /** Error codes for service unavailable. */
   public static final int SERVICE_UNAVAILABLE_CODE = 1013;
 
+  /** Error codes for well-formed requests that cannot be processed. */
+  public static final int UNPROCESSABLE_ENTITY_CODE = 1014;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

@@ -18,19 +18,32 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from gravitino.api.semantic.data_type import DataType
 from gravitino.api.semantic.dataset import Dataset
+from gravitino.api.semantic.dialect_expression import DialectExpression
+from gravitino.api.semantic.expression import Expression
+from gravitino.api.semantic.plan_field_ref import PlanFieldRef
+from gravitino.api.semantic.plan_selection import PlanSelection
+from gravitino.api.semantic.plan_source import PlanSource
 from gravitino.api.semantic.semantic_model_catalog import SemanticModelCatalog
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_filter import SemanticQueryFilter
+from gravitino.api.semantic.semantic_query_plan import SemanticQueryPlan
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.semantic_model_response import SemanticModelResponse
+from gravitino.dto.responses.semantic_query_plan_response import (
+    SemanticQueryPlanResponse,
+)
 from gravitino.dto.semantic.semantic_model_definition_dto import (
     SemanticModelDefinitionDTO,
 )
 from gravitino.dto.semantic.semantic_model_dto import SemanticModelDTO
+from gravitino.dto.semantic.semantic_query_plan_dto import SemanticQueryPlanDTO
 from gravitino.exceptions.base import (
     IllegalArgumentException,
     IllegalNameIdentifierException,
@@ -38,6 +51,7 @@ from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchSemanticModelException,
     SemanticModelAlreadyExistsException,
+    SemanticQueryPlanException,
 )
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -47,6 +61,33 @@ from gravitino.utils import HTTPClient, Response
 def _definition() -> SemanticModelDefinition:
     return SemanticModelDefinition(
         datasets=[Dataset("orders", NameIdentifier.of("sales", "mart", "orders"))]
+    )
+
+
+def _plan() -> SemanticQueryPlan:
+    revenue = PlanFieldRef.of_expression(
+        "orders",
+        Expression([DialectExpression("ANSI_SQL", "SUM(orders.amount)")]),
+        DataType.DECIMAL,
+    )
+    return SemanticQueryPlan(
+        semantic_model=NameIdentifier.of(
+            "test_metalake", "test_catalog", "test_schema", "sales_model"
+        ),
+        semantic_model_version=3,
+        sources=[
+            PlanSource(
+                "orders", NameIdentifier.of("test_catalog", "test_schema", "orders")
+            )
+        ],
+        joins=[],
+        selections=[
+            PlanSelection.of("revenue", PlanSelection.Role.METRIC, True, revenue)
+        ],
+        filters=[],
+        group_by=[],
+        limit=100,
+        warnings=["amount treated as decimal"],
     )
 
 
@@ -84,6 +125,7 @@ class TestSemanticModelCatalog(unittest.TestCase):
     def _mock_semantic_model_response(self, comment: str = "comment") -> Response:
         semantic_model = SemanticModelDTO(
             _name=self.model_name,
+            _version=1,
             _comment=comment,
             _definition=SemanticModelDefinitionDTO.from_definition(_definition()),
             _properties={"owner": "finance"},
@@ -91,6 +133,14 @@ class TestSemanticModelCatalog(unittest.TestCase):
         )
         return self._get_mock_http_resp(
             SemanticModelResponse(_code=0, _semantic_model=semantic_model).to_json()
+        )
+
+    def _mock_plan_response(self) -> Response:
+        return self._get_mock_http_resp(
+            SemanticQueryPlanResponse(
+                _code=0,
+                _plan=SemanticQueryPlanDTO.from_plan(_plan()),
+            ).to_json()
         )
 
     def test_relational_catalog_exposes_semantic_models(self):
@@ -148,6 +198,7 @@ class TestSemanticModelCatalog(unittest.TestCase):
             f"{self.request_path}/{self.model_name}", mock_get.call_args.args[0]
         )
         self.assertEqual(self.model_name, model.name())
+        self.assertEqual(1, model.version())
         self.assertEqual("comment", model.comment())
         self.assertEqual(_definition(), model.definition())
         self.assertEqual({"owner": "finance"}, model.properties())
@@ -352,6 +403,76 @@ class TestSemanticModelCatalog(unittest.TestCase):
                     NameIdentifier.of(self.schema_name, self.model_name)
                 )
             )
+
+    def test_plan_semantic_query(self):
+        identifier = NameIdentifier.of(self.schema_name, self.model_name)
+        query = SemanticQuery(
+            metrics=["revenue"],
+            dimensions=["region"],
+            filters=[
+                SemanticQueryFilter.of(
+                    "order_date", SemanticQueryFilter.Operator.GE, "2024-01-01"
+                )
+            ],
+            limit=100,
+        )
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=self._mock_plan_response(),
+        ) as mock_post:
+            plan = self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                identifier, query
+            )
+
+        self.assertEqual(
+            f"{self.request_path}/{self.model_name}/plan",
+            mock_post.call_args.args[0],
+        )
+        request = mock_post.call_args.kwargs["json"]
+        self.assertEqual(
+            {
+                "metrics": ["revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "order_date", "operator": "ge", "value": "2024-01-01"}
+                ],
+                "limit": 100,
+            },
+            request.to_dict(),
+        )
+        self.assertEqual(_plan(), plan)
+
+    def test_plan_semantic_query_requires_a_query(self):
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Semantic query must not be null"
+        ):
+            self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                NameIdentifier.of(self.schema_name, self.model_name), None
+            )
+
+    def test_plan_semantic_query_rejects_an_invalid_identifier(self):
+        query = SemanticQuery(metrics=["revenue"])
+
+        with self.assertRaises(IllegalNamespaceException):
+            self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                NameIdentifier.of(self.catalog_name, self.schema_name, self.model_name),
+                query,
+            )
+
+    def test_plan_semantic_query_maps_an_unprocessable_response(self):
+        query = SemanticQuery(metrics=["missing_metric"])
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            side_effect=SemanticQueryPlanException(
+                "Metric 'missing_metric' does not exist"
+            ),
+        ):
+            with self.assertRaises(SemanticQueryPlanException):
+                self.catalog.as_semantic_model_catalog().plan_semantic_query(
+                    NameIdentifier.of(self.schema_name, self.model_name), query
+                )
 
     def test_rejects_an_invalid_namespace(self):
         catalog = self.catalog.as_semantic_model_catalog()

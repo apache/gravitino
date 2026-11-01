@@ -16,7 +16,8 @@ manages their lifecycle, ownership, privileges, and tags, even when the underlyi
 has no semantic-model feature. They are separate from [SQL views](./tables-and-views.md) and the
 AI/ML artifacts managed by a [model catalog](./model-catalog.md).
 
-Gravitino manages the definitions. Query compilation, execution, materialization, and publishing
+Gravitino resolves a query against a model into a dialect-neutral logical plan. Rendering that plan
+into SQL or an engine-specific query, executing it, materializing results, and publishing
 engine-specific semantic objects are responsibilities of the applications that consume them.
 
 ## Quick Start

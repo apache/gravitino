@@ -149,6 +149,7 @@ public class SemanticModelPO {
           .withComment(versionPO.semanticModelComment())
           .withDefinition(definitionDTO.toDefinition())
           .withProperties(properties)
+          .withVersion(semanticModelPO.getCurrentVersion())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(semanticModelPO.getAuditInfo(), AuditInfo.class))
           .build();

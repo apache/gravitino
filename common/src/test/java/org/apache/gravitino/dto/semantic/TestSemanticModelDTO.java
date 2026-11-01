@@ -57,6 +57,7 @@ public class TestSemanticModelDTO {
     SemanticModelDTO dto =
         SemanticModelDTO.builder()
             .withName("sales_model")
+            .withVersion(3L)
             .withComment("Governed sales definitions")
             .withDefinition(SemanticModelDefinitionDTO.fromDefinition(definition))
             .withProperties(Map.of("owner", "finance"))
@@ -67,6 +68,7 @@ public class TestSemanticModelDTO {
     JsonNode root = JsonUtils.objectMapper().readTree(json);
 
     assertEquals("sales_model", root.path("name").textValue());
+    assertEquals(3L, root.path("version").asLong());
     assertTrue(root.has("definition"));
     assertEquals("Use governed metrics", root.path("definition").path("aiContext").textValue());
     assertTrue(root.path("definition").has("datasets"));
@@ -78,6 +80,7 @@ public class TestSemanticModelDTO {
     SemanticModelDTO deserialized =
         JsonUtils.objectMapper().readValue(json, SemanticModelDTO.class);
     assertEquals("sales_model", deserialized.name());
+    assertEquals(3L, deserialized.version());
     assertEquals("Governed sales definitions", deserialized.comment());
     assertEquals(definition, deserialized.definition());
     assertEquals(Map.of("owner", "finance"), deserialized.properties());
@@ -147,6 +150,18 @@ public class TestSemanticModelDTO {
             IllegalArgumentException.class,
             () -> SemanticModelDTO.builder().withName("sales_model").withAudit(audit()).build());
     assertEquals("definition cannot be null", missingDefinition.getMessage());
+
+    IllegalArgumentException negativeVersion =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                SemanticModelDTO.builder()
+                    .withName("sales_model")
+                    .withVersion(-1L)
+                    .withDefinition(definition)
+                    .withAudit(audit())
+                    .build());
+    assertEquals("version cannot be negative", negativeVersion.getMessage());
 
     SemanticModelDefinitionDTO invalidDefinition =
         SemanticModelDefinitionDTO.builder().withDatasets(new DatasetDTO[] {null}).build();
