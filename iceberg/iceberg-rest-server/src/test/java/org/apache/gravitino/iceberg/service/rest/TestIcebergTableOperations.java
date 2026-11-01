@@ -415,7 +415,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     String tablePath =
         IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/tables";
     Response firstPageResponse =
-        getIcebergClientBuilder(tablePath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+        getIcebergClientBuilder(
+                tablePath, Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
+            .get();
     Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
     ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
     Assertions.assertEquals(2, firstPage.identifiers().size());

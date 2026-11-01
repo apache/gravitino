@@ -323,10 +323,12 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("page_ns2"));
     doCreateNamespace(Namespace.of("page_ns3"));
 
-    // First page: pageSize=2, no pageToken
+    // First page: an empty pageToken starts paging
     Response firstPageResponse =
         getNamespaceClientBuilder(
-                Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
             .get();
     Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
     ListNamespacesResponse firstPage = firstPageResponse.readEntity(ListNamespacesResponse.class);
