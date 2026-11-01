@@ -1638,6 +1638,17 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   @Test
+  void testCharArrayTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_char_array_type");
+    postgreSqlService.executeQuery(
+        String.format("CREATE TABLE %s.%s (chars char(5)[]);", schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.ListType.nullable(Types.FixedCharType.of(5)), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
   void testNumericScaleOutsidePrecision() {
     Assumptions.assumeTrue(
         postgreImageName == PGImageName.VERSION_15 || postgreImageName == PGImageName.VERSION_16);
