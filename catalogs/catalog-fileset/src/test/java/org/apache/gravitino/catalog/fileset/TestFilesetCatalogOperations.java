@@ -179,6 +179,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -2635,7 +2636,7 @@ public class TestFilesetCatalogOperations {
             return null;
           });
 
-      Assertions.assertEquals(Collections.singletonList("bob"), users);
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
     }
   }
 
@@ -2660,7 +2661,29 @@ public class TestFilesetCatalogOperations {
             return null;
           });
 
-      Assertions.assertEquals(Collections.singletonList("bob"), users);
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
+    }
+  }
+
+  @Test
+  public void testHdfsFileSystemProxyUsesGivenUser() throws Exception {
+    List<ImpersonationHDFSFileSystemProxy.ProxyUserHandler> handlers = new ArrayList<>();
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager);
+        MockedConstruction<ImpersonationHDFSFileSystemProxy> ignored =
+            Mockito.mockConstruction(
+                ImpersonationHDFSFileSystemProxy.class,
+                (proxy, context) ->
+                    handlers.add(
+                        (ImpersonationHDFSFileSystemProxy.ProxyUserHandler)
+                            context.arguments().get(2)))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Called directly: construction mocks only intercept on the current thread.
+      ops.createFileSystem(
+          new Path("hdfs://localhost:8020/proxy_user"), ImmutableMap.of(), "hdfs", null, "bob");
+
+      Assertions.assertEquals(1, handlers.size());
+      Assertions.assertEquals(
+          "bob", PrincipalUtils.doAs(new UserPrincipal("alice"), handlers.get(0)::getProxyUser));
     }
   }
 
@@ -2669,7 +2692,8 @@ public class TestFilesetCatalogOperations {
     List<String> users = new CopyOnWriteArrayList<>();
     Mockito.doAnswer(
             invocation -> {
-              users.add(invocation.getArgument(4));
+              // The requested user, and the user whose Subject the pool thread carries.
+              users.add(invocation.getArgument(4) + " on " + PrincipalUtils.getCurrentUserName());
               return invocation.callRealMethod();
             })
         .when(ops)
@@ -2677,9 +2701,10 @@ public class TestFilesetCatalogOperations {
     return users;
   }
 
-  // Threads that a request starts keep that request's Subject.
+  // Threads that a request starts keep that request's Subject. Keep them alive for the test.
   private static void startPoolThreadsAs(FilesetCatalogOperations ops, String user)
       throws Exception {
+    ops.fileSystemExecutor.allowCoreThreadTimeOut(false);
     PrincipalUtils.doAs(
         new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
   }
