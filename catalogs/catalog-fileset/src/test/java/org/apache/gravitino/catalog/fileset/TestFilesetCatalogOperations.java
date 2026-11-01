@@ -76,6 +76,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2616,6 +2617,71 @@ public class TestFilesetCatalogOperations {
           exception.getMessage().contains("location (location is not a directory)"));
       Assertions.assertFalse(exception.getMessage().contains(fileLocation.toURI().toString()));
     }
+  }
+
+  @Test
+  public void testGetFileSystemUsesRequestUserOnPoolThread() throws Exception {
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            ops.getFileSystem(new Path(TEST_ROOT_PATH, "pool_thread_user"), ImmutableMap.of())
+                .close();
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob"), users);
+    }
+  }
+
+  @Test
+  public void testTestConnectionUsesRequestUserOnPoolThread() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/pool-thread-user");
+    FileUtils.forceMkdir(location);
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, location.toURI().toString()),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            ops.testConnection(NameIdentifier.of("metalake", "catalog"));
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob"), users);
+    }
+  }
+
+  private static List<String> recordFileSystemUsers(FilesetCatalogOperations ops)
+      throws IOException {
+    List<String> users = new CopyOnWriteArrayList<>();
+    Mockito.doAnswer(
+            invocation -> {
+              users.add(invocation.getArgument(4));
+              return invocation.callRealMethod();
+            })
+        .when(ops)
+        .createFileSystem(any(), any(), any(), any(), any());
+    return users;
+  }
+
+  // Threads that a request starts keep that request's Subject.
+  private static void startPoolThreadsAs(FilesetCatalogOperations ops, String user)
+      throws Exception {
+    PrincipalUtils.doAs(
+        new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
   }
 
   @Test
