@@ -142,7 +142,7 @@ export default function TableDetailsPage({ ...props }) {
   const partitioning = store.activatedDetails?.partitioning?.map((i, index) => {
     let fields = i.fieldName || []
     let sub = ''
-    let last = i.fieldName
+    let last = i.fieldName || ''
 
     switch (i.strategy) {
       case 'bucket':
@@ -156,6 +156,14 @@ export default function TableDetailsPage({ ...props }) {
       case 'list':
         fields = i.fieldNames
         last = i.fieldNames.map(v => v[0]).join(',')
+        break
+      case 'range':
+        if (i.assignments?.length) {
+          sub = `[${i.assignments.length} partitions]`
+        }
+
+        // range uses fieldName (String[]), not fieldNames (String[][])
+        last = i.fieldName || (i.fieldNames ? i.fieldNames.map(v => v[0]).join(',') : '')
         break
       case 'function':
         sub = `[${i.funcName}]`
@@ -173,6 +181,7 @@ export default function TableDetailsPage({ ...props }) {
       width: i.width,
       funcName: i.funcName,
       fields,
+      assignments: i.assignments,
       text: `${i.strategy}${sub}(${last})`
     }
   })
