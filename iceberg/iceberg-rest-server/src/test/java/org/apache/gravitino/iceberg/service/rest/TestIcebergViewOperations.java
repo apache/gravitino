@@ -151,7 +151,9 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     String viewPath =
         IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/views";
     Response firstPageResponse =
-        getIcebergClientBuilder(viewPath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+        getIcebergClientBuilder(
+                viewPath, Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
+            .get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), firstPageResponse.getStatus());
     ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
     Assertions.assertEquals(2, firstPage.identifiers().size());
