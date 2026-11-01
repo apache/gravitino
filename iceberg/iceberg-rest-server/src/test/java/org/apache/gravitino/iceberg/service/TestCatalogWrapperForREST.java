@@ -32,6 +32,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,6 +48,7 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -62,6 +64,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
@@ -87,6 +90,7 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestCatalogWrapperForREST {
 
@@ -387,6 +391,57 @@ public class TestCatalogWrapperForREST {
     } finally {
       server.stop(0);
     }
+  }
+
+  @Test
+  void testRegisterOverwriteWithAnotherTablesMetadataIsRefused(@TempDir Path warehouse) {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.<String, String>builder()
+                .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
+                .put(IcebergConstants.URI, "jdbc:sqlite:" + warehouse.resolve("catalog.db"))
+                .put(IcebergConstants.WAREHOUSE, warehouse.toUri().toString())
+                .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC")
+                .put(IcebergConstants.ICEBERG_JDBC_USER, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
+                .build());
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("register-test", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier target = TableIdentifier.of(namespace, "target");
+    TableIdentifier other = TableIdentifier.of(namespace, "other");
+    catalog.createTable(target, schema);
+    catalog.createTable(other, schema);
+    String targetMetadata =
+        ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation();
+    String otherMetadata =
+        ((BaseTable) catalog.loadTable(other)).operations().current().metadataFileLocation();
+
+    RegisterTableRequest otherTable =
+        ImmutableRegisterTableRequest.builder()
+            .name("target")
+            .metadataLocation(otherMetadata)
+            .overwrite(true)
+            .build();
+    BadRequestException e =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.registerTable(namespace, otherTable));
+    Assertions.assertTrue(e.getMessage().contains("different table"), e.getMessage());
+    Assertions.assertEquals(
+        targetMetadata,
+        ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation());
+
+    // An overwrite with metadata of the same table is still accepted.
+    RegisterTableRequest sameTable =
+        ImmutableRegisterTableRequest.builder()
+            .name("target")
+            .metadataLocation(targetMetadata)
+            .overwrite(true)
+            .build();
+    Assertions.assertDoesNotThrow(() -> wrapper.registerTable(namespace, sameTable));
   }
 
   @Test

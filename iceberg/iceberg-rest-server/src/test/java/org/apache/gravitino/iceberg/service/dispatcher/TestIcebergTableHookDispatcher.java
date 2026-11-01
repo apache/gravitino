@@ -52,6 +52,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -198,6 +199,70 @@ public class TestIcebergTableHookDispatcher {
         .setOwner(eq(TEST_METALAKE), any(), userCaptor.capture(), eq(Owner.Type.USER));
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     Assertions.assertEquals(TEST_USER, userCaptor.getValue());
+  }
+
+  @Test
+  public void testCreateTableIsDroppedWhenImportFails() {
+    Namespace namespace = Namespace.of("test_schema");
+    TableIdentifier tableId = TableIdentifier.of(namespace, "variant_table");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("variant_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+    when(mockInternalTableDispatcher.loadTable(any()))
+        .thenThrow(new UnsupportedOperationException("Unsupported Iceberg type: variant"));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> hookDispatcher.createTable(mockContext, namespace, request));
+    Assertions.assertTrue(thrown.getMessage().contains("variant"), thrown.getMessage());
+
+    // The table the request created is dropped again, without purging, and gets no owner.
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testStagedCreateCommitIsDroppedWhenImportFails() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "staged_table");
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+            Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
+    RuntimeException importFailure = new RuntimeException("Failed to import table entity");
+    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.updateTable(mockContext, tableId, request));
+    Assertions.assertSame(importFailure, thrown);
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+  }
+
+  @Test
+  public void testImportFailureIsReportedWhenRollbackFails() {
+    Namespace namespace = Namespace.of("test_schema");
+    TableIdentifier tableId = TableIdentifier.of(namespace, "t");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("t").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+    RuntimeException importFailure = new RuntimeException("import failed");
+    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+    doThrow(new RuntimeException("drop failed"))
+        .when(mockDispatcher)
+        .dropTable(mockContext, tableId, false);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createTable(mockContext, namespace, request));
+    Assertions.assertSame(importFailure, thrown);
+    Assertions.assertEquals("drop failed", thrown.getSuppressed()[0].getMessage());
   }
 
   @Test
