@@ -7,9 +7,10 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-The `local` job executor that ships with Gravitino runs jobs as a process on the Gravitino server
-and is intended for testing. Running jobs anywhere else, such as against a distributed scheduler,
-means implementing your own job executor.
+Gravitino ships two job executors: the [`local` job executor](../local-job-executor.md) runs jobs
+as processes on the Gravitino server and is intended for testing, and the
+[`k8s` job executor](../k8s-job-executor.md) runs Spark jobs on Kubernetes. Running jobs anywhere
+else, such as against another distributed scheduler, means implementing your own job executor.
 
 ## Implement a Custom Job Executor
 
@@ -55,6 +56,42 @@ these times whenever the job runner provides them: Gravitino pulls job states on
 `gravitino.job.statusPullIntervalInMs`, so without them it can only record when it observed each
 status change, and a job that starts and finishes between two pulls gets no start time. Once a job
 has started, keep reporting its start time in every later state, including the finished one.
+
+### Recover Unrecorded Submissions
+
+Gravitino registers a job and its initial owner before it calls `submitJob`, and records the returned
+execution id afterwards. If that id is not recorded within three
+`gravitino.job.statusPullIntervalInMs`, another server, or the same server after a restart, calls
+`findSubmittedJob(JobContext, JobTemplate)` with the original job id, metalake and runtime template:
+
+- A returned execution id is recorded. It must be the same string that `submitJob` returns.
+- An empty result means that the runner has no execution. The job becomes `FAILED`, or
+  `CANCELLED` if cancellation was requested. Only return it when the runner confirms it, unless
+  the job executor can't look up executions at all, see the default implementation below.
+- An exception keeps the job for a lookup in the next status pull.
+
+The default implementation returns empty. Implement the lookup if the runner can identify an
+execution by `JobContext#jobId()`.
+
+The lookup may run concurrently with a slow submission. Keep the registration-to-recording phase
+within three pull intervals; a submission that returns after another server settled the job is
+cancelled and its run request fails. An execution id must not start with `pending-submission:`.
+
+Throw `IllegalArgumentException` for invalid input, or `JobSubmissionRejectedException` when no
+execution was created or its removal is confirmed. Gravitino then removes the job. Other failures,
+including a lost response, have an unknown outcome:
+
+- If the job executor implements `findSubmittedJob`, Gravitino keeps the job and marks it as
+  `CANCELLING` rather than replaying the submission, so an execution found for it later is
+  cancelled. If the metadata store cannot record that, the job is still kept, but a found execution
+  may be tracked as running; check that job before retrying the run request.
+- Otherwise Gravitino removes the job, as it couldn't find an execution left behind. Remove what
+  the submission may have created before throwing.
+
+`cancelJob` must be safe to repeat. A persisted `CANCELLING` job is retried while the runner reports
+`QUEUED` or `STARTED`, including for shared runners. Report `CANCELLING` once an asynchronous
+cancellation is accepted, or a terminal state when it finishes. A temporary failure must not erase
+the cancellation intent.
 
 ### Register the Job Executor
 

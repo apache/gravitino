@@ -79,6 +79,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -129,6 +130,18 @@ class RelationalCatalog extends BaseSchemaCatalog
   @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) {
     return semanticModelOperations.listSemanticModels(namespace);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) {
+    return semanticModelOperations.listMetrics(namespace);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) {
+    return semanticModelOperations.listMetricInfos(namespace);
   }
 
   /** {@inheritDoc} */

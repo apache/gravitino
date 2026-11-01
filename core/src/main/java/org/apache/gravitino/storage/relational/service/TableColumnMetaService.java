@@ -91,6 +91,30 @@ public class TableColumnMetaService {
     return columnId;
   }
 
+  /** Returns active column IDs by name using batched reads of one table. */
+  public Map<String, Long> getColumnIdsByTableIdAndNames(Long tableId, List<String> columnNames) {
+    if (columnNames.isEmpty()) {
+      return new HashMap<>();
+    }
+    Map<String, Long> ids = new HashMap<>();
+    for (List<String> batch : Lists.partition(columnNames, 500)) {
+      List<ColumnPO> rows =
+          SessionUtils.getWithoutCommit(
+              TableColumnMapper.class,
+              mapper -> mapper.selectColumnIdsByTableIdAndNames(tableId, batch));
+      rows.forEach(row -> ids.put(row.getColumnName(), row.getColumnId()));
+    }
+    for (String name : columnNames) {
+      if (!ids.containsKey(name)) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.COLUMN.name().toLowerCase(Locale.ROOT),
+            name);
+      }
+    }
+    return ids;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getColumnPOById")

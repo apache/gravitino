@@ -19,6 +19,48 @@
 
 paths:
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+    get:
+      tags:
+        - semantic-model
+      summary: List metrics across Semantic Models
+      description: >-
+        Lists metrics in the current committed definitions of live Semantic Models in a schema.
+        Supported only for relational catalogs. With details=false (the default), returns metric
+        identifiers; with details=true, returns complete metric definitions and their namespaces.
+        Namespaces contain [metalake, catalog, schema, semanticModel]. Both modes require schema
+        access and include only metrics whose containing model is visible under the existing
+        Semantic Model listing rules. Results are sorted by structured model identifier and then
+        case-sensitive metric name. Models without metrics contribute no entries. Empty results
+        contain an empty identifiers or metrics array. Storage or metric decoding failures fail
+        the entire request, including decoding failures in models that would be filtered out.
+      operationId: listSemanticModelMetrics
+      parameters:
+        - name: details
+          in: query
+          required: false
+          description: Whether to return complete metric definitions instead of identifiers
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelMetricListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -297,6 +339,60 @@ paths:
 components:
 
   schemas:
+    SemanticModelMetric:
+      type: object
+      description: The namespace and complete definition of a discovered metric
+      required:
+        - namespace
+        - metric
+      properties:
+        namespace:
+          type: array
+          description: Full namespace [metalake, catalog, schema, semanticModel]
+          minItems: 4
+          maxItems: 4
+          items:
+            type: string
+            minLength: 1
+        metric:
+          $ref: "#/components/schemas/Metric"
+      additionalProperties: false
+
+    MetricIdentifierListResponse:
+      type: object
+      description: Metric identifiers returned when details is false
+      required:
+        - code
+        - identifiers
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        identifiers:
+          type: array
+          description: Identifiers with namespace [metalake, catalog, schema, semanticModel]
+          items:
+            $ref: "./openapi.yaml#/components/schemas/NameIdentifier"
+      additionalProperties: false
+
+    MetricInfoListResponse:
+      type: object
+      description: Complete metrics returned when details is true
+      required:
+        - code
+        - metrics
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticModelMetric"
+      additionalProperties: false
+
     AIContext:
       description: Additional context for AI tools, encoded as exactly one string or object value
       oneOf:
@@ -1094,6 +1190,35 @@ components:
       }
 
   responses:
+    SemanticModelMetricListResponse:
+      description: Metric identifiers or complete metric definitions, according to details
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/MetricIdentifierListResponse"
+              - $ref: "#/components/schemas/MetricInfoListResponse"
+          examples:
+            Identifiers:
+              summary: details=false
+              value:
+                code: 0
+                identifiers:
+                  - namespace: [lake, sales, mart, sales_model]
+                    name: total_revenue
+            Definitions:
+              summary: details=true
+              value:
+                code: 0
+                metrics:
+                  - namespace: [lake, sales, mart, sales_model]
+                    metric:
+                      name: total_revenue
+                      expression:
+                        dialects:
+                          - dialect: ANSI_SQL
+                            expression: SUM(orders.amount)
+
     SemanticModelListResponse:
       description: Returns the Semantic Model identifiers in the schema
       content:

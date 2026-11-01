@@ -47,6 +47,12 @@ import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailu
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
@@ -57,6 +63,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -92,6 +99,37 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       return identifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListSemanticModelFailureEvent(user, namespace, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListSemanticModelMetricPreEvent(user, namespace));
+    try {
+      NameIdentifier[] metrics = dispatcher.listMetrics(namespace);
+      eventBus.dispatchEvent(
+          new ListSemanticModelMetricEvent(user, namespace, metrics != null ? metrics.length : -1));
+      return metrics;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListSemanticModelMetricFailureEvent(user, namespace, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListSemanticModelMetricInfosPreEvent(user, namespace));
+    try {
+      SemanticModelMetric[] metrics = dispatcher.listMetricInfos(namespace);
+      eventBus.dispatchEvent(
+          new ListSemanticModelMetricInfosEvent(
+              user, namespace, metrics != null ? metrics.length : -1));
+      return metrics;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListSemanticModelMetricInfosFailureEvent(user, namespace, e));
       throw e;
     }
   }

@@ -25,6 +25,13 @@ gravitino.job.statusPullIntervalInMs=300000
 gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
+These settings run the jobs with the [local job executor](../local-job-executor.md). To run them on
+Kubernetes, set `gravitino.job.executor=k8s` and configure the
+[Kubernetes job executor](../k8s-job-executor.md) instead. The examples on this page are for the
+local job executor: on Kubernetes, leave `spark_master` empty, as the Kubernetes job executor
+rejects `local[2]`. See
+[Built-In Jobs](../k8s-job-executor.md#built-in-jobs).
+
 `gravitino.job.statusPullIntervalInMs` defaults to five minutes. Job status is polled rather than pushed, so REST status can lag the real Spark process by a full interval, which makes a working job look hung. Lower it to `10000` for local work and restart the server.
 
 ### TMS cluster-static client auth

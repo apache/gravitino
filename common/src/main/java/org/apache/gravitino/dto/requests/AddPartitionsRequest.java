@@ -27,6 +27,7 @@ import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Request to add partitions to a table. */
 @Getter
@@ -58,5 +59,6 @@ public class AddPartitionsRequest implements RESTRequest {
     Preconditions.checkArgument(partitions != null, "partitions must not be null");
     Preconditions.checkArgument(
         partitions.length == 1, "Haven't yet implemented multiple partitions");
+    WritableDataTypeValidator.validatePartition(partitions[0], "partitions[0]");
   }
 }

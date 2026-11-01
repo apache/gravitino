@@ -41,8 +41,8 @@ import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
-import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobIds;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
@@ -125,17 +125,17 @@ public class PolicyExpandToCronIT extends BaseIT {
     // tomorrow 02:00 for TIME_TRIGGER).
     PolicyExpandRegistrar.forReads(ds).scheduleAt(seeded.policyId, Instant.now().minusSeconds(5));
 
-    awaitCronCapture(CronJobIds.forTable(seeded.tableId, seeded.policyId), 30L);
+    awaitCronCapture(MaintenanceTaskIds.forCronTable(seeded.tableId, seeded.policyId), 30L);
 
     MaintenanceJobSpec spec = CAPTURED_CRON_SPEC.get();
     assertNotNull(spec);
     assertTrue(spec.isValid());
     assertEquals(List.of(seeded.tableId), spec.tableIds());
-    assertEquals(seeded.policyId, spec.getOperations().get(0).getPolicyId());
-    assertTrue(spec.getJobConf().containsKey("updater_options"));
-    assertEquals(seeded.catalogName, spec.getTables().get(0).catalogName());
+    assertEquals(seeded.policyId, spec.getTasks().get(0).getPolicyId());
+    assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
+    assertEquals(seeded.catalogName, spec.getTasks().get(0).catalogName());
     assertEquals(
-        seeded.schemaName + "." + seeded.tableName, spec.getTables().get(0).sparkTableIdentifier());
+        seeded.schemaName + "." + seeded.tableName, spec.getTasks().get(0).tableIdentifier());
   }
 
   private static void awaitCronCapture(String expectedInstanceId, long timeoutSeconds)

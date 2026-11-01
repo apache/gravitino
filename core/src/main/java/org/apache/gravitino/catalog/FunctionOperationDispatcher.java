@@ -36,6 +36,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /**
  * {@code FunctionOperationDispatcher} is responsible for dispatching function-related operations.
@@ -141,6 +142,9 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
     Preconditions.checkArgument(functionType != null, "Function type is required");
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0, "At least one definition is required");
+    for (int i = 0; i < definitions.length; i++) {
+      WritableDataTypeValidator.validateDefinition(definitions[i], "definitions[" + i + "]");
+    }
 
     validateNotIcebergReservedSchema(ident);
 
@@ -170,6 +174,13 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
       throws NoSuchFunctionException, IllegalArgumentException {
     Preconditions.checkArgument(
         changes != null && changes.length > 0, "At least one change is required");
+    for (int i = 0; i < changes.length; i++) {
+      if (changes[i] instanceof FunctionChange.AddDefinition) {
+        WritableDataTypeValidator.validateDefinition(
+            ((FunctionChange.AddDefinition) changes[i]).definition(),
+            "updates[" + i + "].definition");
+      }
+    }
     validateNotIcebergReservedSchema(ident);
 
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());

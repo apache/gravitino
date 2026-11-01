@@ -59,6 +59,7 @@ from gravitino.exceptions.base import (
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
     SemanticModelAlreadyExistsException,
+    ServiceUnavailableException,
     TableAlreadyExistsException,
     UnauthorizedException,
     UnsupportedOperationException,
@@ -200,6 +201,30 @@ class TestErrorHandler(unittest.TestCase):
             with self.subTest(handler=type(handler).__name__):
                 with self.assertRaisesRegex(
                     OptimisticLockException, "Concurrent update"
+                ):
+                    handler.handle(response)
+
+    def test_service_unavailable(self):
+        response = ErrorResponse.from_json(
+            '{"code":1013,"type":"ServiceUnavailableException",'
+            '"message":"Service unavailable","stack":null}'
+        )
+        generated = ErrorResponse.generate_error_response(
+            ServiceUnavailableException, "Service unavailable"
+        )
+        self.assertEqual(1013, generated.code())
+
+        for handler in (
+            REST_ERROR_HANDLER,
+            TABLE_ERROR_HANDLER,
+            VIEW_ERROR_HANDLER,
+            PARTITION_ERROR_HANDLER,
+            STATISTICS_ERROR_HANDLER,
+            CATALOG_ERROR_HANDLER,
+        ):
+            with self.subTest(handler=type(handler).__name__):
+                with self.assertRaisesRegex(
+                    ServiceUnavailableException, "Service unavailable"
                 ):
                     handler.handle(response)
 

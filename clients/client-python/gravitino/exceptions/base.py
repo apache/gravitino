@@ -157,6 +157,10 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
+class ServiceUnavailableException(GravitinoRuntimeException):
+    """An exception thrown when a configured dependency is temporarily unavailable."""
+
+
 class OptimisticLockException(GravitinoRuntimeException):
     """Raised when another update changes an entity before a write completes."""
 

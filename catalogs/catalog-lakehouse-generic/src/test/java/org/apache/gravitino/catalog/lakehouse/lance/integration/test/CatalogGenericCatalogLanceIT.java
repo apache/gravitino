@@ -54,6 +54,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -1207,7 +1208,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
   @Test
   void testRegisterWithNonExistLocation() {
-    // Now try to register a table with non-existing location with CREATE mode - should succeed
+    // Registration must reject a missing dataset without creating catalog metadata or a directory.
     String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Map<String, String> newCreateProperties = createProperties();
@@ -1220,26 +1221,24 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     newCreateProperties.put(Table.PROPERTY_EXTERNAL, "true");
     newCreateProperties.put(LANCE_TABLE_REGISTER, "true");
 
-    Table nonExistingTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                newTableIdentifier,
-                new Column[0],
-                "Updated comment",
-                newCreateProperties,
-                Transforms.EMPTY_TRANSFORM,
-                Distributions.NONE,
-                new SortOrder[0]);
-
-    Assertions.assertNotNull(nonExistingTable);
-    Assertions.assertEquals(
-        newLocation, nonExistingTable.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(dirExists, new File(newLocation).exists());
-
-    // Now try to drop table, there should no problem here
-    boolean dropSuccess = catalog.asTableCatalog().dropTable(newTableIdentifier);
-    Assertions.assertTrue(dropSuccess);
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        newTableIdentifier,
+                        new Column[0],
+                        "Updated comment",
+                        newCreateProperties,
+                        Transforms.EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        new SortOrder[0]));
+    Assertions.assertTrue(failure.getMessage().contains("Could not validate location"));
+    Assertions.assertFalse(new File(newLocation).exists());
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(newTableIdentifier));
   }
 
   @Test

@@ -135,6 +135,9 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
   }
+  implementation(project(":bundles:aws")) {
+    exclude("*")
+  }
   implementation(libs.guava)
   implementation(libs.caffeine)
 

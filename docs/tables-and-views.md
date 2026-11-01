@@ -104,6 +104,10 @@ written. Support is connector-specific.
 An external type represents a catalog type that is not part of the Gravitino type system. It keeps
 the external catalog's type string so clients can inspect it without losing information.
 
+When creating a table, adding a column, or changing a column's type, use a native Gravitino type
+or an explicit external type with a nonblank `catalogString`. This rule also applies to nested
+list, map, struct, and union types. The target catalog still determines whether it supports the type.
+
 ```json
 {
   "type": "external",
@@ -119,6 +123,11 @@ String typeString = ((ExternalType) type).catalogString();
 
 An unparsed type preserves forward compatibility when a client does not recognize a type returned
 by the server. The client retains the serialized value instead of failing deserialization.
+
+`UnparsedType` is not accepted for new or replaced column types, or for literal types in newly
+written expressions. Existing metadata containing it can still be read, imported, renamed, or
+annotated without replacing its type. Gravitino does not automatically convert an unparsed type
+into an external type.
 
 ```json
 {

@@ -27,29 +27,30 @@ import java.util.Objects;
  * and {@link TableMaintenanceActionMetaService#deleteUnboundClaim} without re-reading {@code
  * created_at} from the row.
  *
- * <p>{@link #id()} is the durable claim token for OccupancyGate follow-ups: make {@code runJob}
- * idempotent on this id (or outbox / reconcile-before-reclaim). Binding {@code job_id} alone cannot
- * undo a submit that already succeeded after a crash between {@code runJob} and bind.
+ * <p>{@link #actionId()} is injected into Spark jobConf. Expired unbound slots are abandoned
+ * ({@code finished_at = now}) and replaced with a new row / {@code action_id}, so a stale claim
+ * cannot update the successor soft slot. Binding {@code job_id} alone cannot undo a submit that
+ * already succeeded after a crash between {@code runJob} and bind.
  */
 public final class OccupancyClaim {
 
-  private final long id;
+  private final long actionId;
   private final long createdAt;
 
   /**
-   * @param id {@code table_maintenance_action.id}
-   * @param createdAt claim lease start written at acquire / reclaim time
+   * @param actionId {@code table_maintenance_action.action_id}
+   * @param createdAt claim lease start written at acquire time
    */
-  public OccupancyClaim(long id, long createdAt) {
-    this.id = id;
+  public OccupancyClaim(long actionId, long createdAt) {
+    this.actionId = actionId;
     this.createdAt = createdAt;
   }
 
   /**
    * @return action row id
    */
-  public long id() {
-    return id;
+  public long actionId() {
+    return actionId;
   }
 
   /**
@@ -68,16 +69,16 @@ public final class OccupancyClaim {
       return false;
     }
     OccupancyClaim that = (OccupancyClaim) o;
-    return id == that.id && createdAt == that.createdAt;
+    return actionId == that.actionId && createdAt == that.createdAt;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, createdAt);
+    return Objects.hash(actionId, createdAt);
   }
 
   @Override
   public String toString() {
-    return "OccupancyClaim{id=" + id + ", createdAt=" + createdAt + '}';
+    return "OccupancyClaim{actionId=" + actionId + ", createdAt=" + createdAt + '}';
   }
 }

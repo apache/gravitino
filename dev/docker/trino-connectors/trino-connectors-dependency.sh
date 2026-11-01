@@ -23,7 +23,7 @@
 #
 # The set of version-range modules is DISCOVERED from the Gradle project, so
 # this script does not hard-code which ranges exist. Whatever the checked-out
-# branch supports (for example 440-478 on main, or 435-478 on branch-1.3) is
+# branch supports (for example 469-483 on main, or 435-478 on branch-1.3) is
 # built automatically.
 #
 # Output layout:
@@ -41,9 +41,10 @@ gravitino_home="$(cd "${conn_dir}/../../.." >/dev/null; pwd)"
 cd "${gravitino_home}"
 
 # Discover all Trino connector version-range modules from the Gradle project,
-# e.g. "trino-connector-440-445". Keep stderr so a Gradle failure is visible
+# e.g. "trino-connector-469-472" or the single-version "trino-connector-480".
+# Keep stderr so a Gradle failure is visible
 # instead of being misreported as "no modules found".
-modules="$(./gradlew -q projects | grep -oE "trino-connector-[0-9]+-[0-9]+" | sort -u)"
+modules="$(./gradlew -q projects | grep -oE "trino-connector-[0-9]+(-[0-9]+)?" | sort -u)"
 
 if [ -z "${modules}" ]; then
   echo "ERROR: no trino-connector version-range modules found in the Gradle project." >&2

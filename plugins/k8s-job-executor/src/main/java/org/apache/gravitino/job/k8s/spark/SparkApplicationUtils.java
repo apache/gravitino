@@ -196,17 +196,7 @@ public final class SparkApplicationUtils {
     sparkConf.remove(SPARK_DEPLOY_MODE);
     putIfBlank(sparkConf, SPARK_IMAGE, configs.sparkImage());
     putIfBlank(sparkConf, SPARK_DRIVER_SERVICE_ACCOUNT, configs.sparkServiceAccount());
-    // Only a job chooses its namespace this way. A default set in the Spark configurations of
-    // the executor would silently shadow the namespace of the executor configurations.
-    String namespace = StringUtils.trimToNull(jobSparkConf.get(SPARK_NAMESPACE));
-    if (namespace == null) {
-      namespace = configs.namespace();
-    } else if (!K8sJobResourceUtils.isValidNamespace(namespace)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "%s of job template %s isn't a valid namespace name: %s",
-              SPARK_NAMESPACE, template.name(), namespace));
-    }
+    String namespace = namespaceOf(template, configs);
     sparkConf.put(SPARK_NAMESPACE, namespace);
     appendList(sparkConf, SPARK_JARS, template.jars());
     appendList(sparkConf, SPARK_FILES, template.files());
@@ -258,6 +248,31 @@ public final class SparkApplicationUtils {
             .build();
     app.setAdditionalProperty("spec", spec);
     return app;
+  }
+
+  /**
+   * Returns the namespace the SparkApplication of a job is created in.
+   *
+   * @param template the runtime job template
+   * @param configs the job executor configurations
+   * @return the namespace the job template chooses, or else the namespace of the job executor
+   * @throws IllegalArgumentException if the job template chooses an invalid namespace
+   */
+  public static String namespaceOf(SparkJobTemplate template, K8sJobExecutorConfigs configs) {
+    // Only a job chooses its namespace this way. A default set in the Spark configurations of
+    // the executor would silently shadow the namespace of the executor configurations. A built-in
+    // job template can't choose it in its spark_conf, which ignores spark.kubernetes.*.
+    String namespace = StringUtils.trimToNull(template.configs().get(SPARK_NAMESPACE));
+    if (namespace == null) {
+      return configs.namespace();
+    }
+    if (!K8sJobResourceUtils.isValidNamespace(namespace)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s of job template %s isn't a valid namespace name: %s",
+              SPARK_NAMESPACE, template.name(), namespace));
+    }
+    return namespace;
   }
 
   /**

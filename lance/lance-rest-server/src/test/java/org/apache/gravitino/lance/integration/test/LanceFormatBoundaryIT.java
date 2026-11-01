@@ -231,7 +231,9 @@ public class LanceFormatBoundaryIT extends BaseIT {
 
     RegisterTableRequest registerRequest = new RegisterTableRequest();
     registerRequest.setId(deltaIds);
-    registerRequest.setLocation(tempDir.resolve("rest_register_overwrite").toString());
+    String registerLocation = tempDir.resolve("rest_register_overwrite").toString();
+    LanceDatasetTestUtils.createDataset(registerLocation);
+    registerRequest.setLocation(registerLocation);
     registerRequest.setMode("overwrite");
     LanceNamespaceException registerException =
         Assertions.assertThrows(

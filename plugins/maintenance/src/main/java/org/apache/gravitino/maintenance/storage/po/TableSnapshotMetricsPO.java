@@ -37,7 +37,7 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableSnapshotMetricsPO {
 
-  private Long id;
+  private Long metricsId;
   private Long tableId;
   private Long policyId;
   private Long snapshotId;

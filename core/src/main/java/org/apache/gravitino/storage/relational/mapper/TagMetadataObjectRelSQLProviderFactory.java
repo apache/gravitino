@@ -58,6 +58,14 @@ public class TagMetadataObjectRelSQLProviderFactory {
     return getProvider().listTagPOsByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
+  /** Returns the SQL for a batched tag assignment lookup. */
+  public static String listTagPOsByMetadataObjectIdsAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .listTagPOsByMetadataObjectIdsAndType(metadataObjectIds, metadataObjectType);
+  }
+
   public static String getTagPOsByMetadataObjectAndTagName(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,

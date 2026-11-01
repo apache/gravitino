@@ -27,7 +27,7 @@ import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.TableTarget;
+import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -43,7 +43,7 @@ class TestMaintenanceJobSpecFactory {
   private static final String GRAVITINO_URI = "http://localhost:8090";
 
   @Test
-  void testForCronBuildsSharedJobConfAndIdentifierLevels() {
+  void testForCronBuildsTasksAndSharedBags() {
     MaintenanceJobSpecFactory factory = new MaintenanceJobSpecFactory(configWithUri());
     PolicyEntity policy = compaction(202L);
     MaintenanceJobSpec spec =
@@ -56,29 +56,33 @@ class TestMaintenanceJobSpecFactory {
     Assertions.assertTrue(spec.isValid());
     Assertions.assertEquals("ml", spec.metalake());
     Assertions.assertEquals(List.of(10L, 11L), spec.tableIds());
-    Assertions.assertEquals(1, spec.getOperations().size());
-    Assertions.assertEquals(202L, spec.getOperations().get(0).getPolicyId());
-    Assertions.assertEquals("rewrite_data_files", spec.getOperations().get(0).getMaintenanceType());
-    Assertions.assertNull(spec.getJobConf().get("catalog_name"));
-    Assertions.assertNull(spec.getJobConf().get("table_identifier"));
-    Assertions.assertFalse(spec.getJobConf().containsKey("tms_table_id"));
-    Assertions.assertFalse(spec.getJobConf().containsKey("tms_policy_id"));
+    Assertions.assertEquals(2, spec.getTasks().size());
+    Assertions.assertEquals(202L, spec.getTasks().get(0).getPolicyId());
+    Assertions.assertEquals("rewrite_data_files", spec.getTasks().get(0).getMaintenanceType());
+    Assertions.assertEquals("iceberg", spec.getTasks().get(0).catalogName());
+    Assertions.assertEquals("db.t1", spec.getTasks().get(0).tableIdentifier());
+    Assertions.assertEquals("db.t2", spec.getTasks().get(1).tableIdentifier());
+    Assertions.assertFalse(spec.getTasks().get(0).getParameters().containsKey("updater_options"));
+    Assertions.assertFalse(spec.getTasks().get(0).getParameters().containsKey("spark_conf"));
+    Assertions.assertFalse(
+        spec.getTasks().get(0).getParameters().containsKey("spark_executor_memory"));
     Assertions.assertTrue(
-        spec.getJobConf()
-            .get("updater_options")
-            .contains("gravitino.maintenance.gravitinoAuth.uri"));
-    Assertions.assertFalse(spec.getJobConf().get("updater_options").contains(GRAVITINO_URI));
+        spec.getUpdaterOptions().contains("gravitino.maintenance.gravitinoAuth.uri"));
+    Assertions.assertFalse(spec.getUpdaterOptions().contains(GRAVITINO_URI));
+    Assertions.assertTrue(spec.getSparkConf().contains("spark.executor.memory"));
 
-    TableTarget first = spec.getTables().get(0);
-    Assertions.assertEquals(List.of("ml", "iceberg", "db", "t1"), first.getIdentifier());
     Map<String, String> perTable =
-        MaintenanceJobSpecFactory.jobConfForTable(spec.getJobConf(), first);
+        MaintenanceJobSpecFactory.jobConfForTask(spec, spec.getTasks().get(0));
     Assertions.assertEquals("iceberg", perTable.get("catalog_name"));
     Assertions.assertNull(perTable.get("table_identifier"));
     Assertions.assertNull(perTable.get("table_id"));
+    Assertions.assertEquals(
+        "rewrite_data_files", perTable.get(MaintenanceJobTemplates.MAINTENANCE_TYPES_KEY));
+    Assertions.assertEquals("202", perTable.get(MaintenanceJobTemplates.POLICY_IDS_KEY));
     Assertions.assertTrue(perTable.get("tables").contains("\"table_id\":10"));
     Assertions.assertTrue(perTable.get("tables").contains("\"table_identifier\":\"db.t1\""));
-    Assertions.assertFalse(perTable.containsKey("tms_table_id"));
+    Assertions.assertTrue(perTable.containsKey("updater_options"));
+    Assertions.assertEquals("4g", perTable.get("spark_executor_memory"));
   }
 
   @Test
@@ -106,9 +110,10 @@ class TestMaintenanceJobSpecFactory {
     Assertions.assertEquals(original, restored);
     String json = new String(bytes, StandardCharsets.UTF_8);
     Assertions.assertFalse(json.contains("\"version\""));
-    Assertions.assertFalse(json.contains("\"metalake\""));
-    Assertions.assertTrue(json.contains("\"operations\""));
+    Assertions.assertTrue(json.contains("\"tasks\""));
+    Assertions.assertTrue(json.contains("\"parameters\""));
     Assertions.assertTrue(json.contains("updater_options"));
+    Assertions.assertTrue(json.contains("spark_conf"));
   }
 
   @Test

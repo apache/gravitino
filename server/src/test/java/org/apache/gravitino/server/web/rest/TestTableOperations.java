@@ -155,6 +155,73 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRejectUnresolvedTypesBeforeDispatch() {
+    String[] columns = {
+      "{\"name\":\"c\",\"type\":\"future_type\"}",
+      "{\"name\":\"c\",\"type\":{\"type\":\"external\",\"catalogString\":\" \"}}",
+      "{\"name\":\"c\",\"type\":\"string\",\"defaultValue\":{\"type\":\"literal\",\"dataType\":\"future_type\",\"value\":null}}"
+    };
+    for (String column : columns) {
+      String json = "{\"name\":\"t\",\"columns\":[" + column + "]}";
+      try (Response response =
+          target(tablePath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(json))) {
+        Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response.readEntity(ErrorResponse.class).getMessage().contains("columns[0]"));
+      }
+    }
+    String update =
+        """
+        {"updates":[{"@type":"updateColumnDefaultValue","fieldName":["c"],
+          "newDefaultValue":{"type":"function","funcName":"f","funcArgs":[
+            {"type":"literal","dataType":"future_type","value":null}]}}]}
+        """;
+    try (Response response =
+        target(tablePath(metalake, catalog, schema) + "t")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.json(update))) {
+      Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          response
+              .readEntity(ErrorResponse.class)
+              .getMessage()
+              .contains("updates[0].newDefaultValue.funcArgs[0].dataType"));
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  public void testRejectNullTableInputsBeforeDispatch() {
+    String[][] invalidRequests = {
+      {"{\"name\":\"t\",\"columns\":null}", "columns"},
+      {"{\"name\":\"t\",\"columns\":[null]}", "columns[0]"},
+      {
+        "{\"name\":\"t\",\"columns\":[{\"name\":\"c\",\"type\":\"string\"}],\"sortOrders\":[null]}",
+        "sortOrders[0]"
+      }
+    };
+    for (String[] invalidRequest : invalidRequests) {
+      try (Response response =
+          target(tablePath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(invalidRequest[0]))) {
+        Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response
+                .readEntity(ErrorResponse.class)
+                .getMessage()
+                .contains("\"" + invalidRequest[1] + "\" field is required and cannot be null"));
+      }
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   public void testListTables() {
     NameIdentifier table1 = NameIdentifier.of(metalake, catalog, schema, "table1");
     NameIdentifier table2 = NameIdentifier.of(metalake, catalog, schema, "table2");

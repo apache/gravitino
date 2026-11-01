@@ -139,10 +139,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 Table.PROPERTY_EXTERNAL,
                 "true"));
     // Registered by the admin, so neither owner below owns the table itself.
-    assertStatus(
-        200, register(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, null, location(OWNED_SCHEMA_TABLE)));
-    assertStatus(
-        200, register(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE, null, location(LONE_SCHEMA_TABLE)));
+    assertStatus(200, registerExistingTable(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE));
+    assertStatus(200, registerExistingTable(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE));
     setSchemaOwner(metalake, OWNED_SCHEMA, SCHEMA_OWNER);
     setSchemaOwner(metalake, LONE_SCHEMA, LONE_OWNER);
 
@@ -292,7 +290,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, register(READER, SCHEMA, "reader_table", null, location("reader_table")));
     assertStatus(403, declare(READER, SCHEMA, "reader_table"));
 
-    assertStatus(200, register(PROBER, WRITE_SCHEMA, PROBER_TABLE, null, location(PROBER_TABLE)));
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, PROBER_TABLE));
     // Creating assigns ownership, so the creator can read back what it created even though it
     // holds no SELECT_TABLE privilege.
     assertStatus(200, table(PROBER, WRITE_SCHEMA, PROBER_TABLE, "describe"));
@@ -337,9 +335,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(200, table(ADMIN, VISIBLE_TABLE, "describe"));
 
     // Creating assigns ownership, so the creator may use either removal operation.
-    assertStatus(
-        200, register(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, null, location(DEREGISTER_TABLE)));
-    assertStatus(200, register(PROBER, WRITE_SCHEMA, DROP_TABLE, null, location(DROP_TABLE)));
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE));
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DROP_TABLE));
     assertStatus(200, table(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, "deregister"));
     assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
     assertStatus(404, table(ADMIN, WRITE_SCHEMA, DEREGISTER_TABLE, "describe"));
@@ -444,7 +441,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void registerTable(String tableName) throws Exception {
-    assertStatus(200, register(ADMIN, SCHEMA, tableName, null, location(tableName)));
+    assertStatus(200, registerExistingTable(ADMIN, SCHEMA, tableName));
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
@@ -460,6 +457,12 @@ public class LanceTableAuthorizationIT extends BaseIT {
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
             .build();
     assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+  }
+
+  private HttpResponse<String> registerExistingTable(String user, String schema, String tableName)
+      throws Exception {
+    LanceDatasetTestUtils.createDataset(location(tableName));
+    return register(user, schema, tableName, null, location(tableName));
   }
 
   private HttpResponse<String> register(

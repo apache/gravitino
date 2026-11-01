@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler.job.cron;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Clock;
@@ -130,7 +131,7 @@ public final class MaintenanceJobConfBuilder {
    *
    * @param policy effective maintenance policy
    * @param catalogName Spark catalog alias for IRC property scoping
-   * @return mutable jobConf (per-table keys applied later by {@code jobConfForTable})
+   * @return mutable jobConf (split into envelope bags / task {@code parameters} by the factory)
    */
   public Map<String, String> build(PolicyEntity policy, String catalogName) {
     PolicyContent content = policy.content();
@@ -191,6 +192,69 @@ public final class MaintenanceJobConfBuilder {
       jobConf.put("spark_conf", writeJson(new TreeMap<>(sparkConf), "spark_conf"));
     }
     return jobConf;
+  }
+
+  /**
+   * Re-derives flat template placeholders ({@code spark_executor_memory}, {@code catalog_type}, …)
+   * from nested {@code spark_conf}. Used when enqueue {@code task_data} stores only the JSON bag.
+   *
+   * @param jobConf mutable runJob map that already contains {@code spark_conf}
+   * @param catalogName Spark catalog alias for IRC property scoping
+   */
+  public static void applySparkConfPlaceholders(Map<String, String> jobConf, String catalogName) {
+    Preconditions.checkNotNull(jobConf, "jobConf");
+    Preconditions.checkNotNull(catalogName, "catalogName");
+    String sparkConfJson = jobConf.get("spark_conf");
+    if (sparkConfJson == null || sparkConfJson.trim().isEmpty()) {
+      return;
+    }
+    Map<String, String> sparkConf =
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark_conf");
+    fillPlaceholdersFromSparkConf(jobConf, sparkConf, catalogName);
+  }
+
+  /**
+   * Folds flat session placeholders ({@code spark_executor_memory}, {@code catalog_type}, …) into
+   * nested {@code spark_conf} so enqueue {@code task_data} can keep only the JSON bag at the top
+   * level.
+   *
+   * @param jobConf mutable map from {@link #build}
+   * @param catalogName Spark catalog alias for IRC property scoping
+   */
+  public static void foldPlaceholdersIntoSparkConf(
+      Map<String, String> jobConf, String catalogName) {
+    Preconditions.checkNotNull(jobConf, "jobConf");
+    Preconditions.checkNotNull(catalogName, "catalogName");
+    Map<String, String> sparkConf =
+        new TreeMap<>(
+            IcebergSparkConfigUtils.parseFlatJsonMap(jobConf.get("spark_conf"), "spark_conf"));
+    for (Map.Entry<String, String> entry : SPARK_KEY_TO_PLACEHOLDER.entrySet()) {
+      String sparkKey = entry.getKey();
+      String placeholder = entry.getValue();
+      String value = jobConf.get(placeholder);
+      if (value != null && !value.isBlank()) {
+        sparkConf.putIfAbsent(sparkKey, value);
+      }
+    }
+    String catalogPrefix = SPARK_SQL_CATALOG_PREFIX + catalogName;
+    putIfAbsentSparkFromPlaceholder(jobConf, sparkConf, "catalog_type", catalogPrefix + ".type");
+    putIfAbsentSparkFromPlaceholder(jobConf, sparkConf, "catalog_uri", catalogPrefix + ".uri");
+    putIfAbsentSparkFromPlaceholder(
+        jobConf, sparkConf, "warehouse_location", catalogPrefix + ".warehouse");
+    if (!sparkConf.isEmpty()) {
+      jobConf.put("spark_conf", writeJson(sparkConf, "spark_conf"));
+    }
+  }
+
+  private static void putIfAbsentSparkFromPlaceholder(
+      Map<String, String> jobConf,
+      Map<String, String> sparkConf,
+      String placeholder,
+      String sparkKey) {
+    String value = jobConf.get(placeholder);
+    if (value != null && !value.isBlank()) {
+      sparkConf.putIfAbsent(sparkKey, value);
+    }
   }
 
   /**

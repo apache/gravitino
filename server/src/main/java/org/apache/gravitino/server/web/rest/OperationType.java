@@ -37,6 +37,8 @@ public enum OperationType {
   SET,
   REGISTER, // An operation to register a model
   LIST_VERSIONS, // An operation to list versions of a model
+  /** An operation to list metrics contained in Semantic Models. */
+  LIST_SEMANTIC_MODEL_METRICS,
   LINK, // An operation to link a version to a model
   RUN, // An operation to run a job
   CANCEL, // An operation to cancel a job

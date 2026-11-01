@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -39,7 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.policy.rego.RestrictedRegoExpressionParserFacade;
+import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -233,6 +236,16 @@ public class PolicyManager implements PolicyDispatcher {
     return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return objectPolicyResolver.resolve(metalake, metadataObjects);
+  }
+
   private PolicyEntity loadPolicyEntity(String metalake, String policyName) {
     try {
       return entityStore.get(
@@ -368,11 +381,11 @@ public class PolicyManager implements PolicyDispatcher {
   private static void validateReadRestrictionContent(
       Policy.BuiltInType policyType, PolicyContent content) {
     if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
-      RestrictedRegoExpressionParserFacade.validateRowFilter(
+      RestrictedSqlExpressionParserFacade.validateRowFilter(
           ((RowFilterContent) content).expression());
     } else if (policyType == Policy.BuiltInType.COLUMN_MASK
         && content instanceof ColumnMaskContent) {
-      RestrictedRegoExpressionParserFacade.validateColumnMask(
+      RestrictedSqlExpressionParserFacade.validateColumnMask(
           ((ColumnMaskContent) content).expression());
     }
   }

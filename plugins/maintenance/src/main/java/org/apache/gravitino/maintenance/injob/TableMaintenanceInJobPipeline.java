@@ -42,7 +42,7 @@ public class TableMaintenanceInJobPipeline {
   /**
    * Runs sample → drift → recommend for a cron Spark Job.
    *
-   * @param jobId Gravitino {@code job_run_meta.job_run_id}
+   * @param actionId {@code table_maintenance_action.action_id} for the in-flight row
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param sampledSnapshotId {@code S0}
@@ -51,7 +51,7 @@ public class TableMaintenanceInJobPipeline {
    * @return continue only when HEAD matches {@code S0} and recommender says maintain
    */
   public InJobGateOutcome gateCronJob(
-      long jobId,
+      long actionId,
       long tableId,
       long policyId,
       long sampledSnapshotId,
@@ -59,7 +59,7 @@ public class TableMaintenanceInJobPipeline {
       SnapshotHead head) {
     InJobGateOutcome afterSample =
         sampler.sampleAndGateCronJob(
-            jobId, tableId, policyId, sampledSnapshotId, metricsJson, head);
+            actionId, tableId, policyId, sampledSnapshotId, metricsJson, head);
     if (!afterSample.continueMaintenance()) {
       return afterSample;
     }

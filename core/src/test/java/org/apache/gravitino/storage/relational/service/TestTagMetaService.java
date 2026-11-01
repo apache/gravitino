@@ -33,9 +33,11 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,6 +53,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -1476,6 +1479,103 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertThrows(SQLException.class, () -> insertDuplicateActiveTagRel(tagEntity.id()));
   }
 
+  /**
+   * Verifies batch boundaries and per-source tag values, including columns from different tables.
+   */
+  @TestTemplate
+  public void testBatchListTagsForMetadataObjects() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog1");
+    createAndInsertSchema(METALAKE_NAME, "catalog1", "schema1");
+    List<ColumnEntity> columns = new ArrayList<>();
+    for (int i = 0; i < 502; i++) {
+      columns.add(newColumn("column_" + i, i));
+    }
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, "catalog1", "schema1"))
+            .withColumns(columns)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+    TableEntity otherTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table2")
+            .withNamespace(table.namespace())
+            .withColumns(Lists.newArrayList(newColumn("column_0", 0)))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(otherTable, false);
+    TagMetaService service = TagMetaService.getInstance();
+    for (String name : List.of("stage", "flag")) {
+      service.insertTag(
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName(name)
+              .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+              .withAuditInfo(AUDIT_INFO)
+              .build(),
+          false);
+    }
+    List<NameIdentifier> identifiers = new ArrayList<>();
+    Map<NameIdentifier, Map<String, Set<String>>> expected = new LinkedHashMap<>();
+    for (int i = 0; i < 501; i++) {
+      NameIdentifier identifier = columnIdent(table, columns.get(i).name());
+      identifiers.add(identifier);
+      service.associateTagValuesWithMetadataObject(
+          identifier,
+          Entity.EntityType.COLUMN,
+          new TagValue[] {TagValue.of("stage", "common"), TagValue.of("stage", "value_" + i)},
+          new TagValue[0]);
+      expected.put(identifier, Map.of("stage", Set.of("common", "value_" + i)));
+    }
+    service.associateTagValuesWithMetadataObject(
+        identifiers.get(0),
+        Entity.EntityType.COLUMN,
+        new TagValue[] {TagValue.noValue("flag")},
+        new TagValue[0]);
+    expected.put(
+        identifiers.get(0), Map.of("stage", Set.of("common", "value_0"), "flag", Set.of()));
+    for (int count : new int[] {0, 1, 499, 500, 501}) {
+      List<NameIdentifier> requested = identifiers.subList(0, count);
+      assertBatchTagAssignments(
+          service,
+          requested,
+          Entity.EntityType.COLUMN,
+          requested.stream().collect(Collectors.toMap(identifier -> identifier, expected::get)));
+    }
+
+    NameIdentifier otherColumn = columnIdent(otherTable, "column_0");
+    service.associateTagValuesWithMetadataObject(
+        otherColumn,
+        Entity.EntityType.COLUMN,
+        new TagValue[] {TagValue.of("stage", "other_table")},
+        new TagValue[0]);
+    expected.put(otherColumn, Map.of("stage", Set.of("other_table")));
+    identifiers.add(otherColumn);
+    identifiers.add(columnIdent(table, "column_501")); // An existing column without tags.
+    identifiers.add(identifiers.get(0)); // Duplicate requests must not duplicate relation edges.
+    assertBatchTagAssignments(service, identifiers, Entity.EntityType.COLUMN, expected);
+
+    service.associateTagValuesWithMetadataObject(
+        table.nameIdentifier(),
+        Entity.EntityType.TABLE,
+        new TagValue[] {TagValue.of("stage", "table_value")},
+        new TagValue[0]);
+    assertBatchTagAssignments(
+        service,
+        List.of(table.nameIdentifier(), otherTable.nameIdentifier()),
+        Entity.EntityType.TABLE,
+        Map.of(table.nameIdentifier(), Map.of("stage", Set.of("table_value"))));
+    identifiers.add(columnIdent(table, "missing"));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> service.listTagsForMetadataObjects(identifiers, Entity.EntityType.COLUMN));
+  }
+
   @TestTemplate
   public void testListTagsForMetadataObject() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
@@ -2098,6 +2198,22 @@ public class TestTagMetaService extends TestJDBCBackend {
     // The dropped column's relation row is removed, not just hidden.
     Assertions.assertEquals(2, countActiveTagRel(tag.id()));
 
+    assertBatchTagAssignments(
+        tagMetaService,
+        List.of(columnIdent(table, "c2_new"), columnIdent(table, "c3")),
+        Entity.EntityType.COLUMN,
+        Map.of(
+            columnIdent(table, "c2_new"), Map.of(tag.name(), Set.of()),
+            columnIdent(table, "c3"), Map.of(tag.name(), Set.of())));
+    for (String missing : List.of("c1", "c2", "missing")) {
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              tagMetaService.listTagsForMetadataObjects(
+                  List.of(columnIdent(table, "c3"), columnIdent(table, missing)),
+                  Entity.EntityType.COLUMN));
+    }
+
     Assertions.assertEquals(
         1,
         tagMetaService
@@ -2127,6 +2243,13 @@ public class TestTagMetaService extends TestJDBCBackend {
             .isEmpty());
     Assertions.assertEquals(
         2, tagMetaService.listAssociatedMetadataObjectsForTag(tag.nameIdentifier()).size());
+    assertBatchTagAssignments(
+        tagMetaService,
+        List.of(columnIdent(table, "c1"), columnIdent(table, "c2_new"), columnIdent(table, "c3")),
+        Entity.EntityType.COLUMN,
+        Map.of(
+            columnIdent(table, "c2_new"), Map.of(tag.name(), Set.of()),
+            columnIdent(table, "c3"), Map.of(tag.name(), Set.of())));
   }
 
   private static ColumnEntity newColumn(String name, int position) {
@@ -2177,6 +2300,35 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> tagMetaService.getTagIdByTagName(metalakeId, "missing_tag"));
+  }
+
+  private void assertBatchTagAssignments(
+      TagMetaService service,
+      List<NameIdentifier> identifiers,
+      Entity.EntityType objectType,
+      Map<NameIdentifier, Map<String, Set<String>>> expected) {
+    List<RelationalEntity<?>> relations =
+        service.listTagsForMetadataObjects(identifiers, objectType);
+    relations.forEach(
+        relation -> {
+          assertEquals(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, relation.type());
+          assertEquals(objectType, relation.sourceType());
+          assertEquals(NamespaceUtil.ofTag(METALAKE_NAME), relation.targetEntity().namespace());
+        });
+    Map<NameIdentifier, Map<String, Set<String>>> actual =
+        relations.stream()
+            .collect(
+                Collectors.groupingBy(
+                    RelationalEntity::source,
+                    Collectors.toMap(
+                        relation -> relation.targetEntity().name(),
+                        relation -> {
+                          TagEntity tag = (TagEntity) relation.targetEntity();
+                          assertTrue(tag.assignment().isPresent());
+                          return new LinkedHashSet<>(
+                              Arrays.asList(tag.assignment().get().values()));
+                        })));
+    assertEquals(expected, actual);
   }
 
   private TagEntity copyTagWithComment(TagEntity tag, String comment) {

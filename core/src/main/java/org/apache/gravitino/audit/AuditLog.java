@@ -123,6 +123,10 @@ import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
@@ -535,6 +539,10 @@ public interface AuditLog {
     LOAD_SEMANTIC_MODEL,
 
     LIST_SEMANTIC_MODEL,
+    /** List identifiers of metrics contained in Semantic Models. */
+    LIST_SEMANTIC_MODEL_METRIC,
+    /** List complete metrics contained in Semantic Models. */
+    LIST_SEMANTIC_MODEL_METRIC_INFOS,
     /** Import a Semantic Model from an Ossie document. */
     IMPORT_SEMANTIC_MODEL,
     /** Export a Semantic Model as an Ossie document. */
@@ -662,6 +670,12 @@ public interface AuditLog {
       } else if (event instanceof ListSemanticModelEvent
           || event instanceof ListSemanticModelFailureEvent) {
         return LIST_SEMANTIC_MODEL;
+      } else if (event instanceof ListSemanticModelMetricEvent
+          || event instanceof ListSemanticModelMetricFailureEvent) {
+        return LIST_SEMANTIC_MODEL_METRIC;
+      } else if (event instanceof ListSemanticModelMetricInfosEvent
+          || event instanceof ListSemanticModelMetricInfosFailureEvent) {
+        return LIST_SEMANTIC_MODEL_METRIC_INFOS;
       } else if (event instanceof ImportSemanticModelEvent
           || event instanceof ImportSemanticModelFailureEvent) {
         return IMPORT_SEMANTIC_MODEL;

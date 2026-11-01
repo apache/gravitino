@@ -158,8 +158,8 @@ public class TestPolicyEntity {
 
   @Test
   public void testReadRestrictionPolicyContentTypes() {
-    PolicyContent rowFilter = PolicyContents.rowFilter("filter := true");
-    PolicyContent columnMask = PolicyContents.columnMask("mask := action(\"replace-with-null\")");
+    PolicyContent rowFilter = PolicyContents.rowFilter("() RETURNS BOOLEAN -> TRUE");
+    PolicyContent columnMask = PolicyContents.columnMask("(value STRING) RETURNS STRING -> NULL");
 
     Assertions.assertDoesNotThrow(
         () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, rowFilter));

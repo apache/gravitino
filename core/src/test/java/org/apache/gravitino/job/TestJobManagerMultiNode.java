@@ -29,7 +29,10 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -39,11 +42,18 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.job.JobContext;
 import org.apache.gravitino.connector.job.JobExecutionInfo;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.hook.JobHookDispatcher;
 import org.apache.gravitino.job.local.LocalJobExecutor;
 import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 import org.apache.gravitino.lock.LockManager;
@@ -51,6 +61,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.DatabaseFixture;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
@@ -58,11 +69,13 @@ import org.apache.gravitino.storage.relational.ResetStrategy;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 /**
  * Tests the job system in a multi-node deployment: two Gravitino servers, each with its own {@link
@@ -85,7 +98,12 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   // A cancellation of a local job is answered by its owner within a few pull intervals.
   private static final long JOB_STATUS_PULL_INTERVAL_IN_MS = TimeUnit.MINUTES.toMillis(1);
 
+  // A submission not recorded within three pull intervals is reconciled with the job executor.
+  private static final long SUBMISSION_TIMEOUT_IN_MS = 3 * JOB_STATUS_PULL_INTERVAL_IN_MS;
+
   private File testDir;
+
+  private Config config;
 
   private LocalJobExecutor executorA;
 
@@ -97,12 +115,16 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
 
   private EntityStore entityStore;
 
+  private OwnerDispatcher savedOwnerDispatcher;
+
   @BeforeEach
   public void setUpNodes() throws Exception {
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", null, true);
     testDir = Files.createTempDirectory("gravitino-test-job-multi-node").toFile();
 
     // Both nodes share the same staging directory, like a deployment on shared storage.
-    Config config = newConfig(new File(testDir, "staging"));
+    config = newConfig(new File(testDir, "staging"));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     // Both nodes share the same metadata store, backed by the relational backend under test.
@@ -122,7 +144,7 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
   }
 
   @AfterEach
-  public void tearDownNodes() throws IOException {
+  public void tearDownNodes() throws Exception {
     // Closing a node also kills the job processes it runs.
     if (nodeA != null) {
       nodeA.close();
@@ -131,6 +153,8 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
       nodeB.close();
     }
     FileUtils.deleteDirectory(testDir);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
   }
 
   @TestTemplate
@@ -174,6 +198,166 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     Assertions.assertTrue(
         finished.startedAt() >= job.auditInfo().createTime().toEpochMilli(), finished.toString());
     Assertions.assertTrue(finished.finishedAt() - finished.startedAt() >= 900, finished.toString());
+  }
+
+  @TestTemplate
+  public void testSubmissionLeftByExitedNodeIsSettledByAnotherNode() throws Exception {
+    // The server exits right after the job executor accepts the job, before it records the
+    // submission. The job was registered before the submission, so it's not lost.
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor crashingExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              submitted.set((String) invocation.callRealMethod());
+              throw new SimulatedServerExit();
+            })
+        .when(crashingExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager crashingNode = newJobManager(config, entityStore, crashingExecutor);
+    try {
+      Assertions.assertThrows(
+          SimulatedServerExit.class,
+          () -> crashingNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.QUEUED, pending.status());
+      Assertions.assertEquals(
+          JobManager.pendingSubmissionExecutionId(pending.id()), pending.jobExecutionId());
+
+      // Within the submission timeout, the job is left to the server submitting it.
+      nodeB.pullAndUpdateJobStatus();
+      Assertions.assertEquals(pending, getJob(pending.name()));
+
+      // Beyond it, the job is reconciled with the job executor, which has no execution of it on
+      // node B, so it's marked as FAILED.
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+      nodeB.pullAndUpdateJobStatus();
+      JobEntity settled = getJob(pending.name());
+      Assertions.assertEquals(JobHandle.Status.FAILED, settled.status());
+      Assertions.assertTrue(settled.finishedAt() > 0);
+      Assertions.assertNotNull(submitted.get());
+    } finally {
+      // Closing the node kills the job process it launched.
+      crashingNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testSubmissionLeftByExitedNodeIsRecordedWhenExecutorHasIt() throws Exception {
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor crashingExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              submitted.set((String) invocation.callRealMethod());
+              throw new SimulatedServerExit();
+            })
+        .when(crashingExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager crashingNode = newJobManager(config, entityStore, crashingExecutor);
+    // A job executor that can look up a job by its Gravitino job id finds the execution.
+    JobExecutor lookupExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(invocation -> Optional.ofNullable(submitted.get()))
+        .when(lookupExecutor)
+        .findSubmittedJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager lookupNode = newJobManager(config, entityStore, lookupExecutor);
+    try {
+      Assertions.assertThrows(
+          SimulatedServerExit.class,
+          () -> crashingNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0")));
+      JobEntity pending = onlyJob();
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+
+      lookupNode.pullAndUpdateJobStatus();
+      JobEntity recorded = getJob(pending.name());
+      Assertions.assertEquals(submitted.get(), recorded.jobExecutionId());
+      Assertions.assertEquals(JobHandle.Status.QUEUED, recorded.status());
+
+      // From then on the job is tracked by the node owning the execution like any other job.
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(
+              () -> crashingExecutor.getJobStatus(submitted.get()) == JobHandle.Status.SUCCEEDED);
+      crashingNode.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.SUCCEEDED, getJob(pending.name()).status());
+    } finally {
+      crashingNode.close();
+      lookupNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testSubmissionSettledByAnotherNodeIsCancelled() throws Exception {
+    // The submission takes longer than the submission timeout, so node B settles the job while it
+    // is being submitted. Node A then cancels the execution it can no longer record.
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor decidingExecutor = Mockito.mock(JobExecutor.class);
+    Mockito.when(decidingExecutor.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.empty());
+    JobManager decidingNode = newJobManager(config, entityStore, decidingExecutor);
+    JobExecutor slowExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              String jobName = JobHandle.JOB_ID_PREFIX + context.jobId();
+              moveJobTimestampsBack(jobName, SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+              decidingNode.pullAndUpdateJobStatus();
+              Assertions.assertEquals(JobHandle.Status.FAILED, getJob(jobName).status());
+              submitted.set((String) invocation.callRealMethod());
+              return submitted.get();
+            })
+        .when(slowExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager slowNode = newJobManager(config, entityStore, slowExecutor);
+    try {
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> slowNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      Assertions.assertTrue(failure.getMessage().contains(submitted.get()), failure.getMessage());
+
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> slowExecutor.getJobStatus(submitted.get()) == JobHandle.Status.CANCELLED);
+      JobEntity settled = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.FAILED, settled.status());
+      // The settled job keeps no execution id it never recorded.
+      Assertions.assertEquals(
+          JobManager.pendingSubmissionExecutionId(settled.id()), settled.jobExecutionId());
+    } finally {
+      slowNode.close();
+      decidingNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testJobCancelledFromAnotherNodeDuringSubmissionIsCancelled() throws Exception {
+    AtomicReference<String> submitted = new AtomicReference<>();
+    JobExecutor slowExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              String jobName = JobHandle.JOB_ID_PREFIX + context.jobId();
+              // Node B has no execution to cancel yet, so it only marks the job as CANCELLING.
+              Assertions.assertEquals(
+                  JobHandle.Status.CANCELLING, nodeB.cancelJob(METALAKE, jobName).status());
+              submitted.set((String) invocation.callRealMethod());
+              return submitted.get();
+            })
+        .when(slowExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager slowNode = newJobManager(config, entityStore, slowExecutor);
+    try {
+      JobEntity job = slowNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600"));
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, job.status());
+      Assertions.assertEquals(submitted.get(), job.jobExecutionId());
+      Awaitility.await()
+          .atMost(1, TimeUnit.MINUTES)
+          .until(() -> slowExecutor.getJobStatus(submitted.get()) == JobHandle.Status.CANCELLED);
+
+      slowNode.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(job.name()).status());
+    } finally {
+      slowNode.close();
+    }
   }
 
   @TestTemplate
@@ -498,6 +682,16 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
                 .build());
   }
 
+  private JobEntity onlyJob() {
+    List<JobEntity> jobs = nodeB.listJobs(METALAKE, Optional.empty());
+    Assertions.assertEquals(1, jobs.size(), jobs.toString());
+    return jobs.get(0);
+  }
+
+  // Thrown by a job executor to simulate that the server exits in the middle of a submission. It
+  // is an Error, so that the server doesn't handle it as a failed submission.
+  private static class SimulatedServerExit extends Error {}
+
   private boolean jobExists(String jobName) {
     try {
       getJob(jobName);
@@ -566,5 +760,296 @@ public class TestJobManagerMultiNode extends TestJDBCBackend {
     jobManager.statusPullExecutor.shutdownNow();
     jobManager.cleanUpExecutor.shutdownNow();
     return jobManager;
+  }
+
+  @TestTemplate
+  public void testOwnSubmissionSurvivesStatusPull() throws Exception {
+    AtomicReference<JobManager> ownNode = new AtomicReference<>();
+    JobExecutor slowExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              String jobName = JobHandle.JOB_ID_PREFIX + context.jobId();
+              // Force the persisted row beyond the submission timeout while this node is
+              // submitting.
+              moveJobTimestampsBack(jobName, SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+              ownNode.get().pullAndUpdateJobStatus();
+              Assertions.assertEquals(JobHandle.Status.QUEUED, getJob(jobName).status());
+              return invocation.callRealMethod();
+            })
+        .when(slowExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager slowNode = newJobManager(config, entityStore, slowExecutor);
+    ownNode.set(slowNode);
+    try {
+      slowNode.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0"));
+    } finally {
+      slowNode.close();
+    }
+  }
+
+  @TestTemplate
+  public void testRecoveredSubmissionRetainsCreatorOwnership() throws Exception {
+    String userName = PrincipalUtils.getCurrentUserName();
+    backend.insert(
+        UserEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(userName)
+            .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        false);
+    OwnerDispatcher saved = GravitinoEnv.getInstance().internalOwnerDispatcher();
+    Object savedCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogManager", Mockito.mock(CatalogManager.class), true);
+    OwnerManager owners = new OwnerManager(entityStore);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", owners, true);
+    AtomicReference<String> pendingName = new AtomicReference<>();
+    AtomicReference<String> execution = new AtomicReference<>();
+    JobExecutor crashingExecutor = Mockito.spy(newLocalJobExecutor(config));
+    Mockito.doAnswer(
+            invocation -> {
+              JobContext context = invocation.getArgument(0);
+              pendingName.set(JobHandle.JOB_ID_PREFIX + context.jobId());
+              JobEntity registered = getJob(pendingName.get());
+              Assertions.assertEquals(
+                  userName,
+                  owners
+                      .getOwner(
+                          METALAKE,
+                          NameIdentifierUtil.toMetadataObject(
+                              registered.nameIdentifier(), Entity.EntityType.JOB))
+                      .orElseThrow()
+                      .name());
+              execution.set((String) invocation.callRealMethod());
+              throw new SimulatedServerExit();
+            })
+        .when(crashingExecutor)
+        .submitJob(Mockito.any(JobContext.class), Mockito.any(JobTemplate.class));
+    JobManager crashing = newJobManager(config, entityStore, crashingExecutor);
+    JobExecutor lookupExecutor = Mockito.mock(JobExecutor.class);
+    Mockito.when(lookupExecutor.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenAnswer(invocation -> Optional.of(execution.get()));
+    JobManager lookup = newJobManager(config, entityStore, lookupExecutor);
+    try {
+      // Prove the same real hook and owner store establish ownership on an ordinary run.
+      JobEntity ordinary =
+          new JobHookDispatcher(nodeA).runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0"));
+      Assertions.assertTrue(
+          owners
+              .getOwner(
+                  METALAKE,
+                  NameIdentifierUtil.toMetadataObject(
+                      ordinary.nameIdentifier(), Entity.EntityType.JOB))
+              .isPresent());
+      Assertions.assertThrows(
+          SimulatedServerExit.class,
+          () ->
+              new JobHookDispatcher(crashing)
+                  .runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "0")));
+      moveJobTimestampsBack(pendingName.get(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+      lookup.pullAndUpdateJobStatus();
+      JobEntity recovered = getJob(pendingName.get());
+      Assertions.assertEquals(execution.get(), recovered.jobExecutionId());
+      Assertions.assertTrue(
+          owners
+              .getOwner(
+                  METALAKE,
+                  NameIdentifierUtil.toMetadataObject(
+                      recovered.nameIdentifier(), Entity.EntityType.JOB))
+              .isPresent(),
+          "A recovered job must retain the ownership that permits its creator to get or cancel it");
+    } finally {
+      crashing.close();
+      lookup.close();
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", saved, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
+    }
+  }
+
+  @TestTemplate
+  public void testUnknownSubmissionRecoversAndRetriesCancellation() throws Exception {
+    AtomicReference<JobHandle.Status> runnerStatus =
+        new AtomicReference<>(JobHandle.Status.STARTED);
+    AtomicReference<Boolean> reachable = new AtomicReference<>(false);
+    AtomicInteger cancellations = new AtomicInteger();
+    JobExecutor shared = Mockito.mock(LookupJobExecutor.class);
+    Mockito.when(shared.ownsJob(Mockito.any())).thenReturn(true);
+    Mockito.when(shared.submitJob(Mockito.any(), Mockito.any()))
+        .thenThrow(new RuntimeException("accepted execution, response lost"));
+    Mockito.when(shared.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              if (!reachable.get()) {
+                throw new RuntimeException("runner unavailable");
+              }
+              return Optional.of("shared-execution");
+            });
+    Mockito.when(shared.getJobExecutionInfo("shared-execution"))
+        .thenAnswer(invocation -> JobExecutionInfo.of(runnerStatus.get()));
+    Mockito.doAnswer(
+            invocation -> {
+              if (cancellations.incrementAndGet() == 1) {
+                throw new RuntimeException("temporary cancel failure");
+              }
+              runnerStatus.set(JobHandle.Status.CANCELLED);
+              return null;
+            })
+        .when(shared)
+        .cancelJob("shared-execution");
+    JobManager submitting = newJobManager(config, entityStore, shared);
+    JobManager recovering = newJobManager(config, entityStore, shared);
+    try {
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> submitting.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      Assertions.assertTrue(failure.getMessage().contains("Check the job before retrying"));
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, pending.status());
+      Assertions.assertTrue(jobStagingDir(pending).isDirectory());
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals(pending.jobExecutionId(), getJob(pending.name()).jobExecutionId());
+      reachable.set(true);
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals("shared-execution", getJob(pending.name()).jobExecutionId());
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, getJob(pending.name()).status());
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(pending.name()).status());
+      Assertions.assertEquals(2, cancellations.get());
+      Mockito.verify(shared, Mockito.times(1)).submitJob(Mockito.any(), Mockito.any());
+    } finally {
+      submitting.close();
+      recovering.close();
+    }
+  }
+
+  @TestTemplate
+  public void testRecordingFailureRetriesCancellationWithoutLookup() throws Exception {
+    AtomicInteger updates = new AtomicInteger();
+    EntityStore conflictingStore = Mockito.spy(entityStore);
+    Mockito.doAnswer(
+            invocation -> {
+              if (updates.incrementAndGet() <= 3) {
+                throw new OptimisticLockException("recording conflict");
+              }
+              return invocation.callRealMethod();
+            })
+        .when(conflictingStore)
+        .update(
+            Mockito.any(),
+            Mockito.eq(JobEntity.class),
+            Mockito.eq(Entity.EntityType.JOB),
+            Mockito.any());
+    AtomicInteger cancellations = new AtomicInteger();
+    AtomicReference<JobHandle.Status> runnerStatus =
+        new AtomicReference<>(JobHandle.Status.STARTED);
+    JobExecutor shared = Mockito.mock(JobExecutor.class);
+    Mockito.when(shared.ownsJob(Mockito.any())).thenReturn(true);
+    Mockito.when(shared.submitJob(Mockito.any(), Mockito.any())).thenReturn("accepted-execution");
+    // Like the default findSubmittedJob(), a lookup never finds the accepted execution.
+    Mockito.when(shared.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.empty());
+    Mockito.when(shared.getJobExecutionInfo("accepted-execution"))
+        .thenAnswer(invocation -> JobExecutionInfo.of(runnerStatus.get()));
+    Mockito.doAnswer(
+            invocation -> {
+              if (cancellations.incrementAndGet() == 1) {
+                throw new RuntimeException("temporary cancellation failure");
+              }
+              runnerStatus.set(JobHandle.Status.CANCELLED);
+              return null;
+            })
+        .when(shared)
+        .cancelJob("accepted-execution");
+    JobManager submitting = newJobManager(config, conflictingStore, shared);
+    JobManager recovering = newJobManager(config, entityStore, shared);
+    try {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () -> submitting.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals("accepted-execution", pending.jobExecutionId());
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, pending.status());
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+
+      // The execution is still running, so the job is not settled as CANCELLED before it is.
+      recovering.pullAndUpdateJobStatus();
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(pending.name()).status());
+      Assertions.assertEquals(2, cancellations.get());
+      Mockito.verify(shared, Mockito.never()).findSubmittedJob(Mockito.any(), Mockito.any());
+    } finally {
+      submitting.close();
+      recovering.close();
+    }
+  }
+
+  @TestTemplate
+  public void testRecordingFailureRecoversAndRetriesCancellation() throws Exception {
+    AtomicInteger updates = new AtomicInteger();
+    EntityStore conflictingStore = Mockito.spy(entityStore);
+    Mockito.doAnswer(
+            invocation -> {
+              if (updates.incrementAndGet() <= 3) {
+                throw new OptimisticLockException("recording conflict");
+              }
+              return invocation.callRealMethod();
+            })
+        .when(conflictingStore)
+        .update(
+            Mockito.any(),
+            Mockito.eq(JobEntity.class),
+            Mockito.eq(Entity.EntityType.JOB),
+            Mockito.any());
+    AtomicInteger cancellations = new AtomicInteger();
+    AtomicReference<JobHandle.Status> runnerStatus =
+        new AtomicReference<>(JobHandle.Status.STARTED);
+    JobExecutor shared = Mockito.mock(JobExecutor.class);
+    Mockito.when(shared.ownsJob(Mockito.any())).thenReturn(true);
+    Mockito.when(shared.submitJob(Mockito.any(), Mockito.any())).thenReturn("accepted-execution");
+    Mockito.when(shared.findSubmittedJob(Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of("accepted-execution"));
+    Mockito.when(shared.getJobExecutionInfo("accepted-execution"))
+        .thenAnswer(invocation -> JobExecutionInfo.of(runnerStatus.get()));
+    Mockito.doAnswer(
+            invocation -> {
+              if (cancellations.incrementAndGet() == 1) {
+                throw new RuntimeException("temporary cancellation failure");
+              }
+              runnerStatus.set(JobHandle.Status.CANCELLED);
+              return null;
+            })
+        .when(shared)
+        .cancelJob("accepted-execution");
+    JobManager submitting = newJobManager(config, conflictingStore, shared);
+    JobManager recovering = newJobManager(config, entityStore, shared);
+    try {
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> submitting.runJob(METALAKE, TEMPLATE, ImmutableMap.of("seconds", "600")));
+      Assertions.assertFalse(failure instanceof OptimisticLockException);
+      JobEntity pending = onlyJob();
+      Assertions.assertEquals(JobHandle.Status.CANCELLING, pending.status());
+      Assertions.assertEquals("accepted-execution", pending.jobExecutionId());
+      Assertions.assertEquals(4, updates.get());
+      moveJobTimestampsBack(pending.name(), SUBMISSION_TIMEOUT_IN_MS + 60_000L);
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals("accepted-execution", getJob(pending.name()).jobExecutionId());
+      recovering.pullAndUpdateJobStatus();
+      Assertions.assertEquals(JobHandle.Status.CANCELLED, getJob(pending.name()).status());
+      Assertions.assertEquals(2, cancellations.get());
+      Mockito.verify(shared, Mockito.times(1)).submitJob(Mockito.any(), Mockito.any());
+    } finally {
+      submitting.close();
+      recovering.close();
+    }
   }
 }

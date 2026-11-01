@@ -19,12 +19,13 @@
 package org.apache.gravitino.maintenance.injob;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.storage.service.TableSnapshotMetricsMetaService;
 
 /**
  * In-Spark sampling path for cron jobs (§5.2.2): sample once at {@code S0}, persist metrics, record
- * {@code before_snapshot_id}, then gate on snapshot drift without re-sampling.
+ * {@code before_metrics_id}, then gate on snapshot drift without re-sampling.
  */
 public class TableMaintenanceInJobSampler {
 
@@ -50,13 +51,13 @@ public class TableMaintenanceInJobSampler {
   }
 
   /**
-   * Persists metrics for {@code S0}, sets {@code before_snapshot_id} on the maintenance action row,
+   * Persists metrics for {@code S0}, sets {@code before_metrics_id} on the maintenance action row,
    * and returns whether the cron Spark Job should continue.
    *
    * <p>If HEAD has drifted after the sample, the caller must end the job early and must not
    * re-sample in a loop (§4.3).
    *
-   * @param jobId Gravitino {@code job_run_meta.job_run_id} for the in-flight maintenance row
+   * @param actionId {@code table_maintenance_action.action_id} for the in-flight row
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param sampledSnapshotId Iceberg snapshot id at sample time ({@code S0})
@@ -65,7 +66,7 @@ public class TableMaintenanceInJobSampler {
    * @return continue vs drift stop outcome
    */
   public InJobGateOutcome sampleAndGateCronJob(
-      long jobId,
+      long actionId,
       long tableId,
       long policyId,
       long sampledSnapshotId,
@@ -74,8 +75,25 @@ public class TableMaintenanceInJobSampler {
     Preconditions.checkNotNull(metricsJson, "metricsJson");
     Preconditions.checkNotNull(head, "head");
 
-    metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
-    actionMetaService.recordBeforeSnapshot(jobId, tableId, policyId, sampledSnapshotId);
+    TableMaintenanceActionPO action = actionMetaService.getById(actionId);
+    Preconditions.checkState(action != null, "no maintenance action for action_id %s", actionId);
+    Preconditions.checkState(
+        action.tableId() != null
+            && action.tableId() == tableId
+            && action.policyId() != null
+            && action.policyId() == policyId,
+        "action_id %s does not match table %s policy %s",
+        actionId,
+        tableId,
+        policyId);
+    long metricsId;
+    if (action.beforeMetricsId() != null) {
+      metricsId = action.beforeMetricsId();
+    } else {
+      metricsId =
+          metricsMetaService.insertMetrics(tableId, policyId, sampledSnapshotId, metricsJson);
+      actionMetaService.recordBeforeMetrics(actionId, metricsId);
+    }
 
     long headSnapshotId = head.currentSnapshotId();
     if (sampledSnapshotId != headSnapshotId) {

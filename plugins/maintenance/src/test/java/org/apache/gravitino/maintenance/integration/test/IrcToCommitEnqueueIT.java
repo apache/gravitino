@@ -48,6 +48,7 @@ import org.apache.gravitino.maintenance.integration.test.MaintenanceSchedulerITS
 import org.apache.gravitino.maintenance.listener.PostCommitMaintenanceListener;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.SchedulerPoolTestHooks;
 import org.apache.gravitino.maintenance.web.rest.feature.TableMaintenanceRESTFeature;
 import org.apache.iceberg.PartitionSpec;
@@ -131,14 +132,14 @@ public class IrcToCommitEnqueueIT extends BaseIT {
         NameIdentifier.of(metalake, seeded.catalogName, seeded.schemaName, seeded.tableName);
     GravitinoEnv.getInstance().eventBus().dispatchEvent(icebergUpdateTableEvent(tableId));
 
-    awaitCommitCapture(Long.toString(seeded.tableId), 30L);
+    awaitCommitCapture(MaintenanceTaskIds.forCommitTable(seeded.tableId), 30L);
 
     MaintenanceJobSpec spec = CAPTURED_COMMIT_SPEC.get();
     assertNotNull(spec);
     assertTrue(spec.isValid());
     assertEquals(List.of(seeded.tableId), spec.tableIds());
-    assertEquals(seeded.policyId, spec.getOperations().get(0).getPolicyId());
-    assertTrue(spec.getJobConf().containsKey("updater_options"));
+    assertEquals(seeded.policyId, spec.getTasks().get(0).getPolicyId());
+    assertTrue(spec.getUpdaterOptions() != null && !spec.getUpdaterOptions().isBlank());
   }
 
   private static IcebergUpdateTableEvent icebergUpdateTableEvent(NameIdentifier tableId) {

@@ -18,10 +18,16 @@
 from typing import Optional
 
 from fastmcp import Context, FastMCP
+from mcp.types import ToolAnnotations
 
 
 def load_semantic_model_tools(mcp: FastMCP):
-    @mcp.tool(tags={"semantic_model"})
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
     async def list_of_semantic_models(
         ctx: Context, catalog_name: str, schema_name: str
     ) -> str:
@@ -43,7 +49,71 @@ def load_semantic_model_tools(mcp: FastMCP):
             )
         )
 
-    @mcp.tool(tags={"semantic_model"})
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
+    async def list_metrics(
+        ctx: Context, catalog_name: str, schema_name: str
+    ) -> str:
+        """List visible metric identifiers across the Semantic Models in a schema.
+
+        Gravitino applies containing-model visibility and sorts by model
+        identifier, then case-sensitive metric name. Models without metrics
+        contribute no entries.
+
+        Args:
+            ctx: The request context.
+            catalog_name: Name of the catalog.
+            schema_name: Name of the schema.
+
+        Returns:
+            A JSON array of identifiers with namespace
+            [metalake, catalog, schema, semanticModel] and the metric name.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_semantic_model_operation().list_metrics(
+            catalog_name, schema_name
+        )
+
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
+    async def list_metric_infos(
+        ctx: Context, catalog_name: str, schema_name: str
+    ) -> str:
+        """List complete visible metrics across the Semantic Models in a schema.
+
+        Uses the same visibility and ordering as list_metrics. A failed request
+        raises an error rather than returning a partial list.
+
+        Args:
+            ctx: The request context.
+            catalog_name: Name of the catalog.
+            schema_name: Name of the schema.
+
+        Returns:
+            A JSON array of objects with namespace
+            [metalake, catalog, schema, semanticModel] and a complete metric
+            containing name, expression, and any description, datatype,
+            aiContext, and customExtensions. JSON number precision is preserved.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_semantic_model_operation().list_metric_infos(
+            catalog_name, schema_name
+        )
+
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
     async def load_semantic_model(
         ctx: Context,
         catalog_name: str,

@@ -175,6 +175,50 @@ components:
           range: "#/components/schemas/RangePartition"
           list: "#/components/schemas/ListPartition"
 
+    WritablePartitionSpec:
+      oneOf:
+        - $ref: "#/components/schemas/WritableIdentityPartition"
+        - $ref: "#/components/schemas/WritableRangePartition"
+        - $ref: "#/components/schemas/WritableListPartition"
+      discriminator:
+        propertyName: type
+        mapping:
+          identity: "#/components/schemas/WritableIdentityPartition"
+          range: "#/components/schemas/WritableRangePartition"
+          list: "#/components/schemas/WritableListPartition"
+
+    WritableIdentityPartition:
+      allOf:
+        - $ref: "#/components/schemas/IdentityPartition"
+        - type: object
+          properties:
+            values:
+              type: array
+              items:
+                $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
+    WritableRangePartition:
+      allOf:
+        - $ref: "#/components/schemas/RangePartition"
+        - type: object
+          properties:
+            upper:
+              $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+            lower:
+              $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
+    WritableListPartition:
+      allOf:
+        - $ref: "#/components/schemas/ListPartition"
+        - type: object
+          properties:
+            lists:
+              type: array
+              items:
+                type: array
+                items:
+                  $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
     AddPartitionsRequest:
       type: object
       required:
@@ -184,7 +228,7 @@ components:
           type: array
           description: The partitions to add
           items:
-            $ref: "#/components/schemas/PartitionSpec"
+            $ref: "#/components/schemas/WritablePartitionSpec"
 
     PartitionNameListResponse:
       type: object

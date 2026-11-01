@@ -134,7 +134,7 @@ public class TestIcebergCatalog {
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
     IcebergCatalogWrapper icebergCatalogWrapper =
-        ((IcebergCatalogOperations) catalogOperations).icebergCatalogWrapper;
+        ((IcebergCatalogOperations) catalogOperations).backend.wrapper();
     ListNamespacesResponse listNamespacesResponse =
         icebergCatalogWrapper.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());

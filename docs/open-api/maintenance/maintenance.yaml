@@ -19,10 +19,10 @@
 
 paths:
 
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/before:
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/before:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
-      - $ref: "#/components/parameters/jobId"
+      - $ref: "#/components/parameters/actionId"
       - $ref: "#/components/parameters/finish"
     post:
       tags:
@@ -30,11 +30,11 @@ paths:
       summary: Report TMS before-maintenance (S0) snapshot metrics
       operationId: reportMaintenanceActionBeforeMetrics
       description: |
-        Spark callback for an in-flight maintenance action at S0: persists snapshot metrics and
-        records `before_snapshot_id`. `tableId` and `policyId` select which bound action row when
-        one Spark job covers multiple tables and/or policies. Optional query `finish=true` closes
-        that table/policy soft slot (for example on snapshot drift / skip). Continue / stop stays
-        in the job.
+        Spark callback for an in-flight maintenance action at S0: inserts a
+        `table_snapshot_metrics` row and records `before_metrics_id` on the action keyed by
+        `actionId` (injected at submit). `tableId` and `policyId` must match the soft-slot row.
+        Optional query `finish=true` closes that soft slot (for example on snapshot drift / skip).
+        Continue / stop stays in the job. Soft-slot release without metrics uses POST .../finish.
       requestBody:
         required: true
         content:
@@ -58,20 +58,21 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/maintenance/actions/{jobId}/finish:
+  /metalakes/{metalake}/maintenance/actions/{actionId}/finish:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
-      - $ref: "#/components/parameters/jobId"
+      - $ref: "#/components/parameters/actionId"
     post:
       tags:
         - maintenance
       summary: Finish TMS maintenance action soft slot without metrics
       operationId: finishMaintenanceAction
       description: |
-        Closes the soft slot for one bound table/policy without writing snapshot metrics.
-        Use when the maintenance type does not sample metrics, or when metrics were already
-        reported and only occupancy release remains. `tableId` and `policyId` select the action
-        row. Optional `afterSnapshotId` sets `after_snapshot_id` when known.
+        Closes the soft slot for one bound action (`finished_at` set) without writing snapshot
+        metrics. Use when the maintenance type does not sample metrics, or when metrics were
+        already reported and only occupancy release remains. `tableId` and `policyId` must match
+        the soft-slot row addressed by `actionId`. Iceberg snapshot ids live on the metrics rows,
+        not on this request.
       requestBody:
         required: true
         content:
@@ -95,10 +96,10 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/maintenance/actions/{jobId}/metrics/after:
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/after:
     parameters:
       - $ref: "../openapi.yaml#/components/parameters/metalake"
-      - $ref: "#/components/parameters/jobId"
+      - $ref: "#/components/parameters/actionId"
       - $ref: "#/components/parameters/finish"
     post:
       tags:
@@ -106,10 +107,11 @@ paths:
       summary: Report TMS after-maintenance (S1) snapshot metrics
       operationId: reportMaintenanceActionAfterMetrics
       description: |
-        Spark callback for an in-flight maintenance action at S1: persists snapshot metrics.
-        `tableId` and `policyId` select which bound action row when one Spark job covers multiple
-        tables and/or policies. Optional query `finish=true` closes that table/policy soft slot
-        and sets `after_snapshot_id` to `snapshotId`. Continue / stop stays in the job.
+        Spark callback for an in-flight maintenance action at S1: inserts a
+        `table_snapshot_metrics` row and records `after_metrics_id` on the action keyed by
+        `actionId`. `tableId` and `policyId` must match the soft-slot row. Optional query
+        `finish=true` closes that soft slot. Continue / stop stays in the job. Soft-slot release
+        without metrics uses POST .../finish.
       requestBody:
         required: true
         content:
@@ -136,10 +138,12 @@ paths:
 components:
 
   parameters:
-    jobId:
-      name: jobId
+    actionId:
+      name: actionId
       in: path
-      description: Gravitino job run id (numeric)
+      description: |
+        Soft-slot id from `table_maintenance_action.action_id`, injected into the Spark job as
+        `action_ids` at submit time.
       required: true
       schema:
         type: integer
@@ -148,10 +152,8 @@ components:
       name: finish
       in: query
       description: |
-        When true, close the soft slot for this job/table/policy after storing metrics.
-        Before: typically on drift/skip (after_snapshot_id left null). After: typically after
-        successful maintenance (after_snapshot_id = snapshotId). Prefer POST .../finish when no
-        metrics are written.
+        When true, close the soft slot for this action after storing metrics (sets `finished_at`).
+        Prefer POST .../finish when no metrics are written.
       required: false
       schema:
         type: boolean
@@ -169,18 +171,18 @@ components:
         tableId:
           type: integer
           format: int64
-          description: Table entity id bound to this job
+          description: Table entity id that must match the soft-slot row for actionId
         policyId:
           type: integer
           format: int64
-          description: Policy entity id bound to this job (required when one job covers multiple policies)
+          description: Policy entity id that must match the soft-slot row for actionId
         snapshotId:
           type: integer
           format: int64
-          description: Iceberg snapshot id the metrics were collected for
+          description: Iceberg snapshot id stored on the new table_snapshot_metrics row
         metricsJson:
           type: string
-          description: Serialized metrics JSON for table_snapshot_metrics
+          description: Serialized metrics JSON for table_snapshot_metrics.metrics_value
     MaintenanceActionFinishRequest:
       type: object
       required:
@@ -190,16 +192,11 @@ components:
         tableId:
           type: integer
           format: int64
-          description: Table entity id bound to this job
+          description: Table entity id that must match the soft-slot row for actionId
         policyId:
           type: integer
           format: int64
-          description: Policy entity id bound to this job
-        afterSnapshotId:
-          type: integer
-          format: int64
-          nullable: true
-          description: Optional terminal snapshot id stored as after_snapshot_id
+          description: Policy entity id that must match the soft-slot row for actionId
 
   examples:
     MaintenanceActionBeforeMetricsRequest:
@@ -219,6 +216,5 @@ components:
     MaintenanceActionFinishRequest:
       value: {
         "tableId": 10,
-        "policyId": 20,
-        "afterSnapshotId": null
+        "policyId": 20
       }

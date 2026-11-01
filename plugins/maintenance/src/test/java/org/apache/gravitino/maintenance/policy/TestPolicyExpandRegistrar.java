@@ -106,7 +106,7 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
             .tableName(TableMaintenanceSchedulerPools.EXPAND_TASKS_TABLE)
             .build();
     TaskInstanceId instanceId =
-        TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, "11");
+        TaskInstanceId.of(TableMaintenanceSchedulerPools.POLICY_EXPAND, "policy:11");
     Assertions.assertTrue(client.getScheduledExecution(instanceId).isPresent());
 
     TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();

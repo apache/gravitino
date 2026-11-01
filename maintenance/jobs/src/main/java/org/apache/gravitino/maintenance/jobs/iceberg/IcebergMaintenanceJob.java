@@ -21,8 +21,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableList;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
@@ -64,21 +61,15 @@ import org.slf4j.LoggerFactory;
  * (snapshot drift and trigger-expr recommend) is decided in-job after S0 sample. Soft slots are
  * closed via the finish callback in {@code finally}.
  *
- * <p>TMS-specific {@code jobConf} keys: {@code maintenance_types}, {@code policy_ids} (parallel
- * comma-separated policy entity ids), {@code tables} (JSON targets with system-filled {@code
- * table_id}), {@code updater_options}, {@code rules}. Shared procedure / Spark keys match other
- * Iceberg built-ins. The Gravitino job id is read from the local executor staging directory ({@code
- * job-} plus the numeric id), or from {@code GRAVITINO_JOB_ID}.
+ * <p>TMS-specific {@code jobConf} keys: {@code maintenance_types}, {@code policy_ids} and {@code
+ * action_ids} (parallel comma-separated ids), {@code tables} (JSON targets with system-filled
+ * {@code table_id}), {@code updater_options}, {@code rules}. Shared procedure / Spark keys match
+ * other Iceberg built-ins. Soft-slot callbacks use injected {@code action_ids}, not the Gravitino
+ * job run id.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergMaintenanceJob.class);
-
-  /**
-   * Optional job-id override. Not injected by {@code JobManager}; the local executor staging
-   * directory is the default source.
-   */
-  private static final String GRAVITINO_JOB_ID_ENV = "GRAVITINO_JOB_ID";
 
   /** Built-in template name submitted by TMS cron / commit. */
   public static final String NAME =
@@ -103,6 +94,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * policies.
    */
   public static final String POLICY_IDS_KEY = "policy_ids";
+
+  /**
+   * JobConf key for {@code table_maintenance_action.action_id} values parallel to {@link
+   * #POLICY_IDS_KEY} (comma-separated). Injected by TMS submit after soft-slot acquire.
+   */
+  public static final String ACTION_IDS_KEY = "action_ids";
 
   private static final String VERSION = "v1";
 
@@ -186,13 +183,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
     List<MaintenanceType> types;
     List<Long> policyIds;
-    long jobId;
+    List<Long> actionIds;
     List<TableTarget> tables;
     Map<String, String> updaterOptions;
     try {
       types = parseMaintenanceTypes(argMap.get("maintenance-types"));
       policyIds = parsePolicyIds(argMap.get("policy-ids"), types.size());
-      jobId = resolveGravitinoJobId();
+      actionIds = parseActionIds(argMap.get("action-ids"), types.size());
       tables = parseTables(IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("tables")));
       updaterOptions =
           parseUpdaterOptions(
@@ -217,26 +214,35 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (MaintenanceActionHttpClient client =
           MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
-        // Soft slots are per (tableId, policyId) and already bound to jobId; close every slot even
-        // when a procedure fails or we never reach a later type/table.
+        // Soft slots are per action_id; close every slot even when a procedure fails or we never
+        // reach a later type/table.
         Set<String> finishedSlots = new HashSet<>();
         try {
           for (TableTarget table : tables) {
             for (int i = 0; i < types.size(); i++) {
               MaintenanceType type = types.get(i);
               long policyId = policyIds.get(i);
-              Long afterSnapshotId = null;
+              long actionId = actionIds.get(i);
               try {
                 SnapshotSample s0 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                reportMetricsQuietly(client, jobId, table.tableId, policyId, s0, /*after=*/ false);
+                if (!reportBeforeMetrics(client, actionId, table.tableId, policyId, s0)) {
+                  LOG.info(
+                      "TMS type {} stopped for action_id {} table {} policy {}:"
+                          + " before-metrics claim failed (abandoned or unbound)",
+                      type.wireName,
+                      actionId,
+                      table.tableId,
+                      policyId);
+                  continue;
+                }
 
                 if (s0.snapshotId != s0.headSnapshotId) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} policy {} due to snapshot drift"
+                      "TMS type {} skipped for action_id {} table {} policy {} due to snapshot drift"
                           + " (s0={} head={})",
                       type.wireName,
-                      jobId,
+                      actionId,
                       table.tableId,
                       policyId,
                       s0.snapshotId,
@@ -246,10 +252,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
                 if (!MaintenanceTriggerGate.shouldMaintain(type, argMap, s0.metricsJson)) {
                   LOG.info(
-                      "TMS type {} skipped for job {} table {} policy {} due to in-Spark recommend"
-                          + " skip",
+                      "TMS type {} skipped for action_id {} table {} policy {} due to in-Spark"
+                          + " recommend skip",
                       type.wireName,
-                      jobId,
+                      actionId,
                       table.tableId,
                       policyId);
                   continue;
@@ -258,23 +264,25 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 runProcedure(spark, type, table.catalogName, table.tableIdentifier, argMap);
                 SnapshotSample s1 =
                     sampleSnapshot(spark, table.catalogName, table.tableIdentifier, type);
-                afterSnapshotId = s1.snapshotId;
-                reportMetricsQuietly(client, jobId, table.tableId, policyId, s1, /*after=*/ true);
+                reportMetricsQuietly(
+                    client, actionId, table.tableId, policyId, s1, /*after=*/ true);
               } finally {
-                finishQuietly(client, jobId, table.tableId, policyId, afterSnapshotId);
+                finishQuietly(client, actionId, table.tableId, policyId);
                 finishedSlots.add(slotKey(table.tableId, policyId));
               }
             }
           }
           return 0;
         } catch (Exception e) {
-          LOG.error("TMS Iceberg maintenance failed for job {}", jobId, e);
+          LOG.error("TMS Iceberg maintenance failed for action_ids {}", actionIds, e);
           return 1;
         } finally {
           for (TableTarget table : tables) {
-            for (long policyId : policyIds) {
+            for (int i = 0; i < policyIds.size(); i++) {
+              long policyId = policyIds.get(i);
+              long actionId = actionIds.get(i);
               if (!finishedSlots.contains(slotKey(table.tableId, policyId))) {
-                finishQuietly(client, jobId, table.tableId, policyId, /*afterSnapshotId=*/ null);
+                finishQuietly(client, actionId, table.tableId, policyId);
               }
             }
           }
@@ -555,27 +563,53 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   private static void finishQuietly(
-      MaintenanceActionHttpClient client,
-      long jobId,
-      long tableId,
-      long policyId,
-      @Nullable Long afterSnapshotId) {
+      MaintenanceActionHttpClient client, long actionId, long tableId, long policyId) {
     try {
-      client.finish(jobId, new MaintenanceActionFinishRequest(tableId, policyId, afterSnapshotId));
+      client.finish(actionId, new MaintenanceActionFinishRequest(tableId, policyId));
     } catch (Exception e) {
       LOG.warn(
-          "Best-effort TMS finish failed for job {} table {} policy {} afterSnapshotId={}",
-          jobId,
+          "Best-effort TMS finish failed for action_id {} table {} policy {}",
+          actionId,
           tableId,
           policyId,
-          afterSnapshotId,
           e);
+    }
+  }
+
+  /**
+   * S0 metrics are a hard gate: failure means the soft slot is abandoned/unbound, so maintenance
+   * must not run.
+   */
+  private static boolean reportBeforeMetrics(
+      MaintenanceActionHttpClient client,
+      long actionId,
+      long tableId,
+      long policyId,
+      SnapshotSample sample) {
+    if (sample == null || sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
+      return false;
+    }
+    try {
+      client.reportBeforeMetrics(
+          actionId,
+          new MaintenanceActionMetricsRequest(
+              tableId, policyId, sample.snapshotId, sample.metricsJson));
+      return true;
+    } catch (Exception e) {
+      LOG.warn(
+          "TMS before metrics failed for action_id {} table {} policy {} snapshot {}: {}",
+          actionId,
+          tableId,
+          policyId,
+          sample.snapshotId,
+          e.toString());
+      return false;
     }
   }
 
   private static void reportMetricsQuietly(
       MaintenanceActionHttpClient client,
-      long jobId,
+      long actionId,
       long tableId,
       long policyId,
       SnapshotSample sample,
@@ -588,15 +622,15 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           new MaintenanceActionMetricsRequest(
               tableId, policyId, sample.snapshotId, sample.metricsJson);
       if (after) {
-        client.reportAfterMetrics(jobId, request);
+        client.reportAfterMetrics(actionId, request);
       } else {
-        client.reportBeforeMetrics(jobId, request);
+        client.reportBeforeMetrics(actionId, request);
       }
     } catch (Exception e) {
       LOG.warn(
-          "Best-effort TMS {} metrics report failed for job {} table {} policy {} snapshot {}",
+          "Best-effort TMS {} metrics report failed for action_id {} table {} policy {} snapshot {}",
           after ? "after" : "before",
-          jobId,
+          actionId,
           tableId,
           policyId,
           sample.snapshotId,
@@ -617,50 +651,34 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  /**
-   * Prefers {@code GRAVITINO_JOB_ID}. Falls back to parsing a {@code job-} plus numeric id segment
-   * from {@code user.dir} (local executor staging directory).
-   */
-  private static long resolveGravitinoJobId() {
-    String envValue = System.getenv(GRAVITINO_JOB_ID_ENV);
-    if (envValue != null && !envValue.trim().isEmpty()) {
+  private static List<Long> parseActionIds(@Nullable String raw, int expectedCount) {
+    if (raw == null || raw.trim().isEmpty()) {
+      throw new IllegalArgumentException("action_ids is required");
+    }
+    String[] parts = raw.split(",");
+    List<Long> ids = new ArrayList<>(parts.length);
+    for (String part : parts) {
+      String trimmed = part.trim();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
       try {
-        long parsed = Long.parseLong(envValue.trim());
+        long parsed = Long.parseLong(trimmed);
         if (parsed <= 0) {
-          throw new IllegalStateException(
-              GRAVITINO_JOB_ID_ENV + " must be a positive long: " + envValue);
+          throw new IllegalArgumentException("action_ids must be positive longs: " + trimmed);
         }
-        return parsed;
+        ids.add(parsed);
       } catch (NumberFormatException e) {
-        throw new IllegalStateException(GRAVITINO_JOB_ID_ENV + " must be a long: " + envValue, e);
+        throw new IllegalArgumentException("action_ids must be longs: " + trimmed, e);
       }
     }
-    String userDir = System.getProperty("user.dir");
-    if (userDir != null && !userDir.trim().isEmpty()) {
-      Path dir = Paths.get(userDir).toAbsolutePath().normalize();
-      for (Path current = dir; current != null; current = current.getParent()) {
-        Path fileName = current.getFileName();
-        if (fileName == null) {
-          continue;
-        }
-        String name = fileName.toString();
-        if (!name.startsWith(JobHandle.JOB_ID_PREFIX)) {
-          continue;
-        }
-        try {
-          long parsed = Long.parseLong(name.substring(JobHandle.JOB_ID_PREFIX.length()));
-          if (parsed > 0) {
-            return parsed;
-          }
-        } catch (NumberFormatException ignored) {
-          // Keep walking parents; staging dirs use job-<numericId>.
-        }
-      }
+    if (ids.size() != expectedCount) {
+      throw new IllegalArgumentException(
+          String.format(
+              "action_ids count %s must match maintenance_types count %s",
+              ids.size(), expectedCount));
     }
-    throw new IllegalStateException(
-        "Cannot resolve Gravitino job id: set "
-            + GRAVITINO_JOB_ID_ENV
-            + " or run under a job-<id> staging directory");
+    return ids;
   }
 
   private static void putIfPresent(Map<String, String> target, String key, @Nullable String raw) {
@@ -682,6 +700,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         "{{maintenance_types}}",
         "--policy-ids",
         "{{policy_ids}}",
+        "--action-ids",
+        "{{action_ids}}",
         "--tables",
         "{{tables}}",
         "--updater-options",

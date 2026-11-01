@@ -169,6 +169,12 @@ public class JobExecutorFactory {
         jobExecutorClass.getName());
   }
 
+  static boolean implementsMethod(
+      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
+    // An inherited default method of the interface is declared by the interface itself.
+    return declaringClassOf(jobExecutorClass, name, parameterTypes) != JobExecutor.class;
+  }
+
   private static Class<?> loadJobExecutorClass(String jobExecutorName, String clzName) {
     try {
       return Class.forName(clzName);
@@ -190,12 +196,6 @@ public class JobExecutorFactory {
               jobExecutorName, clzName, hint),
           e);
     }
-  }
-
-  private static boolean implementsMethod(
-      Class<?> jobExecutorClass, String name, Class<?>... parameterTypes) {
-    // An inherited default method of the interface is declared by the interface itself.
-    return declaringClassOf(jobExecutorClass, name, parameterTypes) != JobExecutor.class;
   }
 
   private static Class<?> declaringClassOf(

@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.storage.mapper;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.storage.po.TableSnapshotMetricsPO;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
 
@@ -30,12 +31,10 @@ public interface TableSnapshotMetricsMapper {
   String TABLE_NAME = "table_snapshot_metrics";
 
   @InsertProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "insertMetrics")
+  @Options(useGeneratedKeys = true, keyProperty = "metricsMeta.metricsId", keyColumn = "metrics_id")
   void insertMetrics(@Param("metricsMeta") TableSnapshotMetricsPO metricsMeta);
 
   @Nullable
-  @SelectProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "selectMetrics")
-  TableSnapshotMetricsPO selectMetrics(
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("snapshotId") long snapshotId);
+  @SelectProvider(type = TableSnapshotMetricsSQLProviderFactory.class, method = "selectById")
+  TableSnapshotMetricsPO selectById(@Param("metricsId") long metricsId);
 }

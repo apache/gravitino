@@ -231,10 +231,26 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
+    if (register) {
+      if (mode == CreationMode.CREATE) {
+        // Check metadata before accessing storage so an existing name consistently reports a
+        // conflict. The final strict insert still detects a concurrent registration.
+        try {
+          if (store().exists(ident, Entity.EntityType.TABLE)) {
+            throw new TableAlreadyExistsException("Table %s already exists", ident);
+          }
+        } catch (IOException e) {
+          throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
+        }
+      }
+      // Validate before OVERWRITE can remove existing metadata or managed data.
+      validateExistingDatasetLocation(ident, location, properties);
+    }
+
     // Handle OVERWRITE mode - drop existing table if present
     if (mode == CreationMode.OVERWRITE) {
       if (register) {
-        dropTable(ident);
+        dropExternalTableForRegistration(ident);
       } else {
         purgeTable(ident);
       }
@@ -971,6 +987,64 @@ public class LanceTableOperations extends ManagedTableOperations {
             .build();
       default:
         throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+  }
+
+  private void dropExternalTableForRegistration(NameIdentifier ident) {
+    try {
+      Table existing = super.loadTable(ident);
+      validateLanceTable(ident, existing);
+      Preconditions.checkArgument(
+          LancePropertiesUtils.isExternalTable(existing.properties()),
+          "Cannot overwrite managed Lance table %s with a registration; "
+              + "explicitly drop or purge the managed table before registering a replacement",
+          ident);
+      // Registration replaces external metadata only. Calling dropTable could delete a managed
+      // dataset, including the same dataset that the incoming registration just validated.
+      super.dropTable(ident);
+    } catch (NoSuchTableException e) {
+      // No existing registration needs replacing.
+    }
+  }
+
+  /**
+   * Validates that a caller-supplied location resolves to an existing, valid Lance dataset before
+   * metadata changes adopt it. An explicit purge can later delete the registered location, so a
+   * plain directory must not be adopted as if it were a Lance dataset (issue #13696).
+   *
+   * <p>This checks dataset existence, not operator-defined storage scope or purge authorization.
+   *
+   * @param ident the table being registered, used only for the error message
+   * @param location the caller-supplied dataset location
+   * @param properties the table properties, used to resolve storage options
+   * @throws IllegalArgumentException if the SDK rejects the dataset location as invalid input
+   * @throws RuntimeException if storage access or closing the validation dataset fails
+   */
+  private void validateExistingDatasetLocation(
+      NameIdentifier ident, String location, Map<String, String> properties) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
+    String context =
+        String.format(
+            "Could not validate location %s for Lance table %s as a readable Lance dataset",
+            location, ident);
+    Dataset dataset;
+    try {
+      dataset = openDataset(location, storageOptions);
+    } catch (IllegalArgumentException e) {
+      // Lance maps DatasetNotFound and InvalidInput to IllegalArgumentException, while storage
+      // I/O errors use IOException. Preserve that distinction for the REST error mapper.
+      throw ExceptionMessages.illegalArgument(context + "; check dataset existence and format", e);
+    } catch (Exception e) {
+      throw ExceptionMessages.wrap(
+          context + "; check access permissions and storage connectivity", e);
+    }
+
+    try (Dataset ignored = dataset) {
+      LOG.debug("Validated Lance dataset at location {} for table {}", location, ident);
+    } catch (Exception e) {
+      // Cleanup failures are server errors, even if close throws IllegalArgumentException.
+      throw ExceptionMessages.wrap("Failed to close validated dataset for table " + ident, e);
     }
   }
 }

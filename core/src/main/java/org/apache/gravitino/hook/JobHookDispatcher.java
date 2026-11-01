@@ -118,19 +118,8 @@ public class JobHookDispatcher implements JobOperationDispatcher {
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
-    JobEntity jobEntity = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
-
-    // Set the creator as the owner of the job.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(jobEntity.nameIdentifier(), Entity.EntityType.JOB),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
-    }
-
-    return jobEntity;
+    // The manager persists the initial owner before submission, so recovery preserves it too.
+    return jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
   }
 
   @Override
