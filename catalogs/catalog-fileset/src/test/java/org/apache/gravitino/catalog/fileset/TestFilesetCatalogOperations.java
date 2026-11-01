@@ -52,6 +52,7 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
@@ -112,6 +113,8 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -2615,6 +2618,49 @@ public class TestFilesetCatalogOperations {
       Assertions.assertTrue(
           exception.getMessage().contains("location (location is not a directory)"));
       Assertions.assertFalse(exception.getMessage().contains(fileLocation.toURI().toString()));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheSeparatesAuthenticationSettings() throws Exception {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      Map<String, String> kerberosA =
+          ImmutableMap.of(
+              AuthenticationConfig.AUTH_TYPE_KEY,
+              "kerberos",
+              KerberosConfig.PRINCIPAL_KEY,
+              "svc@A.COM");
+      Map<String, String> kerberosB =
+          ImmutableMap.of(
+              AuthenticationConfig.AUTH_TYPE_KEY,
+              "kerberos",
+              KerberosConfig.PRINCIPAL_KEY,
+              "svc@B.COM");
+      Map<String, String> simpleA =
+          ImmutableMap.of(
+              AuthenticationConfig.AUTH_TYPE_KEY,
+              "simple",
+              KerberosConfig.PRINCIPAL_KEY,
+              "svc@A.COM");
+      Map<String, String> hadoopKerberos =
+          ImmutableMap.of(GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+
+      for (Path path :
+          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
+        FileSystem fs = ops.getFileSystemWithCache(path, kerberosA);
+        Assertions.assertSame(fs, ops.getFileSystemWithCache(path, kerberosA));
+        Assertions.assertSame(
+            fs,
+            ops.getFileSystemWithCache(
+                path,
+                ImmutableMap.<String, String>builder().putAll(kerberosA).put("k", "v").build()));
+        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, kerberosB));
+        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, simpleA));
+        Assertions.assertNotSame(
+            ops.getFileSystemWithCache(path, ImmutableMap.of()),
+            ops.getFileSystemWithCache(path, hadoopKerberos));
+      }
     }
   }
 
