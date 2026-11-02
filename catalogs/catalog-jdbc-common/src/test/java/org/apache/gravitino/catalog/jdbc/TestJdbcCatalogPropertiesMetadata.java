@@ -112,6 +112,20 @@ public class TestJdbcCatalogPropertiesMetadata {
   }
 
   @Test
+  void testNativePoolPropertySyntaxIsValidatedWithoutBackendVerification() {
+    for (String key : List.of("maxWaitMillis", "maxIdle")) {
+      Map<String, String> properties = poolWaitProperties();
+      properties.put("verify-on-create", "false");
+      properties.put("gravitino.bypass." + key, "not-a-number");
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> new TestJdbcCatalog().validateConfiguration(properties));
+      Assertions.assertTrue(error.getMessage().contains(key));
+    }
+  }
+
+  @Test
   void testBooleanConnectionSettingsAreVisibleAndStrict() {
     JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
     Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.VERIFY_ON_CREATE.getKey()));

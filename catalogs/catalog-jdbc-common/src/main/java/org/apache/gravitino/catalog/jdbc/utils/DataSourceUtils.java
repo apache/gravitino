@@ -80,7 +80,7 @@ public class DataSourceUtils {
   }
 
   /**
-   * Validates JDBC settings without creating a pool or opening a connection.
+   * Validates JDBC settings without opening a connection or retaining a pool.
    *
    * @param jdbcConfig the effective JDBC configuration
    * @throws IllegalArgumentException if a boolean, pool bound, driver or URL is invalid
@@ -123,6 +123,37 @@ public class DataSourceUtils {
       throw new GravitinoRuntimeException(e, "Error creating datasource");
     }
     configuredDriver(jdbcConfig);
+    Properties properties = getProperties(jdbcConfig);
+    try {
+      validateNativePoolProperties(properties);
+    } catch (Exception invalidProperties) {
+      // Identify a malformed native alias without printing unrelated settings or credentials.
+      for (String key : properties.stringPropertyNames()) {
+        Properties singleProperty = new Properties();
+        singleProperty.setProperty(key, properties.getProperty(key));
+        try {
+          validateNativePoolProperties(singleProperty);
+        } catch (Exception invalidProperty) {
+          throw new IllegalArgumentException(
+              "Invalid native JDBC connection-pool property '"
+                  + key
+                  + "': "
+                  + invalidProperty.getMessage(),
+              invalidProperty);
+        }
+      }
+      throw new IllegalArgumentException(
+          "Invalid native JDBC connection-pool properties; check gravitino.bypass.* settings",
+          invalidProperties);
+    }
+  }
+
+  private static void validateNativePoolProperties(Properties properties) throws Exception {
+    // initialSize and class-loading properties were rejected before this method. The factory
+    // therefore only parses an uninitialized configuration bean; no connections are opened.
+    try (BasicDataSource ignored = BasicDataSourceFactory.createDataSource(properties)) {
+      // Always close the temporary bean, including on the diagnostic path for individual keys.
+    }
   }
 
   /**
