@@ -28,6 +28,25 @@ public class TestPostgreSqlCatalogCapability {
   private final PostgreSqlCatalogCapability capability = new PostgreSqlCatalogCapability();
 
   @Test
+  void testNativeDeletionNamesRemainDistinctFromCreationNames() {
+    for (Capability.Scope scope :
+        new Capability.Scope[] {Capability.Scope.TABLE, Capability.Scope.SCHEMA}) {
+      Assertions.assertTrue(
+          capability.specificationOnExistingName(scope, "native\"name").supported());
+      Assertions.assertFalse(capability.specificationOnName(scope, "native\"name").supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(scope, "bad\0name").supported());
+      Assertions.assertFalse(capability.specificationOnExistingName(scope, "").supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(scope, "表".repeat(22)).supported());
+    }
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.SCHEMA, "pg_catalog").supported());
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.TABLE, "*").supported());
+  }
+
+  @Test
   void testValidNames() {
     // testing valid names for all scopes
     for (Capability.Scope scope : Capability.Scope.values()) {
