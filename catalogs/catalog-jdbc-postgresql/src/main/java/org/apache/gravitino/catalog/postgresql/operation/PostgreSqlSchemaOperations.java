@@ -48,31 +48,6 @@ import org.apache.gravitino.meta.AuditInfo;
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
-  private static final String EXTERNAL_DEPENDENTS_SQL =
-      "WITH RECURSIVE dependents(classid, objid, objsubid) AS ( "
-          + "  SELECT 'pg_catalog.pg_namespace'::regclass::oid, oid, 0 "
-          + "  FROM pg_catalog.pg_namespace WHERE nspname = ? "
-          + "  UNION "
-          + "  SELECT next_object.classid, next_object.objid, next_object.objsubid "
-          + "  FROM dependents current_object "
-          + "  CROSS JOIN LATERAL ( "
-          + "    SELECT d.classid, d.objid, d.objsubid FROM pg_catalog.pg_depend d "
-          + "    WHERE d.refclassid = current_object.classid AND d.refobjid = current_object.objid "
-          + "      AND (current_object.objsubid = 0 OR d.refobjsubid = current_object.objsubid) "
-          + "    UNION "
-          + "    SELECT d.refclassid, d.refobjid, d.refobjsubid FROM pg_catalog.pg_depend d "
-          + "    WHERE d.classid = current_object.classid AND d.objid = current_object.objid "
-          + "      AND d.objsubid = current_object.objsubid AND d.deptype = 'i' "
-          + "  ) next_object "
-          + ") "
-          + "SELECT DISTINCT pg_catalog.pg_describe_object(d.classid, d.objid, d.objsubid) AS dependent "
-          + "FROM dependents d "
-          + "CROSS JOIN LATERAL pg_catalog.pg_identify_object(d.classid, d.objid, d.objsubid) info "
-          // TOAST tables and their indexes/types are PostgreSQL-managed storage for the tables
-          // being dropped, not user objects in another schema. Keep traversing them, but do not
-          // report the internal pg_toast namespace as an external dependent.
-          + "WHERE info.schema IS NOT NULL AND info.schema <> ? AND info.schema <> 'pg_toast'; ";
-
   private String database;
 
   @Override
@@ -169,69 +144,31 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return metaData.getSchemas(connection.getCatalog(), pattern);
   }
 
+  /** {@inheritDoc} */
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
-    StringBuilder sqlBuilder =
-        new StringBuilder(String.format("DROP SCHEMA %s%s%s", PG_QUOTE, schema, PG_QUOTE));
-    if (cascade) {
-      sqlBuilder.append(" CASCADE");
-    }
-    return sqlBuilder.toString();
+    // PostgreSQL CASCADE also removes objects outside the schema. A client-side dependency
+    // preflight cannot close the race with concurrent DDL, so always let PostgreSQL enforce
+    // RESTRICT atomically. Non-empty cascade requests are refused until a schema-local cascade
+    // can be guaranteed for every object kind and dependency type.
+    return "DROP SCHEMA " + quoteName(schema) + " RESTRICT";
   }
 
+  /** {@inheritDoc} */
   @Override
   protected void dropDatabase(String schema, boolean cascade) {
-    if (!cascade) {
-      super.dropDatabase(schema, false);
-      return;
-    }
     try (Connection connection = getConnection()) {
-      connection.setAutoCommit(false);
-      try {
-        // Keep existing relations stable while checking dependencies and executing the drop.
-        try (PreparedStatement relations =
-            connection.prepareStatement(
-                "SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n "
-                    + "ON c.relnamespace = n.oid WHERE n.nspname = ? AND c.relkind IN ('r', 'p') ORDER BY c.oid")) {
-          relations.setString(1, schema);
-          try (ResultSet result = relations.executeQuery()) {
-            while (result.next()) {
-              JdbcConnectorUtils.executeUpdate(
-                  connection,
-                  "LOCK TABLE ONLY "
-                      + quoteName(schema)
-                      + "."
-                      + quoteName(result.getString(1))
-                      + " IN ACCESS EXCLUSIVE MODE");
-            }
-          }
-        }
-        try (PreparedStatement statement = connection.prepareStatement(EXTERNAL_DEPENDENTS_SQL)) {
-          statement.setString(1, schema);
-          statement.setString(2, schema);
-          try (ResultSet result = statement.executeQuery()) {
-            List<String> external = new ArrayList<>();
-            while (result.next()) {
-              external.add(result.getString(1));
-            }
-            if (!external.isEmpty()) {
-              throw new NonEmptySchemaException(
-                  "Cannot drop schema %s: objects outside the schema depend on it: %s",
-                  schema, external);
-            }
-          }
-        }
-        JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(schema, true));
-        connection.commit();
-      } catch (SQLException | RuntimeException e) {
-        try {
-          connection.rollback();
-        } catch (SQLException rollbackFailure) {
-          e.addSuppressed(rollbackFailure);
-        }
-        throw e;
-      }
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(schema, cascade));
     } catch (SQLException e) {
+      if ("2BP01".equals(e.getSQLState())) {
+        throw new NonEmptySchemaException(
+            e,
+            "Cannot drop non-empty PostgreSQL schema %s: a schema-local cascade cannot be "
+                + "guaranteed. Remove its objects explicitly, then retry dropping the empty schema. "
+                + "PostgreSQL reason: %s",
+            schema,
+            e.getMessage());
+      }
       throw exceptionMapper.toGravitinoException(e);
     }
   }
