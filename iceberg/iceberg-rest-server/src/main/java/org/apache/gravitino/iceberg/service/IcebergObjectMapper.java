@@ -20,12 +20,25 @@ package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import org.apache.iceberg.PartitionSpecParser;
+import org.apache.iceberg.UnboundPartitionSpec;
 import org.apache.iceberg.rest.RESTSerializers;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequestParser;
 
 public class IcebergObjectMapper {
+  private static final String SPEC_ID = "spec-id";
+
   private static final ObjectMapper objectMapper = createIcebergObjectMapper();
 
   private IcebergObjectMapper() {}
@@ -36,7 +49,50 @@ public class IcebergObjectMapper {
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     mapper.setPropertyNamingStrategy(new PropertyNamingStrategies.KebabCaseStrategy());
     RESTSerializers.registerAll(mapper);
+    // Registered after Iceberg's serializers, so these take precedence for the same types.
+    SimpleModule module = new SimpleModule("gravitino-iceberg-rest");
+    module.addDeserializer(UnboundPartitionSpec.class, new PartitionSpecDeserializer());
+    module.addDeserializer(UpdateTableRequest.class, new UpdateTableRequestDeserializer());
+    mapper.registerModule(module);
     return mapper;
+  }
+
+  /**
+   * The REST spec makes a partition spec's {@code spec-id} read-only, so clients may leave it out,
+   * but Iceberg's parser requires it. The server assigns the id of a new spec itself, so a missing
+   * id is read as 0.
+   */
+  private static void defaultSpecId(JsonNode spec) {
+    if (spec instanceof ObjectNode && !spec.has(SPEC_ID)) {
+      ((ObjectNode) spec).put(SPEC_ID, 0);
+    }
+  }
+
+  private static class PartitionSpecDeserializer extends JsonDeserializer<UnboundPartitionSpec> {
+    @Override
+    public UnboundPartitionSpec deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = parser.getCodec().readTree(parser);
+      defaultSpecId(node);
+      return PartitionSpecParser.fromJson(node);
+    }
+  }
+
+  private static class UpdateTableRequestDeserializer extends JsonDeserializer<UpdateTableRequest> {
+    @Override
+    public UpdateTableRequest deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      JsonNode node = parser.getCodec().readTree(parser);
+      JsonNode updates = node == null ? null : node.get("updates");
+      if (updates != null && updates.isArray()) {
+        for (JsonNode update : updates) {
+          if ("add-spec".equals(update.path("action").asText())) {
+            defaultSpecId(update.get("spec"));
+          }
+        }
+      }
+      return UpdateTableRequestParser.fromJson(node);
+    }
   }
 
   public static ObjectMapper getInstance() {
