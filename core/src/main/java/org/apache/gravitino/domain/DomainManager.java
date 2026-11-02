@@ -79,6 +79,7 @@ public class DomainManager implements DomainDispatcher {
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
+  private final Consumer<LockedDomainState> mutationCheck;
 
   /**
    * Creates a domain manager.
@@ -87,8 +88,19 @@ public class DomainManager implements DomainDispatcher {
    * @param entityStore The entity store, which must support the domain operations.
    */
   public DomainManager(IdGenerator idGenerator, EntityStore entityStore) {
+    this(idGenerator, entityStore, state -> {});
+  }
+
+  private DomainManager(
+      IdGenerator idGenerator, EntityStore entityStore, Consumer<LockedDomainState> mutationCheck) {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
+    this.mutationCheck = mutationCheck;
+  }
+
+  @Override
+  public DomainDispatcher withMutationCheck(Consumer<LockedDomainState> check) {
+    return new DomainManager(idGenerator, entityStore, mutationCheck.andThen(check));
   }
 
   @Override
@@ -157,7 +169,10 @@ public class DomainManager implements DomainDispatcher {
           NameIdentifierUtil.ofDomain(metalake, name),
           DomainEntity.class,
           Entity.EntityType.DOMAIN,
-          domain -> applyChanges(domain, changes));
+          domain -> {
+            mutationCheck.accept(new LockedDomainState(domain, null, Collections.emptyList()));
+            return applyChanges(domain, changes);
+          });
     } catch (NoSuchEntityException e) {
       throw noSuchDomain(e, metalake, name);
     } catch (EntityAlreadyExistsException e) {
@@ -186,10 +201,15 @@ public class DomainManager implements DomainDispatcher {
   public boolean deleteDomain(String metalake, String name) throws NonEmptyDomainException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
     try {
-      // In one transaction, the store refuses a domain with sub-domains, and removes the domain
-      // with its own parent edge, its owner and the privileges on it. Its backing tag stays.
-      return entityStore.delete(
-          NameIdentifierUtil.ofDomain(metalake, name), Entity.EntityType.DOMAIN);
+      // The row lock fences parent changes until the caller check and deletion complete.
+      boolean deleted =
+          domainOperations()
+              .deleteDomain(
+                  NameIdentifierUtil.ofDomain(metalake, name),
+                  domain ->
+                      mutationCheck.accept(
+                          new LockedDomainState(domain, null, Collections.emptyList())));
+      return deleted;
     } catch (NonEmptyEntityException e) {
       throw new NonEmptyDomainException(
           e, "Domain %s under metalake %s has sub-domains, remove them first", name, metalake);
@@ -229,7 +249,10 @@ public class DomainManager implements DomainDispatcher {
               NameIdentifierUtil.ofDomain(metalake, name),
               backingTag,
               newAuditInfo(),
-              state -> checkBackingTagUpdate(state, backingTag));
+              state -> {
+                mutationCheck.accept(state);
+                checkBackingTagUpdate(state, backingTag);
+              });
     } catch (NoSuchEntityException e) {
       throw noSuchDomain(e, metalake, name);
     } catch (IOException ioe) {
@@ -263,8 +286,14 @@ public class DomainManager implements DomainDispatcher {
         queriedDomain.parent().isPresent()
             ? new DomainEntity[0]
             : listSubdomainInfos(metalake, name);
+    return listMembers(metalake, queriedDomain, subdomains, filter);
+  }
+
+  @Override
+  public DomainMember[] listMembers(
+      String metalake, DomainEntity domain, DomainEntity[] subdomains, DomainMemberFilter filter) {
     return new DomainMembershipResolver(entityStore)
-        .listMembers(metalake, queriedDomain, subdomains, filter);
+        .listMembers(metalake, domain, subdomains, filter);
   }
 
   @Override
@@ -284,7 +313,10 @@ public class DomainManager implements DomainDispatcher {
               NameIdentifierUtil.ofDomain(metalake, name),
               NameIdentifierUtil.ofDomain(metalake, parent),
               newAuditInfo(),
-              DomainManager::checkAttach);
+              state -> {
+                mutationCheck.accept(state);
+                checkAttach(state);
+              });
     } catch (NoSuchEntityException e) {
       throw new NoSuchDomainException(
           e,
@@ -303,9 +335,9 @@ public class DomainManager implements DomainDispatcher {
   public DomainEntity detachDomain(String metalake, String name) throws NoSuchDomainException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
     try {
-      // Detaching breaks no rule of the hierarchy or the status, so nothing is checked.
+      // The caller checks the current state while the domain row is locked.
       return domainOperations()
-          .removeDomainParentAndGet(NameIdentifierUtil.ofDomain(metalake, name), state -> {});
+          .removeDomainParentAndGet(NameIdentifierUtil.ofDomain(metalake, name), mutationCheck);
     } catch (NoSuchEntityException e) {
       throw noSuchDomain(e, metalake, name);
     } catch (IOException ioe) {
@@ -470,6 +502,7 @@ public class DomainManager implements DomainDispatcher {
       DomainEntity[] inserted = new DomainEntity[1];
       Consumer<LockedDomainState> check =
           state -> {
+            mutationCheck.accept(state);
             checkNewDomain(state);
             DomainEntity checked = state.domain();
             inserted[0] =
@@ -516,9 +549,14 @@ public class DomainManager implements DomainDispatcher {
               NameIdentifierUtil.ofDomain(metalake, name),
               status,
               newAuditInfo(),
-              status == Domain.Status.PUBLISHED
-                  ? DomainManager::checkPublish
-                  : DomainManager::checkUnpublish);
+              state -> {
+                mutationCheck.accept(state);
+                if (status == Domain.Status.PUBLISHED) {
+                  checkPublish(state);
+                } else {
+                  checkUnpublish(state);
+                }
+              });
     } catch (NoSuchEntityException e) {
       throw noSuchDomain(e, metalake, name);
     } catch (IOException ioe) {
