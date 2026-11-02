@@ -26,10 +26,15 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.utils.ExceptionMessages;
+import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
@@ -39,6 +44,7 @@ import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.GlueServiceClientConfiguration;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
+import software.amazon.awssdk.services.glue.model.ConcurrentModificationException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
@@ -95,7 +101,7 @@ final class GlueExceptionConverter {
    *
    * @param e the credential-resolution failure
    * @param context description of the operation context for error messages
-   * @return a Gravitino runtime exception with an actionable message
+   * @return a runtime exception with an actionable message
    */
   static RuntimeException toCredentialException(SdkClientException e, String context) {
     return new RuntimeException(
@@ -196,7 +202,8 @@ final class GlueExceptionConverter {
 
   /**
    * Converts the failures that do not depend on the object being operated on: missing, rejected or
-   * mis-scoped credentials, throttling, invalid input, access denial and an unreachable endpoint.
+   * mis-scoped credentials, throttling, invalid input, access denial, and any other client-side SDK
+   * failure (timeouts, transport errors), which is reported as a connection failure.
    *
    * @param e the SDK failure
    * @param context description of the operation context for error messages
@@ -323,10 +330,14 @@ final class GlueExceptionConverter {
   }
 
   /**
-   * Converts a failure raised by the Iceberg SDK, which reports Glue and S3 errors either as its
-   * own exception types or wrapped around the AWS SDK exception, into the same Gravitino exceptions
-   * the Hive path returns. Exceptions that are already Gravitino or argument errors are returned as
-   * is.
+   * Converts a failure raised by the Iceberg SDK into a Gravitino exception. Iceberg reports Glue
+   * and S3 errors either as its own exception types or wrapped around the AWS SDK exception, so the
+   * cause chain is walked from the outside in and the first recognized type decides the result:
+   * Iceberg not-found, already-exists, validation and forbidden errors map to the matching
+   * Gravitino types, a commit conflict maps to {@link OptimisticLockException}, and AWS SDK causes
+   * go through {@link #toGenericException}. A commit whose state is unknown is reported as such,
+   * because the change may have been applied. {@link GravitinoRuntimeException}, {@link
+   * IllegalArgumentException} and {@link UnsupportedOperationException} are returned as is.
    *
    * @param e the failure raised by an Iceberg catalog call
    * @param context description of the operation context for error messages
@@ -339,37 +350,61 @@ final class GlueExceptionConverter {
       return e;
     }
     for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+      if (t instanceof CommitStateUnknownException) {
+        // A local validation failure underneath means nothing was sent, so the commit did not
+        // happen. Any other cause, such as a transport failure, does not mean the commit failed.
+        Throwable invalid = findCause(t, org.apache.iceberg.exceptions.ValidationException.class);
+        if (invalid != null) {
+          return new IllegalArgumentException(
+              String.format("Invalid request for %s: %s", context, describe(invalid)), e);
+        }
+        return new RuntimeException(
+            String.format(
+                "%s: the commit state is unknown and the change may have been applied; check the"
+                    + " table before retrying: %s",
+                context, describe(t.getCause() != null ? t.getCause() : t)),
+            e);
+      }
+      if (t instanceof CommitFailedException) {
+        Throwable awsCause = findCause(t, SdkException.class);
+        return awsCause == null || awsCause instanceof ConcurrentModificationException
+            ? new OptimisticLockException(
+                e, "%s: the table was changed concurrently, retry: %s", context, describe(t))
+            : toGenericException((SdkException) awsCause, context, null);
+      }
       if (t instanceof AlreadyExistsException) {
         return new TableAlreadyExistsException(
             e, "%s: %s", context, awsErrorDetail((AlreadyExistsException) t));
       }
       if (t instanceof org.apache.iceberg.exceptions.AlreadyExistsException) {
-        return new TableAlreadyExistsException(
-            e, "%s: %s", context, stripCatalogName(t.getMessage()));
+        return new TableAlreadyExistsException(e, "%s: %s", context, describe(t));
       }
-      if (t instanceof org.apache.iceberg.exceptions.NoSuchNamespaceException) {
-        return new NoSuchSchemaException(e, "%s: %s", context, stripCatalogName(t.getMessage()));
+      if (t instanceof NoSuchNamespaceException) {
+        return new NoSuchSchemaException(e, "%s: %s", context, describe(t));
       }
       if (t instanceof org.apache.iceberg.exceptions.NoSuchTableException) {
-        return new NoSuchTableException(e, "%s: %s", context, stripCatalogName(t.getMessage()));
+        return new NoSuchTableException(e, "%s: %s", context, describe(t));
+      }
+      if (t instanceof org.apache.iceberg.exceptions.NotFoundException) {
+        // Iceberg wraps a Glue EntityNotFoundException here; it may be the table or its database.
+        return new NotFoundException(e, "%s: %s", context, describe(t));
       }
       if (t instanceof org.apache.iceberg.exceptions.ValidationException) {
         return new IllegalArgumentException(
-            String.format("Invalid request for %s: %s", context, stripCatalogName(t.getMessage())),
-            e);
+            String.format("Invalid request for %s: %s", context, describe(t)), e);
+      }
+      if (t instanceof org.apache.iceberg.exceptions.ForbiddenException) {
+        // Prefer the AWS denial deeper in the chain so its error code and message are kept.
+        Throwable awsCause = findCause(t, SdkException.class);
+        return awsCause != null
+            ? toGenericException((SdkException) awsCause, context, null)
+            : new ForbiddenException(e, "%s: %s", context, describe(t));
       }
       if (t instanceof SdkException) {
         return toGenericException((SdkException) t, context, null);
       }
-      if (t instanceof org.apache.iceberg.exceptions.ForbiddenException) {
-        // The AWS denial, when present, is further down the chain and handled above.
-        Throwable awsCause = findCause(t, SdkException.class);
-        return awsCause != null
-            ? toGenericException((SdkException) awsCause, context, null)
-            : new ForbiddenException(e, "%s: %s", context, stripCatalogName(t.getMessage()));
-      }
     }
-    return new RuntimeException(context + ": " + stripCatalogName(e.getMessage()), e);
+    return new RuntimeException(context + ": " + describe(e), e);
   }
 
   private static String regionMismatchMessage(GlueException e, @Nullable GlueClient client) {
@@ -400,11 +435,13 @@ final class GlueExceptionConverter {
     return null;
   }
 
-  /** Removes the name of the internal Iceberg catalog, which means nothing to the caller. */
-  private static String stripCatalogName(@Nullable String message) {
-    return message == null
-        ? null
-        : message.replace(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME + ".", "");
+  /**
+   * Describes a throwable for an error message without the name of the internal Iceberg catalog,
+   * which means nothing to the caller, falling back to the type name when there is no message.
+   */
+  private static String describe(Throwable t) {
+    String message = StringUtils.defaultIfBlank(t.getMessage(), t.getClass().getSimpleName());
+    return message.replace(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME + ".", "");
   }
 
   /**

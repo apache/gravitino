@@ -762,7 +762,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         || tableFormatFilter.contains(normalizedFormat);
   }
 
-  /** Tables excluded by {@code table-format-filter} behave as absent for every table operation. */
+  /**
+   * Throws {@link NoSuchTableException} for a table whose format is excluded by {@code
+   * table-format-filter}, so that load and alter treat it as absent.
+   */
   private void rejectIfFormatHidden(Table table, NameIdentifier ident, String dbName) {
     if (!matchesFormatFilter(table)) {
       throw new NoSuchTableException(
@@ -1018,10 +1021,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Invokes a Glue SDK call and converts the failures that do not depend on the object, such as
-   * rejected credentials, throttling or an unreachable endpoint. Other {@link GlueException}s are
-   * rethrown unchanged so each call site's own catch block still applies its usual (e.g.
-   * not-found/already-exists) semantics.
+   * Invokes a Glue SDK call and converts the failures that do not depend on the object (credential,
+   * region, throttling, invalid input, access denied, timeout and transport failures) through
+   * {@link GlueExceptionConverter#toClientException}. Any other {@link SdkException} is rethrown
+   * unchanged so each call site's own catch block still applies its not-found/already-exists
+   * semantics.
    */
   private <T> T callGlue(Supplier<T> call, String context) {
     try {

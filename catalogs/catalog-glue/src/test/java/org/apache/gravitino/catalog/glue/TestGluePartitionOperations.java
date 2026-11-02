@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -212,6 +213,29 @@ class TestGluePartitionOperations {
       assertTrue(ex.getMessage().contains("region"), ex.getMessage());
     }
     verify(mockClient, never()).createPartition(any(CreatePartitionRequest.class));
+  }
+
+  @Test
+  void testAddPartitionValueLengthLimit() {
+    IdentityPartition atLimit = partitionWithRegion(StringUtils.repeat('a', 1024));
+    ops.addPartition(atLimit);
+    verify(mockClient).createPartition(any(CreatePartitionRequest.class));
+
+    IdentityPartition overLimit = partitionWithRegion(StringUtils.repeat('a', 1025));
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> ops.addPartition(overLimit));
+    assertTrue(ex.getMessage().contains("region"), ex.getMessage());
+    verify(mockClient).createPartition(any(CreatePartitionRequest.class));
+  }
+
+  private static IdentityPartition partitionWithRegion(String region) {
+    return Partitions.identity(
+        "p",
+        new String[][] {{"dt"}, {"region"}},
+        new org.apache.gravitino.rel.expressions.literals.Literal[] {
+          Literals.stringLiteral("2024-01-01"), Literals.stringLiteral(region)
+        },
+        java.util.Collections.emptyMap());
   }
 
   @Test

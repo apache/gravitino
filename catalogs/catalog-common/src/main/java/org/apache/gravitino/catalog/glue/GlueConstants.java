@@ -62,8 +62,8 @@ public final class GlueConstants {
 
   /**
    * Upper bound in milliseconds for a single attempt of a Glue API call (optional). Also used as
-   * the HTTP connection and socket timeout of the Iceberg Glue client. Defaults to {@link
-   * #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
+   * the HTTP connection and socket timeout of the AWS clients (Glue and S3) used for Iceberg
+   * tables. Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS =
       "aws-glue-api-call-attempt-timeout-ms";

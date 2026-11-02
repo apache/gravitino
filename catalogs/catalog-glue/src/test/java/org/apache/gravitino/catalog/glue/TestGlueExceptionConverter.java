@@ -24,19 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
+import software.amazon.awssdk.services.glue.model.ConcurrentModificationException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
+import software.amazon.awssdk.services.glue.model.ThrottlingException;
 
 /** Tests for {@link GlueExceptionConverter}. */
 public class TestGlueExceptionConverter {
@@ -107,6 +113,9 @@ public class TestGlueExceptionConverter {
 
     RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "listing schemas");
 
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertInstanceOf(
+        ForbiddenException.class, GlueExceptionConverter.toTableException(cause, "table t"));
     assertSame(cause, converted.getCause());
     assertTrue(converted.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
     assertTrue(converted.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
@@ -326,6 +335,94 @@ public class TestGlueExceptionConverter {
 
     assertInstanceOf(IllegalArgumentException.class, converted);
     assertTrue(converted.getMessage().contains("/tmp/wh/db/t"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergCommitStateUnknownIsNotConnectionFailure() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitStateUnknownException(
+            SdkClientException.create("Read timed out"));
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertFalse(converted instanceof ConnectionFailedException, converted.toString());
+    assertTrue(converted.getMessage().contains("commit state is unknown"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("Read timed out"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergConcurrentCommitIsConflict() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitFailedException(
+            ConcurrentModificationException.builder().message("concurrent update").build(),
+            "Cannot commit db.t because Glue detected concurrent update");
+
+    assertInstanceOf(
+        OptimisticLockException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergNotFoundIsNotFound() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.NotFoundException(
+            EntityNotFoundException.builder().message("Database db not found").build(),
+            "Cannot commit db.t because Glue cannot find the requested entity");
+
+    assertInstanceOf(
+        NotFoundException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergAlreadyExistsIsTableAlreadyExists() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new org.apache.iceberg.exceptions.AlreadyExistsException(
+                "Table already exists: %s.db.t", GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+            "table t");
+
+    assertInstanceOf(TableAlreadyExistsException.class, converted);
+    assertFalse(
+        converted.getMessage().contains(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+        converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergThrottlingCauseIsServiceUnavailable() {
+    RuntimeException raw =
+        new RuntimeException(ThrottlingException.builder().message("Rate exceeded").build());
+
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergUnknownFailureFallsBackWithoutNullMessage() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(new IllegalStateException(), "table t");
+
+    assertEquals(RuntimeException.class, converted.getClass());
+    assertTrue(converted.getMessage().contains("IllegalStateException"), converted.getMessage());
+    assertFalse(converted.getMessage().contains("null"), converted.getMessage());
+  }
+
+  @Test
+  public void testUnmodeledThrottlingStatusIsServiceUnavailable() {
+    GlueException tooMany =
+        (GlueException)
+            GlueException.builder()
+                .message("Too many requests")
+                .statusCode(429)
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("TooManyRequestsException")
+                        .errorMessage("Too many requests")
+                        .build())
+                .build();
+
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toClientException(tooMany, "table t", null));
   }
 
   @Test

@@ -164,7 +164,8 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     List<String> values = new ArrayList<>(ip.values().length);
     for (int i = 0; i < ip.values().length; i++) {
       Object value = ip.values()[i].value();
-      // Glue stores partition values as non-empty strings of at most 1024 characters.
+      // Glue limits partition values to 1024 characters. Null and empty values are rejected because
+      // a Hive-style partition name cannot represent them.
       Preconditions.checkArgument(
           value != null && !value.toString().isEmpty(),
           "Value of partition column %s must not be null or empty",

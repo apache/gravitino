@@ -139,11 +139,13 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testWarehouseMustBeS3UriWithBucket() {
+  void testWarehouseMustBeUriWithScheme() {
     decode(WAREHOUSE, "s3://bucket/warehouse");
     decode(WAREHOUSE, "s3a://bucket");
+    // Hive-only catalogs may keep their tables on other file systems.
+    decode(WAREHOUSE, "hdfs://nn:8020/user/hive/warehouse");
+    decode(WAREHOUSE, "file:///tmp/warehouse");
     assertInvalid(WAREHOUSE, "/tmp/warehouse");
-    assertInvalid(WAREHOUSE, "file:///tmp/warehouse");
     assertInvalid(WAREHOUSE, "s3://");
     assertInvalid(WAREHOUSE, "");
   }

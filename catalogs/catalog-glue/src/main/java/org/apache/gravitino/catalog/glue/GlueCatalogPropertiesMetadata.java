@@ -62,8 +62,6 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   static final Set<String> TABLE_FORMAT_FILTER_VALUES =
       ImmutableSet.of(DEFAULT_TABLE_FORMAT_FILTER, "hive", "iceberg", "delta", "parquet");
 
-  private static final Set<String> WAREHOUSE_SCHEMES = ImmutableSet.of("s3", "s3a", "s3n");
-
   private static final Pattern CATALOG_ID_PATTERN = Pattern.compile("\\d{12}");
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
@@ -140,7 +138,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               TABLE_FORMAT_FILTER,
               stringEntry(
                   TABLE_FORMAT_FILTER,
-                  "Comma-separated table formats exposed by listTables() and loadTable()."
+                  "Comma-separated table formats exposed by the catalog. Tables of other formats"
+                      + " are absent from list, load, alter and drop, and cannot be created."
                       + " Accepted: all, hive, iceberg, delta, parquet.",
                   false /* required */,
                   false /* immutable */,
@@ -225,13 +224,16 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
     } catch (URISyntaxException e) {
       uri = null;
     }
-    // Iceberg tables are written through S3FileIO only, so any other scheme can never work.
+    // A path without a scheme would become a location on the Gravitino server's local disk. The
+    // S3 requirement of Iceberg tables is checked when such a table is created, because Hive
+    // tables may live on other file systems.
     Preconditions.checkArgument(
         uri != null
             && uri.getScheme() != null
-            && WAREHOUSE_SCHEMES.contains(uri.getScheme().toLowerCase(Locale.ROOT))
-            && StringUtils.isNotBlank(uri.getRawAuthority()),
-        "Property '%s' must be an s3://, s3a:// or s3n:// URI with a bucket, got: '%s'",
+            && StringUtils.isNotBlank(uri.getRawSchemeSpecificPart())
+            && (!uri.getScheme().toLowerCase(Locale.ROOT).startsWith("s3")
+                || GlueIcebergTableHelper.isS3Location(warehouse)),
+        "Property '%s' must be a URI with a scheme, such as s3://bucket/path, got: '%s'",
         WAREHOUSE,
         warehouse);
     return warehouse;

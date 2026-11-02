@@ -163,7 +163,23 @@ public class TestGlueCatalogCredentials {
                     "AKIAEXAMPLE"));
 
     assertTrue(catalog.shouldValidateOnCreate());
-    assertThrows(IllegalArgumentException.class, catalog::validateOnCreate);
+    IllegalArgumentException partial =
+        assertThrows(IllegalArgumentException.class, catalog::validateOnCreate);
+    assertTrue(partial.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+
+    GlueCatalog temporaryKey =
+        new GlueCatalog()
+            .withCatalogConf(
+                Map.of(
+                    GlueConstants.AWS_REGION,
+                    "us-east-1",
+                    GlueConstants.AWS_ACCESS_KEY_ID,
+                    "ASIAEXAMPLE",
+                    GlueConstants.AWS_SECRET_ACCESS_KEY,
+                    "secret"));
+    IllegalArgumentException temporary =
+        assertThrows(IllegalArgumentException.class, temporaryKey::validateOnCreate);
+    assertTrue(temporary.getMessage().contains("session token"), temporary.getMessage());
 
     new GlueCatalog()
         .withCatalogConf(Map.of(GlueConstants.AWS_REGION, "us-east-1"))
