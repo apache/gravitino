@@ -29,6 +29,7 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.Collections;
@@ -121,26 +122,17 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/", container.getContainerIpAddress(), container.getFeMysqlPort());
-    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-        Statement statement = connection.createStatement()) {
-      statement.execute("CREATE DATABASE IF NOT EXISTS " + DATABASE_NAME);
-      statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + TABLE_NAME);
-      statement.execute(
-          "CREATE TABLE "
-              + DATABASE_NAME
-              + "."
-              + TABLE_NAME
-              + " (id INT NOT NULL, name VARCHAR(64)) DISTRIBUTED BY HASH(id) BUCKETS 1");
-      statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + UNSUPPORTED_TABLE_NAME);
-      statement.execute(
-          "CREATE TABLE "
-              + DATABASE_NAME
-              + "."
-              + UNSUPPORTED_TABLE_NAME
-              + " (id INT NOT NULL, payload JSON) DISTRIBUTED BY HASH(id) BUCKETS 1");
-      statement.execute(
-          "INSERT INTO " + DATABASE_NAME + "." + TABLE_NAME + " VALUES (1, 'one'), (2, 'two')");
-    }
+    executeJdbcSql(
+        "CREATE DATABASE IF NOT EXISTS " + DATABASE_NAME,
+        "DROP TABLE IF EXISTS " + dorisTable(TABLE_NAME),
+        "CREATE TABLE "
+            + dorisTable(TABLE_NAME)
+            + " (id INT NOT NULL, name VARCHAR(64)) DISTRIBUTED BY HASH(id) BUCKETS 1",
+        "DROP TABLE IF EXISTS " + dorisTable(UNSUPPORTED_TABLE_NAME),
+        "CREATE TABLE "
+            + dorisTable(UNSUPPORTED_TABLE_NAME)
+            + " (id INT NOT NULL, payload JSON) DISTRIBUTED BY HASH(id) BUCKETS 1",
+        "INSERT INTO " + dorisTable(TABLE_NAME) + " VALUES (1, 'one'), (2, 'two')");
   }
 
   @Override
@@ -161,15 +153,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
 
   @Test
   void testReadScalarTable() {
-    List<Object[]> rows =
-        sql(
-            "SELECT id, name FROM "
-                + CATALOG_NAME
-                + "."
-                + DATABASE_NAME
-                + "."
-                + TABLE_NAME
-                + " ORDER BY id");
+    List<Object[]> rows = sql("SELECT id, name FROM " + sparkTable(TABLE_NAME) + " ORDER BY id");
 
     Assertions.assertEquals(2, rows.size());
     Assertions.assertEquals(1, rows.get(0)[0]);
@@ -181,15 +165,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   @Test
   void testCatalogBypassReadOptionControlsPredicatePushdown() {
     Dataset<Row> result =
-        getSparkSession()
-            .sql(
-                "SELECT id, name FROM "
-                    + CATALOG_NAME
-                    + "."
-                    + DATABASE_NAME
-                    + "."
-                    + TABLE_NAME
-                    + " WHERE id = 1");
+        getSparkSession().sql("SELECT id, name FROM " + sparkTable(TABLE_NAME) + " WHERE id = 1");
     List<Row> rows = result.collectAsList();
 
     Assertions.assertEquals(1, rows.size());
@@ -224,12 +200,10 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     try {
       try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
           Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + tableName);
+        statement.execute("DROP TABLE IF EXISTS " + dorisTable(tableName));
         statement.execute(
             "CREATE TABLE "
-                + DATABASE_NAME
-                + "."
-                + tableName
+                + dorisTable(tableName)
                 + " (id INT NOT NULL, required_value "
                 + sqlType
                 + " NOT NULL, nullable_value "
@@ -237,9 +211,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
                 + " NULL) DISTRIBUTED BY HASH(id) BUCKETS 1");
         statement.execute(
             "INSERT INTO "
-                + DATABASE_NAME
-                + "."
-                + tableName
+                + dorisTable(tableName)
                 + " VALUES (1, "
                 + sqlValue
                 + ", "
@@ -250,11 +222,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
         if (expectedValue instanceof Timestamp) {
           try (ResultSet resultSet =
               statement.executeQuery(
-                  "SELECT required_value FROM "
-                      + DATABASE_NAME
-                      + "."
-                      + tableName
-                      + " WHERE id = 1")) {
+                  "SELECT required_value FROM " + dorisTable(tableName) + " WHERE id = 1")) {
             Assertions.assertTrue(resultSet.next());
             // Compare raw timestamps with direct JDBC, independently of Spark string rendering.
             expectedValue = resultSet.getTimestamp(1);
@@ -271,11 +239,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
           getSparkSession()
               .sql(
                   "SELECT id, required_value, nullable_value FROM "
-                      + CATALOG_NAME
-                      + "."
-                      + DATABASE_NAME
-                      + "."
-                      + tableName
+                      + sparkTable(tableName)
                       + " ORDER BY id");
       Assertions.assertFalse(result.schema().fields()[1].nullable(), sqlType);
       Assertions.assertTrue(result.schema().fields()[2].nullable(), sqlType);
@@ -289,10 +253,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
       Assertions.assertEquals(expectedValue, rows.get(1).get(1), sqlType);
       Assertions.assertTrue(rows.get(1).isNullAt(2), sqlType);
     } finally {
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-          Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + tableName);
-      }
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(tableName));
     }
   }
 
@@ -300,24 +261,16 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   void testSmallIntMatchesGenericJdbcPath() throws Exception {
     String tableName = ORDINARY_TYPES_TABLE_NAME + "_smallint";
     try {
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-          Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + tableName);
-        statement.execute(
-            "CREATE TABLE "
-                + DATABASE_NAME
-                + "."
-                + tableName
-                + " (id INT NOT NULL, required_value SMALLINT NOT NULL, "
-                + "nullable_value SMALLINT NULL) DISTRIBUTED BY HASH(id) BUCKETS 1");
-        statement.execute(
-            "INSERT INTO "
-                + DATABASE_NAME
-                + "."
-                + tableName
-                + " VALUES (1, -32768, -32768), (2, 32767, 32767), "
-                + "(3, -32768, NULL), (4, 32767, NULL)");
-      }
+      executeJdbcSql(
+          "DROP TABLE IF EXISTS " + dorisTable(tableName),
+          "CREATE TABLE "
+              + dorisTable(tableName)
+              + " (id INT NOT NULL, required_value SMALLINT NOT NULL, "
+              + "nullable_value SMALLINT NULL) DISTRIBUTED BY HASH(id) BUCKETS 1",
+          "INSERT INTO "
+              + dorisTable(tableName)
+              + " VALUES (1, -32768, -32768), (2, 32767, 32767), "
+              + "(3, -32768, NULL), (4, 32767, NULL)");
 
       // Isolate catalog registration while sharing the fixture-owned SparkContext.
       SparkSession genericSession = getSparkSession().newSession();
@@ -334,11 +287,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
         Dataset<Row> result =
             session.sql(
                 "SELECT id, required_value, nullable_value FROM "
-                    + CATALOG_NAME
-                    + "."
-                    + DATABASE_NAME
-                    + "."
-                    + tableName
+                    + sparkTable(tableName)
                     + " ORDER BY id");
         Assertions.assertEquals(DataTypes.ShortType, result.schema().fields()[1].dataType());
         Assertions.assertEquals(DataTypes.ShortType, result.schema().fields()[2].dataType());
@@ -361,58 +310,40 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
           GravitinoDorisCatalogSpark35.class,
           getSparkSession().sessionState().catalogManager().catalog(CATALOG_NAME).getClass());
     } finally {
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-          Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + tableName);
-      }
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(tableName));
     }
   }
 
   @Test
   void testReadIgnoresColumnsFromOtherTablesAndDatabases() throws Exception {
-    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-        Statement statement = connection.createStatement()) {
-      statement.execute("CREATE DATABASE IF NOT EXISTS " + OTHER_DATABASE_NAME);
-      statement.execute("DROP TABLE IF EXISTS " + OTHER_DATABASE_NAME + "." + TABLE_NAME);
-      statement.execute(
+    String otherTable = OTHER_DATABASE_NAME + "." + TABLE_NAME;
+    try {
+      executeJdbcSql(
+          "CREATE DATABASE IF NOT EXISTS " + OTHER_DATABASE_NAME,
+          "DROP TABLE IF EXISTS " + otherTable,
           "CREATE TABLE "
-              + OTHER_DATABASE_NAME
-              + "."
-              + TABLE_NAME
-              + " (unrelated INT) DISTRIBUTED BY HASH(unrelated) BUCKETS 1");
-      statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + PATTERN_MATCH_TABLE_NAME);
-      statement.execute(
+              + otherTable
+              + " (unrelated INT) DISTRIBUTED BY HASH(unrelated) BUCKETS 1",
+          "DROP TABLE IF EXISTS " + dorisTable(PATTERN_MATCH_TABLE_NAME),
           "CREATE TABLE "
-              + DATABASE_NAME
-              + "."
-              + PATTERN_MATCH_TABLE_NAME
+              + dorisTable(PATTERN_MATCH_TABLE_NAME)
               + " (unrelated INT) DISTRIBUTED BY HASH(unrelated) BUCKETS 1");
 
       GravitinoDorisCatalogSpark35 sparkCatalog =
           (GravitinoDorisCatalogSpark35)
               getSparkSession().sessionState().catalogManager().catalog(CATALOG_NAME);
       sparkCatalog.invalidateTable(Identifier.of(new String[] {DATABASE_NAME}, TABLE_NAME));
-      List<Object[]> rows =
-          sql(
-              "SELECT id, name FROM "
-                  + CATALOG_NAME
-                  + "."
-                  + DATABASE_NAME
-                  + "."
-                  + TABLE_NAME
-                  + " ORDER BY id");
+      List<Object[]> rows = sql("SELECT id, name FROM " + sparkTable(TABLE_NAME) + " ORDER BY id");
       Assertions.assertEquals(2, rows.size());
       Assertions.assertEquals(1, rows.get(0)[0]);
       Assertions.assertEquals("one", rows.get(0)[1]);
       Assertions.assertEquals(2, rows.get(1)[0]);
       Assertions.assertEquals("two", rows.get(1)[1]);
     } finally {
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-          Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + PATTERN_MATCH_TABLE_NAME);
-        statement.execute("DROP TABLE IF EXISTS " + OTHER_DATABASE_NAME + "." + TABLE_NAME);
-        statement.execute("DROP DATABASE IF EXISTS " + OTHER_DATABASE_NAME);
-      }
+      executeJdbcSql(
+          "DROP TABLE IF EXISTS " + dorisTable(PATTERN_MATCH_TABLE_NAME),
+          "DROP TABLE IF EXISTS " + otherTable,
+          "DROP DATABASE IF EXISTS " + OTHER_DATABASE_NAME);
     }
   }
 
@@ -440,11 +371,25 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> sparkCatalog.loadTable(sparkIdentifier));
     } finally {
-      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
-          Statement statement = connection.createStatement()) {
-        statement.execute("DROP TABLE IF EXISTS " + DATABASE_NAME + "." + UNSUPPORTED_TABLE_NAME);
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(UNSUPPORTED_TABLE_NAME));
+    }
+  }
+
+  private void executeJdbcSql(String... statements) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+        Statement statement = connection.createStatement()) {
+      for (String sql : statements) {
+        statement.execute(sql);
       }
     }
+  }
+
+  private static String dorisTable(String tableName) {
+    return DATABASE_NAME + "." + tableName;
+  }
+
+  private static String sparkTable(String tableName) {
+    return CATALOG_NAME + "." + dorisTable(tableName);
   }
 
   private static Stream<Arguments> ordinaryScalarTypes() {
