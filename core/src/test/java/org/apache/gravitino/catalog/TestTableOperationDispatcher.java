@@ -35,8 +35,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -47,6 +49,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -67,9 +74,12 @@ import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
@@ -331,6 +341,238 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         "schemaDispatcherSupplier returned null. "
             + "SchemaDispatcher must be available for table operations.",
         exception.getMessage());
+  }
+
+  /** Verifies a cold table lookup preserves the missing-table signal when its schema is absent. */
+  @Test
+  public void testColdLoadWithMissingSchemaStillReportsMissingTable() {
+    NameIdentifier ident =
+        NameIdentifier.of(metalake, catalog, "schema_missing_import", "missing_table");
+    NoSuchTableException error =
+        Assertions.assertThrows(
+            NoSuchTableException.class, () -> tableOperationDispatcher.loadTable(ident));
+    Assertions.assertTrue(error.getMessage().contains(ident.toString()));
+    Assertions.assertInstanceOf(NoSuchSchemaException.class, error.getCause());
+  }
+
+  /**
+   * Verifies managed tables do not require external schema import when no registration is present.
+   *
+   * @throws Exception if fixture setup or concurrent verification fails
+   */
+  @Test
+  public void testManagedTableWithoutStoreRowDoesNotImportSchema() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_managed_load");
+    NameIdentifier ident = NameIdentifier.of(ns, "managed_table");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) source.ops();
+    operations.createSchema(NameIdentifier.of(ns.levels()), "", Map.of());
+    operations.createTable(
+        ident,
+        new Column[] {Column.of("col", Types.StringType.get())},
+        "managed",
+        Map.of(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    Capability original = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : original.managedStorage(scope);
+          }
+        };
+    FieldUtils.writeField(source, "capability", managed, true);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    TableOperationDispatcher dispatcher =
+        new TableOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> schemaDispatcher, secretManager);
+    try {
+      Assertions.assertEquals("managed", dispatcher.loadTable(ident).comment());
+      verifyNoInteractions(schemaDispatcher);
+      Assertions.assertFalse(entityStore.exists(ident, TABLE));
+    } finally {
+      FieldUtils.writeField(source, "capability", original, true);
+    }
+  }
+
+  /**
+   * Verifies a native table is imported from one source read and keeps its identity on warm loads.
+   *
+   * @throws Exception if fixture setup or concurrent verification fails
+   */
+  @Test
+  public void testNativeTableImportLoadsSourceOnce() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_once");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations original = (TestCatalogOperations) source.ops();
+    original.createTable(
+        ident,
+        new Column[] {Column.of("col", Types.StringType.get())},
+        "native",
+        Map.of(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    TestCatalogOperations operations = spy(original);
+    FieldUtils.writeField(source, "ops", operations, true);
+    try {
+      Table loaded = tableOperationDispatcher.loadTable(ident);
+      Assertions.assertEquals("native", loaded.comment());
+      Assertions.assertTrue(entityStore.exists(ident, TABLE));
+      verify(operations, times(1)).loadTable(ident);
+      long importedId = entityStore.get(ident, TABLE, TableEntity.class).id();
+      tableOperationDispatcher.loadTable(ident);
+      verify(operations, times(2)).loadTable(ident);
+      Assertions.assertEquals(importedId, entityStore.get(ident, TABLE, TableEntity.class).id());
+    } finally {
+      FieldUtils.writeField(source, "ops", original, true);
+    }
+  }
+
+  /**
+   * Verifies importing a native table does not contend with a sibling table write lock.
+   *
+   * @throws Exception if fixture setup or concurrent verification fails
+   */
+  @Test
+  public void testNativeImportDoesNotWaitForSiblingTableWriteLock() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_sibling");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) source.ops())
+        .createTable(
+            ident,
+            new Column[] {Column.of("col", Types.StringType.get())},
+            "native",
+            Map.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            Indexes.EMPTY_INDEXES);
+    try (TreeLockTestSupport.HeldLock other =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(ns, "other_table"), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          other, () -> tableOperationDispatcher.loadTable(ident));
+    }
+    Assertions.assertTrue(entityStore.exists(ident, TABLE));
+  }
+
+  /**
+   * Verifies a blocked source import leaves sibling cold and warm table loads available.
+   *
+   * @throws Exception if fixture setup or concurrent verification fails
+   */
+  @Test
+  public void testSlowNativeImportAllowsSiblingColdAndWarmLoads() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_parallel");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier slow = NameIdentifier.of(ns, "slow_native");
+    NameIdentifier cold = NameIdentifier.of(ns, "cold_native");
+    NameIdentifier warm = NameIdentifier.of(ns, "warm_table");
+    tableOperationDispatcher.createTable(
+        warm,
+        new Column[] {Column.of("col", Types.StringType.get())},
+        "warm",
+        ImmutableMap.of("k1", "v1", "k2", "v2"));
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations original = (TestCatalogOperations) source.ops();
+    for (NameIdentifier ident : new NameIdentifier[] {slow, cold}) {
+      original.createTable(
+          ident,
+          new Column[] {Column.of("col", Types.StringType.get())},
+          "native",
+          Map.of(),
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          Indexes.EMPTY_INDEXES);
+    }
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    TestCatalogOperations operations = spy(original);
+    doAnswer(
+            invocation -> {
+              entered.countDown();
+              Assertions.assertTrue(
+                  release.await(30, TimeUnit.SECONDS), "Slow source was not released");
+              return invocation.callRealMethod();
+            })
+        .when(operations)
+        .loadTable(slow);
+    FieldUtils.writeField(source, "ops", operations, true);
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    Future<Table> slowLoad = executor.submit(() -> tableOperationDispatcher.loadTable(slow));
+    try {
+      Assertions.assertTrue(entered.await(30, TimeUnit.SECONDS));
+      Future<Table> coldLoad = executor.submit(() -> tableOperationDispatcher.loadTable(cold));
+      Future<Table> warmLoad = executor.submit(() -> tableOperationDispatcher.loadTable(warm));
+      Assertions.assertEquals(cold.name(), coldLoad.get(10, TimeUnit.SECONDS).name());
+      Assertions.assertEquals(warm.name(), warmLoad.get(10, TimeUnit.SECONDS).name());
+      Assertions.assertFalse(slowLoad.isDone());
+      verify(operations, times(1)).loadTable(cold);
+      verify(operations, times(1)).loadTable(warm);
+    } finally {
+      release.countDown();
+      try {
+        Assertions.assertEquals(slow.name(), slowLoad.get(30, TimeUnit.SECONDS).name());
+        verify(operations, times(1)).loadTable(slow);
+      } finally {
+        executor.shutdownNow();
+        Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+        FieldUtils.writeField(source, "ops", original, true);
+      }
+    }
+  }
+
+  /**
+   * Verifies native import still waits for an in-flight write on the same table.
+   *
+   * @throws Exception if fixture setup or concurrent verification fails
+   */
+  @Test
+  public void testNativeImportWaitsForSameTableWriteLock() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_same");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) source.ops())
+        .createTable(
+            ident,
+            new Column[] {Column.of("col", Types.StringType.get())},
+            "native",
+            Map.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            Indexes.EMPTY_INDEXES);
+    try (TreeLockTestSupport.HeldLock same =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE)) {
+      TreeLockTestSupport.assertWaitsFor(same, () -> tableOperationDispatcher.loadTable(ident));
+    }
   }
 
   @Test
@@ -2246,7 +2488,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
   @Test
   public void testCreateTableWaitsForSchemaWriteLock() throws Exception {
-    // Rename, drop and import of tables in the schema take the schema WRITE lock.
+    // Rename and drop of tables in the schema take the schema WRITE lock.
     Namespace tableNs = Namespace.of(metalake, catalog, "schema_create_lock_3");
     NameIdentifier schemaIdent = NameIdentifier.of(tableNs.levels());
     schemaOperationDispatcher.createSchema(

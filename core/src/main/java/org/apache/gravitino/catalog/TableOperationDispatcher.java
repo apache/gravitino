@@ -165,18 +165,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
 
-    if (!entityCombinedTable.imported()) {
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
+      try {
+        schemaDispatcher.loadSchema(schemaIdent);
+      } catch (NoSuchSchemaException e) {
+        throw new NoSuchTableException(
+            e, "Table %s does not exist because its schema is missing", ident);
+      }
 
-      // Import the table.
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
       try {
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
         // HA race: another Gravitino node concurrently imported this table. Reload from the
         // entity store to pick up the entity stored by the winning node.
@@ -238,8 +257,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Lock the table node, not the schema, so tables in the same schema can be created
     // concurrently. The connector call and the entity-store write otherwise run under one
     // schema-wide lock, which serialized all creates in a schema. Ancestors are still read-locked,
-    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop/import
-    // (schema WRITE); a same-name create, load or alter contends on the table node.
+    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop
+    // (schema WRITE); a same-name create, load/import or alter contends on the table node.
     // Trade-off: listTables may briefly observe a table whose creation has not committed yet.
     return TreeLockUtils.doWithTreeLock(
         ident,
