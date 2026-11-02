@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CatalogCredentialManager;
@@ -51,6 +52,7 @@ import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
 import org.apache.iceberg.Table;
@@ -166,10 +168,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @Override
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    UpdateTableRequest request =
+        IcebergCommitValidation.assignPartitionFieldIds(
+            updateTableRequest, () -> currentMetadata(tableIdentifier));
     return super.updateTable(
         tableIdentifier,
         IcebergCommitValidation.withValidation(
-            updateTableRequest, () -> getCatalog().loadTable(tableIdentifier).io()));
+            request, () -> getCatalog().loadTable(tableIdentifier).io()));
+  }
+
+  @Nullable
+  private TableMetadata currentMetadata(TableIdentifier tableIdentifier) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    return table instanceof HasTableOperations
+        ? ((HasTableOperations) table).operations().current()
+        : null;
   }
 
   public LoadTableResponse registerTable(
