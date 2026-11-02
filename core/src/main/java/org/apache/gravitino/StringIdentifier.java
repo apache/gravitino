@@ -178,7 +178,7 @@ public class StringIdentifier {
     }
 
     String pattern = "(" + STRING_COMMENT;
-    int startIndex = comment.indexOf(pattern);
+    int startIndex = comment.lastIndexOf(pattern);
     if (startIndex == -1) {
       return null;
     }
@@ -212,11 +212,11 @@ public class StringIdentifier {
     StringIdentifier identifier = fromComment(comment);
     if (identifier != null) {
       String format = String.format(STRING_COMMENT_FORMAT, " ", STRING_COMMENT, identifier);
-      int indexOf = comment.indexOf(format);
+      int indexOf = comment.lastIndexOf(format);
 
       if (indexOf == -1) {
         format = String.format(STRING_COMMENT_FORMAT, "", STRING_COMMENT, identifier);
-        indexOf = comment.indexOf(format);
+        indexOf = comment.lastIndexOf(format);
       }
 
       if (indexOf != -1) {
