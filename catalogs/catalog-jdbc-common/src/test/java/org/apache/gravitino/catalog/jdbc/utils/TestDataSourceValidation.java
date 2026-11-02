@@ -27,6 +27,8 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
@@ -41,6 +43,28 @@ import org.sqlite.SQLiteConnection;
 
 /** Tests default driver validation and explicitly configured SQL validation. */
 public class TestDataSourceValidation {
+
+  @Test
+  void testInvalidConfigurationFailsBeforeConnection() {
+    for (Map<String, String> invalid :
+        List.of(
+            Map.of("jdbc-driver", "java.lang.String"),
+            Map.of("jdbc-driver", "missing.Driver"),
+            Map.of("jdbc-url", "jdbc:postgresql://localhost/db"),
+            Map.of("verify-on-create", "yes"),
+            Map.of("jdbc.pool.test-on-borrow", "maybe"),
+            Map.of("jdbc.pool.min-size", "0"),
+            Map.of("jdbc.pool.max-size", "-1"),
+            Map.of("jdbc.pool.min-size", "5", "jdbc.pool.max-size", "2"),
+            Map.of("jdbc.pool.max-wait-ms", "0"),
+            Map.of("jdbc.pool.connect-timeout-ms", "2147483648"))) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(IllegalArgumentException.class, () -> createDataSource(invalid));
+      Assertions.assertTrue(
+          exception.getMessage().toLowerCase(Locale.ROOT).contains("jdbc")
+              || exception.getMessage().contains("verify-on-create"));
+    }
+  }
 
   /** Verifies default validation preserves a live physical SQLite connection across borrows. */
   @Test

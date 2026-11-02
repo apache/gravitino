@@ -221,7 +221,7 @@ public class JdbcCatalogOperations
       return null;
     }
 
-    return DriverManager.getDriver(jdbcUrl);
+    return DataSourceUtils.configuredDriver(jdbcConfig);
   }
 
   /**

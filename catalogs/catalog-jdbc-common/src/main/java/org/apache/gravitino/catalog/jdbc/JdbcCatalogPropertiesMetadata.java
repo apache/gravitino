@@ -129,7 +129,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.TEST_ON_BORROW.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             longOptionalPropertyEntry(
                 JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
@@ -143,7 +143,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.VERIFY_ON_CREATE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */));
     PROPERTIES_METADATA =
         ImmutableMap.<String, PropertyEntry<?>>builder()

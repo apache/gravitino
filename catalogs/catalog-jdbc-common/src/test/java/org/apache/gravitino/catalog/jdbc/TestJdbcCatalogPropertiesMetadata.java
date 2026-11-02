@@ -39,7 +39,6 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
@@ -49,6 +48,24 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcCatalogPropertiesMetadata {
+
+  @Test
+  void testBooleanConnectionSettingsAreVisibleAndStrict() {
+    JdbcCatalogPropertiesMetadata metadata = new JdbcCatalogPropertiesMetadata();
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.VERIFY_ON_CREATE.getKey()));
+    Assertions.assertFalse(metadata.isHiddenProperty(JdbcConfig.TEST_ON_BORROW.getKey()));
+    for (String value : new String[] {"yes", "1", "perhaps", ""}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              buildCatalog(ImmutableMap.of(JdbcConfig.VERIFY_ON_CREATE.getKey(), value))
+                  .shouldValidateOnCreate());
+    }
+    Assertions.assertTrue(
+        buildCatalog(ImmutableMap.of("verify-on-create", "TRUE")).shouldValidateOnCreate());
+    Assertions.assertFalse(
+        buildCatalog(ImmutableMap.of("verify-on-create", "FALSE")).shouldValidateOnCreate());
+  }
 
   @Test
   public void testPoolSizePropertiesAreNotHidden() {
@@ -113,7 +130,7 @@ public class TestJdbcCatalogPropertiesMetadata {
     properties.put(JdbcConfig.POOL_MAX_WAIT_MS.getKey(), value);
     try (JdbcCatalogOperations operations = poolWaitOperations()) {
       Assertions.assertThrows(
-          GravitinoRuntimeException.class,
+          IllegalArgumentException.class,
           () ->
               operations.initialize(
                   properties, poolWaitCatalogInfo(properties), new TestJdbcCatalog()));
