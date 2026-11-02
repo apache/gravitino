@@ -105,7 +105,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -133,7 +134,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -160,7 +162,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -189,7 +192,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -216,7 +220,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -243,7 +248,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -281,7 +287,8 @@ public interface TableCatalog {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.

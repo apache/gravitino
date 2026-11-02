@@ -100,7 +100,8 @@ public interface SupportsSchemas {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
@@ -123,7 +124,8 @@ public interface SupportsSchemas {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
