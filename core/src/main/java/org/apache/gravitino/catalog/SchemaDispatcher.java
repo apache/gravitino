@@ -62,6 +62,10 @@ public interface SchemaDispatcher extends SupportsSchemas {
    * <p>The default implementation rejects create-time secrets. Implementations that support secrets
    * must override this method.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically replayed.
+   *
    * @param ident The name identifier of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.

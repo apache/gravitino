@@ -498,6 +498,8 @@ public class SchemaMetaService {
 
   private boolean prepareSchemaOverwrite(
       NameIdentifier identifier, SchemaPO incoming, SchemaMetaMapper mapper) {
+    // Reject an active foreign identity before taking its row lock. The locking read below
+    // must still revalidate identity because the first check is only a fail-fast optimization.
     SchemaPO registeredId = mapper.selectSchemaMetaById(incoming.getSchemaId());
     rejectForeignSchemaIdentity(identifier, incoming, registeredId);
     // Lock even a retired ID before reviving it. Otherwise two catalogs could both revive the
@@ -516,7 +518,8 @@ public class SchemaMetaService {
           incoming.getSchemaId());
       // The catalog is exclusively locked. Nested SqlSessions retain this outer transaction;
       // cascade, insert, related metadata cleanup and change-log writes commit or roll back
-      // together. Do not inherit stale children, owners, tags or privileges.
+      // together. Do not inherit stale children, owners, tags or privileges. Do not delete
+      // external secrets here: a renamed source object may still reference the old URNs.
       deleteSchemaAndGet(identifier, true, false);
     }
     return registeredId != null;
