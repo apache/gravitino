@@ -398,6 +398,21 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   }
 
   @Test
+  void testUpdateNamespaceRejectsNullPropertyValue() {
+    verifyCreateNamespaceSucc("update_null_value");
+    Response response =
+        getUpdateNamespaceClientBuilder(Namespace.of("update_null_value"))
+            .post(
+                Entity.entity(
+                    "{\"removals\":[],\"updates\":{\"k\":null}}", MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(400, response.getStatus());
+
+    // Nothing was stored, so the namespace can still be loaded and changed.
+    verifyLoadNamespaceSucc(Namespace.of("update_null_value"));
+    verifyUpdateNamespaceSucc(Namespace.of("update_null_value"));
+  }
+
+  @Test
   void testRegisterTableWithCredentialVending() {
     // register without credential vending -- no credentials in response
     verifyRegisterTableSucc("register_cred_foo1", Namespace.of("register_cred_ns"));
