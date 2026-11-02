@@ -54,6 +54,40 @@ import org.junit.jupiter.api.Test;
 public class TestTableChange {
 
   @Test
+  public void testReadableChangeDescriptions() {
+    String[] field = {"nested", "c"};
+    TableChange[] changes = {
+      TableChange.addColumn(field, Types.StringType.get()),
+      TableChange.renameColumn(field, "new_name"),
+      TableChange.updateColumnDefaultValue(field, Literals.stringLiteral("value")),
+      TableChange.updateColumnType(field, Types.LongType.get()),
+      TableChange.updateColumnComment(field, "comment"),
+      TableChange.updateColumnPosition(field, ColumnPosition.first()),
+      TableChange.deleteColumn(field, true),
+      TableChange.updateColumnNullability(field, false),
+      TableChange.updateColumnAutoIncrement(field, true),
+      TableChange.addIndex(IndexType.UNIQUE_KEY, "idx", new String[][] {field}),
+      TableChange.deleteIndex("idx", true)
+    };
+    String[] descriptions = {
+      "ADDCOLUMN nested.c string",
+      "RENAMECOLUMN nested.c TO new_name",
+      "UPDATECOLUMNDEFAULTVALUE nested.c",
+      "UPDATECOLUMNTYPE nested.c TO long",
+      "UPDATECOLUMNCOMMENT nested.c TO comment",
+      "UPDATECOLUMNPOSITION nested.c TO FIRST",
+      "DELETECOLUMN nested.c",
+      "UPDATECOLUMNNULLABILITY nested.c TO false",
+      "UPDATECOLUMNAUTOINCREMENT nested.c TO true",
+      "ADDINDEX idx",
+      "DELETEINDEX idx"
+    };
+    for (int i = 0; i < changes.length; i++) {
+      assertEquals(descriptions[i], changes[i].toString());
+    }
+  }
+
+  @Test
   public void testRenameTable() {
     String newName = "New table name";
     RenameTable renameTable = (RenameTable) TableChange.rename(newName);
