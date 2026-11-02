@@ -50,11 +50,12 @@ Cron also injects callback identity into `updater_options`:
 
 - `metalake` — always from the policy namespace (policy `updaterOptions.metalake` cannot redirect
   sample/finish to another metalake)
-- `gravitino_uri` — from `gravitino.maintenance.gravitinoUri` when the policy does not set
-  `updaterOptions.gravitino_uri`. Submit fails closed if neither source provides a URI.
+- `gravitino_uri` — from `gravitino.maintenance.gravitinoAuth.uri` when the policy does not set
+  `updaterOptions.gravitino_uri`. A policy `updaterOptions.gravitino_uri` overrides the cluster
+  value. Submit fails closed if neither source provides a URI.
 
 ```properties
-gravitino.maintenance.gravitinoUri = http://localhost:8090
+gravitino.maintenance.gravitinoAuth.uri = http://localhost:8090
 ```
 
 ### TMS commit-job (IRC update → chained Spark)
@@ -88,15 +89,16 @@ unknown or blank suffixes fail fast when the server loads config. Supported `aut
 exactly four: **`none`**, **`simple`**, **`basic`**, **`oauth`**. When any Gravitino auth key is
 set, `authType` is required, and `basic` / `oauth` also require their mode-specific fields below.
 
-| Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                     |
-| ----------------- | -------------------- | ----------------------- | ------------------------------------------- |
-| `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`       |
-| `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required) |
-| `password`        | `password`           | `basic`                 | Password or secret reference (required)     |
-| `oauthServerUri`  | `oauth_server_uri`   | `oauth`                 | OAuth2 token server base URI (required)     |
-| `oauthPath`       | `oauth_path`         | `oauth`                 | Token path (for example `oauth2/token`) (required) |
+| Conf suffix       | `updaterOptions` key | Used when `authType` is | Meaning                                                |
+| ----------------- | -------------------- | ----------------------- | ------------------------------------------------------ |
+| `uri`             | `gravitino_uri`      | any, including unset    | Gravitino callback base URI. Optional on its own.      |
+| `authType`        | `auth_type`          | all modes               | `none`, `simple`, `basic`, or `oauth`                  |
+| `username`        | `username`           | `simple` / `basic`      | User principal (`simple` optional; `basic` required)   |
+| `password`        | `password`           | `basic`                 | Password or secret reference (required)                |
+| `oauthServerUri`  | `oauth_server_uri`   | `oauth`                 | OAuth2 token server base URI (required)                |
+| `oauthPath`       | `oauth_path`         | `oauth`                 | Token path (for example `oauth2/token`) (required)     |
 | `oauthCredential` | `oauth_credential`   | `oauth`                 | Client credential, often `client_id:secret` (required) |
-| `oauthScope`      | `oauth_scope`        | `oauth`                 | Token scope (IdP-specific) (required)       |
+| `oauthScope`      | `oauth_scope`        | `oauth`                 | Token scope (IdP-specific) (required)                  |
 
 **1. `none`** — Gravitino authorization disabled; omit the prefix or set:
 
@@ -327,7 +329,8 @@ Four things are worth confirming before assuming a configuration problem is a co
 
 ## Related
 
-- [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough
+- [Service](./service.md) for the in-process service, `timeTrigger`, and the cron path
+- [Table Maintenance Service](./optimizer.md) for the CLI walkthrough
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
 - [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
