@@ -393,6 +393,37 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       uid = idGenerator.nextId();
     }
 
+    SchemaEntity previousEntity = null;
+    if (stringId != null) {
+      try {
+        for (SchemaEntity existing :
+            store.list(identifier.namespace(), SchemaEntity.class, SCHEMA)) {
+          if (existing.id() == uid) {
+            if (existing.nameIdentifier().equals(identifier)) {
+              previousEntity = existing;
+              break;
+            }
+            try {
+              doWithCatalog(
+                  getCatalogIdentifier(existing.nameIdentifier()),
+                  c -> c.doWithSchemaOps(ops -> ops.loadSchema(existing.nameIdentifier())),
+                  NoSuchSchemaException.class);
+            } catch (NoSuchSchemaException e) {
+              // Preserve a genuine external rename only after confirming the old object is gone.
+              previousEntity = existing;
+              break;
+            }
+            throw new SchemaAlreadyExistsException(
+                "Schema %s carries the identifier of existing schema %s; refusing to move its metadata",
+                identifier, existing.nameIdentifier());
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(
+            "Failed to verify schema identifier ownership for " + identifier, e);
+      }
+    }
+
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(uid)
@@ -407,7 +438,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
+      if (previousEntity == null) {
+        // An untrusted source marker must never overwrite an entity in another namespace.
+        store.put(schemaEntity, false);
+      } else {
+        store.update(
+            previousEntity.nameIdentifier(),
+            SchemaEntity.class,
+            SCHEMA,
+            existing -> {
+              if (!existing.id().equals(schemaEntity.id())) {
+                throw new OptimisticLockException("Schema identifier changed during import");
+              }
+              return schemaEntity;
+            });
+      }
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (Exception e) {
