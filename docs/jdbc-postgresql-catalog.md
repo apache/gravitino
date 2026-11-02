@@ -77,7 +77,7 @@ Sensitive catalog properties such as `jdbc-password` are hidden from the default
 - Gravitino schema corresponds to the PostgreSQL schema.
 - Supports creating schema with comments.
 - Supports dropping schema.
-- Supports cascade dropping schema.
+- Non-empty schema drops, including requests with `cascade=true`, are refused with a schema-not-empty conflict (HTTP 409). PostgreSQL native `CASCADE` can delete objects in other schemas, and a client-side dependency check cannot prevent concurrent DDL from adding such dependencies. Remove the schema objects explicitly, then drop the empty schema.
 
 ### Schema Properties
 
