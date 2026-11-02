@@ -88,9 +88,14 @@ class _GravitinoAsyncClient(httpx.AsyncClient):
             # Preserve that exception instead of misreporting a Gravitino timeout.
             if exc.request.url != request.url:
                 raise
+            # Include only the encoded path: queries, userinfo and credentials are excluded.
+            resource = request.url.raw_path.split(b"?", 1)[0].decode(
+                "ascii", errors="backslashreplace"
+            )
             # Do not retry writes: the upstream operation may already have committed.
             raise GravitinoException(
-                "The MCP server stopped waiting for Gravitino after a response read "
+                f"The MCP server stopped waiting for Gravitino ({request.method} "
+                f"{resource}) after a response read "
                 f"timeout of {self.timeout.read:g} seconds. The operation may still "
                 "complete on the server; check its result before retrying."
             ) from exc

@@ -36,6 +36,7 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args
+from mcp_server.server import GravitinoMCPServer
 
 
 class TestRequestTimeout(unittest.TestCase):
@@ -116,7 +117,14 @@ class TestRequestTimeout(unittest.TestCase):
                 timeout=httpx.Timeout(60),
             ) as client:
                 with self.assertRaises(GravitinoException) as failure:
-                    await client.post("http://localhost/tables", json={})
+                    await client.post(
+                        "http://user:password@localhost/tables?token=query_secret",
+                        headers={"Authorization": "Bearer auth_secret"},
+                        json={},
+                    )
+                self.assertIn("POST /tables", str(failure.exception))
+                self.assertNotIn("password", str(failure.exception))
+                self.assertNotIn("query_secret", str(failure.exception))
                 self.assertIn("60 seconds", str(failure.exception))
                 self.assertIn("may still complete", str(failure.exception))
                 self.assertNotIn("secret", str(failure.exception))
@@ -152,6 +160,48 @@ class TestRequestTimeout(unittest.TestCase):
                     message = " ".join(item.text for item in result.content)
                     self.assertIn("90 seconds", message)
                     self.assertIn("may still complete", message)
+
+        asyncio.run(check())
+
+    def test_registered_tool_preserves_timeout_through_production_server(self):
+        async def check():
+            calls = []
+
+            def handler(request):
+                calls.append(request)
+                raise httpx.ReadTimeout("slow", request=request)
+
+            original_init = _GravitinoAsyncClient.__init__
+
+            def init_with_transport(client, *args, **kwargs):
+                kwargs["transport"] = httpx.MockTransport(handler)
+                original_init(client, *args, **kwargs)
+
+            with patch.object(
+                _GravitinoAsyncClient, "__init__", init_with_transport
+            ):
+                server = GravitinoMCPServer(
+                    Setting(metalake="m", gravitino_read_timeout=75)
+                )
+                async with Client(server.mcp) as client:
+                    result = await client.call_tool(
+                        "get_table_metadata_details",
+                        {
+                            "catalog_name": "c",
+                            "schema_name": "s",
+                            "table_name": "t",
+                        },
+                        raise_on_error=False,
+                    )
+                    self.assertTrue(result.is_error)
+                    message = " ".join(item.text for item in result.content)
+                    self.assertIn("75 seconds", message)
+                    self.assertIn(
+                        "GET /api/metalakes/m/catalogs/c/schemas/s/tables/t",
+                        message,
+                    )
+                    self.assertIn("may still complete", message)
+                    self.assertEqual(1, len(calls))
 
         asyncio.run(check())
 
