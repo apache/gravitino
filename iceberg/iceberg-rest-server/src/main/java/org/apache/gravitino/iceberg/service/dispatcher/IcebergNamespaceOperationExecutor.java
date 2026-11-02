@@ -141,13 +141,6 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
     TableMetadata metadata =
         catalogWrapper.loadTableMetadataFromLocation(registerTableRequest.metadataLocation());
     IcebergColumnFieldValidator.validateSchema(metadata.schema());
-    RegisterTableSourceAuthorization.authorize(
-        context.catalogName(),
-        namespace,
-        registerTableRequest.name(),
-        registerTableRequest.metadataLocation(),
-        metadata,
-        catalogWrapper);
     return catalogWrapper.registerTable(
         namespace, registerTableRequest, context.requestCredentialVending());
   }
