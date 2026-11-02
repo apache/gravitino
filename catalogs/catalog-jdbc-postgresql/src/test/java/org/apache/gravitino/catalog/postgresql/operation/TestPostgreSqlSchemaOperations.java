@@ -65,7 +65,7 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
       JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + other);
       try {
         JdbcConnectorUtils.executeUpdate(
-            connection, "CREATE TABLE " + schema + ".parent (id int PRIMARY KEY)");
+            connection, "CREATE TABLE " + schema + ".parent (id int PRIMARY KEY, payload text)");
         JdbcConnectorUtils.executeUpdate(
             connection, "CREATE VIEW " + other + ".v AS SELECT * FROM " + schema + ".parent");
         JdbcConnectorUtils.executeUpdate(
@@ -103,6 +103,43 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
       Assertions.assertEquals("comment", DATABASE_OPERATIONS.load(schema).comment());
     } finally {
       DATABASE_OPERATIONS.delete(schema, true);
+    }
+  }
+
+  @Test
+  void testCascadeDropIncludesOwnedToastObjects() throws SQLException {
+    String schema = RandomNameUtils.genRandomName("cascade_toast");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + schema);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + schema + ".payload (id int PRIMARY KEY, body text)");
+        long toastId;
+        try (Statement statement = connection.createStatement();
+            ResultSet rows =
+                statement.executeQuery(
+                    "SELECT reltoastrelid FROM pg_catalog.pg_class WHERE oid = '"
+                        + schema
+                        + ".payload'::regclass")) {
+          Assertions.assertTrue(rows.next());
+          toastId = rows.getLong(1);
+          Assertions.assertTrue(toastId > 0, "The test table must have an internal TOAST table");
+        }
+
+        Assertions.assertTrue(DATABASE_OPERATIONS.delete(schema, true));
+        Assertions.assertThrows(
+            NoSuchSchemaException.class, () -> DATABASE_OPERATIONS.load(schema));
+        try (Statement statement = connection.createStatement();
+            ResultSet rows =
+                statement.executeQuery(
+                    "SELECT COUNT(*) FROM pg_catalog.pg_class WHERE oid = " + toastId)) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(0, rows.getInt(1));
+        }
+      } finally {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+      }
     }
   }
 
