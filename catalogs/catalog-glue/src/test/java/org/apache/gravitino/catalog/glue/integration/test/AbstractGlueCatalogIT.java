@@ -290,6 +290,52 @@ abstract class AbstractGlueCatalogIT {
   }
 
   @Test
+  void testDropMissingSchemaWithoutCascadeReturnsFalse() {
+    assertFalse(ops.dropSchema(schemaIdent("glue_it_missing_" + System.nanoTime()), false));
+  }
+
+  @Test
+  void testFormatFilterHidesExcludedTables() throws Exception {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    createHiveTable(schema, "hive_tbl");
+
+    Map<String, String> filteredConfig = new HashMap<>(catalogConfig());
+    filteredConfig.put(GlueConstants.TABLE_FORMAT_FILTER, "iceberg");
+    GlueCatalogOperations filteredOps = new GlueCatalogOperations();
+    try {
+      filteredOps.initialize(filteredConfig, null, null);
+      NameIdentifier ident = tableIdent(schema, "hive_tbl");
+
+      assertEquals(0, filteredOps.listTables(tableNs(schema)).length);
+      assertThrows(NoSuchTableException.class, () -> filteredOps.loadTable(ident));
+      assertThrows(
+          NoSuchTableException.class,
+          () -> filteredOps.alterTable(ident, TableChange.setProperty("k", "v")));
+      assertFalse(filteredOps.dropTable(ident));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              filteredOps.createTable(
+                  tableIdent(schema, "hidden_tbl"),
+                  hiveColumns(),
+                  null,
+                  hiveTableProps(),
+                  new Transform[0],
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[0]));
+    } finally {
+      filteredOps.close();
+    }
+
+    // The table is untouched and still visible through the unfiltered catalog.
+    Table table = ops.loadTable(tableIdent(schema, "hive_tbl"));
+    assertFalse(table.properties().containsKey("k"));
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(tableIdent(schema, "hidden_tbl")));
+  }
+
+  @Test
   void testDropSchemaNonEmpty() {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
@@ -463,6 +509,16 @@ abstract class AbstractGlueCatalogIT {
 
     List<String> names = Arrays.asList(sp.listPartitionNames());
     assertTrue(names.contains("dt=2024-01-01"));
+  }
+
+  @Test
+  void testAddPartitionRejectsEmptyValue() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    SupportsPartitions sp = createPartitionedTable(schema, "ptbl");
+
+    assertThrows(IllegalArgumentException.class, () -> sp.addPartition(identityPartition("")));
+    assertEquals(0, sp.listPartitionNames().length);
   }
 
   @Test
