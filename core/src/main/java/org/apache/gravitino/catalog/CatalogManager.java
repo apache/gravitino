@@ -1292,23 +1292,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         ? new HashMap<>()
                         : new HashMap<>(existing.getProperties());
 
-                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
-                    SecretAlterChanges.prepareCatalogChanges(
-                        secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
-                CatalogChange[] effectiveChanges = secretResult.getLeft();
-
-                CatalogEntity.Builder newCatalogBuilder =
-                    newCatalogBuilder(ident.namespace(), existing);
-
-                Map<String, String> newProps =
-                    existing.getProperties() == null
-                        ? new HashMap<>()
-                        : new HashMap<>(existing.getProperties());
-                CatalogEntity candidate =
-                    updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+                // Validate a transient plaintext view before secret writes. Failed validation
+                // must not overwrite or delete a previously stored write-through secret.
+                CatalogChange[] proposedChanges =
+                    SecretAlterChanges.prepareCatalogChangesForTest(
+                        secretManager, existing.id(), changes);
+                CatalogEntity proposed =
+                    updateEntity(
+                            newCatalogBuilder(ident.namespace(), existing),
+                            new HashMap<>(currentProperties),
+                            proposedChanges)
+                        .build();
                 Map<String, String> proposedConfiguration =
-                    secretManager.toPlaintextProperties(candidate.getProperties());
+                    secretManager.toPlaintextProperties(proposed.getProperties());
                 lease
                     .wrapper()
                     .classLoader
@@ -1318,7 +1314,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                           return null;
                         },
                         IllegalArgumentException.class);
-                return candidate;
+
+                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareCatalogChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                return updateEntity(
+                        newCatalogBuilder(ident.namespace(), existing),
+                        new HashMap<>(currentProperties),
+                        secretResult.getLeft())
+                    .build();
               });
       alterCommitted = true;
       return updatedCatalog;

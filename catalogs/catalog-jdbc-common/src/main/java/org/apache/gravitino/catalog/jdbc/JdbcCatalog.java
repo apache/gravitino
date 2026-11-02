@@ -89,8 +89,28 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
   /** {@inheritDoc} */
   @Override
+  public JdbcCatalog withCatalogConf(Map<String, String> configuration) {
+    return super.withCatalogConf(prepareConfiguration(configuration));
+  }
+
+  /**
+   * Normalizes and validates provider-specific settings for initialization and proposed changes.
+   *
+   * @param configuration the complete proposed configuration, which must not be mutated
+   * @return the normalized settings; the default returns the original map
+   * @throws IllegalArgumentException if provider-specific settings are inconsistent
+   */
+  protected Map<String, String> prepareConfiguration(Map<String, String> configuration) {
+    return configuration;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public void validateConfiguration(Map<String, String> configuration) {
-    DataSourceUtils.validateConfiguration(new JdbcConfig(configuration));
+    JdbcCatalogPropertiesMetadata metadata =
+        (JdbcCatalogPropertiesMetadata) catalogPropertiesMetadata();
+    DataSourceUtils.validateConfiguration(
+        new JdbcConfig(metadata.jdbcProperties(prepareConfiguration(configuration))));
   }
 
   /**
@@ -107,7 +127,10 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     if (properties == null) {
       return true;
     }
-    return new JdbcConfig(properties).getVerifyOnCreate();
+    JdbcCatalogPropertiesMetadata metadata =
+        (JdbcCatalogPropertiesMetadata) catalogPropertiesMetadata();
+    return new JdbcConfig(metadata.jdbcProperties(prepareConfiguration(properties)))
+        .getVerifyOnCreate();
   }
 
   /**

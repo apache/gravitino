@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.TestDataSourceValidation.UnsupportedValidationDriver;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
@@ -81,6 +82,33 @@ public class TestJdbcCatalogPropertiesMetadata {
     unavailable.put("verify-on-create", "false");
     // A static settings check must not attempt a connection to this unavailable backend.
     Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(unavailable));
+  }
+
+  @Test
+  void testValidationUsesTheSameBypassPrecedenceAsOperations() {
+    Map<String, String> properties = poolWaitProperties();
+    properties.put("verify-on-create", "false");
+    properties.put("gravitino.bypass.jdbc.pool.min-size", "5");
+    properties.put("jdbc.pool.max-size", "2");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TestJdbcCatalog().validateConfiguration(properties));
+    properties.put("jdbc.pool.min-size", "1");
+    // Canonical JDBC settings override prefixed settings.
+    Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(properties));
+    properties.put("url", "ignored property");
+    Assertions.assertDoesNotThrow(() -> new TestJdbcCatalog().validateConfiguration(properties));
+    Assertions.assertFalse(
+        buildCatalog(Map.of("gravitino.bypass.verify-on-create", "false"))
+            .shouldValidateOnCreate());
+    Assertions.assertTrue(
+        buildCatalog(
+                Map.of("verify-on-create", "true", "gravitino.bypass.verify-on-create", "false"))
+            .shouldValidateOnCreate());
+    properties.put("gravitino.bypass.initialSize", "1");
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> new TestJdbcCatalog().validateConfiguration(properties));
   }
 
   @Test

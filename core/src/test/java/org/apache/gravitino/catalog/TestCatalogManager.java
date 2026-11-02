@@ -2350,6 +2350,37 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testInvalidConfigurationAlterDoesNotMutateSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "invalid_settings_secret");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "original-secret")),
+          Map.of());
+      CatalogEntity original = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urn = original.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setProperty("validation-min", "3"),
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "replacement"))));
+      Assertions.assertEquals("original-secret", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          original.getProperties(),
+          entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class).getProperties());
+    }
+  }
+
+  @Test
   void testConnectionChangesDoNotMutateSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager();
         CatalogManager manager =
