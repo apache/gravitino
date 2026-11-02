@@ -288,3 +288,8 @@ the corresponding H2, MySQL or PostgreSQL upgrade script before starting the new
 To roll back, restore the pre-upgrade database backup and matching binary; changes made
 after the backup will be lost. Renaming or dropping a long-named column does not remove
 its historical rows. Mixed-version writers are not supported.
+
+The 300-character boundary is consistent for ASCII/BMP names. Java validation counts Unicode
+code points, whereas H2 counts UTF-16 code units for `VARCHAR` capacity. Names containing
+supplementary characters can reach H2's storage limit sooner; this existing backend difference
+is not changed by the expansion.
