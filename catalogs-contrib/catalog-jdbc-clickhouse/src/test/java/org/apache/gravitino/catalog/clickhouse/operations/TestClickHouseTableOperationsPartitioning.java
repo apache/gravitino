@@ -21,8 +21,6 @@ import java.util.Map;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
-import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -149,15 +147,15 @@ public class TestClickHouseTableOperationsPartitioning {
 
   @Test
   public void testPureTypeConversionIsUnwrapped() {
-    Map<String, Type> dateColumns = Map.of("event_time", Types.DateType.get());
+    Map<String, String> dateColumns = Map.of("event_time", "Date");
     Transform[] monthPartitions =
         operations.parsePartitioning("toYYYYMM(toDate(event_time))", dateColumns);
     Assertions.assertEquals(1, monthPartitions.length);
     assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "event_time");
 
-    Map<String, Type> timestampColumns = Map.of("ts", Types.TimestampType.withoutTimeZone(0));
+    Map<String, String> dateTimeColumns = Map.of("ts", "DateTime");
     Transform[] yearPartitions =
-        operations.parsePartitioning("toYear(toDateTime(ts))", timestampColumns);
+        operations.parsePartitioning("toYear(toDateTime(ts))", dateTimeColumns);
     Assertions.assertEquals(1, yearPartitions.length);
     assertSingleFieldTransform(yearPartitions[0], Transforms.NAME_OF_YEAR, "ts");
   }
@@ -165,27 +163,39 @@ public class TestClickHouseTableOperationsPartitioning {
   @Test
   public void testNonEquivalentExpressionsRemainUnstructured() {
     // A String column requires the toDate cast, so it must not be unwrapped.
-    Map<String, Type> stringColumns = Map.of("event_time", Types.StringType.get());
+    Map<String, String> stringColumns = Map.of("event_time", "String");
     Assertions.assertEquals(
         0, operations.parsePartitioning("toYYYYMM(toDate(event_time))", stringColumns).length);
 
-    Map<String, Type> dateColumns = Map.of("statis_ymd", Types.DateType.get());
+    // DateTime64 -> Date/DateTime is a narrowing conversion that can overflow, so it must not be
+    // unwrapped.
+    Map<String, String> dateTime64Columns = Map.of("ts", "DateTime64(0)");
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYear(toDateTime(ts))", dateTime64Columns).length);
+
+    // Date -> DateTime is a narrowing conversion (Date range exceeds DateTime), so it must not be
+    // unwrapped.
+    Map<String, String> dateForDateTimeColumns = Map.of("ts", "Date");
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYear(toDateTime(ts))", dateForDateTimeColumns).length);
+
+    Map<String, String> dateColumns = Map.of("statis_ymd", "Date");
     // An arithmetic offset changes the semantics, so it must not be unwrapped.
     Assertions.assertEquals(
         0, operations.parsePartitioning("toYYYYMM(toDate(statis_ymd + 1))", dateColumns).length);
 
-    Map<String, Type> timestampColumns = Map.of("ts", Types.TimestampType.withoutTimeZone(0));
+    Map<String, String> dateTimeColumns = Map.of("ts", "DateTime");
     // A nested granularity function changes the granularity, so it must not be unwrapped.
     Assertions.assertEquals(
         0, operations.parsePartitioning("toDate(toStartOfMonth(x))", dateColumns).length);
     // A cast function (toString) is not a pure conversion.
     Assertions.assertEquals(
-        0, operations.parsePartitioning("toYear(toString(ts))", timestampColumns).length);
+        0, operations.parsePartitioning("toYear(toString(ts))", dateTimeColumns).length);
   }
 
   @Test
   public void testPureTypeConversionRoundTrips() {
-    Map<String, Type> dateColumns = Map.of("event_time", Types.DateType.get());
+    Map<String, String> dateColumns = Map.of("event_time", "Date");
     Transform[] parsed = operations.parsePartitioning("toYYYYMM(toDate(event_time))", dateColumns);
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals(

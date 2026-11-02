@@ -650,6 +650,47 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testLoadTableWithNarrowingTypeConversion() {
+    // toDateTime over a DateTime64 column is a narrowing conversion that can overflow, so it must
+    // not be unwrapped. partitioning() stays empty with the raw expression preserved.
+    String name = GravitinoITUtils.genRandomName("narrowing_conversion");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `ts` DateTime64(0),\n"
+                + "  `v` UInt32\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY toYear(toDateTime(ts))\n"
+                + "ORDER BY ts",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(0, loaded.partitioning().length);
+    Assertions.assertEquals(
+        "toYear(toDateTime(ts))", loaded.properties().get(TableConstants.PARTITION_KEY));
+
+    // toDateTime over a Date column is also a narrowing conversion (Date range exceeds DateTime),
+    // so it must not be unwrapped either.
+    String dateName = GravitinoITUtils.genRandomName("date_to_datetime_narrowing");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `ts` Date,\n"
+                + "  `v` UInt32\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY toYear(toDateTime(ts))\n"
+                + "ORDER BY ts",
+            schemaName, dateName));
+
+    Table dateLoaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, dateName));
+    Assertions.assertEquals(0, dateLoaded.partitioning().length);
+    Assertions.assertEquals(
+        "toYear(toDateTime(ts))", dateLoaded.properties().get(TableConstants.PARTITION_KEY));
+  }
+
+  @Test
   void testLoadTableWithoutPartition() {
     // An unpartitioned table exposes an empty partition-key property so the key is always present,
     // and partitioning() stays empty.

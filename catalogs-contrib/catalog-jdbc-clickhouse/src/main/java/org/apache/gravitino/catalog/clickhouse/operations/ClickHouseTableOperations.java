@@ -911,6 +911,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       // NOTE: Cannot use getColumnBuilder() here because we need to override the default
       // value for MATERIALIZED/ALIAS columns between getBasicJdbcColumnInfo() and build().
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      Map<String, String> columnTypeNames = new HashMap<>();
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
         if (!Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
@@ -920,6 +921,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         // Correct default value for MATERIALIZED/ALIAS columns: the JDBC driver
         // hardcodes IS_GENERATEDCOLUMN to 'NO', so re-derive with isExpression=true.
         String columnName = columns.getString("COLUMN_NAME");
+        columnTypeNames.put(columnName, columns.getString("TYPE_NAME"));
         String defaultKind = defaultKinds.getOrDefault(columnName, "");
         if ("MATERIALIZED".equals(defaultKind) || "ALIAS".equals(defaultKind)) {
           String columnDef = columns.getString("COLUMN_DEF");
@@ -947,11 +949,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
       String partitionKey = getPartitionKey(connection, databaseName, tableName);
-      Map<String, Type> columnTypes = new HashMap<>();
-      for (JdbcColumn column : jdbcColumns) {
-        columnTypes.put(column.name(), column.dataType());
-      }
-      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey, columnTypes));
+      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey, columnTypeNames));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -1772,8 +1770,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @VisibleForTesting
-  Transform[] parsePartitioning(@Nullable String partitionKey, Map<String, Type> columnTypes) {
-    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey, columnTypes);
+  Transform[] parsePartitioning(
+      @Nullable String partitionKey, Map<String, String> columnTypeNames) {
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey, columnTypeNames);
   }
 
   // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with
