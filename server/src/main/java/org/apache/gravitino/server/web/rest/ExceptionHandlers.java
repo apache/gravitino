@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -130,6 +131,20 @@ public class ExceptionHandlers {
   public static Response handleGroupPermissionOperationException(
       OperationType op, String roles, String parent, Exception e) {
     return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
+  }
+
+  /**
+   * Maps domain query failures to REST error responses.
+   *
+   * @param op The operation.
+   * @param name The queried domain or metadata object.
+   * @param metalake The metalake name.
+   * @param e The failure.
+   * @return The error response.
+   */
+  public static Response handleDomainException(
+      OperationType op, String name, String metalake, Exception e) {
+    return DomainExceptionHandler.INSTANCE.handle(op, name, metalake, e);
   }
 
   public static Response handleTagException(
@@ -859,6 +874,39 @@ public class ExceptionHandlers {
       } else {
         return super.handle(op, tag, parent, e);
       }
+    }
+  }
+
+  private static class DomainExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new DomainExceptionHandler();
+
+    @Override
+    public Response handle(OperationType op, String name, String metalake, Exception e) {
+      String message =
+          String.format(
+              "Failed to execute domain operation [%s] on [%s] under metalake [%s], reason [%s]",
+              op, name, metalake, getErrorMsg(e));
+      LOG.warn(message, e);
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(message, e);
+      }
+      if (e instanceof NotFoundException) {
+        return Utils.notFound(message, e);
+      }
+      if (e instanceof NotInUseException) {
+        return Utils.notInUse(message, e);
+      }
+      if (e instanceof AlreadyExistsException) {
+        return Utils.alreadyExists(message, e);
+      }
+      if (e instanceof NonEmptyDomainException) {
+        return Utils.operationConflict(message, e);
+      }
+      if (e instanceof ForbiddenException) {
+        return Utils.forbidden(message, e);
+      }
+      return super.handle(op, name, metalake, e);
     }
   }
 
