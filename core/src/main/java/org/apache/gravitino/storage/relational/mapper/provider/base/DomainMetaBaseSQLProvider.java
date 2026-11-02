@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.DomainMetaMapper.DOMAIN_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
@@ -46,14 +47,22 @@ public class DomainMetaBaseSQLProvider {
   // Reads take the backing tag name from the live tag, so a deleted tag reads as no backing tag.
   // Locking reads do not join: they must lock the domain row only, and PostgreSQL rejects FOR
   // UPDATE on the nullable side of an outer join.
-  private static final String DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME =
-      DOMAIN_COLUMNS + ", bt.tag_name as backingTagName";
+  private static final String DOMAIN_COLUMNS_WITH_RESOLVED_NAMES =
+      DOMAIN_COLUMNS + ", bt.tag_name as backingTagName, pd.domain_name as parentName";
 
   private static final String BACKING_TAG_JOIN =
       " LEFT JOIN "
           + TagMetaMapper.TAG_TABLE_NAME
           + " bt ON dm.backing_tag_id = bt.tag_id AND dm.metalake_id = bt.metalake_id"
           + " AND bt.deleted_at = 0";
+
+  private static final String PARENT_JOIN =
+      " LEFT JOIN "
+          + DomainRelMapper.DOMAIN_REL_TABLE_NAME
+          + " pr ON dm.domain_id = pr.child_id AND pr.deleted_at = 0"
+          + " LEFT JOIN "
+          + DOMAIN_TABLE_NAME
+          + " pd ON pr.parent_id = pd.domain_id AND pd.deleted_at = 0";
 
   /**
    * Returns SQL that lists the active domains of a metalake.
@@ -63,13 +72,14 @@ public class DomainMetaBaseSQLProvider {
    */
   public String listDomainPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName} AND dm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
@@ -83,13 +93,14 @@ public class DomainMetaBaseSQLProvider {
   public String selectDomainMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("domainName") String domainName) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName} AND dm.domain_name = #{domainName}"
         + " AND dm.deleted_at = 0 AND mm.deleted_at = 0";
   }
@@ -131,11 +142,12 @@ public class DomainMetaBaseSQLProvider {
    */
   public String selectDomainMetaById(@Param("domainId") Long domainId) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE dm.domain_id = #{domainId} AND dm.deleted_at = 0";
   }
 
@@ -146,11 +158,17 @@ public class DomainMetaBaseSQLProvider {
    * @return The SQL.
    */
   public String selectDomainMetaByIdForUpdate(@Param("domainId") Long domainId) {
-    return "SELECT "
-        + DOMAIN_COLUMNS
-        + " FROM "
-        + DOMAIN_TABLE_NAME
-        + " dm WHERE dm.domain_id = #{domainId} AND dm.deleted_at = 0 FOR UPDATE";
+    return selectLockableDomainMetaById(domainId) + " FOR UPDATE";
+  }
+
+  /**
+   * Returns SQL that selects an active domain by ID and locks it for shared access.
+   *
+   * @param domainId The domain ID.
+   * @return The SQL.
+   */
+  public String selectDomainMetaByIdForShare(@Param("domainId") Long domainId) {
+    return selectLockableDomainMetaById(domainId) + " LOCK IN SHARE MODE";
   }
 
   /**
@@ -185,13 +203,14 @@ public class DomainMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("domainNames") List<String> domainNames) {
     return "<script>"
         + "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName}"
         + " AND dm.domain_name IN ("
         + "<foreach collection='domainNames' item='domainName' separator=','>"
@@ -200,6 +219,34 @@ public class DomainMetaBaseSQLProvider {
         + ")"
         + " AND dm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+
+  /**
+   * Returns SQL that resolves the live parent and lists its sub-domains in one statement.
+   *
+   * @param metalakeName The metalake name.
+   * @param parentName The parent domain name.
+   * @return The SQL. An existing childless parent produces a row with a null domain ID.
+   */
+  public String listDomainPOsByParentIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("parentName") String parentName) {
+    return "SELECT "
+        + DOMAIN_COLUMNS
+        + ", bt.tag_name as backingTagName, lp.domain_name as parentName"
+        + " FROM "
+        + DOMAIN_TABLE_NAME
+        + " lp JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON lp.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " LEFT JOIN "
+        + DomainRelMapper.DOMAIN_REL_TABLE_NAME
+        + " dr ON lp.domain_id = dr.parent_id AND dr.deleted_at = 0"
+        + " LEFT JOIN "
+        + DOMAIN_TABLE_NAME
+        + " dm ON dr.child_id = dm.domain_id AND dm.deleted_at = 0"
+        + BACKING_TAG_JOIN
+        + " WHERE mm.metalake_name = #{metalakeName} AND lp.domain_name = #{parentName}"
+        + " AND lp.deleted_at = 0";
   }
 
   /**
@@ -298,5 +345,20 @@ public class DomainMetaBaseSQLProvider {
     return "DELETE FROM "
         + DOMAIN_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  /**
+   * Returns SQL that selects an active domain by ID without joining the backing tag, so that a
+   * locking clause appended to it locks the domain row only.
+   *
+   * @param domainId The domain ID.
+   * @return The SQL.
+   */
+  protected String selectLockableDomainMetaById(Long domainId) {
+    return "SELECT "
+        + DOMAIN_COLUMNS
+        + " FROM "
+        + DOMAIN_TABLE_NAME
+        + " dm WHERE dm.domain_id = #{domainId} AND dm.deleted_at = 0";
   }
 }
