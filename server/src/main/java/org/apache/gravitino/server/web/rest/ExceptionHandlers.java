@@ -1123,6 +1123,12 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+      // A source catalog connection failure is a downstream failure rather than a server bug.
+      if (e instanceof ConnectionFailedException) {
+        LOG.warn(errorMsg, e);
+        return Utils.connectionFailed(errorMsg, e);
+      }
+
       // Classify domain-specific UnsupportedOperationException subclasses before the generic
       // capability fallback below.
       if (e instanceof UnmodifiableStatisticException) {

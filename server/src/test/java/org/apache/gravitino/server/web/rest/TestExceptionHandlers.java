@@ -22,11 +22,53 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionHandlers {
+
+  @Test
+  void testSchemaConnectionFailuresReturnBadGateway() {
+    for (OperationType operation :
+        new OperationType[] {
+          OperationType.LIST, OperationType.LOAD, OperationType.CREATE, OperationType.DROP
+        }) {
+      try (Response response =
+          ExceptionHandlers.handleSchemaException(
+              operation,
+              "schema",
+              "catalog",
+              new ConnectionFailedException("backend unavailable"))) {
+        Assertions.assertEquals(502, response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, error.getCode());
+        Assertions.assertEquals("ConnectionFailedException", error.getType());
+        Assertions.assertTrue(error.getMessage().contains("backend unavailable"));
+      }
+    }
+  }
+
+  @Test
+  void testSchemaNonConnectionErrorsKeepTheirStatuses() {
+    Exception[] failures = {
+      new IllegalArgumentException("bad input"),
+      new NoSuchSchemaException("missing"),
+      new ForbiddenException("denied"),
+      new RuntimeException("unexpected")
+    };
+    int[] statuses = {400, 404, 403, 500};
+    for (int i = 0; i < failures.length; i++) {
+      try (Response response =
+          ExceptionHandlers.handleSchemaException(
+              OperationType.LOAD, "schema", "catalog", failures[i])) {
+        Assertions.assertEquals(statuses[i], response.getStatus());
+      }
+    }
+  }
 
   @Test
   public void testGetErrorMsg() {
