@@ -49,6 +49,7 @@ if (hasProperty("excludePackagesForSparkConnector")) {
 }
 
 dependencies {
+  testImplementation(libs.mockito.core)
   implementation(project(":spark-connector:spark-3.4"))
   implementation(project(":spark-connector:spark-common"))
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
