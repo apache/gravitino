@@ -62,6 +62,29 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   private static Type INT = Types.IntegerType.get();
 
   @Test
+  void testBackslashTableNameLoadsAndAlters() {
+    String name = "back\\slash_%";
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        name,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+        },
+        "comment",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      Assertions.assertEquals("id", TABLE_OPERATIONS.load(TEST_DB_NAME, name).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, name, TableChange.updateComment("updated"));
+      Assertions.assertEquals("updated", TABLE_OPERATIONS.load(TEST_DB_NAME, name).comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomNameUtils.genRandomName("op_table_");
     String tableComment = "test_comment";

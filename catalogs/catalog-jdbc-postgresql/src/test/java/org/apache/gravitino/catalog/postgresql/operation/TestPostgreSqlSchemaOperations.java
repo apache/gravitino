@@ -40,6 +40,18 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test
+  void testBackslashSchemaNameLoads() {
+    String schema = "back\\slash_%";
+    DATABASE_OPERATIONS.create(schema, "comment", Map.of());
+    try {
+      Assertions.assertEquals(schema, DATABASE_OPERATIONS.load(schema).name());
+      Assertions.assertEquals("comment", DATABASE_OPERATIONS.load(schema).comment());
+    } finally {
+      DATABASE_OPERATIONS.delete(schema, true);
+    }
+  }
+
+  @Test
   public void testBaseOperationSchema() {
     String databaseName = RandomNameUtils.genRandomName("ct_db");
     Map<String, String> properties = new HashMap<>();
