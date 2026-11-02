@@ -255,6 +255,7 @@ class GravitinoContext:
                 setting.gravitino_uri,
                 startup_authorization(setting),
                 auth=self._service_auth,
+                read_timeout=setting.gravitino_read_timeout,
             )
             if setting.metalake
             else None
@@ -331,6 +332,7 @@ class GravitinoContext:
             metalake,
             self._setting.gravitino_uri,
             authorization,
+            read_timeout=self._setting.gravitino_read_timeout,
         )
         self._cache_put(key, client)
         return self._borrow(client)
@@ -394,6 +396,7 @@ class GravitinoContext:
             self._setting.gravitino_uri,
             startup_authorization(self._setting),
             auth=self._service_auth,
+            read_timeout=self._setting.gravitino_read_timeout,
         )
         self._cache_put(key, client)
         return client
