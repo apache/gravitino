@@ -31,7 +31,9 @@ from mcp_server.client.statistic_operation import StatisticOperation
 
 
 class MockOperation(GravitinoOperation):
-    def __init__(self, metalake, uri, authorization="", *, auth=None):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         pass
 
     def as_table_operation(self) -> TableOperation:

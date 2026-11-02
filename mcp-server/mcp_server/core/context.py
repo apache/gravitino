@@ -153,6 +153,7 @@ class GravitinoContext:
             setting.gravitino_uri,
             startup_authorization(setting),
             auth=_service_auth(setting),
+            read_timeout=setting.gravitino_read_timeout,
         )
         # LRU cache of per-principal clients keyed by the raw Authorization header.
         # Safe without locking: rest_client() runs on the single asyncio event
@@ -201,6 +202,7 @@ class GravitinoContext:
             self._setting.metalake,
             self._setting.gravitino_uri,
             authorization,
+            read_timeout=self._setting.gravitino_read_timeout,
         )
         self._clients_by_auth[authorization] = client
         if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
