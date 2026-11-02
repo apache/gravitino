@@ -49,6 +49,9 @@ import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -66,6 +69,8 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.PlanStatus;
@@ -465,6 +470,42 @@ public class TestCatalogWrapperForREST {
     Assertions.assertFalse(
         vended2.credentials().isEmpty(),
         "Vended request on cache hit should return fresh credentials");
+  }
+
+  @Test
+  void testPlanTableScanRethrowsValidationException() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("validation-test", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier tableId = TableIdentifier.of(namespace, "tbl");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    Table table =
+        catalog.createTable(tableId, schema, PartitionSpec.unpartitioned(), Collections.emptyMap());
+    // Binding only happens when the table has a snapshot; append a stub file first.
+    DataFile dataFile =
+        DataFiles.builder(table.spec())
+            .withPath("file:///tmp/validation-test.parquet")
+            .withFormat(FileFormat.PARQUET)
+            .withRecordCount(1)
+            .withFileSizeInBytes(10L)
+            .build();
+    table.newAppend().appendFile(dataFile).commit();
+
+    PlanTableScanRequest scanRequest =
+        PlanTableScanRequest.builder().withFilter(Expressions.equal("no_such_col", 1)).build();
+
+    Assertions.assertThrows(
+        ValidationException.class,
+        () -> wrapper.planTableScan(tableId, scanRequest, false, CredentialPrivilege.READ));
   }
 
   @SuppressWarnings("deprecation")

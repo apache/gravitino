@@ -61,6 +61,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -491,6 +492,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     } catch (IllegalArgumentException e) {
       LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
       throw new IllegalArgumentException("Invalid scan parameters: " + e.getMessage(), e);
+    } catch (ValidationException e) {
+      LOG.error("Invalid scan filter for table {}: {}", tableIdentifier, e.getMessage());
+      throw e;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       LOG.error("Table not found during scan planning: {}", tableIdentifier);
       throw e;

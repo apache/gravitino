@@ -65,6 +65,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Map<Class<? extends Exception>, Integer> EXCEPTION_ERROR_CODES =
       ImmutableMap.<Class<? extends Exception>, Integer>builder()
           .put(IllegalArgumentException.class, 400)
+          .put(IllegalStateException.class, 400)
           .put(BadRequestException.class, 400)
           .put(ValidationException.class, 400)
           .put(IllegalNameIdentifierException.class, 400)
@@ -76,6 +77,9 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
           .put(NotFoundException.class, 404)
+          // Iceberg NotFoundException shares a simple name with javax.ws.rs.NotFoundException;
+          // map it explicitly so registerTable / IO failures are 404, not 500.
+          .put(org.apache.iceberg.exceptions.NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
@@ -136,6 +140,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
       return new ForbiddenException("%s", message);
     }
     if (e instanceof IllegalArgumentException
+        || e instanceof IllegalStateException
         || e instanceof IllegalNameIdentifierException
         || e instanceof ValidationException) {
       return new BadRequestException("%s", message);

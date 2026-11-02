@@ -57,6 +57,7 @@ public class TestIcebergExceptionMapper {
   @Test
   public void testIcebergExceptionMapper() {
     checkExceptionStatus(new IllegalArgumentException(""), 400);
+    checkExceptionStatus(new IllegalStateException("Invalid schema for v2"), 400);
     checkExceptionStatus(new ValidationException(""), 400);
     checkExceptionStatus(new NamespaceNotEmptyException(""), 409);
     checkExceptionStatus(new NotAuthorizedException(""), 401);
@@ -64,6 +65,7 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new AuthenticationTimeoutException("expired"), 419);
     checkExceptionStatus(new ForbiddenException(""), 403);
     checkExceptionStatus(new NotFoundException(), 404);
+    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException("missing file"), 404);
     checkExceptionStatus(new NoSuchNamespaceException(""), 404);
     checkExceptionStatus(new NoSuchTableException(""), 404);
     checkExceptionStatus(new NoSuchIcebergTableException(""), 404);
@@ -95,6 +97,15 @@ public class TestIcebergExceptionMapper {
     Exception converted = IcebergExceptionMapper.convertToIcebergException(original);
     Assertions.assertSame(original, converted);
     Assertions.assertEquals(406, IcebergExceptionMapper.getErrorCode(converted));
+  }
+
+  @Test
+  public void testConvertToIcebergExceptionMapsIllegalStateException() {
+    Exception converted =
+        IcebergExceptionMapper.convertToIcebergException(
+            new IllegalStateException("Invalid schema for v2"));
+    Assertions.assertTrue(converted instanceof org.apache.iceberg.exceptions.BadRequestException);
+    Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(converted));
   }
 
   /** Checks that errors retain their type and nested causes in the response. */
