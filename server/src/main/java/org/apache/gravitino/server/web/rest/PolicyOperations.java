@@ -161,8 +161,10 @@ public class PolicyOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            request.validate();
+            // Type before content: unknown/mis-cased policyType must not be masked by custom
+            // content validation (e.g. "supportedObjectTypes cannot be empty").
             validateCreatePolicyType(request.getPolicyType());
+            request.validate();
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
                     metalake,
@@ -398,13 +400,6 @@ public class PolicyOperations {
   }
 
   private static void validateCreatePolicyType(String policyType) {
-    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
-    if (builtInType != Policy.BuiltInType.CUSTOM
-        && !builtInType.policyType().equalsIgnoreCase(policyType)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Built-in policy type must use prefixed value '%s', but got: %s",
-              builtInType.policyType(), policyType));
-    }
+    PolicyCreateRequest.validatePolicyType(policyType);
   }
 }

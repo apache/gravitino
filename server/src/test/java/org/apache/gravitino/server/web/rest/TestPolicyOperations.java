@@ -545,6 +545,39 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreatePolicyUnknownOrMisCasedTypeNamedInError() throws Exception {
+    String unknownBody =
+        "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"enabled\":true,\"content\":{}}";
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(unknownBody, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String unknownMsg = resp.readEntity(String.class);
+    Assertions.assertTrue(
+        unknownMsg.contains("Unknown built-in policy type: system_iceberg_bogus"), unknownMsg);
+    Assertions.assertFalse(unknownMsg.contains("supportedObjectTypes"), unknownMsg);
+
+    String misCasedBody =
+        "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+            + "\"enabled\":true,\"content\":{}}";
+    resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(misCasedBody, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String misCasedMsg = resp.readEntity(String.class);
+    Assertions.assertTrue(
+        misCasedMsg.contains("system_iceberg_compaction")
+            && misCasedMsg.contains("SYSTEM_ICEBERG_COMPACTION"),
+        misCasedMsg);
+    Assertions.assertFalse(misCasedMsg.contains("supportedObjectTypes"), misCasedMsg);
+  }
+
+  @Test
   public void testGetPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =

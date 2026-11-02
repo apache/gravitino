@@ -28,6 +28,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a policy. */
@@ -119,6 +120,25 @@ public class PolicyCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
     Preconditions.checkArgument(
         policyContent != null, "\"content\" is required and cannot be null");
+    // Resolve policyType before content.validate(): Jackson may have fallen back to custom content
+    // for an unknown or mis-cased type, and custom content rules would obscure the type error.
+    validatePolicyType(policyType);
     policyContent.validate();
+  }
+
+  /**
+   * Ensures {@code policyType} is a known type and built-in wire names use the canonical lowercase
+   * prefixed value (Jackson subtype matching is case-sensitive).
+   *
+   * @param policyType request policy type
+   */
+  public static void validatePolicyType(String policyType) {
+    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
+    if (builtInType != Policy.BuiltInType.CUSTOM && !builtInType.policyType().equals(policyType)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Built-in policy type must use prefixed value '%s', but got: %s",
+              builtInType.policyType(), policyType));
+    }
   }
 }

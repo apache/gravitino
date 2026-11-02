@@ -59,17 +59,41 @@ public class TestPolicyCreateRequest {
             .build();
     request =
         new PolicyCreateRequest(
-            "policy_test_null_types", "test_type", "policy comment", true, contentWithNullTypes);
+            "policy_test_null_types", "custom", "policy comment", true, contentWithNullTypes);
     serJson = JsonUtils.objectMapper().writeValueAsString(request);
     deserRequest = JsonUtils.objectMapper().readValue(serJson, PolicyCreateRequest.class);
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("policy_test_null_types", deserRequest.getName());
     Assertions.assertEquals("policy comment", deserRequest.getComment());
-    Assertions.assertEquals("test_type", deserRequest.getPolicyType());
+    Assertions.assertEquals("custom", deserRequest.getPolicyType());
     Assertions.assertTrue(deserRequest.getEnabled());
     Assertions.assertEquals(contentWithNullTypes, deserRequest.getPolicyContent());
 
     Exception e = Assertions.assertThrows(IllegalArgumentException.class, request::validate);
     Assertions.assertEquals("supportedObjectTypes cannot be empty", e.getMessage());
+  }
+
+  @Test
+  public void testValidateNamesUnknownOrMisCasedPolicyType() throws JsonProcessingException {
+    // Empty content deserializes as custom content when policyType is not an exact subtype name.
+    // Type must be reported before custom content rules (e.g. supportedObjectTypes).
+    PolicyCreateRequest unknown =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"name\":\"p_bogus\",\"policyType\":\"system_iceberg_bogus\",\"enabled\":true,\"content\":{}}",
+                PolicyCreateRequest.class);
+    Exception e = Assertions.assertThrows(IllegalArgumentException.class, unknown::validate);
+    Assertions.assertEquals("Unknown built-in policy type: system_iceberg_bogus", e.getMessage());
+
+    PolicyCreateRequest misCased =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"name\":\"p_upper\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\",\"enabled\":true,\"content\":{}}",
+                PolicyCreateRequest.class);
+    e = Assertions.assertThrows(IllegalArgumentException.class, misCased::validate);
+    Assertions.assertEquals(
+        "Built-in policy type must use prefixed value 'system_iceberg_compaction', but got:"
+            + " SYSTEM_ICEBERG_COMPACTION",
+        e.getMessage());
   }
 }
