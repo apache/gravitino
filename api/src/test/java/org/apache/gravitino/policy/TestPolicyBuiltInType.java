@@ -57,8 +57,7 @@ public class TestPolicyBuiltInType {
             IllegalArgumentException.class,
             () -> Policy.BuiltInType.fromPolicyType("SYSTEM_ICEBERG_COMPACTION"));
     Assertions.assertEquals(
-        "Built-in policy type must use prefixed value 'system_iceberg_compaction', but got:"
-            + " SYSTEM_ICEBERG_COMPACTION",
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
         exception.getMessage());
   }
 

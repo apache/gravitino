@@ -71,6 +71,30 @@ public class TestPolicyUpdatesRequest {
   }
 
   @Test
+  public void testUpdatePolicyContentValidateNamesUnknownOrMisCasedType()
+      throws JsonProcessingException {
+    PolicyUpdateRequest.UpdatePolicyContentRequest unknown =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
+                    + "\"newContent\":{}}",
+                PolicyUpdateRequest.UpdatePolicyContentRequest.class);
+    Exception e = Assertions.assertThrows(IllegalArgumentException.class, unknown::validate);
+    Assertions.assertEquals("Unknown built-in policy type: system_iceberg_bogus", e.getMessage());
+
+    PolicyUpdateRequest.UpdatePolicyContentRequest misCased =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"@type\":\"updateContent\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+                    + "\"newContent\":{}}",
+                PolicyUpdateRequest.UpdatePolicyContentRequest.class);
+    e = Assertions.assertThrows(IllegalArgumentException.class, misCased::validate);
+    Assertions.assertEquals(
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
+        e.getMessage());
+  }
+
+  @Test
   public void testPolicyUpdatesRequestSerDe() throws JsonProcessingException {
     PolicyUpdateRequest request = new PolicyUpdateRequest.RenamePolicyRequest("policy_test_new");
     PolicyUpdateRequest request1 =

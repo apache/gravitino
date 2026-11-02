@@ -92,8 +92,7 @@ public class TestPolicyCreateRequest {
                 PolicyCreateRequest.class);
     e = Assertions.assertThrows(IllegalArgumentException.class, misCased::validate);
     Assertions.assertEquals(
-        "Built-in policy type must use prefixed value 'system_iceberg_compaction', but got:"
-            + " SYSTEM_ICEBERG_COMPACTION",
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
         e.getMessage());
   }
 }

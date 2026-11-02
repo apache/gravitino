@@ -79,9 +79,8 @@ public interface Policy extends Auditable {
     /**
      * Get the built-in policy type from the policy type string.
      *
-     * <p>Matching is case-sensitive for the wire value (same as Jackson {@code @JsonSubTypes}
-     * names). A known type with the wrong case is rejected with the canonical value named in the
-     * error, rather than accepted via ignore-case.
+     * <p>Wire names are matched case-sensitively. A known type with the wrong case is rejected with
+     * the canonical value named in the error.
      *
      * @param policyType the policy type string
      * @return the matched built-in policy type
@@ -96,15 +95,8 @@ public interface Policy extends Auditable {
       }
       for (BuiltInType type : BuiltInType.values()) {
         if (type.policyType.equalsIgnoreCase(policyType)) {
-          if (type == CUSTOM) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "Policy type must be '%s', but got: %s", type.policyType, policyType));
-          }
           throw new IllegalArgumentException(
-              String.format(
-                  "Built-in policy type must use prefixed value '%s', but got: %s",
-                  type.policyType, policyType));
+              String.format("Policy type must be '%s', but got: %s", type.policyType, policyType));
         }
       }
 
