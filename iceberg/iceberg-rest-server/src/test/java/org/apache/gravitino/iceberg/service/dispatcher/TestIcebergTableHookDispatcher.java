@@ -47,6 +47,8 @@ import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
@@ -74,6 +76,8 @@ public class TestIcebergTableHookDispatcher {
       new Schema(NestedField.required(1, "test_field", StringType.get()));
 
   private IcebergTableHookDispatcher hookDispatcher;
+  private LockManager mockLockManager;
+  private LockManager previousLockManager;
   private IcebergTableOperationDispatcher mockDispatcher;
   private IcebergNamespaceOperationDispatcher mockNamespaceDispatcher;
   private EntityStore mockEntityStore;
@@ -127,6 +131,13 @@ public class TestIcebergTableHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockInternalOwnerDispatcher, true);
 
+    previousLockManager =
+        (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
+    mockLockManager = mock(LockManager.class);
+    TreeLock mockTreeLock = mock(TreeLock.class);
+    when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
+
     // Create mock IcebergRESTServerContext
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
@@ -163,6 +174,8 @@ public class TestIcebergTableHookDispatcher {
         previousInternalOwnerDispatcher,
         true);
 
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", previousLockManager, true);
+
     // Reset IcebergRESTServerContext singleton
     Class<?> holderClass =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
@@ -170,6 +183,25 @@ public class TestIcebergTableHookDispatcher {
             .findFirst()
             .orElseThrow(() -> new RuntimeException("InstanceHolder class not found"));
     FieldUtils.writeStaticField(holderClass, "INSTANCE", null, true);
+  }
+
+  @Test
+  public void testCreateTableHoldsTheNamespaceBranchLockForReading() {
+    // dropNamespace holds the same lock for writing, so a create and a drop of one namespace are
+    // serialized on this server.
+    Namespace namespace = Namespace.of("A", "B");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("t").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.createTable(mockContext, namespace, request);
+
+    ArgumentCaptor<NameIdentifier> lockId = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockLockManager).createTreeLock(lockId.capture());
+    Assertions.assertArrayEquals(
+        new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
+    Assertions.assertEquals("A", lockId.getValue().name());
   }
 
   @Test
