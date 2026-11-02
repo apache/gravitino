@@ -27,7 +27,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -47,9 +49,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -84,7 +88,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndListSchemas() throws IOException {
+  public void testCreateAndListSchemas() throws Exception {
     Namespace ns = Namespace.of(metalake, catalog);
 
     NameIdentifier schemaIdent = NameIdentifier.of(ns, "schema1");
@@ -129,24 +133,24 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
             .findFirst();
     Assertions.assertTrue(ident1.isPresent());
 
-    // Test when the entity store failed to put the schema entity
-    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    IOException registrationFailure = new IOException("store unavailable");
+    doThrow(registrationFailure).when(entityStore).put(any(), anyBoolean());
     NameIdentifier schemaIdent2 = NameIdentifier.of(ns, "schema2");
-    Schema schema2 = dispatcher.createSchema(schemaIdent2, "comment", props);
-
-    // Check if the created Schema's field values are correct
-    Assertions.assertEquals("schema2", schema2.name());
-    Assertions.assertEquals("comment", schema2.comment());
-    testProperties(props, schema2.properties());
-
-    // Check if the Schema entity is stored in the EntityStore
+    GravitinoRuntimeException error =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> dispatcher.createSchema(schemaIdent2, "comment", props));
+    Assertions.assertSame(registrationFailure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(schemaIdent2.toString()));
+    Assertions.assertTrue(error.getMessage().contains("created in the external catalog"));
+    Assertions.assertTrue(error.getMessage().contains("verify external state before retrying"));
     Assertions.assertFalse(entityStore.exists(schemaIdent2, SCHEMA));
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> entityStore.get(schemaIdent2, SCHEMA, SchemaEntity.class));
-
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", schema2.auditInfo().creator());
+    Schema created =
+        catalogManager
+            .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+            .doWithSchemaOps(ops -> ops.loadSchema(schemaIdent2));
+    Assertions.assertEquals("schema2", created.name());
+    Assertions.assertEquals("comment", created.comment());
   }
 
   @Test
@@ -532,6 +536,55 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(dispatcher.dropSchema(leaf, false));
     Assertions.assertTrue(entityStore.exists(parentAb, SCHEMA));
     Assertions.assertTrue(entityStore.exists(ancestorA, SCHEMA));
+  }
+
+  @Test
+  void testNativeSchemaImportDoesNotOverwriteAnotherRegistration() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_native_no_marker");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) source.ops())
+        .createSchema(ident, "native", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    reset(entityStore);
+    try {
+      Assertions.assertEquals(ident.name(), dispatcher.loadSchema(ident).name());
+      verify(entityStore).put(any(SchemaEntity.class), eq(false));
+      verify(entityStore, never()).put(any(SchemaEntity.class), eq(true));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  void testRegistrationFailureRetainsSecretsUsedByCreatedSchema() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_partial_create");
+      doThrow(new IOException("store unavailable"))
+          .when(entityStore)
+          .put(any(SchemaEntity.class), eq(true));
+      try {
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                d.createSchema(
+                    ident,
+                    "comment",
+                    ImmutableMap.of("k1", "v1"),
+                    Map.of("k2", new SecretBinding("memory", "retained-secret")),
+                    Map.of()));
+        Schema created =
+            catalogManager
+                .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                .doWithSchemaOps(ops -> ops.loadSchema(ident));
+        SecretUrn urn = SecretUrn.parse(created.properties().get("k2"));
+        Assertions.assertEquals("retained-secret", secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+      }
+    }
   }
 
   @Test

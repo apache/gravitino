@@ -194,25 +194,29 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .findFirst();
     Assertions.assertTrue(ident1.isPresent());
 
-    // Test when the entity store failed to put the table entity
-    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    // Source creation succeeds, but a failed registration must not be reported as success.
+    IOException registrationFailure = new IOException("store unavailable");
+    doThrow(registrationFailure).when(entityStore).put(any(), anyBoolean());
     NameIdentifier tableIdent2 = NameIdentifier.of(tableNs, "table2");
-    Table table2 =
-        tableOperationDispatcher.createTable(
-            tableIdent2, columns, "comment", props, new Transform[0]);
-
-    // Check if the created Schema's field values are correct
-    Assertions.assertEquals("table2", table2.name());
-    Assertions.assertEquals("comment", table2.comment());
-    testProperties(props, table2.properties());
-
-    // Check if the Table entity is stored in the EntityStore
+    GravitinoRuntimeException error =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    tableIdent2, columns, "comment", props, new Transform[0]));
+    Assertions.assertSame(registrationFailure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(tableIdent2.toString()));
+    Assertions.assertTrue(error.getMessage().contains("created in the external catalog"));
+    Assertions.assertTrue(error.getMessage().contains("verify external state before retrying"));
     Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> entityStore.get(tableIdent2, TABLE, TableEntity.class));
-
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", table2.auditInfo().creator());
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        source -> {
+          Table created = ((TestCatalogOperations) source.ops()).loadTable(tableIdent2);
+          Assertions.assertEquals("table2", created.name());
+          Assertions.assertEquals("comment", created.comment());
+          return null;
+        });
   }
 
   @Test

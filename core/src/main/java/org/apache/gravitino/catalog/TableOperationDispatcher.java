@@ -213,6 +213,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; inspect
+   *     external state and resolve the entity-store error before retrying.
    */
   @Override
   public Table createTable(
@@ -778,7 +780,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      throw new GravitinoRuntimeException(
+          e,
+          "Table %s was created in the external catalog, but its registration in Gravitino "
+              + "failed. Resolve the entity-store error and verify external state before retrying.",
+          ident);
     }
 
     // Merge both the metadata from catalog operation and the metadata from entity store.

@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -41,6 +42,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -136,6 +138,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @throws NoSuchCatalogException If the catalog corresponding to the provided identifier does not
    *     exist.
    * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; inspect
+   *     external state and resolve the entity-store error before retrying.
    */
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
@@ -143,6 +147,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; inspect
+   *     external state and resolve the entity-store error before retrying. Secret material
+   *     referenced by the externally created schema is retained for reconciliation.
+   */
   @Override
   public Schema createSchema(
       NameIdentifier ident,
@@ -184,6 +195,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Roll back on any create failure (same pattern as CatalogManager /
     // FilesetOperationDispatcher).
     secretManager.writeSecrets(secretMaterials);
+    AtomicBoolean createdInCatalog = new AtomicBoolean();
     try {
       return TreeLockUtils.doWithTreeLock(
           catalogIdent,
@@ -195,7 +207,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             Schema schema =
                 doWithCatalog(
                     catalogIdent,
-                    c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, updatedProperties)),
+                    c ->
+                        c.doWithSchemaOps(
+                            s -> {
+                              Schema created = s.createSchema(ident, comment, updatedProperties);
+                              createdInCatalog.set(true);
+                              return created;
+                            }),
                     NoSuchCatalogException.class,
                     SchemaAlreadyExistsException.class);
 
@@ -229,12 +247,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               store.put(schemaEntity, true /* overwrite */);
             } catch (Exception e) {
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-              return EntityCombinedSchema.of(schema)
-                  .withHiddenProperties(
-                      getMaskAndOmitKeys(
-                          catalogIdent,
-                          HasPropertyMetadata::schemaPropertiesMetadata,
-                          schema.properties()));
+              throw new GravitinoRuntimeException(
+                  e,
+                  "Schema %s was created in the external catalog, but its registration in Gravitino "
+                      + "failed. Resolve the entity-store error and verify external state before retrying.",
+                  ident);
             }
 
             // Merge both the metadata from catalog operation and the metadata from entity store.
@@ -246,7 +263,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                         schema.properties()));
           });
     } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
+      // An externally created schema may already reference these URNs. Keep its credentials
+      // available for reconciliation when only the entity-store registration failed.
+      if (!createdInCatalog.get()) {
+        secretManager.rollbackSecrets(secretMaterials);
+      }
       throw e;
     }
   }
@@ -668,7 +689,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
+      // A generated ID has no source identity and must not replace a concurrent registration.
+      store.put(schemaEntity, stringId != null);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {
