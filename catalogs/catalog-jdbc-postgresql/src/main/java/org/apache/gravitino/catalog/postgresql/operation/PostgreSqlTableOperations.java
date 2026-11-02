@@ -434,10 +434,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
     validateIndexName(addIndex.getName());
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("ALTER TABLE ")
-        .append(quotedIdentifier(tableName))
-        .append(" ADD");
+    sqlBuilder.append("ALTER TABLE ").append(quotedIdentifier(tableName)).append(" ADD");
     if (StringUtils.isNotEmpty(addIndex.getName())) {
       sqlBuilder.append(" CONSTRAINT ").append(quotedIdentifier(addIndex.getName()));
     }
@@ -766,8 +763,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
   }
 
-  private static String quotedIdentifier(@Nullable String name) {
-    return PG_QUOTE + String.valueOf(name).replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
+  private static String quotedIdentifier(String name) {
+    return PG_QUOTE + name.replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
   }
 
   private static void validateIndexName(@Nullable String name) {

@@ -123,7 +123,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   @Test
   void testUnnamedUniqueIndexesDoNotCollideAcrossTables() {
-    String first = RandomNameUtils.genRandomName("unnamed_first");
+    String first = "quoted\"" + RandomNameUtils.genRandomName("unnamed_first");
     String second = RandomNameUtils.genRandomName("unnamed_second");
     for (String name : new String[] {first, second}) {
       TABLE_OPERATIONS.create(

@@ -75,7 +75,8 @@ public class PostgreSqlCatalogCapability implements Capability {
               scope, name));
     }
 
-    if (scope == Scope.SCHEMA && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase())) {
+    if (scope == Scope.SCHEMA
+        && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase(Locale.ROOT))) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is reserved and cannot be used.", scope, name));
     }

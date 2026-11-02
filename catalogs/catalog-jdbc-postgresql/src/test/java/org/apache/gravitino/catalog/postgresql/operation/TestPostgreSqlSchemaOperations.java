@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test
-  void testQuotedAndBackslashSchemaNamesLoadWithoutExecutingSql() throws SQLException {
+  void testQuotedSchemaNamesLoadWithoutExecutingSql() throws SQLException {
     for (String schema : new String[] {"quoted';CREATE SCHEMA injected_marker;--"}) {
       DATABASE_OPERATIONS.create(schema, "safe comment", Map.of());
       try {
