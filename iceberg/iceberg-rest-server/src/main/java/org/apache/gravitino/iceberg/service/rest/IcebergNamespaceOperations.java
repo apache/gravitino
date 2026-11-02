@@ -320,7 +320,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      RegisterTableRequest registerTableRequest,
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.REGISTER_TABLE)
+          RegisterTableRequest registerTableRequest,
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);

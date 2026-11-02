@@ -161,6 +161,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case REGISTER_TABLE:
+            return Optional.of(new RegisterTableOverwriteAuthzHandler(parameters, args));
           default:
             break;
         }
