@@ -383,9 +383,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       // If the entity in the store doesn't match the one in the external system, we use the data
       // of external system to correct it.
       LOG.warn(
-          "The Schema uid {} existed but still needs to be imported, this could be happened "
-              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
-              + "we need to overwrite the stored entity to keep consistency.",
+          "Verifying ownership of schema identifier {} before import; the source may have been "
+              + "renamed externally or may carry a copied identifier.",
           stringId);
       uid = stringId.id();
     } else {
