@@ -46,6 +46,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
+  private static final int MAX_NUMERIC_PRECISION = 1000;
+
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
@@ -112,7 +114,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
             : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
         Integer length = typeBean.getColumnSize();
-        return length == null || length <= 0
+        return length == null || length <= 0 || length == Integer.MAX_VALUE
             ? Types.StringType.get()
             : Types.FixedCharType.of(length);
       case TEXT:
@@ -199,10 +201,19 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
     // PostgreSQL has no dedicated element metadata for array columns: the driver reports the
     // element's type information (length, scale, precision) on the array column itself, encoded
-    // through atttypmod. Propagate it to the element bean, otherwise length-driven element types
-    // such as BPCHAR unbox a null column size and table loading fails with an NPE.
+    // through atttypmod. Propagate it to the element bean so constrained character, numeric and
+    // temporal element types keep the same metadata as their scalar counterparts.
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
-    bean.setColumnSize(columnBean.getColumnSize());
+    Integer columnSize = columnBean.getColumnSize();
+    // pgjdbc getColumns substitutes the display width (131089) when an unconstrained NUMERIC
+    // array's precision is zero, because its JDBC type is ARRAY rather than NUMERIC. That width
+    // is not a declared precision: PostgreSQL only allows explicit precision up to 1000.
+    if (NUMERIC.equals(elementTypeName)
+        && columnSize != null
+        && columnSize > MAX_NUMERIC_PRECISION) {
+      columnSize = 0;
+    }
+    bean.setColumnSize(columnSize);
     bean.setScale(columnBean.getScale());
     bean.setDatetimePrecision(columnBean.getDatetimePrecision());
     return ListType.nullable(toGravitino(bean));

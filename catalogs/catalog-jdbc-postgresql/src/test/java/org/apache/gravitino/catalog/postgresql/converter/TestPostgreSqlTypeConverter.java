@@ -141,6 +141,52 @@ public class TestPostgreSqlTypeConverter {
         Types.ListType.nullable(Types.StringType.get()), "_bpchar", null, null, null);
     checkJdbcTypeToGravitinoType(
         Types.ListType.nullable(Types.StringType.get()), "_bpchar", 0, null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.StringType.get()), "_bpchar", Integer.MAX_VALUE, null, null);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), BPCHAR, Integer.MAX_VALUE, null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.StringType.get()), "_varchar", Integer.MAX_VALUE, null, null);
+  }
+
+  @Test
+  void testNumericArrayElementMetadata() {
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.DecimalType.of(10, 2)), "_numeric", 10, 2, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric")), "_numeric", 0, 0, null);
+    // pgjdbc getColumns reports display width rather than precision for unconstrained arrays.
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric")), "_numeric", 131089, 0, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(1000,0)")),
+        "_numeric",
+        1000,
+        0,
+        null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(39,0)")), "_numeric", 39, 0, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(2,-3)")), "_numeric", 2, 2045, null);
+  }
+
+  @Test
+  void testTemporalArrayElementMetadata() {
+    for (int precision : new int[] {0, 3, 6}) {
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimeType.of(precision)), "_time", null, null, precision);
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimestampType.withoutTimeZone(precision)),
+          "_timestamp",
+          null,
+          null,
+          precision);
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimestampType.withTimeZone(precision)),
+          "_timestamptz",
+          null,
+          null,
+          precision);
+    }
   }
 
   @Test

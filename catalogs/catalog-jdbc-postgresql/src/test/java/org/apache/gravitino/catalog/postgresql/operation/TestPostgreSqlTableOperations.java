@@ -96,7 +96,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
               + TEST_DB_NAME
               + "."
               + name
-              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[], wide numeric(39,0)[])");
+              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[], wide numeric(39,0)[], "
+              + "unbounded varchar[], unconstrained numeric[], t time(0)[], tz timestamptz(6)[], "
+              + "max_precision numeric(1000,0)[])");
       try {
         JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
         Assertions.assertEquals(
@@ -111,6 +113,42 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         Assertions.assertEquals(
             Types.ListType.nullable(Types.ExternalType.of("numeric(39,0)")),
             table.columns()[4].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.StringType.get()), table.columns()[5].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric")),
+            table.columns()[6].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimeType.of(0)), table.columns()[7].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimestampType.withTimeZone(6)),
+            table.columns()[8].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric(1000,0)")),
+            table.columns()[9].dataType());
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @Test
+  void testNativeUnboundedBpcharLoadsAsString() throws SQLException {
+    String name = RandomNameUtils.genRandomName("unbounded_bpchar");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (label bpchar, labels bpchar[], bounded char(3))");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(Types.StringType.get(), table.columns()[0].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.StringType.get()), table.columns()[1].dataType());
+        Assertions.assertEquals(Types.FixedCharType.of(3), table.columns()[2].dataType());
       } finally {
         TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
       }
