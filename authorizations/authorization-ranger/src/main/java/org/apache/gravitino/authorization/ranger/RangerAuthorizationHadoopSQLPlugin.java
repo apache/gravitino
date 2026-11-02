@@ -250,11 +250,9 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                 }
                 // Update the policy resource names, up to the renamed level, to the new names
                 for (int i = 0; i <= index; i++) {
-                  policy
-                      .getResources()
-                      .put(
-                          policyResourceDefinesRule().get(i),
-                          new RangerPolicy.RangerPolicyResource(newAuthzMetaObject.names().get(i)));
+                  policy.setResource(
+                      policyResourceDefinesRule().get(i),
+                      new RangerPolicy.RangerPolicyResource(newAuthzMetaObject.names().get(i)));
                 }
 
                 boolean alreadyExist =
@@ -402,7 +400,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-      policy.getResources().put(policyResourceDefinesRule().get(i), policyResource);
+      policy.setResource(policyResourceDefinesRule().get(i), policyResource);
     }
     return policy;
   }

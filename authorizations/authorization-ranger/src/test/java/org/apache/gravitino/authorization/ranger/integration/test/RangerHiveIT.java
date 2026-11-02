@@ -2192,7 +2192,7 @@ public class RangerHiveIT {
       for (RangerPolicy.RangerPolicyItem policyItem : policy.getPolicyItems()) {
         if (policyItem.getRoles().remove(currentOwnerRole)) {
           if (!policyItem.getRoles().contains(legacyOwnerRole)) {
-            policyItem.getRoles().add(legacyOwnerRole);
+            policyItem.addRole(legacyOwnerRole);
           }
           replaced = true;
         }

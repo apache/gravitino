@@ -44,6 +44,10 @@ dependencies {
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
     implementation(libs.woodstox.core)
+    // hadoop-common, hadoop-auth, Curator and the Hive shims bring ZooKeeper 3.6.3, which is end of
+    // life. Only the ZooKeeper client classes are on this classpath.
+    implementation(libs.zookeeper)
+    implementation(libs.zookeeper.jute)
   }
 
   implementation(libs.hadoop3.common) {

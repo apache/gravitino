@@ -517,7 +517,7 @@ public class RangerITEnv {
       Assertions.assertTrue(policies.size() <= 1);
       if (!policies.isEmpty()) {
         RangerPolicy policy = policies.get(0);
-        policy.getPolicyItems().addAll(policyItems);
+        policyItems.forEach(policy::addPolicyItem);
         rangerClient.updatePolicy(policy.getId(), policy);
       } else {
         RangerPolicy policy = new RangerPolicy();

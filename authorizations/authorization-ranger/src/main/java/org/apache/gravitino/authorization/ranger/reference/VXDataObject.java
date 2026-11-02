@@ -18,18 +18,19 @@
  */
 package org.apache.gravitino.authorization.ranger.reference;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.util.Date;
-import org.codehaus.jackson.annotate.JsonAutoDetect;
-import org.codehaus.jackson.annotate.JsonAutoDetect.Visibility;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 // apache/ranger/security-admin/src/main/java/org/apache/ranger/view/VXDataObject.java
 @JsonAutoDetect(
     getterVisibility = Visibility.NONE,
     setterVisibility = Visibility.NONE,
     fieldVisibility = Visibility.ANY)
-@JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VXDataObject implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
