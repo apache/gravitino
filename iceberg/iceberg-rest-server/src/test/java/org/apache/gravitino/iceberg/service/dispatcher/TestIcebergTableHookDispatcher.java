@@ -19,8 +19,10 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,6 +48,9 @@ import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
@@ -63,6 +68,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 public class TestIcebergTableHookDispatcher {
 
@@ -73,6 +79,9 @@ public class TestIcebergTableHookDispatcher {
       new Schema(NestedField.required(1, "test_field", StringType.get()));
 
   private IcebergTableHookDispatcher hookDispatcher;
+  private LockManager mockLockManager;
+  private TreeLock mockTreeLock;
+  private LockManager previousLockManager;
   private IcebergTableOperationDispatcher mockDispatcher;
   private IcebergNamespaceOperationDispatcher mockNamespaceDispatcher;
   private EntityStore mockEntityStore;
@@ -126,6 +135,13 @@ public class TestIcebergTableHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockInternalOwnerDispatcher, true);
 
+    previousLockManager =
+        (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
+    mockLockManager = mock(LockManager.class);
+    mockTreeLock = mock(TreeLock.class);
+    when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
+
     // Create mock IcebergRESTServerContext
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
@@ -162,6 +178,8 @@ public class TestIcebergTableHookDispatcher {
         previousInternalOwnerDispatcher,
         true);
 
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", previousLockManager, true);
+
     // Reset IcebergRESTServerContext singleton
     Class<?> holderClass =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
@@ -169,6 +187,47 @@ public class TestIcebergTableHookDispatcher {
             .findFirst()
             .orElseThrow(() -> new RuntimeException("InstanceHolder class not found"));
     FieldUtils.writeStaticField(holderClass, "INSTANCE", null, true);
+  }
+
+  @Test
+  public void testCreateTableHoldsTheNamespaceBranchLockForReading() {
+    // dropNamespace holds the same lock for writing, so a create and a drop of one namespace are
+    // serialized on this server.
+    Namespace namespace = Namespace.of("A", "B");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("t").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.createTable(mockContext, namespace, request);
+
+    ArgumentCaptor<NameIdentifier> lockId = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockLockManager).createTreeLock(lockId.capture());
+    Assertions.assertArrayEquals(
+        new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
+    Assertions.assertEquals("A", lockId.getValue().name());
+    InOrder order = inOrder(mockTreeLock, mockDispatcher);
+    order.verify(mockTreeLock).lock(LockType.READ);
+    order.verify(mockDispatcher).createTable(mockContext, namespace, request);
+    order.verify(mockTreeLock).unlock();
+  }
+
+  @Test
+  void testStagedCreateCommitHoldsNamespaceBranchLock() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("A", "B"), "staged");
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, table, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.updateTable(mockContext, table, request);
+
+    verify(mockLockManager).createTreeLock(NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "A"));
+    InOrder order = inOrder(mockTreeLock, mockDispatcher);
+    order.verify(mockTreeLock).lock(LockType.READ);
+    order.verify(mockDispatcher).updateTable(mockContext, table, request);
+    order.verify(mockTreeLock).unlock();
   }
 
   @Test
@@ -198,6 +257,47 @@ public class TestIcebergTableHookDispatcher {
         .setOwner(eq(TEST_METALAKE), any(), userCaptor.capture(), eq(Owner.Type.USER));
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     Assertions.assertEquals(TEST_USER, userCaptor.getValue());
+  }
+
+  @Test
+  public void testCreateTableIsNotDroppedWhenImportFails() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+    RuntimeException importFailure = new RuntimeException("Failed to import table entity");
+    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createTable(mockContext, namespace, request));
+    Assertions.assertSame(importFailure, thrown);
+
+    verify(mockDispatcher, never()).dropTable(any(), any(), anyBoolean());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testStagedCreateCommitIsNotDroppedWhenImportFails() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "staged_table");
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.singletonList(new UpdateRequirement.AssertTableDoesNotExist()),
+            Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
+    RuntimeException importFailure = new RuntimeException("Failed to import table entity");
+    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.updateTable(mockContext, tableId, request));
+    Assertions.assertSame(importFailure, thrown);
+    verify(mockDispatcher, never()).dropTable(any(), any(), anyBoolean());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
