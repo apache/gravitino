@@ -25,6 +25,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestCompactionPolicyStrictTypes {
   @ParameterizedTest
@@ -39,10 +40,34 @@ class TestCompactionPolicyStrictTypes {
     "minIntervalMs,3600.5",
     "minIntervalMs,\"100\"",
     "commitTrigger,\"true\"",
-    "commitTrigger,1"
+    "commitTrigger,1",
+    "rewriteStrategy,1",
+    "rewriteStrategy,true",
+    "sortOrder,2",
+    "sortOrder,true",
+    "timeTrigger,1",
+    "timeTrigger,true",
+    "rewriteOptions,1",
+    "jobOptions,1",
+    "updaterOptions,true"
   })
   void rejectInvalidValuesInCreateAndUpdate(String field, String value) {
-    String content = "{\"" + field + "\":" + value + "}";
+    assertRejected("{\"" + field + "\":" + value + "}");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"rewriteOptions\":{\"target-file-size-bytes\":134217728}}",
+        "{\"rewriteOptions\":{\"partial-progress-enabled\":true}}",
+        "{\"jobOptions\":{\"k\":1}}",
+        "{\"updaterOptions\":{\"metalake\":true}}"
+      })
+  void rejectNonStringMapEntryValues(String content) {
+    assertRejected(content);
+  }
+
+  private static void assertRejected(String content) {
     String create =
         "{\"name\":\"compact\",\"policyType\":\"system_iceberg_compaction\","
             + "\"enabled\":true,\"content\":"

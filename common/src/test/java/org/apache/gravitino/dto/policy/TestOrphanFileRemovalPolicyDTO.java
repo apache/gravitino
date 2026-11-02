@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestOrphanFileRemovalPolicyDTO {
   @Test
@@ -128,10 +129,25 @@ class TestOrphanFileRemovalPolicyDTO {
     "minIntervalMs,1.9",
     "minIntervalMs,\"100\"",
     "commitTrigger,1",
-    "commitTrigger,\"false\""
+    "commitTrigger,\"false\"",
+    "location,123",
+    "location,true",
+    "timeTrigger,1",
+    "timeTrigger,true",
+    "jobOptions,1",
+    "updaterOptions,true"
   })
   void rejectInvalidValuesInCreateAndUpdate(String field, String value) {
-    String content = "{\"" + field + "\":" + value + "}";
+    assertRejected("{\"" + field + "\":" + value + "}");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"jobOptions\":{\"k\":1}}", "{\"updaterOptions\":{\"metalake\":true}}"})
+  void rejectNonStringMapEntryValues(String content) {
+    assertRejected(content);
+  }
+
+  private static void assertRejected(String content) {
     String create =
         "{\"name\":\"cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\","
             + "\"enabled\":true,\"content\":"

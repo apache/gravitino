@@ -77,7 +77,11 @@ class TestManifestRewritePolicyDTO {
     "minIntervalMs,1.5",
     "minIntervalMs,\"100\"",
     "commitTrigger,1",
-    "commitTrigger,\"true\""
+    "commitTrigger,\"true\"",
+    "timeTrigger,1",
+    "timeTrigger,true",
+    "jobOptions,1",
+    "updaterOptions,true"
   })
   void testRejectInvalidValuesInCreateAndUpdate(String field, String value) {
     String content = "{\"" + field + "\":" + value + "}";

@@ -169,6 +169,52 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
+  /**
+   * Reads a string without silently coercing numbers or booleans.
+   *
+   * <p>Shared by Iceberg maintenance policy string fields ({@code rewriteStrategy}, {@code
+   * sortOrder}, orphan {@code location}, peer {@code timeTrigger}).
+   */
+  class StrictStringDeserializer extends JsonDeserializer<String> {
+    @Override
+    public String deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_STRING)) {
+        return context.reportInputMismatch(String.class, "Value must be a string");
+      }
+      return parser.getText();
+    }
+  }
+
+  /**
+   * Reads a string-to-string map without silently coercing numeric or boolean entry values.
+   *
+   * <p>Shared by Iceberg maintenance {@code rewriteOptions}, {@code jobOptions}, and {@code
+   * updaterOptions}.
+   */
+  class StrictStringMapDeserializer extends JsonDeserializer<Map<String, String>> {
+    @Override
+    public Map<String, String> deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.START_OBJECT)) {
+        return context.reportInputMismatch(Map.class, "Value must be a JSON object");
+      }
+      Map<String, String> result = new LinkedHashMap<>();
+      while (parser.nextToken() != JsonToken.END_OBJECT) {
+        String key = parser.currentName();
+        JsonToken valueToken = parser.nextToken();
+        if (valueToken == JsonToken.VALUE_NULL) {
+          result.put(key, null);
+        } else if (valueToken != JsonToken.VALUE_STRING) {
+          return context.reportInputMismatch(Map.class, "Map entry '%s' must be a string", key);
+        } else {
+          result.put(key, parser.getText());
+        }
+      }
+      return result;
+    }
+  }
+
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
   @ToString
@@ -241,17 +287,21 @@ public interface PolicyContentDTO extends PolicyContent {
     private Long maxPartitionNum;
 
     @JsonProperty("rewriteStrategy")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String rewriteStrategy;
 
     @JsonProperty("sortOrder")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String sortOrder;
 
     @JsonProperty("rewriteOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     private Map<String, String> rewriteOptions;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
@@ -271,11 +321,13 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -482,6 +534,7 @@ public interface PolicyContentDTO extends PolicyContent {
     private Long olderThanDays;
 
     @JsonProperty("location")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String location;
 
     @JsonProperty("dryRun")
@@ -491,6 +544,7 @@ public interface PolicyContentDTO extends PolicyContent {
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
@@ -510,11 +564,13 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -674,6 +730,7 @@ public interface PolicyContentDTO extends PolicyContent {
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
@@ -693,11 +750,13 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -891,6 +950,7 @@ public interface PolicyContentDTO extends PolicyContent {
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
@@ -910,11 +970,13 @@ public interface PolicyContentDTO extends PolicyContent {
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
