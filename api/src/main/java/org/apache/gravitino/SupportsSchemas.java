@@ -79,6 +79,8 @@ public interface SupportsSchemas {
    *
    * @param schemaName The name of the schema.
    * @return True if the schema exists, false otherwise.
+   * @throws SchemaAlreadyExistsException If loading an external schema detects an identifier owned
+   *     by another existing schema; the conflict is propagated instead of returning false.
    */
   default boolean schemaExists(String schemaName) {
     try {
@@ -145,6 +147,8 @@ public interface SupportsSchemas {
    * @param schemaName The name of the schema.
    * @return A schema.
    * @throws NoSuchSchemaException If the schema does not exist (optional).
+   * @throws SchemaAlreadyExistsException If an external schema carries the identifier of another
+   *     existing schema. Remove the copied source marker before importing an independent copy.
    */
   Schema loadSchema(String schemaName) throws NoSuchSchemaException;
 

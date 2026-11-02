@@ -513,9 +513,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * Drops a schema.
    *
    * @param ident The identifier of the schema to be dropped.
-   * @param cascade If true, drops all tables within the schema as well.
+   * @param cascade Whether to request cascading deletion. A catalog may reject a non-empty schema
+   *     even when this is true if it cannot safely contain the deletion.
    * @return True if the schema was successfully dropped, false if the schema doesn't exist.
-   * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   * @throws NonEmptySchemaException If the schema is non-empty and cascade is false, or if the
+   *     catalog cannot safely support the requested cascading deletion.
    * @throws RuntimeException If an error occurs while dropping the schema.
    */
   @Override

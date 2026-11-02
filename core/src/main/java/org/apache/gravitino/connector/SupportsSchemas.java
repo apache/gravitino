@@ -59,6 +59,8 @@ public interface SupportsSchemas {
    *
    * @param ident The name identifier of the schema.
    * @return True if the schema exists, false otherwise.
+   * @throws SchemaAlreadyExistsException If loading an external schema detects an identifier owned
+   *     by another existing schema; the conflict is propagated instead of returning false.
    */
   default boolean schemaExists(NameIdentifier ident) {
     try {
@@ -88,6 +90,8 @@ public interface SupportsSchemas {
    * @param ident The name identifier of the schema.
    * @return A schema.
    * @throws NoSuchSchemaException If the schema does not exist (optional).
+   * @throws SchemaAlreadyExistsException If an external schema carries the identifier of another
+   *     existing schema. Remove the copied source marker before importing an independent copy.
    */
   Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException;
 
