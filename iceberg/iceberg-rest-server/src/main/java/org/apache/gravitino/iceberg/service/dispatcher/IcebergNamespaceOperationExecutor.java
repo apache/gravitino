@@ -19,9 +19,13 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -93,6 +97,7 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    validatePropertyUpdate(updateNamespacePropertiesRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateNamespaceProperties(namespace, updateNamespacePropertiesRequest);
@@ -141,5 +146,27 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
     IcebergColumnFieldValidator.validateSchema(metadata.schema());
     return catalogWrapper.registerTable(
         namespace, registerTableRequest, context.requestCredentialVending());
+  }
+
+  /**
+   * Rejects a property update that sets a null value or removes a null key. Iceberg's request
+   * builder refuses these, but a request read from JSON skips the builder, and the JDBC catalog
+   * would store a null value that makes the namespace unreadable.
+   */
+  @VisibleForTesting
+  static void validatePropertyUpdate(UpdateNamespacePropertiesRequest request) {
+    Set<String> nullValues =
+        request.updates().entrySet().stream()
+            .filter(entry -> entry.getKey() == null || entry.getValue() == null)
+            .map(entry -> String.valueOf(entry.getKey()))
+            .collect(Collectors.toCollection(TreeSet::new));
+    if (!nullValues.isEmpty()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid value to update for properties %s: null. Use remove instead", nullValues));
+    }
+    if (request.removals().contains(null)) {
+      throw new IllegalArgumentException("Invalid property to remove: null");
+    }
   }
 }
