@@ -23,8 +23,11 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 
 /**
  * Core registry of Iceberg maintenance policy definitions.
@@ -89,6 +92,34 @@ public final class MaintenancePolicyDefinitions {
    */
   public static boolean isMaintenance(Policy.BuiltInType builtInType) {
     return builtInType != null && BY_TYPE.containsKey(builtInType);
+  }
+
+  /**
+   * @param content policy content, may be null
+   * @return whether {@code content} is an instance of a registered maintenance content class
+   */
+  public static boolean isMaintenance(@Nullable PolicyContent content) {
+    if (content == null) {
+      return false;
+    }
+    for (Policy.BuiltInType type : BY_TYPE.keySet()) {
+      if (type.contentClass().isInstance(content)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * @param content policy content, may be null
+   * @return {@code timeTrigger} from an executable content, or null when absent
+   */
+  @Nullable
+  public static String timeTrigger(@Nullable PolicyContent content) {
+    if (!(content instanceof ExecutablePolicyContent)) {
+      return null;
+    }
+    return ((ExecutablePolicyContent) content).executionSpec().timeTrigger();
   }
 
   private static void register(

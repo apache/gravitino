@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.scheduler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
@@ -43,7 +42,6 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.meta.PolicyEntity;
 
 /**
@@ -114,26 +112,6 @@ public final class MaintenanceJobSpecFactory {
    */
   public MaintenanceJobSpec forCommit(List<TableCandidate> tables) {
     return build(tables);
-  }
-
-  /**
-   * Legacy cron enqueue-time spec used by the pre-planner {@code CronJobClient}. Prefer {@link
-   * #forCron(List)} with {@link TableCandidate} once that client is split.
-   *
-   * @param policy effective maintenance policy
-   * @param tables resolved table refs (same order as enqueue)
-   * @return spec ready for {@code task_data}
-   */
-  public MaintenanceJobSpec forCron(PolicyEntity policy, List<ResolvedTableRef> tables) {
-    Preconditions.checkNotNull(policy, "policy");
-    Preconditions.checkArgument(tables != null && !tables.isEmpty(), "tables must not be empty");
-    List<TableCandidate> candidates = new ArrayList<>(tables.size());
-    for (ResolvedTableRef ref : tables) {
-      candidates.add(
-          new TableCandidate(
-              ref.tableId(), ref.catalogName(), ref.tableIdentifier(), List.of(policy)));
-    }
-    return build(candidates);
   }
 
   private MaintenanceJobSpec build(List<TableCandidate> tables) {
@@ -323,7 +301,7 @@ public final class MaintenanceJobSpecFactory {
    * Splits a {@link MaintenanceJobConfBuilder#build} map into per-task {@code parameters} plus
    * shared {@code updater_options} / {@code spark_conf}.
    */
-  public static JobConfParts splitJobConfParts(Map<String, String> built) {
+  private static JobConfParts splitJobConfParts(Map<String, String> built) {
     Preconditions.checkNotNull(built, "built");
     Map<String, String> parameters = new LinkedHashMap<>();
     String updaterOptions = null;
@@ -511,8 +489,7 @@ public final class MaintenanceJobSpecFactory {
    * Parses Spark-style memory strings ({@code 512m}, {@code 1g}, {@code 2048}) into bytes for max
    * merge.
    */
-  @VisibleForTesting
-  static Optional<Long> parseMemoryBytes(String value) {
+  private static Optional<Long> parseMemoryBytes(String value) {
     if (value == null) {
       return Optional.empty();
     }
@@ -574,29 +551,16 @@ public final class MaintenanceJobSpecFactory {
     }
   }
 
-  /** Visible for tests that assert resource merge. */
-  @VisibleForTesting
-  public static Map<String, String> newLinkedMap(String... kv) {
-    Map<String, String> map = new LinkedHashMap<>();
-    for (int i = 0; i + 1 < kv.length; i += 2) {
-      map.put(kv[i], kv[i + 1]);
-    }
-    return map;
-  }
-
   /**
    * Result of splitting {@link MaintenanceJobConfBuilder#build} into per-task parameters and shared
    * jobConf fields.
    */
-  public static final class JobConfParts {
-    /** Per-task template placeholders (excludes updater_options / spark_conf). */
-    public final Map<String, String> parameters;
-    /** Shared updater_options JSON string. */
-    public final String updaterOptions;
-    /** Shared spark_conf JSON string; may be null. */
-    @Nullable public final String sparkConf;
+  private static final class JobConfParts {
+    private final Map<String, String> parameters;
+    private final String updaterOptions;
+    @Nullable private final String sparkConf;
 
-    JobConfParts(
+    private JobConfParts(
         Map<String, String> parameters, String updaterOptions, @Nullable String sparkConf) {
       this.parameters = parameters;
       this.updaterOptions = updaterOptions;

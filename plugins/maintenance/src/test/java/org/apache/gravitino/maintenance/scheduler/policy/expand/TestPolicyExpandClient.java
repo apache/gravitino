@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.policy;
+package org.apache.gravitino.maintenance.scheduler.policy.expand;
 
 import java.time.Instant;
 import javax.sql.DataSource;
@@ -26,29 +26,29 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-class TestPolicyExpandRegistrar extends TestJDBCBackend {
+class TestPolicyExpandClient extends TestJDBCBackend {
 
   private static final String CRON = "0 0 2 * * ?";
   private static final String LATER_CRON = "0 30 4 * * ?";
 
   @TestTemplate
-  void testSyncInsertsReschedulesAndRemovesTheExpandRow() {
+  void testScheduleRescheduleAndRemoveTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
+    SessionUtils.doMultipleWithCommit(() -> schedule(writer, 42L, CRON));
     Instant firstDue = executionTime(reader, 42L);
     Assertions.assertTrue(firstDue.isAfter(Instant.now()));
 
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, LATER_CRON));
+    SessionUtils.doMultipleWithCommit(() -> schedule(writer, 42L, LATER_CRON));
     Instant secondDue = executionTime(reader, 42L);
     Assertions.assertNotEquals(firstDue, secondDue);
 
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, false, LATER_CRON));
+    SessionUtils.doMultipleWithCommit(() -> writer.remove(42L));
     Assertions.assertTrue(reader.scheduledExecutionTime(42L).isEmpty());
 
-    SessionUtils.doMultipleWithCommit(() -> writer.sync(42L, true, CRON));
+    SessionUtils.doMultipleWithCommit(() -> schedule(writer, 42L, CRON));
     Assertions.assertTrue(reader.scheduledExecutionTime(42L).isPresent());
     SessionUtils.doMultipleWithCommit(() -> writer.remove(42L));
     Assertions.assertTrue(reader.scheduledExecutionTime(42L).isEmpty());
@@ -58,14 +58,14 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   @TestTemplate
   void testFailedTransactionRollsBackTheExpandRow() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalStateException.class,
         () ->
             SessionUtils.doMultipleWithCommit(
-                () -> writer.sync(99L, true, CRON),
+                () -> schedule(writer, 99L, CRON),
                 () -> {
                   throw new IllegalStateException("boom");
                 }));
@@ -76,12 +76,12 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
   @TestTemplate
   void testInvalidCronFailsBeforeAnExpandRowIsWritten() {
     DataSource dataSource = entityStoreDataSource();
-    PolicyExpandRegistrar writer = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandRegistrar reader = PolicyExpandRegistrar.forReads(dataSource);
+    PolicyExpandClient writer = PolicyExpandClient.joiningCurrentTransaction();
+    PolicyExpandClient reader = PolicyExpandClient.forReads(dataSource);
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> SessionUtils.doMultipleWithCommit(() -> writer.sync(100L, true, "not a cron")));
+        () -> SessionUtils.doMultipleWithCommit(() -> schedule(writer, 100L, "not a cron")));
 
     Assertions.assertTrue(reader.scheduledExecutionTime(100L).isEmpty());
   }
@@ -94,8 +94,12 @@ class TestPolicyExpandRegistrar extends TestJDBCBackend {
         .getDataSource();
   }
 
-  private static Instant executionTime(PolicyExpandRegistrar registrar, long policyId) {
-    return registrar
+  private static void schedule(PolicyExpandClient writer, long policyId, String cron) {
+    writer.scheduleAt(policyId, PolicyExpandClient.nextExecution(cron));
+  }
+
+  private static Instant executionTime(PolicyExpandClient expandClient, long policyId) {
+    return expandClient
         .scheduledExecutionTime(policyId)
         .orElseThrow(() -> new AssertionError("missing expand row " + policyId));
   }

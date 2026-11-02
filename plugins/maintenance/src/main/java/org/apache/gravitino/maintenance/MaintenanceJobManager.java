@@ -69,7 +69,7 @@ public class MaintenanceJobManager {
   }
 
   private MaintenanceJobManager(JobOperationDispatcher jobOperationDispatcher) {
-    this.jobOperationDispatcher = jobOperationDispatcher;
+    this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
   }
 
   /**

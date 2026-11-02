@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.policy.expand;
+package org.apache.gravitino.maintenance.scheduler.policy;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.meta.AuditInfo;
@@ -57,7 +58,7 @@ class TestNearestMaintenancePolicyResolver {
   }
 
   @Test
-  void testTableLevelBeatsCatalogLevel() {
+  void testResolveWinnerIdNearestFallbackAndEmpty() {
     PolicyEntity tablePolicy = policy(10L, "table-compaction");
     PolicyEntity catalogPolicy = policy(20L, "catalog-compaction");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
@@ -65,54 +66,20 @@ class TestNearestMaintenancePolicyResolver {
             new Match[] {
               new Match(tablePolicy, List.of(TABLE)), new Match(catalogPolicy, List.of(CATALOG))
             });
+    Assertions.assertEquals(
+        Optional.of(10L),
+        resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
 
-    NearestMaintenancePolicyResolver.Decision decision =
-        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.WINNER, decision.kind());
-    Assertions.assertEquals(java.util.Optional.of(10L), decision.winnerPolicyId());
-    Assertions.assertEquals(TABLE, decision.winnerLevel());
-  }
-
-  @Test
-  void testFallsBackToAncestorWhenTableHasNoMatch() {
-    PolicyEntity catalogPolicy = policy(20L, "catalog-compaction");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
         .thenReturn(new Match[] {new Match(catalogPolicy, List.of(CATALOG))});
-
-    NearestMaintenancePolicyResolver.Decision decision =
-        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.WINNER, decision.kind());
-    Assertions.assertEquals(java.util.Optional.of(20L), decision.winnerPolicyId());
-    Assertions.assertEquals(CATALOG, decision.winnerLevel());
-  }
-
-  @Test
-  void testEmptyWhenNoMatchingType() {
-    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE)).thenReturn(new Match[0]);
-
-    NearestMaintenancePolicyResolver.Decision decision =
-        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.NONE, decision.kind());
-  }
-
-  @Test
-  void testSameLevelConflict() {
-    PolicyEntity p1 = policy(10L, "compaction-a");
-    PolicyEntity p2 = policy(11L, "compaction-b");
-    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(new Match[] {new Match(p1, List.of(TABLE)), new Match(p2, List.of(TABLE))});
-
-    NearestMaintenancePolicyResolver.Decision decision =
-        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
     Assertions.assertEquals(
-        NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT, decision.kind());
-    Assertions.assertEquals(TABLE, decision.conflictLevel());
-    Assertions.assertEquals(List.of(10L, 11L), decision.conflictingPolicyIds());
-    Assertions.assertTrue(decision.winnerPolicyId().isEmpty());
-  }
+        Optional.of(20L),
+        resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
 
-  @Test
-  void testIgnoresNonMatchingBuiltInType() {
+    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE)).thenReturn(new Match[0]);
+    Assertions.assertTrue(
+        resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION).isEmpty());
+
     PolicyEntity custom =
         PolicyEntity.builder()
             .withId(99L)
@@ -128,10 +95,25 @@ class TestNearestMaintenancePolicyResolver {
             .build();
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
         .thenReturn(new Match[] {new Match(custom, List.of(TABLE))});
+    Assertions.assertTrue(
+        resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION).isEmpty());
+  }
 
-    NearestMaintenancePolicyResolver.Decision decision =
-        resolver.resolve(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION);
-    Assertions.assertEquals(NearestMaintenancePolicyResolver.Decision.Kind.NONE, decision.kind());
+  @Test
+  void testSameLevelConflictThrows() {
+    when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
+        .thenReturn(
+            new Match[] {
+              new Match(policy(10L, "a"), List.of(TABLE)),
+              new Match(policy(11L, "b"), List.of(TABLE))
+            });
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
+    Assertions.assertTrue(thrown.getMessage().contains("ambiguous"));
+    Assertions.assertTrue(thrown.getMessage().contains("10"));
+    Assertions.assertTrue(thrown.getMessage().contains("11"));
   }
 
   private static PolicyEntity policy(long id, String name) {

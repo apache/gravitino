@@ -41,9 +41,11 @@ import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPipeline;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.MaintenanceExpandSubmitPipeline;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPlanner;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,12 +57,14 @@ import org.slf4j.LoggerFactory;
  * isolation; sharing one physical table across pools is unsupported (see design §5.2).
  *
  * <p>The expand pool fans a due {@code policy-expand} lease into {@code cron-job} rows with an
- * enqueue-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
+ * schedule-time {@link MaintenanceJobSpec}. The cron and commit pools consume that spec, claim a
  * soft slot, and submit Spark.
+ *
+ * <p>Dependencies are injected by the composition root ({@code TableMaintenanceRESTFeature}).
  */
-public class TableMaintenanceSchedulerPools implements AutoCloseable {
+public class MaintenanceSchedulerPools implements AutoCloseable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TableMaintenanceSchedulerPools.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSchedulerPools.class);
 
   /** Expand-pool db-scheduler table. */
   public static final String EXPAND_TASKS_TABLE = "scheduled_expand_tasks";
@@ -84,7 +88,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    * Expand pipeline supplier used by {@link #policyExpandTask()}. {@link #start} installs the
    * relational implementation.
    */
-  private static final AtomicReference<Supplier<PolicyExpandPipeline>> EXPAND_PIPELINE =
+  private static final AtomicReference<Supplier<MaintenanceExpandSubmitPipeline>> EXPAND_PIPELINE =
       new AtomicReference<>(
           () -> {
             throw new IllegalStateException("policy-expand pipeline is not configured");
@@ -109,29 +113,46 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
    * @param dataSource relational JDBC pool shared with the entity store
    * @param config maintenance scheduler settings
    * @param gravitinoConfig server config for {@code minIntervalMs} fallbacks and jobConf overlay
+   * @param jobManager TMS Spark submit+bind manager
+   * @param actionManager occupancy / cooldown gate
+   * @param actionMetaService soft-slot claim store used by cron/commit submit pipelines
+   * @param tableEnumerator nearest-policy table scan for expand
+   * @param policyMetaService policy lookup used by expand planning
    */
-  public void start(DataSource dataSource, TableMaintenanceConfig config, Config gravitinoConfig) {
+  public void start(
+      DataSource dataSource,
+      TableMaintenanceConfig config,
+      Config gravitinoConfig,
+      MaintenanceJobManager jobManager,
+      MaintenanceActionManager actionManager,
+      TableMaintenanceActionMetaService actionMetaService,
+      NearestPolicyTableEnumerator tableEnumerator,
+      PolicyMetaService policyMetaService) {
     Preconditions.checkState(schedulers.isEmpty(), "scheduler pools already started");
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig must not be null");
+    Preconditions.checkNotNull(jobManager, "jobManager must not be null");
+    Preconditions.checkNotNull(actionManager, "actionManager must not be null");
+    Preconditions.checkNotNull(actionMetaService, "actionMetaService must not be null");
+    Preconditions.checkNotNull(tableEnumerator, "tableEnumerator must not be null");
+    Preconditions.checkNotNull(policyMetaService, "policyMetaService must not be null");
 
-    MaintenanceActionManager actionManager =
-        new MaintenanceActionManager(
-            TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
-    PolicyExpandPipeline pipeline =
-        new PolicyExpandPipeline(
-            new NearestPolicyTableEnumerator(),
-            new CronJobClient(dataSource, gravitinoConfig),
-            actionManager,
-            gravitinoConfig,
-            config.expandEnqueueBatchSize());
+    MaintenanceExpandSubmitPipeline pipeline =
+        new MaintenanceExpandSubmitPipeline(
+            new PolicyExpandPlanner(
+                tableEnumerator,
+                new CronJobClient(dataSource, gravitinoConfig),
+                actionManager,
+                gravitinoConfig,
+                config.expandScheduleBatchSize(),
+                policyMetaService));
     EXPAND_PIPELINE.set(() -> pipeline);
 
     MaintenanceCronSubmitPipeline cronSubmit =
         new MaintenanceCronSubmitPipeline(
             actionManager,
-            TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobManager.getInstance(),
+            actionMetaService,
+            jobManager,
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
@@ -139,8 +160,8 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     MaintenanceCommitSubmitPipeline commitSubmit =
         new MaintenanceCommitSubmitPipeline(
             actionManager,
-            TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobManager.getInstance(),
+            actionMetaService,
+            jobManager,
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     COMMIT_SUBMIT.set(commitSubmit::submit);
@@ -238,7 +259,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Cron-pool task definition. Consumes the enqueue-time spec, claims a soft slot, submits Spark,
+   * Cron-pool task definition. Consumes the schedule-time spec, claims a soft slot, submits Spark,
    * then removes the one-shot row so a later expand pick can schedule again.
    *
    * @return the {@code cron-job} task
@@ -260,7 +281,7 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
   }
 
   /**
-   * Commit-pool task definition. Consumes the enqueue-time chain spec, claims a soft slot, submits
+   * Commit-pool task definition. Consumes the schedule-time chain spec, claims a soft slot, submits
    * Spark, then removes the one-shot row.
    *
    * @return the {@code commit-job} task

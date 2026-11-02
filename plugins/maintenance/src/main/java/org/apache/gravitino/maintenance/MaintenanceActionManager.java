@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 
@@ -34,10 +35,35 @@ import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMe
  */
 public final class MaintenanceActionManager {
 
+  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
+      TableMaintenanceActionMetaService.getInstance();
+
+  private static volatile MaintenanceActionManager instance;
+
   private final TableMaintenanceActionMetaService actionMetaService;
   private final long claimTimeoutMs;
 
   /**
+   * Returns the shared action manager for the server process.
+   *
+   * @return singleton manager
+   */
+  public static MaintenanceActionManager getInstance() {
+    if (instance == null) {
+      synchronized (MaintenanceActionManager.class) {
+        if (instance == null) {
+          long claimTimeoutMs =
+              TableMaintenanceConfig.from(GravitinoEnv.getInstance().config()).claimTimeoutMs();
+          instance = new MaintenanceActionManager(ACTION_SERVICE, claimTimeoutMs);
+        }
+      }
+    }
+    return instance;
+  }
+
+  /**
+   * Test / override constructor. Production code should use {@link #getInstance()}.
+   *
    * @param actionMetaService maintenance action store
    * @param claimTimeoutMs unbound claim TTL
    */
@@ -49,15 +75,12 @@ public final class MaintenanceActionManager {
   }
 
   /**
+   * Test / override constructor with the default claim timeout.
+   *
    * @param actionMetaService maintenance action store
    */
   public MaintenanceActionManager(TableMaintenanceActionMetaService actionMetaService) {
     this(actionMetaService, TableMaintenanceConfig.DEFAULT_CLAIM_TIMEOUT_MS);
-  }
-
-  /** Uses {@link TableMaintenanceActionMetaService#getInstance()} and the default claim timeout. */
-  public MaintenanceActionManager() {
-    this(TableMaintenanceActionMetaService.getInstance());
   }
 
   /**

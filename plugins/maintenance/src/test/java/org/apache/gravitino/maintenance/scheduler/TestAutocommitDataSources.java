@@ -113,8 +113,7 @@ class TestAutocommitDataSources extends TestJDBCBackend {
             10));
     SchedulerClient client = CronJobClient.schedulerClient(dataSource());
     return client
-        .getScheduledExecutionsForTask(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)
+        .getScheduledExecutionsForTask(MaintenanceSchedulerPools.CRON_JOB, MaintenanceJobSpec.class)
         .stream()
         .filter(
             execution -> {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.policy.expand;
+package org.apache.gravitino.maintenance.scheduler.policy;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,6 +36,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.maintenance.model.TableCandidate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -117,8 +118,8 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, table));
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -166,14 +167,11 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table2 =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "schema", "t2"), MetadataObject.Type.TABLE);
-    MetadataObject schema =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
 
-    when(nearest.resolve(METALAKE, table1, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(11L, table1));
-    when(nearest.resolve(METALAKE, table2, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, schema));
+    when(nearest.resolveWinnerId(METALAKE, table1, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(11L));
+    when(nearest.resolveWinnerId(METALAKE, table2, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
@@ -216,10 +214,8 @@ class TestNearestPolicyTableEnumerator {
     MetadataObject table =
         MetadataObjects.of(
             java.util.Arrays.asList("catalog", "a:b", "t1"), MetadataObject.Type.TABLE);
-    MetadataObject parentSchema =
-        MetadataObjects.of(java.util.Arrays.asList("catalog", "a"), MetadataObject.Type.SCHEMA);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, parentSchema));
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
 
     Assertions.assertEquals(
         List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -267,46 +263,14 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
         .thenReturn(List.of(t1, t2, t3));
 
-    when(nearest.resolve(
+    when(nearest.resolveWinnerId(
             eq(METALAKE), any(MetadataObject.class), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenAnswer(
-            invocation -> {
-              MetadataObject table = invocation.getArgument(1);
-              return NearestMaintenancePolicyResolver.Decision.winner(10L, table);
-            });
+        .thenReturn(java.util.Optional.of(10L));
 
-    PolicyTableEnumerator.ShouldSkipTable gate =
+    NearestPolicyTableEnumerator.ShouldSkipTable gate =
         (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
     Assertions.assertEquals(
         List.of(102L), tableIds(enumerator.listTableIds(policy, 1, gate, 60_000L)));
-  }
-
-  @Test
-  void testSameLevelConflictSkipsTable() throws Exception {
-    PolicyEntity policy = policy(10L, "compaction");
-    TagEntity tagA = tag(1L, "t-a");
-
-    when(policyTagRelService.listRelations(
-            eq(List.of(NameIdentifierUtil.ofPolicy(METALAKE, "compaction"))),
-            eq(Entity.EntityType.POLICY)))
-        .thenReturn(List.of(policyTagEdge(policy, tagA)));
-    when(tagMetaService.listAssociatedMetadataObjectsForTag(tagA.nameIdentifier()))
-        .thenReturn(
-            List.of(
-                GenericEntity.builder()
-                    .withId(100L)
-                    .withName("catalog.schema.t1")
-                    .withEntityType(Entity.EntityType.TABLE)
-                    .build()));
-
-    MetadataObject table =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema", "t1"), MetadataObject.Type.TABLE);
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.conflict(table, List.of(10L, 11L)));
-
-    Assertions.assertEquals(
-        List.of(), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
   }
 
   @Test
@@ -326,39 +290,14 @@ class TestNearestPolicyTableEnumerator {
             EntityCombinedTable.of(Mockito.mock(Table.class), table(501L, "missing"))
                 .withImported(true));
 
-    MetadataObject schemaObj =
-        MetadataObjects.of(
-            java.util.Arrays.asList("catalog", "schema"), MetadataObject.Type.SCHEMA);
-    stubWinner(tableMeta("catalog", "schema", "known"), schemaObj);
-    stubWinner(tableMeta("catalog", "schema", "missing"), schemaObj);
+    stubWinner(tableMeta("catalog", "schema", "known"));
+    stubWinner(tableMeta("catalog", "schema", "missing"));
 
     Assertions.assertEquals(
         List.of(500L, 501L),
         tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
     verify(tables).loadTable(missing);
     verify(tables, never()).loadTable(known);
-  }
-
-  @Test
-  void testImportsOnlyMissingSchemasAfterCatalogList() throws Exception {
-    PolicyEntity policy = stubTaggedObject("catalog", Entity.EntityType.CATALOG);
-    SchemaDispatcher schemas = mock(SchemaDispatcher.class);
-    TableDispatcher tables = mock(TableDispatcher.class);
-    NameIdentifier known = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "known");
-    NameIdentifier missing = NameIdentifierUtil.ofSchema(METALAKE, "catalog", "missing");
-    when(schemas.listSchemas(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
-        .thenReturn(new NameIdentifier[] {known, missing});
-    when(schemaMetaService.listSchemasByNamespace(eq(NamespaceUtil.ofSchema(METALAKE, "catalog"))))
-        .thenReturn(List.of(schema(2L, "known")));
-    when(schemas.loadSchema(eq(missing))).thenReturn(mock(org.apache.gravitino.Schema.class));
-    when(tables.listTables(any())).thenReturn(new NameIdentifier[0]);
-    when(tableMetaService.listTablesByNamespace(any())).thenReturn(List.of());
-
-    Assertions.assertEquals(
-        List.of(),
-        tableIds(catalogEnumerator(schemas, tables).listTableIds(policy, 10, allowAll(), 0L)));
-    verify(schemas).loadSchema(missing);
-    verify(schemas, never()).loadSchema(known);
   }
 
   private PolicyEntity stubTaggedObject(String objectName, Entity.EntityType type)
@@ -380,9 +319,9 @@ class TestNearestPolicyTableEnumerator {
     return policy;
   }
 
-  private void stubWinner(MetadataObject table, MetadataObject nearestObject) {
-    when(nearest.resolve(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(NearestMaintenancePolicyResolver.Decision.winner(10L, nearestObject));
+  private void stubWinner(MetadataObject table) {
+    when(nearest.resolveWinnerId(METALAKE, table, Policy.BuiltInType.ICEBERG_COMPACTION))
+        .thenReturn(java.util.Optional.of(10L));
   }
 
   private NearestPolicyTableEnumerator catalogEnumerator(
@@ -410,11 +349,11 @@ class TestNearestPolicyTableEnumerator {
         .build();
   }
 
-  private static List<Long> tableIds(List<ExpandTableCandidate> candidates) {
-    return candidates.stream().map(ExpandTableCandidate::tableId).toList();
+  private static List<Long> tableIds(List<TableCandidate> candidates) {
+    return candidates.stream().map(TableCandidate::tableId).toList();
   }
 
-  private static PolicyTableEnumerator.ShouldSkipTable allowAll() {
+  private static NearestPolicyTableEnumerator.ShouldSkipTable allowAll() {
     return (tableId, policyId, minIntervalMs, nowMs) -> false;
   }
 

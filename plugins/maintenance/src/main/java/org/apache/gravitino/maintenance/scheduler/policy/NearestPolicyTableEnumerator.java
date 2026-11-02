@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.policy.expand;
+package org.apache.gravitino.maintenance.scheduler.policy;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -27,11 +28,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -43,6 +44,9 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.model.TableCandidate;
+import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -65,14 +69,33 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
- * picks this policy and {@link PolicyTableEnumerator.ShouldSkipTable} allows enqueue. Stops after
- * {@code limit} accepted tables (skipped cooldown / in-flight tables do not count).
+ * picks this policy and {@link ShouldSkipTable} allows schedule. Stops after {@code limit} accepted
+ * tables (skipped cooldown / in-flight tables do not count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
  * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
  * the relational store. A direct table tag uses the stored table id as-is.
  */
-public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator {
+public final class NearestPolicyTableEnumerator {
+
+  /**
+   * Skip check used while scanning for schedulable tables.
+   *
+   * <p>Production expand skips when the action cannot start or a pending {@code cron-job} already
+   * covers the table.
+   */
+  @FunctionalInterface
+  interface ShouldSkipTable {
+
+    /**
+     * @param tableId table entity id
+     * @param policyId policy entity id
+     * @param minIntervalMs resolved cooldown for the policy type
+     * @param nowMs current epoch millis
+     * @return true when expand must not schedule a cron-job for this pair
+     */
+    boolean shouldSkip(long tableId, long policyId, long minIntervalMs, long nowMs);
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(NearestPolicyTableEnumerator.class);
 
@@ -83,24 +106,6 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
   private final Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier;
   @Nullable private final SchemaDispatcher schemaDispatcher;
   @Nullable private final TableDispatcher tableDispatcher;
-
-  /**
-   * Production wiring via relational singletons and {@link GravitinoEnv}.
-   *
-   * <p>Resolves {@link GravitinoEnv#entityStore()} lazily so scheduler pool startup can construct
-   * this enumerator before the env is fully initialized (unit tests). Dispatchers may be null until
-   * env init; expand then falls back to relational meta listing.
-   */
-  public NearestPolicyTableEnumerator() {
-    this(
-        PolicyTagRelService.getInstance(),
-        TagMetaService.getInstance(),
-        SchemaMetaService.getInstance(),
-        TableMetaService.getInstance(),
-        () -> new NearestMaintenancePolicyResolver(GravitinoEnv.getInstance().entityStore()),
-        GravitinoEnv.getInstance().internalSchemaDispatcher(),
-        GravitinoEnv.getInstance().internalTableDispatcher());
-  }
 
   /**
    * Meta-only constructor for unit tests (no catalog list/import).
@@ -153,12 +158,45 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     this.tableDispatcher = tableDispatcher;
   }
 
-  @Override
-  public List<ExpandTableCandidate> listTableIds(
+  /**
+   * Lists up to {@code limit} tables that are nearest-policy winners and can start (not occupied /
+   * cooling) and are not already covered by a queued cron-job.
+   *
+   * @param policy loaded policy
+   * @param limit maximum schedulable candidates to return
+   * @param minIntervalMs resolved cooldown for {@link MaintenanceActionManager#canStart}
+   * @param actionManager occupancy / cooldown checks
+   * @param cronJobClient pending cron-job coverage
+   * @return distinct schedulable candidates, size at most {@code limit}
+   */
+  public List<TableCandidate> listTableIds(
       PolicyEntity policy,
       int limit,
-      PolicyTableEnumerator.ShouldSkipTable shouldSkip,
-      long minIntervalMs) {
+      long minIntervalMs,
+      MaintenanceActionManager actionManager,
+      CronJobClient cronJobClient) {
+    Preconditions.checkNotNull(actionManager);
+    Preconditions.checkNotNull(cronJobClient);
+    return listTableIds(
+        policy,
+        limit,
+        (tableId, policyId, intervalMs, nowMs) ->
+            !actionManager.canStart(tableId, policyId, intervalMs, nowMs)
+                || cronJobClient.isTableAlreadyQueued(tableId, policyId),
+        minIntervalMs);
+  }
+
+  /**
+   * Lists up to {@code limit} tables that are nearest-policy winners and are not skipped.
+   *
+   * @param policy loaded policy
+   * @param limit maximum schedulable candidates to return
+   * @param shouldSkip skip occupied / cooling / already-queued tables while scanning
+   * @param minIntervalMs resolved cooldown for {@link ShouldSkipTable#shouldSkip}
+   * @return distinct schedulable candidates, size at most {@code limit}
+   */
+  List<TableCandidate> listTableIds(
+      PolicyEntity policy, int limit, ShouldSkipTable shouldSkip, long minIntervalMs) {
     if (limit <= 0) {
       return List.of();
     }
@@ -171,8 +209,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     ScanState scan =
         new ScanState(
             metalake,
-            policy.id(),
-            policy.policyType(),
+            policy,
             nearestResolverSupplier.get(),
             shouldSkip,
             minIntervalMs,
@@ -225,7 +262,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
     switch (objectType) {
       case TABLE:
         if (taggedObject.id() != null) {
-          tryEnqueueTable(taggedObject.id(), metadataObject, scan);
+          tryScheduleTable(taggedObject.id(), metadataObject, scan);
         }
         break;
       case SCHEMA:
@@ -356,7 +393,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
           if (!importTableIfMissing(tableIdent, storedTables)) {
             continue;
           }
-          tryEnqueueTable(
+          tryScheduleTable(
               storedTables.get(tableIdent.name()).id(),
               NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE),
               scan);
@@ -383,7 +420,7 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
       if (scan.batchFull()) {
         return;
       }
-      tryEnqueueTable(
+      tryScheduleTable(
           table.id(),
           NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE),
           scan);
@@ -490,70 +527,75 @@ public final class NearestPolicyTableEnumerator implements PolicyTableEnumerator
 
   /**
    * Accepts {@code tableId} into the batch when this policy is the nearest winner and occupancy
-   * allows enqueue.
+   * allows schedule.
    */
-  private static void tryEnqueueTable(long tableId, MetadataObject tableObject, ScanState scan) {
+  private static void tryScheduleTable(long tableId, MetadataObject tableObject, ScanState scan) {
     if (tableId <= 0 || !scan.visitedTableIds.add(tableId)) {
       return;
     }
 
-    NearestMaintenancePolicyResolver.Decision decision =
-        scan.nearestResolver.resolve(scan.metalake, tableObject, scan.policyType);
-    if (decision.kind() == NearestMaintenancePolicyResolver.Decision.Kind.CONFLICT) {
+    Policy.BuiltInType policyType = scan.policy.policyType();
+    final Optional<Long> winnerId;
+    try {
+      winnerId = scan.nearestResolver.resolveWinnerId(scan.metalake, tableObject, policyType);
+    } catch (IllegalArgumentException e) {
       LOG.error(
-          "Skip table {} for maintenance type {}: ambiguous policies {} on nearest level {} ({})",
+          "Skip table {} for maintenance type {}: {}",
           tableObject.fullName(),
-          scan.policyType,
-          decision.conflictingPolicyIds(),
-          decision.conflictLevel() == null ? "?" : decision.conflictLevel().type(),
-          decision.conflictLevel() == null ? "?" : decision.conflictLevel().fullName());
+          policyType,
+          e.getMessage());
       return;
     }
-    if (decision.winnerPolicyId().orElse(-1L) != scan.policyId) {
+    if (winnerId.isEmpty() || winnerId.get().longValue() != scan.policy.id()) {
       return;
     }
-    MetadataObject winnerLevel = decision.winnerLevel();
-    if (winnerLevel == null) {
-      return;
-    }
-    if (scan.shouldSkip.shouldSkip(tableId, scan.policyId, scan.minIntervalMs, scan.nowMs)) {
+    if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id(), scan.minIntervalMs, scan.nowMs)) {
       LOG.debug(
-          "Skip cron-job enqueue for table {} policy {} (in-flight or within minIntervalMs={})",
+          "Skip cron-job schedule for table {} policy {} (in-flight or within minIntervalMs={})",
           tableId,
-          scan.policyId,
+          scan.policy.id(),
           scan.minIntervalMs);
       return;
     }
-    scan.acceptedByTableId.put(tableId, new ExpandTableCandidate(tableId, winnerLevel.type()));
+    String fullName = tableObject.fullName();
+    int dot = fullName.indexOf('.');
+    if (dot <= 0 || dot >= fullName.length() - 1) {
+      LOG.warn("Skip table {} with unusable name {}", tableId, fullName);
+      return;
+    }
+    scan.acceptedByTableId.put(
+        tableId,
+        new TableCandidate(
+            tableId,
+            fullName.substring(0, dot),
+            fullName.substring(dot + 1),
+            List.of(scan.policy)));
   }
 
   /** Mutable progress for one {@link #listTableIds} call. */
   private static final class ScanState {
     private final String metalake;
-    private final long policyId;
-    private final Policy.BuiltInType policyType;
+    private final PolicyEntity policy;
     private final NearestMaintenancePolicyResolver nearestResolver;
-    private final PolicyTableEnumerator.ShouldSkipTable shouldSkip;
+    private final ShouldSkipTable shouldSkip;
     private final long minIntervalMs;
     private final long nowMs;
     private final Set<Long> visitedTableIds;
-    private final Map<Long, ExpandTableCandidate> acceptedByTableId;
+    private final Map<Long, TableCandidate> acceptedByTableId;
     private final int limit;
 
     private ScanState(
         String metalake,
-        long policyId,
-        Policy.BuiltInType policyType,
+        PolicyEntity policy,
         NearestMaintenancePolicyResolver nearestResolver,
-        PolicyTableEnumerator.ShouldSkipTable shouldSkip,
+        ShouldSkipTable shouldSkip,
         long minIntervalMs,
         long nowMs,
         Set<Long> visitedTableIds,
-        Map<Long, ExpandTableCandidate> acceptedByTableId,
+        Map<Long, TableCandidate> acceptedByTableId,
         int limit) {
       this.metalake = metalake;
-      this.policyId = policyId;
-      this.policyType = policyType;
+      this.policy = policy;
       this.nearestResolver = nearestResolver;
       this.shouldSkip = shouldSkip;
       this.minIntervalMs = minIntervalMs;
