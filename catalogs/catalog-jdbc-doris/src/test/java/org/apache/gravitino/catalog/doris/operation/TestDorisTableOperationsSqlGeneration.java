@@ -1774,6 +1774,23 @@ public class TestDorisTableOperationsSqlGeneration {
     Index[] primaryKey = {
       Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}})
     };
+    IllegalArgumentException missingDistributionException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.generateCreateTableSql(
+                    "test_table",
+                    columns,
+                    null,
+                    Collections.singletonMap(REPLICATION_FACTOR, "1"),
+                    Transforms.EMPTY_TRANSFORM,
+                    null,
+                    primaryKey));
+    Assertions.assertTrue(
+        missingDistributionException.getMessage().contains("Doris must set distribution"),
+        missingDistributionException.getMessage());
+    Mockito.verifyNoInteractions(versionDataSource);
+
     String sql =
         ops.generateCreateTableSql(
             "test_table",
