@@ -274,7 +274,7 @@ After restoring, verify that your Gravitino instance starts
 successfully with the restored database before attempting the
 upgrade again.
 
-### Column name capacity in 2.0
+## Column name capacity in 2.0
 
 The entity store supports top-level table column names up to 300 characters; other entity names retain
 their 128-character limit. Catalog-specific name restrictions still apply. Fresh 2.0 installs
