@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -49,6 +52,44 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
         Assertions.assertFalse(DATABASE_OPERATIONS.listDatabases().contains("injected_marker"));
       } finally {
         DATABASE_OPERATIONS.delete(schema, true);
+      }
+    }
+  }
+
+  @Test
+  void testCascadeDropPreservesExternalDependents() throws SQLException {
+    String schema = RandomNameUtils.genRandomName("cascade_source");
+    String other = RandomNameUtils.genRandomName("cascade_other");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + schema);
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + other);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + schema + ".parent (id int PRIMARY KEY)");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE VIEW " + other + ".v AS SELECT * FROM " + schema + ".parent");
+        JdbcConnectorUtils.executeUpdate(
+            connection,
+            "CREATE TABLE " + other + ".child (id int REFERENCES " + schema + ".parent)");
+        NonEmptySchemaException error =
+            Assertions.assertThrows(
+                NonEmptySchemaException.class, () -> DATABASE_OPERATIONS.delete(schema, true));
+        Assertions.assertTrue(error.getMessage().contains(other));
+        try (Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT * FROM " + other + ".v")) {
+          Assertions.assertFalse(rows.next());
+        }
+        Assertions.assertThrows(
+            SQLException.class,
+            () ->
+                JdbcConnectorUtils.executeUpdate(
+                    connection, "INSERT INTO " + other + ".child VALUES (123)"));
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA " + other + " CASCADE");
+        Assertions.assertTrue(DATABASE_OPERATIONS.delete(schema, true));
+      } finally {
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA IF EXISTS " + other + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
       }
     }
   }

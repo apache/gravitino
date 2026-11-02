@@ -40,11 +40,35 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
+
+  private static final String EXTERNAL_DEPENDENTS_SQL =
+      "WITH RECURSIVE dependents(classid, objid, objsubid) AS ( "
+          + "  SELECT 'pg_catalog.pg_namespace'::regclass::oid, oid, 0 "
+          + "  FROM pg_catalog.pg_namespace WHERE nspname = ? "
+          + "  UNION "
+          + "  SELECT next_object.classid, next_object.objid, next_object.objsubid "
+          + "  FROM dependents current_object "
+          + "  CROSS JOIN LATERAL ( "
+          + "    SELECT d.classid, d.objid, d.objsubid FROM pg_catalog.pg_depend d "
+          + "    WHERE d.refclassid = current_object.classid AND d.refobjid = current_object.objid "
+          + "      AND (current_object.objsubid = 0 OR d.refobjsubid = current_object.objsubid) "
+          + "    UNION "
+          + "    SELECT d.refclassid, d.refobjid, d.refobjsubid FROM pg_catalog.pg_depend d "
+          + "    WHERE d.classid = current_object.classid AND d.objid = current_object.objid "
+          + "      AND d.objsubid = current_object.objsubid AND d.deptype = 'i' "
+          + "  ) next_object "
+          + ") "
+          + "SELECT DISTINCT pg_catalog.pg_describe_object(d.classid, d.objid, d.objsubid) AS dependent "
+          + "FROM dependents d "
+          + "CROSS JOIN LATERAL pg_catalog.pg_identify_object(d.classid, d.objid, d.objsubid) info "
+          + "WHERE info.schema IS NOT NULL AND info.schema <> ?; ";
 
   private String database;
 
@@ -150,6 +174,67 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
       sqlBuilder.append(" CASCADE");
     }
     return sqlBuilder.toString();
+  }
+
+  @Override
+  protected void dropDatabase(String schema, boolean cascade) {
+    if (!cascade) {
+      super.dropDatabase(schema, false);
+      return;
+    }
+    try (Connection connection = getConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        // Keep existing relations stable while checking dependencies and executing the drop.
+        try (PreparedStatement relations =
+            connection.prepareStatement(
+                "SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n "
+                    + "ON c.relnamespace = n.oid WHERE n.nspname = ? AND c.relkind IN ('r', 'p') ORDER BY c.oid")) {
+          relations.setString(1, schema);
+          try (ResultSet result = relations.executeQuery()) {
+            while (result.next()) {
+              JdbcConnectorUtils.executeUpdate(
+                  connection,
+                  "LOCK TABLE ONLY "
+                      + quoteName(schema)
+                      + "."
+                      + quoteName(result.getString(1))
+                      + " IN ACCESS EXCLUSIVE MODE");
+            }
+          }
+        }
+        try (PreparedStatement statement = connection.prepareStatement(EXTERNAL_DEPENDENTS_SQL)) {
+          statement.setString(1, schema);
+          statement.setString(2, schema);
+          try (ResultSet result = statement.executeQuery()) {
+            List<String> external = new ArrayList<>();
+            while (result.next()) {
+              external.add(result.getString(1));
+            }
+            if (!external.isEmpty()) {
+              throw new NonEmptySchemaException(
+                  "Cannot drop schema %s: objects outside the schema depend on it: %s",
+                  schema, external);
+            }
+          }
+        }
+        JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(schema, true));
+        connection.commit();
+      } catch (SQLException | RuntimeException e) {
+        try {
+          connection.rollback();
+        } catch (SQLException rollbackFailure) {
+          e.addSuppressed(rollbackFailure);
+        }
+        throw e;
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  private static String quoteName(String name) {
+    return "\"" + name.replace("\"", "\"\"") + "\"";
   }
 
   @Override
