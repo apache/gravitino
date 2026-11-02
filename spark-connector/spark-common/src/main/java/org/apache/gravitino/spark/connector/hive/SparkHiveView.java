@@ -172,8 +172,9 @@ public class SparkHiveView extends HiveTable {
   /**
    * Builds the qualifier for the namespace the view SQL resolves in: the catalog and namespace
    * Spark recorded when it created the view, or else the view's own catalog and schema. A recorded
-   * session catalog means Spark created the view in this metastore through its session catalog, so
-   * it maps to the catalog the view was loaded from.
+   * {@code spark_catalog} is mapped to the catalog the view was loaded from. This assumes that the
+   * session catalog of the Spark session that created the view used the same Hive metastore as this
+   * catalog.
    */
   @SuppressWarnings("deprecation") // JavaConverters is deprecated on Scala 2.13 but needed on 2.12
   private ViewRelationQualifier relationQualifier(SparkSession spark) {
