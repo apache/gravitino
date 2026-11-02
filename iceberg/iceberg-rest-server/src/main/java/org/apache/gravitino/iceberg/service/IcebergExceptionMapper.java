@@ -164,6 +164,14 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
+    // An OutOfMemoryError wrapped in a mapped exception (for example IllegalStateException) must
+    // still be reported as 500: IllegalStateException alone is a client error (400), but OOM is a
+    // server failure that also poisons health probes.
+    OutOfMemoryError oom = findCause(ex, OutOfMemoryError.class);
+    if (oom != null) {
+      LOG.error("Iceberg REST server unexpected failure:", oom);
+      return IcebergRESTUtils.errorResponse(oom, Status.INTERNAL_SERVER_ERROR.getStatusCode());
+    }
     ex = toClientFacingException(ex);
     int status =
         ex instanceof Exception

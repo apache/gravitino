@@ -166,7 +166,9 @@ public class TestIcebergHealthOperations {
   @Test
   public void testOrdinaryMappedFailureDoesNotPoisonLiveness() {
     ServerHealth health = new ServerHealth();
-    Throwable failure = new IllegalStateException("ordinary failure");
+    // IllegalStateException is mapped to 400 (client error). Use a plain RuntimeException so this
+    // case still exercises an unmapped server failure (500) that must not poison liveness.
+    Throwable failure = new RuntimeException("ordinary failure");
     try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
       shared.when(ServerHealth::getInstance).thenReturn(health);
       try (Response response = IcebergExceptionMapper.toRESTResponse(failure)) {

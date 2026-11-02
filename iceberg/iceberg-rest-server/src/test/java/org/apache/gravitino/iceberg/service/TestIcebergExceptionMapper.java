@@ -108,6 +108,22 @@ public class TestIcebergExceptionMapper {
     Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(converted));
   }
 
+  @Test
+  public void testOutOfMemoryWrappedInIllegalStateExceptionStays500() {
+    try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+      ServerHealth health = new ServerHealth();
+      shared.when(ServerHealth::getInstance).thenReturn(health);
+      try (Response response =
+          icebergExceptionMapper.toResponse(
+              new IllegalStateException(new OutOfMemoryError("Java heap space")))) {
+        Assertions.assertEquals(500, response.getStatus());
+        ErrorResponse entity = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals("OutOfMemoryError", entity.type());
+      }
+      Assertions.assertTrue(health.hasOutOfMemoryError());
+    }
+  }
+
   /** Checks that errors retain their type and nested causes in the response. */
   @Test
   public void testErrorsRetainTypeAndCause() {
