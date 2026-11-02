@@ -189,6 +189,18 @@ class TagAlreadyAssociatedException(AlreadyExistsException):
     """Exception thrown when a tag with specified name already associated to a metadata object."""
 
 
+class NoSuchPolicyException(NotFoundException):
+    """An exception thrown when a policy with specified name is not existed."""
+
+
+class PolicyAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a policy with specified name already exists."""
+
+
+class PolicyAlreadyAssociatedException(AlreadyExistsException):
+    """Exception thrown when a policy with specified name already associated to a tag."""
+
+
 class JobTemplateAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a job template with specified name already exists."""
 
