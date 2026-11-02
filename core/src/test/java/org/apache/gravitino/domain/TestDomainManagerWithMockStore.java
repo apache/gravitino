@@ -108,6 +108,47 @@ public class TestDomainManagerWithMockStore {
     domainManager = new DomainManager(idGenerator, entityStore);
   }
 
+  /** Verifies scoped caller checks run on locked state without changing the original dispatcher. */
+  @Test
+  public void testScopedMutationCheckUsesCurrentState() throws IOException {
+    DomainEntity current = domain("Trading", "Markets", Domain.Status.DRAFT);
+    Mockito.when(domainOperations.removeDomainParentAndGet(eq(TRADING), any()))
+        .thenAnswer(
+            call -> {
+              call.<Consumer<LockedDomainState>>getArgument(1)
+                  .accept(new LockedDomainState(current, null, Collections.emptyList()));
+              return current.toBuilder().withParent(null).build();
+            });
+    Consumer<LockedDomainState> check = Mockito.mock(Consumer.class);
+    Consumer<LockedDomainState> additional = Mockito.mock(Consumer.class);
+    domainManager
+        .withMutationCheck(check)
+        .withMutationCheck(additional)
+        .detachDomain(METALAKE, "Trading");
+    ArgumentCaptor<LockedDomainState> captured = ArgumentCaptor.forClass(LockedDomainState.class);
+    Mockito.verify(check).accept(captured.capture());
+    Assertions.assertEquals("Markets", captured.getValue().domain().parent().get());
+    Mockito.verify(additional).accept(captured.getValue());
+    Mockito.clearInvocations(check, additional);
+    domainManager.detachDomain(METALAKE, "Trading");
+    Mockito.verifyNoInteractions(check, additional);
+  }
+
+  /** Verifies a caller check can abort a mutation while the raw manager remains usable. */
+  @Test
+  public void testScopedMutationCheckFailureDoesNotAffectRawManager() {
+    DomainDispatcher checked =
+        domainManager.withMutationCheck(
+            state -> {
+              throw new IllegalStateException("Rejected by caller");
+            });
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> checked.createDomain(METALAKE, "Finance", null, null, BACKING_TAG, false));
+    Assertions.assertDoesNotThrow(
+        () -> domainManager.createDomain(METALAKE, "Finance", null, null, BACKING_TAG, false));
+  }
+
   @Test
   public void testMissingMetalake() throws IOException {
     Mockito.when(
@@ -420,7 +461,7 @@ public class TestDomainManagerWithMockStore {
     OptimisticLockException conflict = new OptimisticLockException("Concurrent operation");
     Mockito.when(entityStore.update(eq(FINANCE), eq(DomainEntity.class), any(), any()))
         .thenThrow(conflict);
-    Mockito.when(entityStore.delete(FINANCE, Entity.EntityType.DOMAIN)).thenThrow(conflict);
+    Mockito.when(domainOperations.deleteDomain(eq(FINANCE), any())).thenThrow(conflict);
 
     Assertions.assertSame(
         conflict,
@@ -435,7 +476,7 @@ public class TestDomainManagerWithMockStore {
 
   @Test
   public void testDeleteDomain() throws IOException {
-    Mockito.when(entityStore.delete(FINANCE, Entity.EntityType.DOMAIN))
+    Mockito.when(domainOperations.deleteDomain(eq(FINANCE), any()))
         .thenReturn(true)
         .thenReturn(false)
         .thenThrow(new NonEmptyEntityException("has sub-domains"))
@@ -478,6 +519,26 @@ public class TestDomainManagerWithMockStore {
         NoSuchDomainException.class, () -> domainManager.unpublishDomain(METALAKE, "Finance"));
     assertIOExceptionWrapped(() -> domainManager.publishDomain(METALAKE, "Finance"));
     assertIOExceptionWrapped(() -> domainManager.unpublishDomain(METALAKE, "Finance"));
+  }
+
+  /** Verifies authorized snapshots cannot be replaced by a subsequent name lookup. */
+  @Test
+  public void testMemberListingUsesSuppliedSnapshotsWithoutReloading() throws IOException {
+    DomainEntity published = domain("Finance", null, Domain.Status.PUBLISHED);
+    DomainEntity replacement =
+        published.toBuilder().withId(200L).withStatus(Domain.Status.DRAFT).build();
+    Mockito.when(entityStore.get(FINANCE, Entity.EntityType.DOMAIN, DomainEntity.class))
+        .thenReturn(replacement);
+
+    Assertions.assertEquals(
+        0,
+        domainManager.listMembers(
+                METALAKE, published, new DomainEntity[0], DomainMemberFilter.builder().build())
+            .length);
+
+    Mockito.verify(entityStore, Mockito.never())
+        .get(FINANCE, Entity.EntityType.DOMAIN, DomainEntity.class);
+    Mockito.verifyNoInteractions(domainOperations);
   }
 
   /** Verifies that member listing reads only the queried domain and its sub-domains. */

@@ -37,6 +37,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -55,11 +56,14 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.server.authorization.DomainAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** REST operations for domains. Domain access control is integrated separately. */
+/** REST operations and authorization checks for domains. */
 @Path("/metalakes/{metalake}/domains")
 @Produces("application/vnd.gravitino.v1+json")
 public class DomainOperations {
@@ -88,8 +92,10 @@ public class DomainOperations {
   @GET
   @Timed(name = "list-domains." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-domains", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listDomains(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean details) {
     return execute(
         OperationType.LIST,
@@ -97,8 +103,18 @@ public class DomainOperations {
         "",
         () -> {
           return details
-              ? listResponse(domainDispatcher.listDomainInfos(metalake))
-              : Utils.ok(new NameListResponse(domainDispatcher.listDomains(metalake)));
+              ? listResponse(
+                  DomainAuthzHelper.filterDomains(
+                      metalake, domainDispatcher.listDomainInfos(metalake)))
+              : Utils.ok(
+                  new NameListResponse(
+                      DomainAuthzHelper.enabled()
+                          ? Arrays.stream(
+                                  DomainAuthzHelper.filterDomains(
+                                      metalake, domainDispatcher.listDomainInfos(metalake)))
+                              .map(DomainEntity::name)
+                              .toArray(String[]::new)
+                          : domainDispatcher.listDomains(metalake)));
         });
   }
 
@@ -113,8 +129,11 @@ public class DomainOperations {
   @Consumes("application/json")
   @Timed(name = "create-domain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-domain", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response createDomain(
-      @PathParam("metalake") String metalake, DomainCreateRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      DomainCreateRequest request) {
     return execute(
         OperationType.CREATE,
         metalake,
@@ -122,16 +141,30 @@ public class DomainOperations {
         () -> {
           validateRequest(request);
           DomainCreateRequest.BackingTag tag = request.getBackingTag();
+          DomainAuthzHelper.requireManage(metalake, null);
+          if (tag.isCreate()) {
+            DomainAuthzHelper.requireBackingTag(metalake, tag.getName(), true);
+          }
+          DomainDispatcher checked =
+              DomainAuthzHelper.checked(
+                  domainDispatcher,
+                  state -> {
+                    DomainAuthzHelper.requireManage(metalake, null);
+                    state
+                        .parent()
+                        .ifPresent(parent -> DomainAuthzHelper.requireManage(metalake, parent));
+                    DomainAuthzHelper.requireBackingTag(metalake, tag.getName(), tag.isCreate());
+                  });
           DomainEntity created =
               request.getParent() == null
-                  ? domainDispatcher.createDomain(
+                  ? checked.createDomain(
                       metalake,
                       request.getName(),
                       request.getComment(),
                       request.getProperties(),
                       tag.tagValue(),
                       tag.isCreate())
-                  : domainDispatcher.createSubdomain(
+                  : checked.createSubdomain(
                       metalake,
                       request.getParent(),
                       request.getName(),
@@ -154,14 +187,19 @@ public class DomainOperations {
   @Path("{domain}")
   @Timed(name = "get-domain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-domain", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response getDomain(
-      @PathParam("metalake") String metalake, @PathParam("domain") String domain) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("domain") String domain) {
     return execute(
         OperationType.GET,
         metalake,
         domain,
         () -> {
-          return domainResponse(domainDispatcher.getDomain(metalake, domain));
+          DomainEntity loaded = domainDispatcher.getDomain(metalake, domain);
+          DomainAuthzHelper.requireVisible(metalake, loaded);
+          return domainResponse(loaded);
         });
   }
 
@@ -178,8 +216,10 @@ public class DomainOperations {
   @Consumes("application/json")
   @Timed(name = "alter-domain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-domain", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response alterDomain(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       DomainUpdatesRequest request) {
     return execute(
@@ -192,7 +232,9 @@ public class DomainOperations {
               request.getUpdates().stream()
                   .map(DomainUpdateRequest::domainChange)
                   .toArray(DomainChange[]::new);
-          return domainResponse(domainDispatcher.alterDomain(metalake, domain, changes));
+          return domainResponse(
+              DomainAuthzHelper.managed(domainDispatcher, metalake)
+                  .alterDomain(metalake, domain, changes));
         });
   }
 
@@ -209,8 +251,10 @@ public class DomainOperations {
   @Consumes("application/json")
   @Timed(name = "set-domain-status." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-domain-status", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response setDomain(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       DomainSetRequest request) {
     return execute(
@@ -219,10 +263,11 @@ public class DomainOperations {
         domain,
         () -> {
           validateRequest(request);
+          DomainDispatcher checked = DomainAuthzHelper.managed(domainDispatcher, metalake);
           return domainResponse(
               request.getStatus() == Domain.Status.PUBLISHED
-                  ? domainDispatcher.publishDomain(metalake, domain)
-                  : domainDispatcher.unpublishDomain(metalake, domain));
+                  ? checked.publishDomain(metalake, domain)
+                  : checked.unpublishDomain(metalake, domain));
         });
   }
 
@@ -237,14 +282,22 @@ public class DomainOperations {
   @Path("{domain}")
   @Timed(name = "delete-domain." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-domain", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response deleteDomain(
-      @PathParam("metalake") String metalake, @PathParam("domain") String domain) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("domain") String domain) {
     return execute(
         OperationType.DELETE,
         metalake,
         domain,
         () -> {
-          return Utils.ok(new DropResponse(domainDispatcher.deleteDomain(metalake, domain)));
+          boolean deleted =
+              DomainAuthzHelper.managed(domainDispatcher, metalake).deleteDomain(metalake, domain);
+          if (!deleted) {
+            DomainAuthzHelper.requireManage(metalake, null);
+          }
+          return Utils.ok(new DropResponse(deleted));
         });
   }
 
@@ -261,8 +314,10 @@ public class DomainOperations {
   @Consumes("application/json")
   @Timed(name = "set-domain-parent." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-domain-parent", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response setParent(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       DomainParentSetRequest request) {
     return execute(
@@ -272,7 +327,15 @@ public class DomainOperations {
         () -> {
           validateRequest(request);
           return domainResponse(
-              domainDispatcher.attachDomain(metalake, domain, request.getParent()));
+              DomainAuthzHelper.checked(
+                      domainDispatcher,
+                      state -> {
+                        DomainAuthzHelper.requireManage(metalake, state.domain());
+                        state
+                            .parent()
+                            .ifPresent(parent -> DomainAuthzHelper.requireManage(metalake, parent));
+                      })
+                  .attachDomain(metalake, domain, request.getParent()));
         });
   }
 
@@ -287,14 +350,18 @@ public class DomainOperations {
   @Path("{domain}/parent")
   @Timed(name = "remove-domain-parent." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-domain-parent", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response removeParent(
-      @PathParam("metalake") String metalake, @PathParam("domain") String domain) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("domain") String domain) {
     return execute(
         OperationType.ALTER,
         metalake,
         domain,
         () -> {
-          return domainResponse(domainDispatcher.detachDomain(metalake, domain));
+          return domainResponse(
+              DomainAuthzHelper.managed(domainDispatcher, metalake).detachDomain(metalake, domain));
         });
   }
 
@@ -311,8 +378,10 @@ public class DomainOperations {
   @Consumes("application/json")
   @Timed(name = "set-domain-backing-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-domain-backing-tag", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response setBackingTag(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       DomainBackingTagSetRequest request) {
     return execute(
@@ -322,10 +391,19 @@ public class DomainOperations {
         () -> {
           validateRequest(request);
           return domainResponse(
-              domainDispatcher.updateBackingTag(
-                  metalake,
-                  domain,
-                  request.getBackingTag() == null ? null : request.getBackingTag().tagValue()));
+              DomainAuthzHelper.checked(
+                      domainDispatcher,
+                      state -> {
+                        DomainAuthzHelper.requireManage(metalake, state.domain());
+                        if (request.getBackingTag() != null) {
+                          DomainAuthzHelper.requireBackingTag(
+                              metalake, request.getBackingTag().getName(), false);
+                        }
+                      })
+                  .updateBackingTag(
+                      metalake,
+                      domain,
+                      request.getBackingTag() == null ? null : request.getBackingTag().tagValue()));
         });
   }
 
@@ -341,8 +419,10 @@ public class DomainOperations {
   @Path("{domain}/subdomains")
   @Timed(name = "list-subdomains." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-subdomains", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listSubdomains(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       @QueryParam("details") @DefaultValue("false") boolean details) {
     return execute(
@@ -350,9 +430,21 @@ public class DomainOperations {
         metalake,
         domain,
         () -> {
+          DomainAuthzHelper.requireVisible(domainDispatcher, metalake, domain);
           return details
-              ? listResponse(domainDispatcher.listSubdomainInfos(metalake, domain))
-              : Utils.ok(new NameListResponse(domainDispatcher.listSubdomains(metalake, domain)));
+              ? listResponse(
+                  DomainAuthzHelper.filterDomains(
+                      metalake, domainDispatcher.listSubdomainInfos(metalake, domain)))
+              : Utils.ok(
+                  new NameListResponse(
+                      DomainAuthzHelper.enabled()
+                          ? Arrays.stream(
+                                  DomainAuthzHelper.filterDomains(
+                                      metalake,
+                                      domainDispatcher.listSubdomainInfos(metalake, domain)))
+                              .map(DomainEntity::name)
+                              .toArray(String[]::new)
+                          : domainDispatcher.listSubdomains(metalake, domain)));
         });
   }
 

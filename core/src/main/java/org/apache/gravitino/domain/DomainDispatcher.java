@@ -20,8 +20,10 @@ package org.apache.gravitino.domain;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
@@ -64,6 +66,15 @@ import org.apache.gravitino.tag.TagValue;
  */
 @Evolving
 public interface DomainDispatcher {
+
+  /**
+   * Creates a scoped dispatcher that checks mutations against their locked state. The caller
+   * supplies the check; the dispatcher does not interpret permissions.
+   *
+   * @param check The additional check; throwing prevents the mutation from committing.
+   * @return A dispatcher sharing the same storage with the additional mutation check.
+   */
+  DomainDispatcher withMutationCheck(Consumer<LockedDomainState> check);
 
   /**
    * Lists the names of the domains in a metalake, including sub-domains.
@@ -265,8 +276,8 @@ public interface DomainDispatcher {
   DomainEntity[] listSubdomainInfos(String metalake, String name) throws NoSuchDomainException;
 
   /**
-   * Lists recorded leaf objects in a domain's scope, with every applicable relation. Authorization
-   * and visibility filtering are supplied by the authorization dispatcher.
+   * Lists recorded leaf objects in a domain's scope, with every applicable relation. Results are
+   * unfiltered; server callers apply domain visibility and metadata access checks.
    *
    * <p>This operation is unpaginated. Catalog and schema assignments enumerate recorded leaf
    * objects, and each candidate requires effective-tag resolution, including ancestor lookups and
@@ -282,8 +293,21 @@ public interface DomainDispatcher {
   DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter);
 
   /**
+   * Resolves members using the supplied domain snapshots without reloading domains by name. Callers
+   * can authorize these exact snapshots before resolving their membership paths.
+   *
+   * @param metalake The metalake name.
+   * @param domain The queried domain snapshot.
+   * @param subdomains The subdomain snapshots included in the scope.
+   * @param filter The member filter.
+   * @return The matching members.
+   */
+  DomainMember[] listMembers(
+      String metalake, DomainEntity domain, DomainEntity[] subdomains, DomainMemberFilter filter);
+
+  /**
    * Lists domains whose scopes contain a leaf object, including its relations to each domain.
-   * Authorization and visibility filtering are supplied by the authorization dispatcher.
+   * Results are unfiltered; server callers apply domain visibility and metadata access checks.
    *
    * @param metalake The metalake name.
    * @param object The leaf metadata object.
