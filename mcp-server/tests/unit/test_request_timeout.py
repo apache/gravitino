@@ -41,26 +41,36 @@ from mcp_server.server import GravitinoMCPServer
 
 class TestRequestTimeout(unittest.TestCase):
     def test_configuration(self):
-        self.assertEqual(60.0, Setting().gravitino_read_timeout)
+        self.assertEqual(60.0, Setting(metalake="m").gravitino_read_timeout)
         for value in (0, -1, math.inf, math.nan):
             with self.assertRaises(ValueError):
-                Setting(gravitino_read_timeout=value)
+                Setting(metalake="m", gravitino_read_timeout=value)
         with patch.dict(os.environ, {"GRAVITINO_READ_TIMEOUT": "120"}):
-            with patch.object(sys, "argv", ["mcp_server"]):
+            with patch.object(sys, "argv", ["mcp_server", "--metalake", "m"]):
                 self.assertEqual(120, _parse_args().gravitino_read_timeout)
             with patch.object(
-                sys, "argv", ["mcp_server", "--gravitino-read-timeout", "90"]
+                sys,
+                "argv",
+                [
+                    "mcp_server",
+                    "--metalake",
+                    "m",
+                    "--gravitino-read-timeout",
+                    "90",
+                ],
             ):
                 self.assertEqual(90, _parse_args().gravitino_read_timeout)
 
     def test_invalid_cli_and_environment_timeout(self):
         with patch.dict(os.environ, {"GRAVITINO_READ_TIMEOUT": "nan"}):
-            with patch.object(sys, "argv", ["mcp_server"]):
+            with patch.object(sys, "argv", ["mcp_server", "--metalake", "m"]):
                 with self.assertRaises(SystemExit) as failure:
                     _parse_args()
                 self.assertEqual(2, failure.exception.code)
         with patch.object(
-            sys, "argv", ["mcp_server", "--gravitino-read-timeout", "0"]
+            sys,
+            "argv",
+            ["mcp_server", "--metalake", "m", "--gravitino-read-timeout", "0"],
         ):
             with self.assertRaises(SystemExit):
                 _parse_args()
@@ -84,10 +94,12 @@ class TestRequestTimeout(unittest.TestCase):
             context = GravitinoContext(
                 Setting(metalake="m", gravitino_read_timeout=120)
             )
-            clients = [
-                context._default_client,
-                context._service_client("other"),
-            ]
+            clients = [context._default_client]
+            with patch(
+                "mcp_server.core.context._get_request_authorization",
+                return_value="",
+            ):
+                self.assertIs(context._default_client, context.rest_client())
             with patch(
                 "mcp_server.core.context._get_request_authorization",
                 return_value="Bearer caller",
