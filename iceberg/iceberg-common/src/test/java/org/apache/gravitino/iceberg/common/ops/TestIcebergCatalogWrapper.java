@@ -20,9 +20,11 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,8 +36,11 @@ import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
@@ -187,6 +192,54 @@ public class TestIcebergCatalogWrapper {
     TableMetadata actual = wrapper.loadTableMetadataFromLocation(metadataFile.toUri().toString());
 
     Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
+  }
+
+  @Test
+  public void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(@TempDir Path warehouseDir)
+      throws Exception {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+    config.put(IcebergConstants.URI, "jdbc:sqlite:" + warehouseDir.resolve("catalog.db"));
+    config.put(IcebergConstants.WAREHOUSE, warehouseDir.toUri().toString());
+    config.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    config.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig(config));
+    Namespace namespace = Namespace.of("db");
+    TableIdentifier ident = TableIdentifier.of(namespace, "purged");
+    wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+    Table table =
+        wrapper
+            .getCatalog()
+            .createTable(
+                ident, new Schema(Types.NestedField.required(1, "id", Types.LongType.get())));
+    Path first = Files.createFile(warehouseDir.resolve("first.parquet"));
+    Path second = Files.createFile(warehouseDir.resolve("second.parquet"));
+    for (Path data : new Path[] {first, second}) {
+      table
+          .newFastAppend()
+          .appendFile(
+              DataFiles.builder(table.spec())
+                  .withPath(data.toUri().toString())
+                  .withFileSizeInBytes(1)
+                  .withRecordCount(1)
+                  .build())
+          .commit();
+    }
+    table.refresh();
+    String metadataFile =
+        ((HasTableOperations) table).operations().current().metadataFileLocation();
+    // The first snapshot's manifest list is gone.
+    Files.delete(Paths.get(URI.create(table.snapshots().iterator().next().manifestListLocation())));
+
+    wrapper.purgeTable(ident);
+
+    Assertions.assertFalse(wrapper.getCatalog().tableExists(ident));
+    // Files reachable through the remaining manifest list, and the metadata, are deleted.
+    Assertions.assertFalse(Files.exists(second));
+    Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
+    wrapper.close();
   }
 
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)
