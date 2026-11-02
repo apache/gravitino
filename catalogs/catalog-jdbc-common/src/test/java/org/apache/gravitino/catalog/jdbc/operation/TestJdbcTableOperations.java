@@ -139,6 +139,7 @@ public class TestJdbcTableOperations {
                 DATABASE_NAME,
                 tableName,
                 (connection, builder) -> {
+                  Assertions.assertFalse(Assertions.assertDoesNotThrow(connection::isClosed));
                   borrowed.add(connection);
                   builder.withProperties(Map.of("snapshot", "first"));
                 });
@@ -147,6 +148,7 @@ public class TestJdbcTableOperations {
                 DATABASE_NAME,
                 tableName,
                 (connection, builder) -> {
+                  Assertions.assertFalse(Assertions.assertDoesNotThrow(connection::isClosed));
                   borrowed.add(connection);
                   builder.withProperties(Map.of("snapshot", "second"));
                 });
@@ -197,6 +199,8 @@ public class TestJdbcTableOperations {
                         DATABASE_NAME,
                         tableName,
                         (connection, builder) -> {
+                          Assertions.assertFalse(
+                              Assertions.assertDoesNotThrow(connection::isClosed));
                           borrowed.add(connection);
                           throw failure;
                         })));
