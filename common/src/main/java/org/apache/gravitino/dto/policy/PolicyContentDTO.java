@@ -152,6 +152,23 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
+  /**
+   * Reads an int without silently coercing fractional values or strings.
+   *
+   * <p>Shared by Iceberg maintenance policy 32-bit integer fields (for example rewrite-manifests
+   * {@code spec_id}).
+   */
+  class StrictIntegerDeserializer extends JsonDeserializer<Integer> {
+    @Override
+    public Integer deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+        return context.reportInputMismatch(Integer.class, "Value must be a 32-bit integer");
+      }
+      return parser.getIntValue();
+    }
+  }
+
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
   @ToString
@@ -647,7 +664,7 @@ public interface PolicyContentDTO extends PolicyContent {
     private Long avgManifestSizeThresholdBytes;
 
     @JsonProperty("spec_id")
-    @JsonDeserialize(using = ManifestSpecIdDeserializer.class)
+    @JsonDeserialize(using = StrictIntegerDeserializer.class)
     private Integer specId;
 
     @JsonProperty("use_caching")
@@ -801,18 +818,6 @@ public interface PolicyContentDTO extends PolicyContent {
     public void validate() {
       PolicyContentDTO.super.validate();
       toDomainContent().validate();
-    }
-
-    /** Reads a partition spec ID without silently coercing fractional values or strings. */
-    public static class ManifestSpecIdDeserializer extends JsonDeserializer<Integer> {
-      @Override
-      public Integer deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
-          return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
-        }
-        return parser.getIntValue();
-      }
     }
 
     /**
