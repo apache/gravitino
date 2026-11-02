@@ -52,6 +52,35 @@ public final class GlueConstants {
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
   /**
+   * Upper bound in milliseconds for one Glue API call, including all retries (optional). Defaults
+   * to {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
+   */
+  public static final String AWS_GLUE_API_CALL_TIMEOUT_MS = "aws-glue-api-call-timeout-ms";
+
+  /** Default value for {@link #AWS_GLUE_API_CALL_TIMEOUT_MS}: 30 seconds. */
+  public static final long DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS = 30_000L;
+
+  /**
+   * Upper bound in milliseconds for a single attempt of a Glue API call (optional). Also used as
+   * the HTTP connection and socket timeout of the Iceberg Glue client. Defaults to {@link
+   * #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
+   */
+  public static final String AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS =
+      "aws-glue-api-call-attempt-timeout-ms";
+
+  /** Default value for {@link #AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}: 10 seconds. */
+  public static final long DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS = 10_000L;
+
+  /**
+   * Maximum number of attempts of a Glue API call, including the first one (optional). Retries
+   * apply to throttling and transient failures. Defaults to {@link #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
+   */
+  public static final String AWS_GLUE_MAX_ATTEMPTS = "aws-glue-max-attempts";
+
+  /** Default value for {@link #AWS_GLUE_MAX_ATTEMPTS}. */
+  public static final int DEFAULT_AWS_GLUE_MAX_ATTEMPTS = 4;
+
+  /**
    * Default table format used when creating tables via Gravitino's {@code createTable()} API
    * (optional). Accepted values: {@code iceberg}, {@code hive}. Defaults to {@code hive}.
    */

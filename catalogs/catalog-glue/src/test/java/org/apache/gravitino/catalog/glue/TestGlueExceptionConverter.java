@@ -259,4 +259,116 @@ public class TestGlueExceptionConverter {
                     .build())
             .build();
   }
+
+  @Test
+  public void testIcebergRenameOntoExistingTableIsAlreadyExists() {
+    RuntimeException raw =
+        new RuntimeException(
+            AlreadyExistsException.builder()
+                .message("Table already exists.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("AlreadyExistsException")
+                        .errorMessage("Table already exists.")
+                        .build())
+                .build());
+
+    assertInstanceOf(
+        TableAlreadyExistsException.class,
+        GlueExceptionConverter.toIcebergException(raw, "altering table t1"));
+  }
+
+  @Test
+  public void testIcebergMissingNamespaceIsNoSuchSchema() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new org.apache.iceberg.exceptions.NoSuchNamespaceException(
+                "Cannot rename db.t to nodb.t because namespace nodb does not exist"),
+            "altering table t");
+
+    assertInstanceOf(NoSuchSchemaException.class, converted);
+  }
+
+  @Test
+  public void testIcebergForbiddenKeepsAwsDenialWithoutCatalogName() {
+    AccessDeniedException denial =
+        AccessDeniedException.builder()
+            .message(IAM_MESSAGE)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("AccessDeniedException")
+                    .errorMessage(IAM_MESSAGE)
+                    .build())
+            .build();
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.ForbiddenException(
+            denial,
+            "Cannot commit %s.db.t because Glue cannot access the requested resources",
+            GlueIcebergTableHelper.ICEBERG_CATALOG_NAME);
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertTrue(converted.getMessage().contains("glue:CreateDatabase"), converted.getMessage());
+    assertFalse(
+        converted.getMessage().contains(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+        converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergValidationUnderCommitFailureIsIllegalArgument() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitStateUnknownException(
+            new org.apache.iceberg.exceptions.ValidationException(
+                "Invalid S3 URI, cannot determine scheme: /tmp/wh/db/t/metadata/0.json"));
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(IllegalArgumentException.class, converted);
+    assertTrue(converted.getMessage().contains("/tmp/wh/db/t"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergGravitinoExceptionsPassThrough() {
+    NoSuchTableException original = new NoSuchTableException("gone");
+    assertSame(original, GlueExceptionConverter.toIcebergException(original, "table t"));
+    UnsupportedOperationException unsupported =
+        new UnsupportedOperationException("Transform is not supported: bucket");
+    assertSame(unsupported, GlueExceptionConverter.toIcebergException(unsupported, "table t"));
+  }
+
+  @Test
+  public void testServiceScopeErrorIsNotRegionMismatch() {
+    GlueException serviceError =
+        (GlueException)
+            GlueException.builder()
+                .message("Credential should be scoped to correct service: 'glue'.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("InvalidSignatureException")
+                        .errorMessage("Credential should be scoped to correct service: 'glue'.")
+                        .build())
+                .build();
+
+    assertFalse(GlueExceptionConverter.isRegionScopeFailure(serviceError));
+  }
+
+  @Test
+  public void testRegionScopeErrorIsNotReportedAsRejectedCredentials() {
+    GlueException regionError =
+        (GlueException)
+            GlueException.builder()
+                .message("Credential should be scoped to a valid region.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("InvalidSignatureException")
+                        .errorMessage("Credential should be scoped to a valid region.")
+                        .build())
+                .build();
+
+    assertFalse(GlueExceptionConverter.isAuthenticationFailure(regionError));
+    String message = GlueExceptionConverter.toConnectionException(regionError).getMessage();
+    assertTrue(message.contains(GlueConstants.AWS_REGION), message);
+    assertFalse(message.contains("rejected the configured credentials"), message);
+  }
 }

@@ -19,7 +19,10 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_ACCESS_KEY_ID;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_API_CALL_TIMEOUT_MS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_ENDPOINT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_MAX_ATTEMPTS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -37,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.GlueClient;
 
@@ -163,5 +168,82 @@ class TestGlueClientProvider {
     config.put(AWS_GLUE_ENDPOINT, "not a valid uri ://");
 
     assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));
+  }
+
+  @Test
+  void testBuildClientAppliesTimeoutsAndRetries() {
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "us-east-1");
+    config.put(AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(AWS_SECRET_ACCESS_KEY, "test-secret-key");
+    config.put(AWS_GLUE_API_CALL_TIMEOUT_MS, "5000");
+    config.put(AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "2000");
+    config.put(AWS_GLUE_MAX_ATTEMPTS, "2");
+
+    try (GlueClient client = GlueClientProvider.buildClient(config)) {
+      ClientOverrideConfiguration override =
+          client.serviceClientConfiguration().overrideConfiguration();
+      assertEquals(Duration.ofMillis(5000), override.apiCallTimeout().orElseThrow());
+      assertEquals(Duration.ofMillis(2000), override.apiCallAttemptTimeout().orElseThrow());
+      assertEquals(2, override.retryStrategy().orElseThrow().maxAttempts());
+    }
+  }
+
+  @Test
+  void testBuildClientDefaultTimeouts() {
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "us-east-1");
+    config.put(AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    try (GlueClient client = GlueClientProvider.buildClient(config)) {
+      ClientOverrideConfiguration override =
+          client.serviceClientConfiguration().overrideConfiguration();
+      assertEquals(
+          Duration.ofMillis(GlueConstants.DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS),
+          override.apiCallTimeout().orElseThrow());
+      assertEquals(
+          GlueConstants.DEFAULT_AWS_GLUE_MAX_ATTEMPTS,
+          override.retryStrategy().orElseThrow().maxAttempts());
+    }
+  }
+
+  @Test
+  void testValidateConfigRejectsTemporaryAccessKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "us-east-1");
+    config.put(AWS_ACCESS_KEY_ID, "ASIAEXAMPLEKEY");
+    config.put(AWS_SECRET_ACCESS_KEY, "secret");
+
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class, () -> GlueClientProvider.validateConfig(config));
+    assertTrue(ex.getMessage().contains("session token"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("default AWS credential chain"), ex.getMessage());
+    assertFalse(ex.getMessage().contains("ASIAEXAMPLEKEY"), ex.getMessage());
+  }
+
+  @Test
+  void testValidateConfigRejectsPartialKeyPairAndBadEndpoint() {
+    Map<String, String> partial = new HashMap<>();
+    partial.put(AWS_REGION, "us-east-1");
+    partial.put(AWS_ACCESS_KEY_ID, "AKIAEXAMPLE");
+    partial.put(AWS_SECRET_ACCESS_KEY, "   ");
+    assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.validateConfig(partial));
+
+    Map<String, String> badEndpoint = new HashMap<>();
+    badEndpoint.put(AWS_REGION, "us-east-1");
+    badEndpoint.put(AWS_GLUE_ENDPOINT, "not a url");
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class, () -> GlueClientProvider.validateConfig(badEndpoint));
+    assertTrue(ex.getMessage().contains(AWS_GLUE_ENDPOINT), ex.getMessage());
+  }
+
+  @Test
+  void testValidateConfigAcceptsDefaultCredentialChain() {
+    Map<String, String> config = new HashMap<>();
+    config.put(AWS_REGION, "us-east-1");
+    GlueClientProvider.validateConfig(config);
   }
 }

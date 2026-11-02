@@ -19,8 +19,11 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_ACCESS_KEY_ID;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_API_CALL_TIMEOUT_MS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_CATALOG_ID;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_ENDPOINT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_GLUE_MAX_ATTEMPTS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_REGION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.AWS_SECRET_ACCESS_KEY;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT;
@@ -31,6 +34,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
@@ -106,5 +110,75 @@ class TestGlueCatalogPropertiesMetadata {
         DEFAULT_TABLE_FORMAT_FILTER,
         metadata.getDefaultValue(TABLE_FORMAT_FILTER),
         "Default table format filter should be 'all'");
+  }
+
+  @Test
+  void testRegionMustBeKnownLowerCaseRegion() {
+    decode(AWS_REGION, "us-east-2");
+    assertInvalid(AWS_REGION, "us-east-9");
+    assertInvalid(AWS_REGION, "US-EAST-2");
+    assertInvalid(AWS_REGION, "us-east-2 ");
+    assertInvalid(AWS_REGION, "");
+  }
+
+  @Test
+  void testCatalogIdMustBeTwelveDigits() {
+    decode(AWS_GLUE_CATALOG_ID, "123456789012");
+    assertInvalid(AWS_GLUE_CATALOG_ID, "12345678901");
+    assertInvalid(AWS_GLUE_CATALOG_ID, "notanumber");
+  }
+
+  @Test
+  void testEndpointMustBeHttpUrl() {
+    decode(AWS_GLUE_ENDPOINT, "http://localhost:4566");
+    decode(AWS_GLUE_ENDPOINT, "https://glue.us-east-2.amazonaws.com");
+    decode(AWS_GLUE_ENDPOINT, "http://moto_server:5000");
+    assertInvalid(AWS_GLUE_ENDPOINT, "not a url");
+    assertInvalid(AWS_GLUE_ENDPOINT, "ht!tp://bad");
+    assertInvalid(AWS_GLUE_ENDPOINT, "glue.us-east-2.amazonaws.com");
+  }
+
+  @Test
+  void testWarehouseMustBeS3UriWithBucket() {
+    decode(WAREHOUSE, "s3://bucket/warehouse");
+    decode(WAREHOUSE, "s3a://bucket");
+    assertInvalid(WAREHOUSE, "/tmp/warehouse");
+    assertInvalid(WAREHOUSE, "file:///tmp/warehouse");
+    assertInvalid(WAREHOUSE, "s3://");
+    assertInvalid(WAREHOUSE, "");
+  }
+
+  @Test
+  void testTableFormatValuesMustBeDocumented() {
+    decode(DEFAULT_TABLE_FORMAT, "ICEBERG");
+    decode(DEFAULT_TABLE_FORMAT, "hive");
+    assertInvalid(DEFAULT_TABLE_FORMAT, "paimon");
+    assertInvalid(DEFAULT_TABLE_FORMAT, "");
+
+    decode(TABLE_FORMAT_FILTER, "iceberg, hive");
+    decode(TABLE_FORMAT_FILTER, "all");
+    assertInvalid(TABLE_FORMAT_FILTER, "icebrg");
+    assertInvalid(TABLE_FORMAT_FILTER, "iceberg,");
+    assertInvalid(TABLE_FORMAT_FILTER, "");
+  }
+
+  @Test
+  void testTimeoutAndRetryValuesMustBePositive() {
+    assertEquals(5000L, decode(AWS_GLUE_API_CALL_TIMEOUT_MS, "5000"));
+    assertEquals(3, decode(AWS_GLUE_MAX_ATTEMPTS, "3"));
+    assertInvalid(AWS_GLUE_API_CALL_TIMEOUT_MS, "0");
+    assertInvalid(AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "-1");
+    assertInvalid(AWS_GLUE_MAX_ATTEMPTS, "zero");
+  }
+
+  private Object decode(String key, String value) {
+    return metadata.getPropertyEntry(key).decode(value);
+  }
+
+  private void assertInvalid(String key, String value) {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> decode(key, value),
+        () -> key + " should reject '" + value + "'");
   }
 }

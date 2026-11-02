@@ -94,6 +94,9 @@ import org.slf4j.LoggerFactory;
  */
 final class GlueIcebergTableHelper {
 
+  /** Name of the internal Iceberg catalog; it never reaches users. */
+  static final String ICEBERG_CATALOG_NAME = "gravitino-glue-iceberg";
+
   private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergTableHelper.class);
 
   private static final String DOT = ".";
@@ -103,6 +106,11 @@ final class GlueIcebergTableHelper {
   private static final String GLUE_CATALOG = "GlueCatalog";
   private static final String GLUE_ID = "glue.id";
   private static final String GLUE_ENDPOINT = "glue.endpoint";
+  private static final String HTTP_CLIENT_TYPE = "http-client.type";
+  private static final String HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS =
+      "http-client.apache.connection-timeout-ms";
+  private static final String HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS =
+      "http-client.apache.socket-timeout-ms";
   private static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
   private static final String CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID =
       "client.credentials-provider.access-key-id";
@@ -146,7 +154,7 @@ final class GlueIcebergTableHelper {
     Map<String, String> icebergProps = buildIcebergCatalogProperties(config);
 
     GlueCatalog glueCatalog = new GlueCatalog();
-    glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
+    glueCatalog.initialize(ICEBERG_CATALOG_NAME, icebergProps);
     LOG.info("Initialized Iceberg GlueCatalog for region {}", config.get(GlueConstants.AWS_REGION));
     return glueCatalog;
   }
@@ -187,6 +195,13 @@ final class GlueIcebergTableHelper {
     if (StringUtils.isNotBlank(endpoint)) {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
+
+    // The Iceberg AWS clients take no total call timeout, so bound each connection and read by
+    // the per-attempt timeout of the catalog's own Glue client.
+    String attemptTimeoutMs = String.valueOf(GlueClientProvider.apiCallAttemptTimeoutMs(config));
+    icebergProps.put(HTTP_CLIENT_TYPE, "apache");
+    icebergProps.put(HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS, attemptTimeoutMs);
+    icebergProps.put(HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS, attemptTimeoutMs);
 
     icebergProps.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
     return icebergProps;
