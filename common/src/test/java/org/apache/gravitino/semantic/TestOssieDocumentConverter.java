@@ -37,10 +37,10 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.OssieDocumentConverter.ParsedSemanticModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -769,15 +769,13 @@ public class TestOssieDocumentConverter {
 
   private static SemanticModel semanticModel(
       SemanticModelDefinition definition, Map<String, String> properties) {
-    return SemanticModelEntity.builder()
-        .withId(1L)
+    return SemanticModelDTO.builder()
         .withName("sales")
-        .withNamespace(Namespace.of("lake", "sales", "mart"))
         .withComment("Governed sales definitions")
-        .withDefinition(definition)
+        .withDefinition(SemanticModelDefinitionDTO.fromDefinition(definition))
         .withProperties(properties)
-        .withAuditInfo(
-            AuditInfo.builder()
+        .withAudit(
+            AuditDTO.builder()
                 .withCreator("tester")
                 .withCreateTime(Instant.parse("2026-09-28T00:00:00Z"))
                 .build())
