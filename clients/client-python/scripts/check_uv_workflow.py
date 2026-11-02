@@ -153,7 +153,6 @@ def main():
         "UV_PROJECT_ENVIRONMENT",
         "UV_LOCKED",
         "UV_FROZEN",
-        "UV_NO_SYNC",
     ):
         environment.pop(name, None)
     _require(shutil.which("uv") is not None, "Install uv before running this check")

@@ -136,9 +136,6 @@ run `uv lock`, review the lockfile changes, and verify `uv lock --check`. Use
 `uv sync --locked --all-extras` to install all existing optional extras in the
 development environment.
 
-The uv workflow above runs unit tests. Integration tests still use the existing Gradle
-commands below and their server or storage prerequisites.
-
 For an independent lock, metadata-equivalence and cache-invalidation check, run:
 
 ```shell
@@ -147,7 +144,8 @@ uv run --locked python scripts/check_uv_workflow.py
 
 This lightweight check needs only the core client and the default setuptools development
 tool. It changes README and requirements only in temporary source copies, reuses the uv
-cache, and does not run server or engine integration tests. A failed check exits nonzero.
+cache, and exits nonzero on failure. The uv commands above do not run integration tests;
+use the existing Gradle commands below with their server or storage prerequisites.
 
 ### Build and Test
 
