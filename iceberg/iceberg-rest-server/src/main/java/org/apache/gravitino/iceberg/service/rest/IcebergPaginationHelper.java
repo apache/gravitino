@@ -122,6 +122,12 @@ class IcebergPaginationHelper {
     }
     String token = pageToken.get();
 
+    // An empty pageToken with no pageSize asks for every item from the start, which is the
+    // unsorted list as given; skip the sort.
+    if (token.isEmpty() && !pageSize.isPresent()) {
+      return new PaginatedPage<>(items, Optional.empty());
+    }
+
     List<T> sorted =
         items.stream().sorted(Comparator.comparing(keyExtractor)).collect(Collectors.toList());
 

@@ -242,4 +242,17 @@ class TestIcebergPaginationHelper {
     Assertions.assertEquals(1, firstPage.namespaces().size());
     Assertions.assertEquals("a", firstPage.nextPageToken());
   }
+
+  @Test
+  void testEmptyPageTokenWithoutPageSizeReturnsAllUnsorted() {
+    ListNamespacesResponse namespaces =
+        ListNamespacesResponse.builder()
+            .addAll(Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")))
+            .build();
+    ListNamespacesResponse all =
+        IcebergPaginationHelper.paginateNamespaces(namespaces, Optional.of(""), Optional.empty());
+    Assertions.assertEquals(
+        Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")), all.namespaces());
+    Assertions.assertNull(all.nextPageToken());
+  }
 }
