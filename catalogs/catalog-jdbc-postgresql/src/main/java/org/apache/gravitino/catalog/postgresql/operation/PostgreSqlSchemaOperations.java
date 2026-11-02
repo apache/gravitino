@@ -144,7 +144,16 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return metaData.getSchemas(connection.getCatalog(), pattern);
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Generates an atomic, restrictive schema drop even when cascade is requested.
+   *
+   * <p>PostgreSQL cascade can remove objects outside this schema. Until schema-local cascade is
+   * supported safely, the generated statement refuses every non-empty schema.
+   *
+   * @param schema the schema to drop
+   * @param cascade whether cascade was requested; it does not enable PostgreSQL native cascade
+   * @return the restrictive drop statement
+   */
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
     // PostgreSQL CASCADE also removes objects outside the schema. A client-side dependency
@@ -154,7 +163,13 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return "DROP SCHEMA " + quoteName(schema) + " RESTRICT";
   }
 
-  /** {@inheritDoc} */
+  /**
+   * Drops an empty schema without requiring explicit locks on its relations.
+   *
+   * @param schema the schema to drop
+   * @param cascade whether cascade was requested
+   * @throws NonEmptySchemaException if the schema is non-empty, including when cascade is requested
+   */
   @Override
   protected void dropDatabase(String schema, boolean cascade) {
     try (Connection connection = getConnection()) {
