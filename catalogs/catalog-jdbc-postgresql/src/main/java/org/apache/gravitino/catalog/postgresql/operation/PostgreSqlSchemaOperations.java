@@ -68,7 +68,10 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           + "SELECT DISTINCT pg_catalog.pg_describe_object(d.classid, d.objid, d.objsubid) AS dependent "
           + "FROM dependents d "
           + "CROSS JOIN LATERAL pg_catalog.pg_identify_object(d.classid, d.objid, d.objsubid) info "
-          + "WHERE info.schema IS NOT NULL AND info.schema <> ?; ";
+          // TOAST tables and their indexes/types are PostgreSQL-managed storage for the tables
+          // being dropped, not user objects in another schema. Keep traversing them, but do not
+          // report the internal pg_toast namespace as an external dependent.
+          + "WHERE info.schema IS NOT NULL AND info.schema <> ? AND info.schema <> 'pg_toast'; ";
 
   private String database;
 
