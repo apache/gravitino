@@ -64,6 +64,9 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   private static final Pattern CATALOG_ID_PATTERN = Pattern.compile("\\d{12}");
 
+  private static final Pattern HOST_PORT_PATTERN =
+      Pattern.compile("[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?(:\\d{1,5})?");
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -101,7 +104,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               AWS_GLUE_API_CALL_TIMEOUT_MS,
               positiveLongEntry(
                   AWS_GLUE_API_CALL_TIMEOUT_MS,
-                  "Upper bound in milliseconds for one Glue API call, including retries.",
+                  "Upper bound in milliseconds for one Glue API call made by the catalog,"
+                      + " including retries. Not applied to Iceberg table I/O.",
                   DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS))
           .put(
               AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS,
@@ -114,7 +118,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               new PropertyEntry.Builder<Integer>()
                   .withName(AWS_GLUE_MAX_ATTEMPTS)
                   .withDescription(
-                      "Maximum number of attempts of a Glue API call, including the first one.")
+                      "Maximum number of attempts of a Glue API call made by the catalog,"
+                          + " including the first one. Not applied to Iceberg table I/O.")
                   .withJavaType(Integer.class)
                   .withDefaultValue(DEFAULT_AWS_GLUE_MAX_ATTEMPTS)
                   .withDecoder(
@@ -173,8 +178,6 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
    * @throws IllegalArgumentException if the endpoint is not such a URI
    */
   static URI parseEndpoint(String endpoint) {
-    // The authority, not getHost(), is checked: getHost() is null for host names with '_', such
-    // as Docker service names.
     URI uri;
     try {
       uri = new URI(endpoint);
@@ -185,11 +188,19 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
     }
     Preconditions.checkArgument(
         ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-            && StringUtils.isNotBlank(uri.getRawAuthority()),
+            && hasHost(uri),
         "Property '%s' must be an http or https URL with a host, got: %s",
         AWS_GLUE_ENDPOINT,
         endpoint);
     return uri;
+  }
+
+  private static boolean hasHost(URI uri) {
+    // getHost() is null for host names with '_', such as Docker service names, so such an
+    // authority is accepted when it is a plain host name with an optional port.
+    return uri.getHost() != null
+        || (uri.getRawAuthority() != null
+            && HOST_PORT_PATTERN.matcher(uri.getRawAuthority()).matches());
   }
 
   private static String checkRegion(String region) {

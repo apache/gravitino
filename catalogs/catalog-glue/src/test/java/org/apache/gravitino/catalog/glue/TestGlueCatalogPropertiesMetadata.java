@@ -133,6 +133,8 @@ class TestGlueCatalogPropertiesMetadata {
     decode(AWS_GLUE_ENDPOINT, "http://localhost:4566");
     decode(AWS_GLUE_ENDPOINT, "https://glue.us-east-2.amazonaws.com");
     decode(AWS_GLUE_ENDPOINT, "http://moto_server:5000");
+    assertInvalid(AWS_GLUE_ENDPOINT, "http://:4566");
+    assertInvalid(AWS_GLUE_ENDPOINT, "http://user@");
     assertInvalid(AWS_GLUE_ENDPOINT, "not a url");
     assertInvalid(AWS_GLUE_ENDPOINT, "ht!tp://bad");
     assertInvalid(AWS_GLUE_ENDPOINT, "glue.us-east-2.amazonaws.com");

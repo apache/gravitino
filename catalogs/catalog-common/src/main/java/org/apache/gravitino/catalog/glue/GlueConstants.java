@@ -52,8 +52,9 @@ public final class GlueConstants {
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
   /**
-   * Upper bound in milliseconds for one Glue API call, including all retries (optional). Defaults
-   * to {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
+   * Upper bound in milliseconds for one Glue API call made by the catalog, including all retries
+   * (optional). The AWS clients used for Iceberg tables only take the attempt timeout. Defaults to
+   * {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_TIMEOUT_MS = "aws-glue-api-call-timeout-ms";
 
@@ -72,8 +73,9 @@ public final class GlueConstants {
   public static final long DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS = 10_000L;
 
   /**
-   * Maximum number of attempts of a Glue API call, including the first one (optional). Retries
-   * apply to throttling and transient failures. Defaults to {@link #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
+   * Maximum number of attempts of a Glue API call made by the catalog, including the first one
+   * (optional). Retries apply to throttling and transient failures. The AWS clients used for
+   * Iceberg tables keep the AWS SDK default. Defaults to {@link #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
    */
   public static final String AWS_GLUE_MAX_ATTEMPTS = "aws-glue-max-attempts";
 

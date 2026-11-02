@@ -394,11 +394,17 @@ final class GlueExceptionConverter {
             String.format("Invalid request for %s: %s", context, describe(t)), e);
       }
       if (t instanceof org.apache.iceberg.exceptions.ForbiddenException) {
-        // Prefer the AWS denial deeper in the chain so its error code and message are kept.
+        // A Glue denial deeper in the chain keeps its AWS error code and message through the
+        // shared mapping; a denial by another service (such as S3) stays forbidden.
         Throwable awsCause = findCause(t, SdkException.class);
-        return awsCause != null
+        return awsCause instanceof GlueException
             ? toGenericException((SdkException) awsCause, context, null)
-            : new ForbiddenException(e, "%s: %s", context, describe(t));
+            : new ForbiddenException(
+                e, "%s: %s", context, describe(awsCause != null ? awsCause : t));
+      }
+      if (t instanceof EntityNotFoundException) {
+        // Not wrapped by Iceberg; it may be the table or its database.
+        return new NotFoundException(e, "%s: %s", context, describe(t));
       }
       if (t instanceof SdkException) {
         return toGenericException((SdkException) t, context, null);

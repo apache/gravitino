@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
@@ -267,6 +268,39 @@ public class TestGlueExceptionConverter {
                     .errorMessage("The security token included in the request is invalid")
                     .build())
             .build();
+  }
+
+  @Test
+  public void testIcebergForbiddenWithNonGlueCauseStaysForbidden() {
+    AwsServiceException s3Denial =
+        AwsServiceException.builder()
+            .message("Access Denied")
+            .statusCode(403)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .serviceName("S3")
+                    .errorCode("AccessDenied")
+                    .errorMessage("Access Denied")
+                    .build())
+            .build();
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.ForbiddenException(
+            s3Denial, "Cannot commit db.t because S3 denied access");
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertTrue(converted.getMessage().contains("Access Denied"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergRawGlueNotFoundIsNotFound() {
+    RuntimeException raw =
+        new RuntimeException(
+            EntityNotFoundException.builder().message("Database db not found").build());
+
+    assertInstanceOf(
+        NotFoundException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
   }
 
   @Test
