@@ -380,6 +380,60 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
+  void testVendsOnlyWhereACredentialProviderCoversTheLocation() {
+    Namespace namespace = Namespace.of("db");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+
+    // No credential provider: a request asking for vended credentials is served without them.
+    CatalogWrapperForREST noProvider =
+        new CatalogWrapperForREST(
+            "no-provider",
+            new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND, "memory",
+                    IcebergConstants.WAREHOUSE, "/tmp/warehouse")));
+    ((SupportsNamespaces) noProvider.getCatalog()).createNamespace(namespace);
+    noProvider
+        .getCatalog()
+        .createTable(
+            table,
+            schema,
+            PartitionSpec.unpartitioned(),
+            "s3://bucket/wh/db/tbl",
+            Collections.emptyMap());
+    LoadTableResponse loaded = noProvider.loadTable(table, true, CredentialPrivilege.READ);
+    Assertions.assertFalse(noProvider.shouldGenerateCredential(loaded, true));
+    Assertions.assertTrue(loaded.credentials().isEmpty());
+    Assertions.assertTrue(
+        loaded.config().keySet().stream().noneMatch(key -> key.startsWith("s3.")),
+        loaded.config().toString());
+
+    // With a provider covering the scheme, credentials are vended as before.
+    CatalogWrapperForREST withProvider =
+        new CatalogWrapperForREST(
+            "with-provider",
+            new IcebergConfig(
+                ImmutableMap.of(
+                    IcebergConstants.CATALOG_BACKEND, "memory",
+                    IcebergConstants.WAREHOUSE, "/tmp/warehouse",
+                    CredentialConstants.CREDENTIAL_PROVIDERS,
+                        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE)));
+    ((SupportsNamespaces) withProvider.getCatalog()).createNamespace(namespace);
+    withProvider
+        .getCatalog()
+        .createTable(
+            table,
+            schema,
+            PartitionSpec.unpartitioned(),
+            "s3://bucket/wh/db/tbl",
+            Collections.emptyMap());
+    Assertions.assertTrue(
+        withProvider.shouldGenerateCredential(
+            withProvider.loadTable(table, false, CredentialPrivilege.READ), true));
+  }
+
+  @Test
   void testLocalTableCredentials() {
     IcebergConfig config =
         new IcebergConfig(
