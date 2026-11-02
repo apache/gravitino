@@ -42,7 +42,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.mapper.provider.MaintenanceMapperPackageProvider;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;

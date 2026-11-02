@@ -30,7 +30,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.metrics.Monitored;

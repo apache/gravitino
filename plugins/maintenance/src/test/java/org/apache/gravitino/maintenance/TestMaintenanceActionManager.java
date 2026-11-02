@@ -25,7 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;

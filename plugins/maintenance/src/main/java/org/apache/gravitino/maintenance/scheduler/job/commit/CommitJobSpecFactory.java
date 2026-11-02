@@ -31,7 +31,7 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
-import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory.EnqueueBags;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory.JobConfParts;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 
@@ -69,7 +69,7 @@ final class CommitJobSpecFactory {
 
     Map<String, String> firstBuilt = jobConfBuilder.build(chain.get(0).policy(), ref.catalogName());
     MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(firstBuilt, ref.catalogName());
-    EnqueueBags first = MaintenanceJobSpecFactory.splitEnqueueBags(firstBuilt);
+    JobConfParts first = MaintenanceJobSpecFactory.splitJobConfParts(firstBuilt);
     String updaterOptions = first.updaterOptions;
     Map<String, String> sparkConf =
         new LinkedHashMap<>(
@@ -78,13 +78,13 @@ final class CommitJobSpecFactory {
     List<Task> tasks = new ArrayList<>(chain.size());
     for (int i = 0; i < chain.size(); i++) {
       CommitChainMember member = chain.get(i);
-      EnqueueBags bags;
+      JobConfParts bags;
       if (i == 0) {
         bags = first;
       } else {
         Map<String, String> built = jobConfBuilder.build(member.policy(), ref.catalogName());
         MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(built, ref.catalogName());
-        bags = MaintenanceJobSpecFactory.splitEnqueueBags(built);
+        bags = MaintenanceJobSpecFactory.splitJobConfParts(built);
         mergeSparkConfMaps(sparkConf, bags.sparkConf);
       }
       Map<String, String> parameters = new LinkedHashMap<>(bags.parameters);

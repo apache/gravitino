@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.MaintenanceJobManager;
-import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
