@@ -161,9 +161,6 @@ public class PolicyOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            // Type before content: unknown/mis-cased policyType must not be masked by custom
-            // content validation (e.g. "supportedObjectTypes cannot be empty").
-            validateCreatePolicyType(request.getPolicyType());
             request.validate();
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
@@ -397,9 +394,5 @@ public class PolicyOperations {
             .relationValue()
             .map(PolicyAssociationSelectorSerde::deserialize)
             .orElseGet(AllValuesSelector::get));
-  }
-
-  private static void validateCreatePolicyType(String policyType) {
-    PolicyCreateRequest.validatePolicyType(policyType);
   }
 }

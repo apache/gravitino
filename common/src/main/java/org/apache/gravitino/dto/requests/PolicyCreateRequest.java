@@ -132,7 +132,7 @@ public class PolicyCreateRequest implements RESTRequest {
    *
    * @param policyType request policy type
    */
-  public static void validatePolicyType(String policyType) {
+  static void validatePolicyType(String policyType) {
     Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
     if (builtInType != Policy.BuiltInType.CUSTOM && !builtInType.policyType().equals(policyType)) {
       throw new IllegalArgumentException(

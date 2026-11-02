@@ -195,6 +195,9 @@ public interface PolicyUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
       Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
+      // Same ordering as PolicyCreateRequest: type before content for EXTERNAL_PROPERTY +
+      // defaultImpl custom fallback.
+      PolicyCreateRequest.validatePolicyType(policyType);
       newContent.validate();
     }
   }
