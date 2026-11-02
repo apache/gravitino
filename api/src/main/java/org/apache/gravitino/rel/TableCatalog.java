@@ -103,6 +103,11 @@ public interface TableCatalog {
    * need the table with default values applied, use the {@link #loadTable(NameIdentifier)} method
    * after creation.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -127,6 +132,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -149,6 +159,11 @@ public interface TableCatalog {
 
   /**
    * Create a table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -175,6 +190,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -198,6 +218,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -220,6 +245,11 @@ public interface TableCatalog {
 
   /**
    * Create a partitioned table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -254,6 +284,11 @@ public interface TableCatalog {
 
   /**
    * Create a table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * reported error and verify catalog state before retrying; creation is not automatically
+   * replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.

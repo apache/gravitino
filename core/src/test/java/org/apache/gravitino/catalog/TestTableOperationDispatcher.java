@@ -111,6 +111,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -204,25 +205,29 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .findFirst();
     Assertions.assertTrue(ident1.isPresent());
 
-    // Test when the entity store failed to put the table entity
-    doThrow(new IOException()).when(entityStore).put(any(), anyBoolean());
+    // Source creation succeeds, but a failed registration must not be reported as success.
+    IOException registrationFailure = new IOException("store unavailable");
+    doThrow(registrationFailure).when(entityStore).put(any(), anyBoolean());
     NameIdentifier tableIdent2 = NameIdentifier.of(tableNs, "table2");
-    Table table2 =
-        tableOperationDispatcher.createTable(
-            tableIdent2, columns, "comment", props, new Transform[0]);
-
-    // Check if the created Schema's field values are correct
-    Assertions.assertEquals("table2", table2.name());
-    Assertions.assertEquals("comment", table2.comment());
-    testProperties(props, table2.properties());
-
-    // Check if the Table entity is stored in the EntityStore
+    GravitinoRuntimeException error =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    tableIdent2, columns, "comment", props, new Transform[0]));
+    Assertions.assertSame(registrationFailure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(tableIdent2.toString()));
+    Assertions.assertTrue(error.getMessage().contains("created in the external catalog"));
+    Assertions.assertTrue(error.getMessage().contains("verify external state before retrying"));
     Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> entityStore.get(tableIdent2, TABLE, TableEntity.class));
-
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", table2.auditInfo().creator());
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        source -> {
+          Table created = ((TestCatalogOperations) source.ops()).loadTable(tableIdent2);
+          Assertions.assertEquals("table2", created.name());
+          Assertions.assertEquals("comment", created.comment());
+          return null;
+        });
   }
 
   @Test
@@ -960,13 +965,49 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         });
   }
 
+  /**
+   * Verifies native columns at the old and new boundaries survive import and repeated loads.
+   *
+   * @param length the native column name length
+   * @throws IOException if the test store cannot be accessed
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {128, 129, 300})
+  public void testImportNativeTableWithLongColumnName(int length) throws IOException {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_native_long_column_" + length);
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    String columnName = "c".repeat(length);
+    Column[] columns = new Column[] {Column.of(columnName, Types.StringType.get())};
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) source.ops())
+        .createTable(
+            ident,
+            columns,
+            "native",
+            Map.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            Indexes.EMPTY_INDEXES);
+    Assertions.assertEquals(
+        columnName, tableOperationDispatcher.loadTable(ident).columns()[0].name());
+    Assertions.assertEquals(
+        columnName, entityStore.get(ident, TABLE, TableEntity.class).columns().get(0).name());
+    Assertions.assertEquals(
+        columnName, tableOperationDispatcher.loadTable(ident).columns()[0].name());
+  }
+
   @Test
   public void testRejectsOversizedColumnFieldsBeforeExternalChange() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_field_limits");
     NameIdentifier validTableIdent = NameIdentifier.of(tableNs, "valid_table");
     NameIdentifier invalidNameTableIdent = NameIdentifier.of(tableNs, "invalid_column_name");
     NameIdentifier invalidCommentTableIdent = NameIdentifier.of(tableNs, "invalid_column_comment");
-    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
     String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column validColumn =
@@ -996,7 +1037,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     props,
                     new Transform[0]));
     Assertions.assertEquals(
-        "The name of the column must not exceed 128 characters", createNameException.getMessage());
+        "The name of the column must not exceed 300 characters", createNameException.getMessage());
 
     IllegalArgumentException createCommentException =
         Assertions.assertThrows(
@@ -1030,7 +1071,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     validTableIdent,
                     TableChange.addColumn(new String[] {oversizedName}, Types.StringType.get())));
     Assertions.assertEquals(
-        "The name of the column must not exceed 128 characters", addNameException.getMessage());
+        "The name of the column must not exceed 300 characters", addNameException.getMessage());
 
     IllegalArgumentException addCommentException =
         Assertions.assertThrows(
@@ -1052,7 +1093,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                     validTableIdent,
                     TableChange.renameColumn(new String[] {"col1"}, oversizedName)));
     Assertions.assertEquals(
-        "The name of the column must not exceed 128 characters", renameException.getMessage());
+        "The name of the column must not exceed 300 characters", renameException.getMessage());
 
     IllegalArgumentException updateCommentException =
         Assertions.assertThrows(
