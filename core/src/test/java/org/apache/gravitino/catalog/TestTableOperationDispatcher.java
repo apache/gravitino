@@ -546,12 +546,12 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   /**
-   * Verifies native import still waits for an in-flight write on the same table.
+   * Verifies the import write lock waits for a reader after the preflight read can complete.
    *
    * @throws Exception if fixture setup or concurrent verification fails
    */
   @Test
-  public void testNativeImportWaitsForSameTableWriteLock() throws Exception {
+  public void testNativeImportWaitsForSameTableReadLock() throws Exception {
     Namespace ns = Namespace.of(metalake, catalog, "schema_import_same");
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
@@ -570,7 +570,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             new SortOrder[0],
             Indexes.EMPTY_INDEXES);
     try (TreeLockTestSupport.HeldLock same =
-        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE)) {
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.READ)) {
       TreeLockTestSupport.assertWaitsFor(same, () -> tableOperationDispatcher.loadTable(ident));
     }
   }
