@@ -44,6 +44,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
@@ -266,6 +267,36 @@ public class TestIcebergTableOperationExecutor {
                     mockContext, Namespace.of("test_namespace"), oversizedCommentRequest));
     Assertions.assertEquals(
         "The comment of the column must not exceed 4096 characters", commentException.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRejectsUnrepresentableDecimalBeforeCreate() {
+    // Iceberg accepts decimal(10, 11); Gravitino cannot import it, so it must be refused before the
+    // table is created rather than after.
+    Schema schema =
+        new Schema(
+            NestedField.required(1, "id", StringType.get()),
+            NestedField.optional(
+                2,
+                "s",
+                Types.StructType.of(
+                    NestedField.optional(3, "amount", Types.DecimalType.of(10, 11)))));
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(schema).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.createTable(mockContext, Namespace.of("test_namespace"), request));
+    Assertions.assertTrue(exception.getMessage().contains("amount"), exception.getMessage());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            executor.updateTable(
+                mockContext,
+                TableIdentifier.of("test_namespace", "test_table"),
+                updateRequest(schema)));
     verifyNoInteractions(mockCatalogWrapper);
   }
 
