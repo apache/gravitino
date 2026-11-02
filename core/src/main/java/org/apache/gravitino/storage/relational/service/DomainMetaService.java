@@ -185,17 +185,25 @@ public class DomainMetaService {
    * committed. The check gets the new domain, the parent with its own parent set, and no
    * sub-domains.
    *
+   * <p>This operation must own its transaction so a failed check rolls back the inserted domain. It
+   * cannot run inside another transaction.
+   *
    * @param domainEntity The domain to insert; its parent, if set, is the parent to insert it under.
    * @param check The check of the locked state; nothing is inserted if it throws.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists.
    * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws IllegalStateException If it is called inside a transaction.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertDomainWithCheck")
   public void insertDomain(DomainEntity domainEntity, Consumer<LockedDomainState> check)
       throws IOException {
+    Preconditions.checkState(
+        !SessionUtils.isInTransaction(),
+        "The domain %s cannot be inserted with a check inside another transaction",
+        domainEntity.nameIdentifier());
     Namespace ns = domainEntity.namespace();
     String metalakeName = ns.level(0);
 

@@ -868,6 +868,40 @@ public class TestDomainRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testInsertDomainWithCheckRejectsOuterTransaction() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    for (String parent : new String[] {null, finance.name()}) {
+      DomainEntity rejected = newDomain(METALAKE_NAME, "Rejected", parent);
+      DomainEntity accepted = newDomain(METALAKE_NAME, "Accepted" + rejected.id(), null);
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            Assertions.assertThrows(
+                IllegalStateException.class,
+                () ->
+                    domainMetaService.insertDomain(
+                        rejected,
+                        state -> {
+                          throw new IllegalArgumentException("rejected");
+                        }));
+            // Catching the rejection must not leave a domain for the outer commit to persist.
+            // A separate write confirms that the outer transaction still commits normally.
+            try {
+              domainMetaService.insertDomain(accepted, false);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
+      Assertions.assertEquals(
+          accepted, domainMetaService.getDomainByIdentifier(accepted.nameIdentifier()));
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> domainMetaService.getDomainByIdentifier(rejected.nameIdentifier()));
+      Assertions.assertEquals(0, countDomainRelRows(rejected.id()));
+    }
+  }
+
+  @TestTemplate
   public void testSetDomainParent() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     String anotherMetalakeName = METALAKE_NAME + "_another";

@@ -58,13 +58,15 @@ public interface SupportsDomainOperations {
    * <p>The metalake is locked shared and the parent, if any, is locked shared, so the parent cannot
    * be attached elsewhere, deleted or unpublished before the change commits. The domain is written
    * before the check runs, so a duplicate name fails first. The check gets the new domain, the
-   * parent with its own parent set, and no sub-domains.
+   * parent with its own parent set, and no sub-domains. This operation must own its transaction so
+   * a failed check rolls back the inserted domain; it cannot run inside another transaction.
    *
    * @param domain The domain to insert.
    * @param check The check of the locked state.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists.
    * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws IllegalStateException If it is called inside a transaction.
    */
   void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
       throws IOException, EntityAlreadyExistsException, NoSuchEntityException;
