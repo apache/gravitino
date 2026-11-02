@@ -464,6 +464,64 @@ public class TestIcebergCommitValidation {
     Assertions.assertTrue(catalog.loadTable(IDENT).specs().containsKey(1));
   }
 
+  @Test
+  void testPartitionIdsCannotCollideWithinOneCommit() {
+    commitFails(
+        ValidationException.class,
+        addSpec("{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1000}"),
+        addSpec(
+            "{\"name\":\"id_bucket\",\"transform\":\"bucket[4]\",\"source-id\":1,\"field-id\":1000}"));
+    Assertions.assertEquals(1, catalog.loadTable(IDENT).specs().size());
+  }
+
+  @Test
+  void testUnusedUnknownSortOrderDoesNotBlockSettingKnownDefault() {
+    MetadataUpdate unknown =
+        MetadataUpdateParser.fromJson(
+            "{\"action\":\"add-sort-order\",\"sort-order\":{\"order-id\":1,\"fields\":["
+                + "{\"transform\":\"zorder\",\"source-id\":1,\"direction\":\"asc\","
+                + "\"null-order\":\"nulls-first\"}]}}");
+    commit(unknown, new MetadataUpdate.SetDefaultSortOrder(0));
+    Assertions.assertTrue(catalog.loadTable(IDENT).sortOrder().isUnsorted());
+    Assertions.assertEquals(2, catalog.loadTable(IDENT).sortOrders().size());
+  }
+
+  @Test
+  void testStagedCreateCannotUseUnknownDefaultTransform() {
+    TableIdentifier staged = TableIdentifier.of("db", "unknown_transform");
+    UpdateTableRequest create = stagedCreateRequest(staged);
+    List<MetadataUpdate> updates =
+        ImmutableList.<MetadataUpdate>builder()
+            .addAll(create.updates())
+            .add(
+                addSpec(
+                    "{\"name\":\"unknown\",\"transform\":\"custom\",\"source-id\":1,\"field-id\":1000}"))
+            .add(new MetadataUpdate.SetDefaultPartitionSpec(-1))
+            .build();
+    UpdateTableRequest request = new UpdateTableRequest(create.requirements(), updates);
+
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog, staged, IcebergCommitValidation.withValidation(request)));
+    Assertions.assertFalse(catalog.tableExists(staged));
+  }
+
+  @Test
+  void testRemovingAndRestoringMainCannotBypassSchemaChecks() {
+    commitFails(
+        ValidationException.class,
+        new MetadataUpdate.RemoveSnapshotRef(SnapshotRef.MAIN_BRANCH),
+        addSchema("{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1),
+        new MetadataUpdate.SetSnapshotRef(
+            SnapshotRef.MAIN_BRANCH, secondSnapshot, SnapshotRefType.BRANCH, null, null, null));
+    Assertions.assertEquals(Types.LongType.get(), catalog.loadTable(IDENT).schema().findType("id"));
+    Assertions.assertEquals(
+        secondSnapshot, catalog.loadTable(IDENT).currentSnapshot().snapshotId());
+  }
+
   private Table createPartitionedTable(String name) {
     Schema schema =
         new Schema(

@@ -234,11 +234,11 @@ public final class IcebergCommitValidation implements UpdateRequirement {
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
         updates.stream()
-            .anyMatch(
-                u ->
-                    u instanceof MetadataUpdate.RemoveSnapshotRef
-                        && SnapshotRef.MAIN_BRANCH.equals(
-                            ((MetadataUpdate.RemoveSnapshotRef) u).name()))
+                .anyMatch(
+                    u ->
+                        u instanceof MetadataUpdate.RemoveSnapshotRef
+                            && SnapshotRef.MAIN_BRANCH.equals(
+                                ((MetadataUpdate.RemoveSnapshotRef) u).name()))
             && (updated.currentSnapshot() == null
                 || base.snapshot(updated.currentSnapshot().snapshotId()) == null);
     boolean hasData = !base.snapshots().isEmpty();

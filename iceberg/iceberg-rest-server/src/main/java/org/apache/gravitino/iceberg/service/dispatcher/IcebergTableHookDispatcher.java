@@ -92,14 +92,20 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
-    LoadTableResponse response =
-        dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     // Import the table and set ownership only when committing a staged table create.
     // A staged create commit is identified by the AssertTableDoesNotExist requirement,
     // which is set by UpdateRequirements.forCreateTable().
     boolean isStagedCreateCommit =
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+    LoadTableResponse response =
+        isStagedCreateCommit
+            ? TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(
+                    metalake, context.catalogName(), tableIdentifier.namespace().level(0)),
+                LockType.READ,
+                () -> dispatcher.updateTable(context, tableIdentifier, updateTableRequest))
+            : dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     if (isStagedCreateCommit) {
       importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
     }

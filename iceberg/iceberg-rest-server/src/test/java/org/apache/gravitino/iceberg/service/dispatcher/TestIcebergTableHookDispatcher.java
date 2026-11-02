@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,6 +49,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
@@ -66,6 +68,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 public class TestIcebergTableHookDispatcher {
 
@@ -77,6 +80,7 @@ public class TestIcebergTableHookDispatcher {
 
   private IcebergTableHookDispatcher hookDispatcher;
   private LockManager mockLockManager;
+  private TreeLock mockTreeLock;
   private LockManager previousLockManager;
   private IcebergTableOperationDispatcher mockDispatcher;
   private IcebergNamespaceOperationDispatcher mockNamespaceDispatcher;
@@ -134,7 +138,7 @@ public class TestIcebergTableHookDispatcher {
     previousLockManager =
         (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
     mockLockManager = mock(LockManager.class);
-    TreeLock mockTreeLock = mock(TreeLock.class);
+    mockTreeLock = mock(TreeLock.class);
     when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
 
@@ -202,6 +206,28 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertArrayEquals(
         new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
     Assertions.assertEquals("A", lockId.getValue().name());
+    InOrder order = inOrder(mockTreeLock, mockDispatcher);
+    order.verify(mockTreeLock).lock(LockType.READ);
+    order.verify(mockDispatcher).createTable(mockContext, namespace, request);
+    order.verify(mockTreeLock).unlock();
+  }
+
+  @Test
+  void testStagedCreateCommitHoldsNamespaceBranchLock() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("A", "B"), "staged");
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
+    when(mockDispatcher.updateTable(mockContext, table, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.updateTable(mockContext, table, request);
+
+    verify(mockLockManager).createTreeLock(NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "A"));
+    InOrder order = inOrder(mockTreeLock, mockDispatcher);
+    order.verify(mockTreeLock).lock(LockType.READ);
+    order.verify(mockDispatcher).updateTable(mockContext, table, request);
+    order.verify(mockTreeLock).unlock();
   }
 
   @Test

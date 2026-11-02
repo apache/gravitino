@@ -64,6 +64,8 @@ import org.apache.iceberg.view.ViewOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
@@ -311,52 +313,51 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
-  @Test
-  public void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(@TempDir Path warehouseDir)
-      throws Exception {
-    Map<String, String> config = new HashMap<>();
-    config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
-    config.put(IcebergConstants.URI, "jdbc:sqlite:" + warehouseDir.resolve("catalog.db"));
-    config.put(IcebergConstants.WAREHOUSE, warehouseDir.toUri().toString());
-    config.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
-    config.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
-    config.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
-    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
-    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig(config));
-    Namespace namespace = Namespace.of("db");
-    TableIdentifier ident = TableIdentifier.of(namespace, "purged");
-    wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
-    Table table =
-        wrapper
-            .getCatalog()
-            .createTable(
-                ident, new Schema(Types.NestedField.required(1, "id", Types.LongType.get())));
-    Path first = Files.createFile(warehouseDir.resolve("first.parquet"));
-    Path second = Files.createFile(warehouseDir.resolve("second.parquet"));
-    for (Path data : new Path[] {first, second}) {
-      table
-          .newFastAppend()
-          .appendFile(
-              DataFiles.builder(table.spec())
-                  .withPath(data.toUri().toString())
-                  .withFileSizeInBytes(1)
-                  .withRecordCount(1)
-                  .build())
-          .commit();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(
+      boolean gcEnabled, @TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier ident = TableIdentifier.of(namespace, "purged");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      Table table =
+          wrapper
+              .getCatalog()
+              .createTable(
+                  ident,
+                  new Schema(Types.NestedField.required(1, "id", Types.LongType.get())),
+                  PartitionSpec.unpartitioned(),
+                  ImmutableMap.of("gc.enabled", Boolean.toString(gcEnabled)));
+      Path first = Files.createFile(warehouseDir.resolve("first.parquet"));
+      Path second = Files.createFile(warehouseDir.resolve("second.parquet"));
+      for (Path data : new Path[] {first, second}) {
+        table
+            .newFastAppend()
+            .appendFile(
+                DataFiles.builder(table.spec())
+                    .withPath(data.toUri().toString())
+                    .withFileSizeInBytes(1)
+                    .withRecordCount(1)
+                    .build())
+            .commit();
+      }
+      table.refresh();
+      String metadataFile =
+          ((HasTableOperations) table).operations().current().metadataFileLocation();
+      // The first snapshot's manifest list is gone.
+      Files.delete(
+          Paths.get(URI.create(table.snapshots().iterator().next().manifestListLocation())));
+
+      wrapper.purgeTable(ident);
+
+      Assertions.assertFalse(wrapper.getCatalog().tableExists(ident));
+      // Files reachable through the remaining manifest list, and the metadata, are deleted.
+      Assertions.assertEquals(!gcEnabled, Files.exists(first));
+      Assertions.assertEquals(!gcEnabled, Files.exists(second));
+      Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
     }
-    table.refresh();
-    String metadataFile =
-        ((HasTableOperations) table).operations().current().metadataFileLocation();
-    // The first snapshot's manifest list is gone.
-    Files.delete(Paths.get(URI.create(table.snapshots().iterator().next().manifestListLocation())));
-
-    wrapper.purgeTable(ident);
-
-    Assertions.assertFalse(wrapper.getCatalog().tableExists(ident));
-    // Files reachable through the remaining manifest list, and the metadata, are deleted.
-    Assertions.assertFalse(Files.exists(second));
-    Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
-    wrapper.close();
   }
 
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)

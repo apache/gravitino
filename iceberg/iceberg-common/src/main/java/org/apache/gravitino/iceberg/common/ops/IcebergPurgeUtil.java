@@ -29,7 +29,9 @@ import org.apache.iceberg.ManifestReader;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.util.PropertyUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,12 +45,15 @@ final class IcebergPurgeUtil {
   /**
    * Deletes every data, delete, manifest, manifest list, statistics and metadata file reachable
    * from the metadata, skipping the parts that cannot be read. A missing manifest list only loses
-   * the files listed in it.
+   * the files listed in it. Content files are preserved when {@code gc.enabled} is false.
    *
    * @param io the table's FileIO
    * @param metadata the table metadata read before the table was dropped
    */
   static void deleteReachableFiles(FileIO io, TableMetadata metadata) {
+    boolean gcEnabled =
+        PropertyUtil.propertyAsBoolean(
+            metadata.properties(), TableProperties.GC_ENABLED, TableProperties.GC_ENABLED_DEFAULT);
     Set<String> manifestLists = new HashSet<>();
     Set<String> manifests = new HashSet<>();
     Set<String> contentFiles = new HashSet<>();
@@ -58,7 +63,7 @@ final class IcebergPurgeUtil {
       }
       try {
         for (ManifestFile manifest : snapshot.allManifests(io)) {
-          if (manifests.add(manifest.path())) {
+          if (manifests.add(manifest.path()) && gcEnabled) {
             collectContentFiles(io, metadata, manifest, contentFiles);
           }
         }
