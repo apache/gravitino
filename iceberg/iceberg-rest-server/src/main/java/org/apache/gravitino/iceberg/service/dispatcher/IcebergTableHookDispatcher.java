@@ -30,6 +30,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -67,7 +69,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
-    LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
+    // Hold the namespace's tree lock in read mode, as dropNamespace holds it in write mode, so a
+    // create and a drop of the same namespace on this server do not both succeed.
+    LoadTableResponse response =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(metalake, context.catalogName(), namespace.level(0)),
+            LockType.READ,
+            () -> dispatcher.createTable(context, namespace, createTableRequest));
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
     if (!createTableRequest.stageCreate()) {
