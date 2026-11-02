@@ -28,6 +28,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -49,6 +52,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private static TableNormalizeDispatcher tableNormalizeDispatcher;
@@ -63,6 +67,55 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
             TestTableOperationDispatcher.schemaOperationDispatcher, catalogManager);
+  }
+
+  @Test
+  void testDeletionCanUseProviderValidatedNativeNamesWithoutRelaxingCreation() throws Exception {
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            return CapabilityResult.SUPPORTED;
+          }
+        };
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(delegate, manager);
+    NameIdentifier nativeIdent =
+        NameIdentifier.of("metalake", "catalog", "native schema", "native\"table");
+    dispatcher.dropTable(nativeIdent);
+    dispatcher.purgeTable(nativeIdent);
+    Mockito.verify(delegate).dropTable(nativeIdent);
+    Mockito.verify(delegate).purgeTable(nativeIdent);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTable(
+                nativeIdent,
+                new Column[0],
+                null,
+                Map.of(),
+                new Transform[0],
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]));
+  }
+
+  @Test
+  void testDeletionKeepsDefaultNameRestrictions() throws Exception {
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(delegate, manager);
+    NameIdentifier invalid = NameIdentifier.of("metalake", "catalog", "schema", "native\"table");
+    Assertions.assertThrows(IllegalArgumentException.class, () -> dispatcher.dropTable(invalid));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> dispatcher.purgeTable(invalid));
+    Mockito.verifyNoInteractions(delegate);
   }
 
   @Test
