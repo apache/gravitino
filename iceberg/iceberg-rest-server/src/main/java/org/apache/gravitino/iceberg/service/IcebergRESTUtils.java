@@ -53,9 +53,11 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
@@ -459,12 +461,44 @@ public class IcebergRESTUtils {
     includeErrorStackTrace = include;
   }
 
+  /**
+   * Checks that a request body was sent and passes the request's own validation, so a missing or
+   * incomplete body is answered with 400 instead of failing later with an internal error.
+   *
+   * @param request the deserialized request body, which is null when no body was sent
+   * @param requestType the request type named in the error message
+   * @throws BadRequestException if the body is missing or fails validation
+   */
+  public static void validateRequest(Object request, String requestType) {
+    if (request == null) {
+      throw new BadRequestException("Invalid request: a %s body is required", requestType);
+    }
+    if (request instanceof RESTRequest) {
+      try {
+        ((RESTRequest) request).validate();
+      } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+        throw new BadRequestException(
+            "Invalid %s: %s",
+            requestType, e.getMessage() == null ? "a required field is missing" : e.getMessage());
+      }
+    }
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
+    String message = ex.getMessage();
+    if (message == null) {
+      message =
+          httpStatus >= Status.INTERNAL_SERVER_ERROR.getStatusCode()
+              ? "Internal server error"
+              : Status.fromStatusCode(httpStatus) == null
+                  ? "Request failed"
+                  : Status.fromStatusCode(httpStatus).getReasonPhrase();
+    }
     ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage());
+            .withMessage(message);
     if (includeErrorStackTrace) {
       builder.withStackTrace(ex);
     }

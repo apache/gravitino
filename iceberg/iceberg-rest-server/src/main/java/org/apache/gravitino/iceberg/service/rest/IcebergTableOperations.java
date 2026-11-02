@@ -184,6 +184,7 @@ public class IcebergTableOperations {
           String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -226,6 +227,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
       UpdateTableRequest updateTableRequest) {
+    IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -427,6 +429,7 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
+    IcebergRESTUtils.validateRequest(request, "ReportMetricsRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -541,6 +544,7 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       PlanTableScanRequest scanRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(scanRequest, "PlanTableScanRequest");
     if (scanRequest == null) {
       return missingRequestBody("plan table scan");
     }
@@ -606,6 +610,7 @@ public class IcebergTableOperations {
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       FetchScanTasksRequest request) {
+    IcebergRESTUtils.validateRequest(request, "FetchScanTasksRequest");
     if (request == null) {
       return missingRequestBody("fetch scan tasks");
     }
