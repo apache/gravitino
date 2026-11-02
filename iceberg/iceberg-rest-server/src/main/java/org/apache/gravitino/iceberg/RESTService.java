@@ -34,6 +34,11 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.IcebergRequestBodyReaderInterceptor;
+>>>>>>> 90da2776a ([#14432] fix(iceberg-rest): answer invalid requests with 400 and an ErrorModel (#14433))
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
@@ -104,8 +109,13 @@ public class RESTService implements GravitinoAuxiliaryService {
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
 
-    config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    config
+        .register(IcebergObjectMapperProvider.class)
+        // Without the bundled mappers, Jackson failures reach IcebergExceptionMapper and are
+        // answered with an Iceberg ErrorModel instead of a text/plain Jackson message.
+        .register(JacksonFeature.withoutExceptionMappers());
     config.register(IcebergExceptionMapper.class);
+    config.register(IcebergRequestBodyReaderInterceptor.class);
     config.register(new OutOfMemoryErrorListener());
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);

@@ -247,6 +247,7 @@ public class IcebergNamespaceOperations {
       @IcebergAuthorizationMetadata(
               type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
           CreateNamespaceRequest createNamespaceRequest) {
+    IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
@@ -280,6 +281,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -321,6 +324,7 @@ public class IcebergNamespaceOperations {
           String namespace,
       RegisterTableRequest registerTableRequest,
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -349,6 +353,46 @@ public class IcebergNamespaceOperations {
     }
   }
 
+<<<<<<< HEAD
+=======
+  @POST
+  @Path("{namespace}/register-view")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "register-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  public Response registerView(
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      RegisterViewRequest registerViewRequest) {
+    IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    LOG.info(
+        "Register Iceberg view, catalog: {}, namespace: {}, registerViewRequest: {}",
+        catalogName,
+        icebergNS,
+        registerViewRequest);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            LoadViewResponse loadViewResponse =
+                namespaceOperationDispatcher.registerView(context, icebergNS, registerViewRequest);
+            return IcebergRESTUtils.ok(loadViewResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+>>>>>>> 90da2776a ([#14432] fix(iceberg-rest): answer invalid requests with 400 and an ErrorModel (#14433))
   private NameIdentifier[] toNameIdentifiers(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
@@ -391,6 +435,8 @@ public class IcebergNamespaceOperations {
 
   private String SerializeUpdateNamespacePropertiesRequest(
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     try {
       return icebergObjectMapper.writeValueAsString(updateNamespacePropertiesRequest);
     } catch (JsonProcessingException e) {

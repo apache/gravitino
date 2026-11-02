@@ -181,6 +181,7 @@ public class IcebergTableOperations {
           String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -223,6 +224,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
       UpdateTableRequest updateTableRequest) {
+    IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -416,6 +418,7 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
+    IcebergRESTUtils.validateRequest(request, "ReportMetricsRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -546,7 +549,17 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
+<<<<<<< HEAD
       PlanTableScanRequest scanRequest) {
+=======
+      PlanTableScanRequest scanRequest,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(scanRequest, "PlanTableScanRequest");
+    if (scanRequest == null) {
+      return missingRequestBody("plan table scan");
+    }
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
+>>>>>>> 90da2776a ([#14432] fix(iceberg-rest): answer invalid requests with 400 and an ErrorModel (#14433))
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -555,7 +568,76 @@ public class IcebergTableOperations {
         "Plan table scan, catalog: {}, namespace: {}, table: {}",
         catalogName,
         icebergNS,
+<<<<<<< HEAD
         tableName);
+=======
+        tableName,
+        accessDelegation,
+        isCredentialVending);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+
+            PlanTableScanResponse scanResponse =
+                tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+
+            return IcebergRESTUtils.ok(scanResponse);
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Fetch scan tasks endpoint. Completes the second step of the Iceberg REST two-step scan planning
+   * protocol: a client exchanges a {@code plan-task} handed out by {@code POST
+   * .../tables/{table}/plan} for the scan tasks it covers.
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param request The request containing the {@code plan-task}
+   * @return Response containing the scan tasks for the given plan task
+   */
+  @POST
+  @Path("{table}/tasks")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Timed(name = "fetch-scan-tasks." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "fetch-scan-tasks", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response fetchScanTasks(
+      @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
+      @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
+          String namespace,
+      @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
+      FetchScanTasksRequest request) {
+    IcebergRESTUtils.validateRequest(request, "FetchScanTasksRequest");
+    if (request == null) {
+      return missingRequestBody("fetch scan tasks");
+    }
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    String tableName = RESTUtil.decodeString(table);
+    LOG.info(
+        "Fetch scan tasks, catalog: {}, namespace: {}, table: {}, planTask: {}",
+        catalogName,
+        icebergNS,
+        tableName,
+        request.planTask());
+>>>>>>> 90da2776a ([#14432] fix(iceberg-rest): answer invalid requests with 400 and an ErrorModel (#14433))
 
     try {
       return Utils.doAs(
