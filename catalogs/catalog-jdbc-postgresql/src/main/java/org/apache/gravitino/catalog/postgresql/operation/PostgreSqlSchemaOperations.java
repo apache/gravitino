@@ -48,6 +48,8 @@ import org.apache.gravitino.meta.AuditInfo;
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
+  private static final String DEPENDENT_OBJECTS_STILL_EXIST = "2BP01";
+
   private String database;
 
   @Override
@@ -175,7 +177,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     try (Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(schema, cascade));
     } catch (SQLException e) {
-      if ("2BP01".equals(e.getSQLState())) {
+      if (DEPENDENT_OBJECTS_STILL_EXIST.equals(e.getSQLState())) {
         throw new NonEmptySchemaException(
             e,
             "Cannot drop non-empty PostgreSQL schema %s: a schema-local cascade cannot be "
