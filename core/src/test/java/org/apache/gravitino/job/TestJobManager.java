@@ -77,6 +77,7 @@ import org.apache.gravitino.connector.job.JobSubmissionRejectedException;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -726,6 +727,19 @@ public class TestJobManager {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> jobManager.registerJobTemplate(metalake, shellJobTemplate));
+  }
+
+  @Test
+  public void testRegisterJobTemplateRejectsDottedName() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity dotted = newShellJobTemplateEntity("a.b", "Dotted names are not allowed");
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class,
+        () -> jobManager.registerJobTemplate(metalake, dotted));
+    verify(entityStore, never()).put(eq(dotted), eq(false));
   }
 
   @Test

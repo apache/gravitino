@@ -38,6 +38,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +65,8 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
+    NameIdentifierUtil.checkMetadataObjectName(
+        AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE);
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(idGenerator.nextId())
