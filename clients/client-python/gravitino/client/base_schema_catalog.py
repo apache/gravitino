@@ -294,12 +294,17 @@ class BaseSchemaCatalog(
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
 
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
+
         Args:
             schema_name: The name of the schema.
-            cascade: Whether to drop all the tables under the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Raises:
-            NonEmptySchemaException if the schema is not empty and cascade is false.
+            NonEmptySchemaException if the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
 
         Returns:
              true if the schema is dropped successfully, false otherwise.
