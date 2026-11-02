@@ -275,3 +275,16 @@ successfully with the restored database before attempting the
 upgrade again.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />
+
+### Column name capacity in 2.0
+
+The entity store supports table column names up to 300 characters; other entity names retain
+their 128-character limit. Catalog-specific name restrictions still apply. Fresh 2.0 installs
+and the 1.3-to-2.0 upgrade scripts include this column expansion.
+
+If the database was initialized with an earlier 2.0 SNAPSHOT schema, stop Gravitino and back
+up the entity store, then apply the `table_column_version_info.column_name` expansion from
+the corresponding H2, MySQL or PostgreSQL upgrade script before starting the new binary.
+To roll back, restore the pre-upgrade database backup and matching binary; changes made
+after the backup will be lost. Renaming or dropping a long-named column does not remove
+its historical rows. Mixed-version writers are not supported.

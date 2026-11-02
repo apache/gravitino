@@ -76,6 +76,16 @@ public class TestEntityFieldLimits {
     assertLengthLimit(builder, "alias", "model version", EntityFieldLimits.MAX_NAME_LENGTH);
   }
 
+  /** Verifies column names use their own limit while other entity names keep the existing limit. */
+  @Test
+  public void testColumnNameLength() {
+    assertLengthLimit(
+        name -> columnBuilder(name, null),
+        "name",
+        "column",
+        EntityFieldLimits.MAX_COLUMN_NAME_LENGTH);
+  }
+
   @Test
   public void testColumnCommentLength() {
     assertLengthLimit(
@@ -129,7 +139,6 @@ public class TestEntityFieldLimits {
 
   private static Stream<Arguments> nameBuilders() {
     return Stream.of(
-        Arguments.of("column", (Function<String, Entity>) name -> columnBuilder(name, null)),
         Arguments.of(
             "table",
             (Function<String, Entity>)

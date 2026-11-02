@@ -42,7 +42,7 @@ public class ColumnEntity implements Entity, Auditable {
 
   public static final Field ID = Field.required("id", Long.class, "The column's unique identifier");
   public static final Field NAME =
-      Field.required("name", "The column's name", EntityFieldLimits.MAX_NAME_LENGTH);
+      Field.required("name", "The column's name", EntityFieldLimits.MAX_COLUMN_NAME_LENGTH);
   public static final Field POSITION =
       Field.required("position", Integer.class, "The column's position");
   public static final Field TYPE = Field.required("dataType", Type.class, "The column's data type");
