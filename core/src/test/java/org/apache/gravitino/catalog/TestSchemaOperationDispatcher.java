@@ -131,6 +131,12 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(
         originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
     Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
+    Assertions.assertTrue(dispatcher.dropSchema(copy, false));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertEquals(
+        originalEntity.properties(),
+        entityStore.get(original, SCHEMA, SchemaEntity.class).properties());
   }
 
   @Test
