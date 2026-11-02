@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.web.rest;
 
 import java.util.List;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -187,15 +186,6 @@ public class TestExceptionHandlers {
       Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
       Assertions.assertTrue(error.getMessage().contains("probe_tag"));
       Assertions.assertTrue(error.getMessage().contains(reason));
-    }
-
-    try (Response legacy =
-        ExceptionHandlers.handleSecretException(
-            OperationType.GET, "probe_column", new NotSupportedException(reason))) {
-      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), legacy.getStatus());
-      ErrorResponse error = (ErrorResponse) legacy.getEntity();
-      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
-      Assertions.assertTrue(error.getMessage().contains("probe_column"));
     }
   }
 

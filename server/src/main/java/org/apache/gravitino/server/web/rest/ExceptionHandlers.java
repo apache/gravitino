@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.web.rest;
 
 import com.google.common.annotations.VisibleForTesting;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -822,10 +821,6 @@ public class ExceptionHandlers {
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
-        return Utils.illegalArguments(errorMsg, e);
-
-      } else if (e instanceof NotSupportedException) {
-        // Legacy path: unsupported object types used to throw NotSupportedException and became 500.
         return Utils.illegalArguments(errorMsg, e);
 
       } else if (e instanceof ServiceUnavailableException) {
