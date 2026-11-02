@@ -1335,8 +1335,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("first")),
             IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")),
             IcebergReadRestrictionLoader.Result.of(tableResponse, Optional.of("second")))
-        // RuntimeException stays an unmapped 500; IllegalStateException is a client 400.
-        .thenThrow(new RuntimeException("policy resolution failed"))
+        .thenThrow(new IllegalStateException("policy resolution failed"))
         .thenThrow(new IllegalNameIdentifierException("Dotted names are unsupported"));
 
     IcebergTableOperations operations =

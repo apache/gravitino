@@ -57,7 +57,6 @@ public class TestIcebergExceptionMapper {
   @Test
   public void testIcebergExceptionMapper() {
     checkExceptionStatus(new IllegalArgumentException(""), 400);
-    checkExceptionStatus(new IllegalStateException("Invalid schema for v2"), 400);
     checkExceptionStatus(new ValidationException(""), 400);
     checkExceptionStatus(new NamespaceNotEmptyException(""), 409);
     checkExceptionStatus(new NotAuthorizedException(""), 401);
@@ -97,31 +96,6 @@ public class TestIcebergExceptionMapper {
     Exception converted = IcebergExceptionMapper.convertToIcebergException(original);
     Assertions.assertSame(original, converted);
     Assertions.assertEquals(406, IcebergExceptionMapper.getErrorCode(converted));
-  }
-
-  @Test
-  public void testConvertToIcebergExceptionMapsIllegalStateException() {
-    Exception converted =
-        IcebergExceptionMapper.convertToIcebergException(
-            new IllegalStateException("Invalid schema for v2"));
-    Assertions.assertTrue(converted instanceof org.apache.iceberg.exceptions.BadRequestException);
-    Assertions.assertEquals(400, IcebergExceptionMapper.getErrorCode(converted));
-  }
-
-  @Test
-  public void testOutOfMemoryWrappedInIllegalStateExceptionStays500() {
-    try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
-      ServerHealth health = new ServerHealth();
-      shared.when(ServerHealth::getInstance).thenReturn(health);
-      try (Response response =
-          icebergExceptionMapper.toResponse(
-              new IllegalStateException(new OutOfMemoryError("Java heap space")))) {
-        Assertions.assertEquals(500, response.getStatus());
-        ErrorResponse entity = (ErrorResponse) response.getEntity();
-        Assertions.assertEquals("OutOfMemoryError", entity.type());
-      }
-      Assertions.assertTrue(health.hasOutOfMemoryError());
-    }
   }
 
   /** Checks that errors retain their type and nested causes in the response. */

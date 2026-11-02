@@ -65,7 +65,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Map<Class<? extends Exception>, Integer> EXCEPTION_ERROR_CODES =
       ImmutableMap.<Class<? extends Exception>, Integer>builder()
           .put(IllegalArgumentException.class, 400)
-          .put(IllegalStateException.class, 400)
           .put(BadRequestException.class, 400)
           .put(ValidationException.class, 400)
           .put(IllegalNameIdentifierException.class, 400)
@@ -78,7 +77,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(ForbiddenException.class, 403)
           .put(NotFoundException.class, 404)
           // Iceberg NotFoundException shares a simple name with javax.ws.rs.NotFoundException;
-          // map it explicitly so registerTable / IO failures are 404, not 500.
+          // map it explicitly so uncaught Iceberg not-found failures are 404, not 500.
           .put(org.apache.iceberg.exceptions.NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
@@ -140,7 +139,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
       return new ForbiddenException("%s", message);
     }
     if (e instanceof IllegalArgumentException
-        || e instanceof IllegalStateException
         || e instanceof IllegalNameIdentifierException
         || e instanceof ValidationException) {
       return new BadRequestException("%s", message);
@@ -164,14 +162,6 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
-    // An OutOfMemoryError wrapped in a mapped exception (for example IllegalStateException) must
-    // still be reported as 500: IllegalStateException alone is a client error (400), but OOM is a
-    // server failure that also poisons health probes.
-    OutOfMemoryError oom = findCause(ex, OutOfMemoryError.class);
-    if (oom != null) {
-      LOG.error("Iceberg REST server unexpected failure:", oom);
-      return IcebergRESTUtils.errorResponse(oom, Status.INTERNAL_SERVER_ERROR.getStatusCode());
-    }
     ex = toClientFacingException(ex);
     int status =
         ex instanceof Exception
