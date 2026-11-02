@@ -356,8 +356,8 @@ to migrate.
 
 ## Known Limitations
 
-These limitations describe the observable consequences of the association contract. They do not
-relax the requirement to commit model definitions and their dataset associations atomically.
+These limitations describe observable consequences of the association and lookup contracts. They do
+not relax the requirement to commit model definitions and their dataset associations atomically.
 Each item includes **Current scope** handling through the proposed lookup and existing model
 operations, plus optional **Extension** suggestions requiring a separate design. These extensions
 are not included in the Development Plan.
@@ -462,6 +462,30 @@ are not included in the Development Plan.
    - **Extension:** Introduce a shared structured identifier representation for object relationship
      APIs, preserving catalog, schema, and object name as separate components through REST and both
      SDKs.
+
+8. **Authorization evaluation failures can hide results.** Per-model authorization evaluation
+   exceptions exclude the affected models, so the request can succeed with incomplete or empty
+   results. This follows the existing per-object authorization filtering behavior of list and
+   relationship APIs, including table listing, Tag relationship lookup, and metric discovery.
+
+   - **Current scope:** Evaluation exceptions are recorded in server logs. The response does not
+     indicate that evaluation failed or that a retry may be needed. Request-level authorization and
+     storage failures still fail the request.
+
+   - **Extension:** Distinguishing operational authorization failures from ordinary denials would
+     require a shared decision across listing APIs.
+
+9. **Lookup processing and response size are unbounded.** This endpoint is unpaginated, consistent
+   with existing relationship and metric discovery APIs. The source index does not cap matching
+   datasets or models. Large match sets increase memory use, per-model authorization work, and
+   global result sorting; the response includes every dataset that passes visibility filtering.
+
+   - **Current scope:** No result-count limit or silent truncation is introduced. This proposal
+     does not define a supported maximum cardinality.
+
+   - **Extension:** Define pagination and processing bounds, including permission filtering,
+     ordering, and concurrent edits. See the broader REST pagination proposal in
+     [#14453](https://github.com/apache/gravitino/issues/14453).
 
 ## Development Plan
 
