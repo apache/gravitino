@@ -32,6 +32,7 @@ public enum OperationType {
   RENAME_TABLE,
   REGISTER_TABLE,
   TABLE_EXISTS,
+  REPORT_TABLE_METRICS,
 
   // Tag operations
   CREATE_TAG,
