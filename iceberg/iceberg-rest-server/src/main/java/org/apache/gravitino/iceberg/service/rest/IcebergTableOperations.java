@@ -77,10 +77,7 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.MetricsReport;
-import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
@@ -435,26 +432,8 @@ public class IcebergTableOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
-            if (!tableOperationDispatcher.tableExists(context, tableIdentifier)) {
-              throw new NoSuchTableException("Table %s not found", tableIdentifier);
-            }
             MetricsReport report = request.report();
-            String reportedTableName;
-            if (report instanceof CommitReport) {
-              reportedTableName = ((CommitReport) report).tableName();
-            } else if (report instanceof ScanReport) {
-              reportedTableName = ((ScanReport) report).tableName();
-            } else {
-              throw new IllegalArgumentException("Unsupported metrics report type");
-            }
-            String qualifiedTableName = tableIdentifier.toString();
-            if (reportedTableName == null
-                || (!tableName.equals(reportedTableName)
-                    && !qualifiedTableName.equals(reportedTableName)
-                    && !reportedTableName.endsWith("." + qualifiedTableName))) {
-              throw new IllegalArgumentException(
-                  "Metrics report table name does not match the requested table");
-            }
+            tableOperationDispatcher.checkTableMetricsReport(context, tableIdentifier, report);
             boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();

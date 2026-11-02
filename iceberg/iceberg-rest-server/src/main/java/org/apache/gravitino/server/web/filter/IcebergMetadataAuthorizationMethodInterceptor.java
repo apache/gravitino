@@ -36,6 +36,7 @@ import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
@@ -168,6 +169,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       }
     }
     return Optional.empty();
+  }
+
+  @Override
+  protected Optional<EventSource> authorizationDenialEventSource() {
+    return Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
   }
 
   @Override

@@ -59,12 +59,16 @@ import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.GenericBlobMetadata;
@@ -106,6 +110,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.opentest4j.AssertionFailedError;
 
 @SuppressWarnings("deprecation")
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
@@ -433,11 +438,19 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .commitMetrics(commitMetrics)
             .build();
     ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
+    dummyEventListener.clearEvent();
     Response response =
         getReportMetricsClientBuilder("metrics_foo1", namespace)
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+    // The report is recorded as its own operation, with no table-exists event for the check.
+    Assertions.assertInstanceOf(
+        IcebergReportTableMetricsPreEvent.class, dummyEventListener.popPreEvent());
+    Assertions.assertInstanceOf(
+        IcebergReportTableMetricsEvent.class, dummyEventListener.popPostEvent());
+    Assertions.assertThrows(AssertionFailedError.class, dummyEventListener::popPostEvent);
+    Assertions.assertThrows(AssertionFailedError.class, dummyEventListener::popPreEvent);
 
     ReportMetricsRequest qualifiedRequest =
         ReportMetricsRequest.of(
@@ -453,10 +466,14 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .post(Entity.entity(qualifiedRequest, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), qualifiedResponse.getStatus());
 
+    dummyEventListener.clearEvent();
     Response missingTableResponse =
         getReportMetricsClientBuilder("missing_metrics_table", namespace)
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), missingTableResponse.getStatus());
+    Event failure = dummyEventListener.popPostEvent();
+    Assertions.assertInstanceOf(IcebergReportTableMetricsFailureEvent.class, failure);
+    Assertions.assertEquals(OperationType.REPORT_TABLE_METRICS, failure.operationType());
 
     ReportMetricsRequest mismatchedRequest =
         ReportMetricsRequest.of(

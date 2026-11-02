@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -86,6 +87,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.
     newlyOwned.add(leaf);
+    for (Namespace created : newlyOwned) {
+      IcebergEntityAuditUtils.recordCreator(
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, catalogName, created, HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.SCHEMA,
+          context.userName());
+    }
     IcebergOwnershipUtils.setSchemaOwners(
         metalake,
         catalogName,
@@ -187,6 +195,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
     importTable(context.catalogName(), namespace, registerTableRequest.name());
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, registerTableRequest.name()),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.TABLE,
+        context.userName());
 
     IcebergOwnershipUtils.setTableOwner(
         metalake,
