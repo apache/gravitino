@@ -1135,6 +1135,9 @@ public class JobManager implements JobOperationDispatcher {
     for (JobTemplateChange change : changes) {
       if (change instanceof JobTemplateChange.RenameJobTemplate) {
         newName = ((JobTemplateChange.RenameJobTemplate) change).getNewName();
+        NameIdentifierUtil.checkMetadataObjectName(
+            NameIdentifier.of(jobTemplateEntity.namespace(), newName),
+            Entity.EntityType.JOB_TEMPLATE);
 
       } else if (change instanceof JobTemplateChange.UpdateJobTemplateComment) {
         newComment = ((JobTemplateChange.UpdateJobTemplateComment) change).getNewComment();

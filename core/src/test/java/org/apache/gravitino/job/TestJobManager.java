@@ -743,6 +743,16 @@ public class TestJobManager {
   }
 
   @Test
+  public void testAlterJobTemplateRejectsDottedRename() {
+    JobTemplateEntity plain = newShellJobTemplateEntity("plain_job", "ok");
+    NameIdentifier ident = NameIdentifierUtil.ofJobTemplate(metalake, plain.name());
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class,
+        () -> jobManager.updateJobTemplateEntity(ident, plain, JobTemplateChange.rename("a.b")));
+    Assertions.assertEquals("plain_job", plain.name());
+  }
+
+  @Test
   public void testGetJobTemplate() throws IOException {
     mockedMetalake
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
