@@ -29,6 +29,8 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -78,6 +80,79 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
                     .build()
               })
           .build();
+    }
+  }
+
+  @Test
+  void testQuotedTableAndColumnNamesCannotEscapeIdentifiers() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String name = "t\"; DROP TABLE victim; --";
+    String quoted = "\"t\"\"; DROP TABLE victim; --\"";
+    Assertions.assertEquals("DROP TABLE " + quoted, ops.generateDropTableSql(name));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " RENAME TO " + quoted, ops.generateRenameTableSql(name, name));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " RENAME COLUMN " + quoted + " TO " + quoted + ";",
+        ops.alterTableSql(name, TableChange.renameColumn(new String[] {name}, name)));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " DROP CONSTRAINT " + quoted + ";",
+        ops.alterTableSql(name, TableChange.deleteIndex(name, false)));
+    Assertions.assertEquals(
+        quoted, PostgreSqlTableOperations.getIndexFieldStr(new String[][] {{name}}));
+    String sql =
+        ops.createTableSql(
+            name,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName(name)
+                  .withType(Types.IntegerType.get())
+                  .withNullable(true)
+                  .build()
+            });
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE " + quoted + " ("));
+    Assertions.assertTrue(sql.contains("    " + quoted + " int4"));
+  }
+
+  @Test
+  void testOversizedIndexNamesAreRejectedOnCreateAndAlter() {
+    String name = "表".repeat(22);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PostgreSqlTableOperations.addIndexDefinition(
+                "t",
+                (TableChange.AddIndex)
+                    TableChange.addIndex(IndexType.UNIQUE_KEY, name, new String[][] {{"col1"}})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PostgreSqlTableOperations.appendIndexesSql(
+                new Index[] {Indexes.unique(name, new String[][] {{"col1"}})},
+                new StringBuilder()));
+  }
+
+  @Test
+  void testUnnamedIndexesKeepNativeTableAndColumnQuotes() {
+    for (String name : new String[] {null, ""}) {
+      Assertions.assertEquals(
+          "ALTER TABLE \"native\"\"table\" ADD UNIQUE (\"quoted\"\"column\");",
+          PostgreSqlTableOperations.addIndexDefinition(
+              "native\"table",
+              (TableChange.AddIndex)
+                  TableChange.addIndex(
+                      IndexType.UNIQUE_KEY, name, new String[][] {{"quoted\"column"}})));
+    }
+  }
+
+  @Test
+  void testUnnamedIndexesUsePostgreSqlGeneratedNames() {
+    for (String name : new String[] {null, ""}) {
+      Assertions.assertEquals(
+          "ALTER TABLE \"t\" ADD UNIQUE (\"col1\");",
+          PostgreSqlTableOperations.addIndexDefinition(
+              "t",
+              (TableChange.AddIndex)
+                  TableChange.addIndex(IndexType.UNIQUE_KEY, name, new String[][] {{"col1"}})));
     }
   }
 
