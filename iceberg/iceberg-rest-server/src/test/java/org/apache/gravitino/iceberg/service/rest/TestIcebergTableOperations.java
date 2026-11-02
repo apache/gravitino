@@ -336,11 +336,22 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     dummyEventListener.clearEvent();
 
-    // First page: pageSize=2
     String tablePath =
         IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/tables";
+    // pageSize alone must not truncate the list.
+    try (Response response =
+        getIcebergClientBuilder(tablePath, Optional.of(ImmutableMap.of("pageSize", "2"))).get()) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+      ListTablesResponse all = response.readEntity(ListTablesResponse.class);
+      Assertions.assertEquals(3, all.identifiers().size());
+      Assertions.assertNull(all.nextPageToken());
+    }
+
+    // An empty pageToken starts paging.
     Response firstPageResponse =
-        getIcebergClientBuilder(tablePath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+        getIcebergClientBuilder(
+                tablePath, Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
+            .get();
     Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
     ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
     Assertions.assertEquals(2, firstPage.identifiers().size());

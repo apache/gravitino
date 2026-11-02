@@ -50,6 +50,7 @@ import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -450,6 +451,22 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testCloneFallsBackToOriginalWhenIcebergCannotSerialize() throws Exception {
+    // A partition field without its optional field-id parses, but Iceberg cannot write it again.
+    UpdateTableRequest request =
+        IcebergObjectMapper.getInstance()
+            .readValue(
+                "{\"requirements\": [], \"updates\": [{\"action\": \"add-spec\", \"spec\":"
+                    + " {\"spec-id\": 1, \"fields\": [{\"name\": \"id_bucket\", \"transform\": \"bucket[4]\","
+                    + " \"source-id\": 1}]}}]}",
+                UpdateTableRequest.class);
+    UpdateTableRequest copy =
+        Assertions.assertDoesNotThrow(
+            () -> IcebergRESTUtils.cloneIcebergRESTObject(request, UpdateTableRequest.class));
+    Assertions.assertEquals(request.updates().size(), copy.updates().size());
   }
 
   @Test
