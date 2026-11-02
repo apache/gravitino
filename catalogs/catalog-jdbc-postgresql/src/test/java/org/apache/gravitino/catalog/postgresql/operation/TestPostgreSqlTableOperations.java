@@ -155,6 +155,26 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+  void testListTablesEscapesSchemaPattern() throws SQLException {
+    String schema = "list\\schema_%";
+    String neighbor = "listXschema_neighbor";
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA \"" + schema + "\"");
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + neighbor);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE \"" + schema + "\".actual_table(id int)");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + neighbor + ".wrong_table(id int)");
+        Assertions.assertEquals(List.of("actual_table"), TABLE_OPERATIONS.listTables(schema));
+      } finally {
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA \"" + schema + "\" CASCADE");
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA " + neighbor + " CASCADE");
+      }
+    }
+  }
+
+  @Test
   void testBackslashTableNameLoadsAndAlters() {
     String name = "back\\slash_%";
     TABLE_OPERATIONS.create(

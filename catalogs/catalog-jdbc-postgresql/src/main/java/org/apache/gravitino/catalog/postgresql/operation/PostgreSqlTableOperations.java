@@ -50,6 +50,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -716,6 +717,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     connection.setCatalog(database);
     connection.setSchema(schema);
     return connection;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected ResultSet getTables(Connection connection) throws SQLException {
+    DatabaseMetaData metadata = connection.getMetaData();
+    return metadata.getTables(
+        connection.getCatalog(),
+        metadataPattern(metadata, connection.getSchema()),
+        null,
+        JdbcConnectorUtils.getTableTypes());
   }
 
   @Override
