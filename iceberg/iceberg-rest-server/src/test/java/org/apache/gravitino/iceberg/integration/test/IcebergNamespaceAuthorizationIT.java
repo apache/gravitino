@@ -456,6 +456,54 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testRegisterTableCannotAdoptUnreadableSource() {
+    String sourceNamespace = "ns_register_secret";
+    String destNamespace = "ns_register_mine";
+    String sourceTable = "secret";
+    String copyTable = "copy";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(sourceNamespace, "secret schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(destNamespace, "caller schema", new HashMap<>());
+
+    // Admin owns the secret table; the normal user never receives privileges on it.
+    sql("USE %s", sourceNamespace);
+    sql("CREATE TABLE %s(id bigint, ssn string) USING iceberg", sourceTable);
+    List<Object[]> metadataResults =
+        sql("SELECT file FROM %s.%s.metadata_log_entries", sourceNamespace, sourceTable);
+    String metadataLocation = (String) metadataResults.get(metadataResults.size() - 1)[0];
+
+    revokeUserRoles();
+    resetMetalakeAndCatalogOwner();
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, destNamespace), MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(destNamespace);
+
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("USE %s", sourceNamespace));
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
+                destNamespace, copyTable, metadataLocation));
+
+    grantUseSchemaRole(sourceNamespace);
+    grantSelectTableRole(sourceNamespace, sourceTable);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql(
+                "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
+                destNamespace, copyTable, metadataLocation));
+  }
+
+  @Test
   void testComplexAuthorizations() {
     String namespace = "ns_complex_auth";
 
@@ -528,6 +576,22 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     metalakeClientWithAllPrivilege.createRole(
         roleName, new HashMap<>(), ImmutableList.of(schemaObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+  }
+
+  /** Grants SELECT_TABLE privilege to the normal user for the specified table. */
+  private void grantSelectTableRole(String schemaName, String tableName) {
+    String roleName = "selectTable_" + UUID.randomUUID();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(GRAVITINO_CATALOG_NAME, ImmutableList.of());
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(catalogObject, schemaName, ImmutableList.of());
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, tableName, ImmutableList.of(Privileges.SelectTable.allow()));
+
+    metalakeClientWithAllPrivilege.createRole(
+        roleName, new HashMap<>(), ImmutableList.of(tableObject));
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
   }
 
