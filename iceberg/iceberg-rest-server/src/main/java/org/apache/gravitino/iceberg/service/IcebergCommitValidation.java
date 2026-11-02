@@ -21,12 +21,15 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.iceberg.DataOperations;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.RetryableValidationException;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.SnapshotRefType;
@@ -67,62 +70,86 @@ public final class IcebergCommitValidation implements UpdateRequirement {
    * @param request the table commit request
    * @return a request with the same updates and the checks as an additional requirement
    */
-  public static UpdateTableRequest withValidation(UpdateTableRequest request) {
+  @Nullable
+  public static UpdateTableRequest withValidation(@Nullable UpdateTableRequest request) {
     if (request == null || request.updates() == null || request.updates().isEmpty()) {
       return request;
     }
-    List<UpdateRequirement> requirements =
-        ImmutableList.<UpdateRequirement>builder()
-            .addAll(request.requirements() == null ? ImmutableList.of() : request.requirements())
-            .add(new IcebergCommitValidation(request.updates()))
-            .build();
-    return new UpdateTableRequest(requirements, request.updates());
+    ImmutableList.Builder<UpdateRequirement> requirements = ImmutableList.builder();
+    boolean create = false;
+    for (UpdateRequirement requirement : request.requirements()) {
+      if (requirement instanceof UpdateRequirement.AssertTableDoesNotExist) {
+        // CatalogHandlers accepts only AssertTableDoesNotExist requirements for a staged create.
+        requirements.add(new CreateValidation(request.updates()));
+        create = true;
+      } else {
+        requirements.add(requirement);
+      }
+    }
+    if (!create) {
+      requirements.add(new IcebergCommitValidation(request.updates()));
+    }
+    return new UpdateTableRequest(requirements.build(), request.updates());
   }
 
   @Override
-  public void validate(TableMetadata base) {
-    if (base == null) {
-      // A create commit: there is no existing metadata to check against.
-      return;
-    }
+  public void validate(@Nullable TableMetadata base) {
     validate(base, updates);
   }
 
   @VisibleForTesting
-  static void validate(TableMetadata base, List<MetadataUpdate> updates) {
-    boolean addsSchema = false;
+  static void validate(@Nullable TableMetadata base, List<MetadataUpdate> updates) {
     Set<Long> removedSnapshots = new HashSet<>();
-    Set<String> changedRefs = new HashSet<>();
+    Map<String, Long> remainingRefs = new HashMap<>();
+    if (base != null) {
+      base.refs().forEach((name, ref) -> remainingRefs.put(name, ref.snapshotId()));
+    }
     for (MetadataUpdate update : updates) {
-      if (update instanceof MetadataUpdate.AddSchema) {
-        addsSchema = true;
-      } else if (update instanceof MetadataUpdate.RemoveSnapshots) {
+      if (update instanceof MetadataUpdate.RemoveSnapshots) {
         removedSnapshots.addAll(((MetadataUpdate.RemoveSnapshots) update).snapshotIds());
       } else if (update instanceof MetadataUpdate.RemoveSnapshotRef) {
-        changedRefs.add(((MetadataUpdate.RemoveSnapshotRef) update).name());
+        remainingRefs.remove(((MetadataUpdate.RemoveSnapshotRef) update).name());
       } else if (update instanceof MetadataUpdate.SetSnapshotRef) {
         MetadataUpdate.SetSnapshotRef setRef = (MetadataUpdate.SetSnapshotRef) update;
         checkMainIsBranch(setRef);
-        changedRefs.add(setRef.name());
-      }
-    }
-
-    for (MetadataUpdate update : updates) {
-      if (update instanceof MetadataUpdate.AddSnapshot) {
-        checkSnapshot(base, ((MetadataUpdate.AddSnapshot) update).snapshot(), addsSchema);
+        remainingRefs.put(setRef.name(), setRef.snapshotId());
       }
     }
 
     // Iceberg drops every ref that points at a removed snapshot. Removing a snapshot that a branch
     // or tag still references is only valid when the same commit also moves or removes that ref.
-    for (Map.Entry<String, SnapshotRef> ref : base.refs().entrySet()) {
-      if (removedSnapshots.contains(ref.getValue().snapshotId())
-          && !changedRefs.contains(ref.getKey())) {
+    for (Map.Entry<String, Long> ref : remainingRefs.entrySet()) {
+      if (removedSnapshots.contains(ref.getValue())) {
         throw new CommitFailedException(
-            "Cannot remove snapshot %s: it is referenced by %s %s",
-            ref.getValue().snapshotId(),
-            ref.getValue().isBranch() ? "branch" : "tag",
-            ref.getKey());
+            "Cannot remove snapshot %s: it is referenced by ref %s", ref.getValue(), ref.getKey());
+      }
+    }
+
+    // Apply only in memory. Iceberg assigns schema ids while applying AddSchema, so checking the
+    // resulting metadata avoids accepting an arbitrary id just because the request adds a schema.
+    TableMetadata.Builder builder;
+    if (base == null) {
+      builder =
+          updates.stream()
+              .filter(MetadataUpdate.UpgradeFormatVersion.class::isInstance)
+              .map(MetadataUpdate.UpgradeFormatVersion.class::cast)
+              .map(MetadataUpdate.UpgradeFormatVersion::formatVersion)
+              .findFirst()
+              .map(TableMetadata::buildFromEmpty)
+              .orElseGet(TableMetadata::buildFromEmpty);
+    } else {
+      builder = TableMetadata.buildFrom(base);
+    }
+    try {
+      updates.forEach(update -> update.applyTo(builder));
+    } catch (RetryableValidationException e) {
+      // Preserve CatalogHandlers' conflict response for stale sequence numbers and row ids.
+      throw new CommitFailedException(e, "Validation failed, please retry: %s", e.getMessage());
+    }
+    TableMetadata updated = builder.build();
+    for (MetadataUpdate update : updates) {
+      if (update instanceof MetadataUpdate.AddSnapshot) {
+        checkSnapshot(updated, ((MetadataUpdate.AddSnapshot) update).snapshot());
       }
     }
   }
@@ -135,7 +162,7 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     }
   }
 
-  private static void checkSnapshot(TableMetadata base, Snapshot snapshot, boolean addsSchema) {
+  private static void checkSnapshot(TableMetadata base, Snapshot snapshot) {
     // The summary and its operation are required from format version 2 on.
     String operation = snapshot.operation();
     if (operation == null) {
@@ -149,10 +176,24 @@ public final class IcebergCommitValidation implements UpdateRequirement {
           snapshot.snapshotId(), operation, SNAPSHOT_OPERATIONS);
     }
     Integer schemaId = snapshot.schemaId();
-    if (schemaId != null && !addsSchema && !base.schemasById().containsKey(schemaId)) {
+    if (schemaId != null && !base.schemasById().containsKey(schemaId)) {
       throw new ValidationException(
           "Invalid snapshot %s: the table has no schema with id %s",
           snapshot.snapshotId(), schemaId);
+    }
+  }
+
+  private static final class CreateValidation extends UpdateRequirement.AssertTableDoesNotExist {
+    private final List<MetadataUpdate> updates;
+
+    private CreateValidation(List<MetadataUpdate> updates) {
+      this.updates = updates;
+    }
+
+    @Override
+    public void validate(@Nullable TableMetadata base) {
+      super.validate(base);
+      IcebergCommitValidation.validate(base, updates);
     }
   }
 }

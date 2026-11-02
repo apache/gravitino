@@ -253,7 +253,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testCreateNamespaceIsDroppedWhenImportFails() {
+  public void testCreateNamespaceIsNotDroppedWhenImportFails() {
     Namespace namespace = Namespace.of("test_schema");
     CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
     when(request.namespace()).thenReturn(namespace);
@@ -267,7 +267,7 @@ public class TestIcebergNamespaceHookDispatcher {
         Assertions.assertThrows(
             RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, request));
     Assertions.assertSame(importFailure, thrown);
-    verify(mockDispatcher).dropNamespace(mockContext, namespace);
+    verify(mockDispatcher, never()).dropNamespace(any(), any());
     verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
   }
 

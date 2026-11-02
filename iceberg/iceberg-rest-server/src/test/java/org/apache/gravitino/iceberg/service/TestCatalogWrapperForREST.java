@@ -430,6 +430,12 @@ public class TestCatalogWrapperForREST {
         Assertions.assertThrows(
             BadRequestException.class, () -> wrapper.registerTable(namespace, otherTable));
     Assertions.assertTrue(e.getMessage().contains("different table"), e.getMessage());
+    // The REST executor uses the overload carrying the credential-vending flag.
+    for (boolean requestCredential : new boolean[] {false, true}) {
+      Assertions.assertThrows(
+          BadRequestException.class,
+          () -> wrapper.registerTable(namespace, otherTable, requestCredential));
+    }
     Assertions.assertEquals(
         targetMetadata,
         ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation());

@@ -30,6 +30,7 @@ import org.apache.iceberg.SnapshotParser;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.SnapshotRefType;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -37,6 +38,7 @@ import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -126,6 +128,130 @@ public class TestIcebergCommitValidation {
   }
 
   @Test
+  public void testAddingSchemaDoesNotBypassSnapshotSchemaValidation() {
+    Schema schema =
+        new Schema(
+            99,
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "name", Types.StringType.get()));
+    commitFails(
+        ValidationException.class,
+        new MetadataUpdate.AddSchema(schema),
+        addSnapshot(", \"summary\": {\"operation\": \"append\"}, \"schema-id\": 99"));
+    Assertions.assertEquals(1, catalog.loadTable(IDENT).schemas().size());
+    Assertions.assertNull(catalog.loadTable(IDENT).snapshot(999L));
+
+    // Iceberg assigns id 1 to the new schema, regardless of the id supplied in add-schema.
+    commit(
+        new MetadataUpdate.AddSchema(schema),
+        addSnapshot(", \"summary\": {\"operation\": \"append\"}, \"schema-id\": 1"));
+    Assertions.assertNotNull(catalog.loadTable(IDENT).schemas().get(1));
+    Assertions.assertEquals(1, catalog.loadTable(IDENT).snapshot(999L).schemaId());
+  }
+
+  @Test
+  public void testStaleSnapshotRemainsACommitConflict() {
+    MetadataUpdate snapshot =
+        new MetadataUpdate.AddSnapshot(
+            SnapshotParser.fromJson(
+                "{\"snapshot-id\": 999, \"parent-snapshot-id\": "
+                    + secondSnapshot
+                    + ", \"sequence-number\": 1, \"timestamp-ms\": "
+                    + System.currentTimeMillis()
+                    + ", \"manifest-list\": \"/data/snap-999.avro\","
+                    + " \"summary\": {\"operation\": \"append\"}, \"schema-id\": 0}"));
+    commitFails(CommitFailedException.class, snapshot);
+    Assertions.assertEquals(
+        secondSnapshot, catalog.loadTable(IDENT).currentSnapshot().snapshotId());
+    Assertions.assertNull(catalog.loadTable(IDENT).snapshot(999L));
+  }
+
+  @Test
+  public void testChangingRefMustActuallyMoveItOffRemovedSnapshot() {
+    commit(
+        new MetadataUpdate.SetSnapshotRef(
+            "keep", firstSnapshot, SnapshotRefType.TAG, null, null, null));
+    commitFails(
+        CommitFailedException.class,
+        new MetadataUpdate.SetSnapshotRef(
+            "keep", firstSnapshot, SnapshotRefType.TAG, null, null, null),
+        new MetadataUpdate.RemoveSnapshots(firstSnapshot));
+    Assertions.assertNotNull(catalog.loadTable(IDENT).snapshot(firstSnapshot));
+    Assertions.assertEquals(
+        firstSnapshot, catalog.loadTable(IDENT).refs().get("keep").snapshotId());
+
+    commit(
+        new MetadataUpdate.SetSnapshotRef(
+            "keep", secondSnapshot, SnapshotRefType.TAG, null, null, null),
+        new MetadataUpdate.RemoveSnapshots(firstSnapshot));
+    Assertions.assertNull(catalog.loadTable(IDENT).snapshot(firstSnapshot));
+    Assertions.assertEquals(
+        secondSnapshot, catalog.loadTable(IDENT).refs().get("keep").snapshotId());
+  }
+
+  @Test
+  public void testStagedCreateCommitIsAccepted() {
+    TableIdentifier staged = TableIdentifier.of("db", "staged");
+    UpdateTableRequest request = stagedCreateRequest(staged);
+    Assertions.assertFalse(catalog.tableExists(staged));
+
+    CatalogHandlers.updateTable(catalog, staged, IcebergCommitValidation.withValidation(request));
+    Assertions.assertTrue(catalog.tableExists(staged));
+    Assertions.assertTrue(SCHEMA.sameSchema(catalog.loadTable(staged).schema()));
+
+    // Keep the original existence requirement: retrying the create cannot replace the table.
+    Assertions.assertThrows(
+        CommitFailedException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog, staged, IcebergCommitValidation.withValidation(request)));
+  }
+
+  @Test
+  public void testStagedCreateIsValidatedBeforeCommit() {
+    TableIdentifier staged = TableIdentifier.of("db", "invalid_staged");
+    UpdateTableRequest create = stagedCreateRequest(staged);
+    List<MetadataUpdate> updates =
+        ImmutableList.<MetadataUpdate>builder()
+            .addAll(create.updates())
+            .add(
+                new MetadataUpdate.SetSnapshotRef(
+                    SnapshotRef.MAIN_BRANCH, 999L, SnapshotRefType.TAG, null, null, null))
+            .build();
+    UpdateTableRequest invalid = new UpdateTableRequest(create.requirements(), updates);
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog, staged, IcebergCommitValidation.withValidation(invalid)));
+    Assertions.assertFalse(catalog.tableExists(staged));
+  }
+
+  @Test
+  public void testStagedCreateRejectsSnapshotWithoutSummary() {
+    TableIdentifier staged = TableIdentifier.of("db", "invalid_snapshot");
+    UpdateTableRequest create = stagedCreateRequest(staged);
+    MetadataUpdate snapshot =
+        new MetadataUpdate.AddSnapshot(
+            SnapshotParser.fromJson(
+                "{\"snapshot-id\": 999, \"sequence-number\": 1, \"timestamp-ms\": "
+                    + System.currentTimeMillis()
+                    + ", \"manifest-list\": \"/data/snap-999.avro\", \"schema-id\": 0}"));
+    List<MetadataUpdate> updates =
+        ImmutableList.<MetadataUpdate>builder().addAll(create.updates()).add(snapshot).build();
+    UpdateTableRequest invalid = new UpdateTableRequest(create.requirements(), updates);
+
+    ValidationException thrown =
+        Assertions.assertThrows(
+            ValidationException.class,
+            () ->
+                CatalogHandlers.updateTable(
+                    catalog, staged, IcebergCommitValidation.withValidation(invalid)));
+    Assertions.assertTrue(thrown.getMessage().contains("summary"));
+    Assertions.assertFalse(catalog.tableExists(staged));
+  }
+
+  @Test
   public void testRefCreatedAfterTheClientReadIsProtected() {
     // An expire job read the table before a user tagged the snapshot it is about to remove: the
     // commit is checked against the metadata it is applied to, so the tag is not lost.
@@ -168,6 +294,22 @@ public class TestIcebergCommitValidation {
             + extraFields
             + "}";
     return new MetadataUpdate.AddSnapshot(SnapshotParser.fromJson(json));
+  }
+
+  private UpdateTableRequest stagedCreateRequest(TableIdentifier identifier) {
+    TableMetadata metadata =
+        CatalogHandlers.stageTableCreate(
+                catalog,
+                identifier.namespace(),
+                CreateTableRequest.builder()
+                    .withName(identifier.name())
+                    .withSchema(SCHEMA)
+                    .setProperties(ImmutableMap.of("format-version", "2"))
+                    .stageCreate()
+                    .build())
+            .tableMetadata();
+    return new UpdateTableRequest(
+        ImmutableList.of(new UpdateRequirement.AssertTableDoesNotExist()), metadata.changes());
   }
 
   private void commit(MetadataUpdate... updates) {

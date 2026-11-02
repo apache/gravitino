@@ -50,8 +50,6 @@ import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code IcebergSchemaHookDispatcher} is a decorator for {@link
@@ -60,8 +58,6 @@ import org.slf4j.LoggerFactory;
  * operations.
  */
 public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperationDispatcher {
-
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergNamespaceHookDispatcher.class);
 
   private final IcebergNamespaceOperationDispatcher dispatcher;
   private final String metalake;
@@ -94,20 +90,9 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
     // Gravitino entity row for each ancestor, so a single leaf import covers the branch.
     // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
-    // that Gravitino doesn't know about. The namespace is dropped again first, so a refused
-    // request does not leave a namespace nobody owns.
-    try {
-      importSchema(catalogName, leaf);
-    } catch (RuntimeException e) {
-      try {
-        dispatcher.dropNamespace(context, leaf);
-      } catch (RuntimeException dropFailure) {
-        e.addSuppressed(dropFailure);
-        LOG.warn(
-            "Failed to drop namespace {} after Gravitino could not import it", leaf, dropFailure);
-      }
-      throw e;
-    }
+    // that Gravitino doesn't know about. Do not drop the namespace on import failure: another
+    // client may already have created objects in it.
+    importSchema(catalogName, leaf);
 
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.
@@ -121,14 +106,6 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     return createNamespaceResponse;
   }
 
-  /**
-   * Returns all ancestor namespaces of {@code namespace} that do not currently exist in the
-   * catalog. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same utility as the
-   * Gravitino REST API side) so the prefix-enumeration algorithm is shared.
-   *
-   * <p>For example, if {@code namespace} is {@code Namespace.of("A","B","C")} and only {@code
-   * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
-   */
   /**
    * Rejects a namespace Gravitino cannot hold as a schema before anything is created: a level
    * containing '.', which is reserved as the qualified-name separator (and which the JDBC backend
@@ -156,6 +133,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     }
   }
 
+  /**
+   * Returns all ancestor namespaces of {@code namespace} that do not currently exist in the
+   * catalog. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same utility as the
+   * Gravitino REST API side) so the prefix-enumeration algorithm is shared.
+   *
+   * <p>For example, if {@code namespace} is {@code Namespace.of("A","B","C")} and only {@code
+   * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
+   */
   private List<Namespace> getMissingAncestors(IcebergRequestContext context, Namespace namespace) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String namespaceName = String.join(separator, namespace.levels());
