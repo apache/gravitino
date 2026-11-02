@@ -168,7 +168,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     return super.updateTable(
-        tableIdentifier, IcebergCommitValidation.withValidation(updateTableRequest));
+        tableIdentifier,
+        IcebergCommitValidation.withValidation(
+            updateTableRequest, () -> getCatalog().loadTable(tableIdentifier).io()));
   }
 
   public LoadTableResponse registerTable(
