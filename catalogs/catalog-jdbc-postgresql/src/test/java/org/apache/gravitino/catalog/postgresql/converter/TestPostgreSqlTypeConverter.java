@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIME
 import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIMESTAMP;
 import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.ARRAY_TOKEN;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BIGSERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
@@ -36,7 +37,6 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SMALLSERIAL;
-import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BIGSERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;

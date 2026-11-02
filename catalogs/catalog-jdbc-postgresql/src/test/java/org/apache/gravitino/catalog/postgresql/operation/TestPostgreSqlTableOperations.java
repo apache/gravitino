@@ -62,6 +62,31 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   private static Type INT = Types.IntegerType.get();
 
   @Test
+  void testNativeSerialColumnsRetainIntegerTypesAndAutoIncrement() throws SQLException {
+    String name = RandomNameUtils.genRandomName("serial_types");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (small_id smallserial, id serial, big_id bigserial)");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(Types.ShortType.get(), table.columns()[0].dataType());
+        Assertions.assertEquals(Types.IntegerType.get(), table.columns()[1].dataType());
+        Assertions.assertEquals(Types.LongType.get(), table.columns()[2].dataType());
+        for (Column column : table.columns()) {
+          Assertions.assertTrue(column.autoIncrement());
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @Test
   void testArrayElementMetadataFromSource() throws SQLException {
     String name = RandomNameUtils.genRandomName("array_metadata");
     try (Connection connection = DATA_SOURCE.getConnection()) {
