@@ -323,6 +323,17 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("page_ns2"));
     doCreateNamespace(Namespace.of("page_ns3"));
 
+    // pageSize alone must not truncate the list.
+    try (Response response =
+        getNamespaceClientBuilder(
+                Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+            .get()) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+      ListNamespacesResponse all = response.readEntity(ListNamespacesResponse.class);
+      Assertions.assertEquals(3, all.namespaces().size());
+      Assertions.assertNull(all.nextPageToken());
+    }
+
     // First page: an empty pageToken starts paging
     Response firstPageResponse =
         getNamespaceClientBuilder(

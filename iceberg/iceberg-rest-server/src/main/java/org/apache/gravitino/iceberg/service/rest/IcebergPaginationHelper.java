@@ -61,8 +61,8 @@ class IcebergPaginationHelper {
    * Paginate a {@link ListNamespacesResponse}.
    *
    * @param response the full (unpaginated) response
-   * @param pageToken cursor-based page token (name of last item on previous page), or empty for the
-   *     first page
+   * @param pageToken cursor-based page token (name of last item on previous page), an empty string
+   *     for the first page, or absent to return all results
    * @param pageSize maximum items per page, or empty for no limit
    * @return a new response containing only the requested page
    */
@@ -79,8 +79,8 @@ class IcebergPaginationHelper {
    * Paginate a {@link ListTablesResponse}. Works for both table and view list responses.
    *
    * @param response the full (unpaginated) response
-   * @param pageToken cursor-based page token (name of last item on previous page), or empty for the
-   *     first page
+   * @param pageToken cursor-based page token (name of last item on previous page), an empty string
+   *     for the first page, or absent to return all results
    * @param pageSize maximum items per page, or empty for no limit
    * @return a new response containing only the requested page
    */

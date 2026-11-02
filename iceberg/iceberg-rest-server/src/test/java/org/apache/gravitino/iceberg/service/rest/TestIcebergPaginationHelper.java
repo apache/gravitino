@@ -255,4 +255,23 @@ class TestIcebergPaginationHelper {
         Arrays.asList(Namespace.of("c"), Namespace.of("a"), Namespace.of("b")), all.namespaces());
     Assertions.assertNull(all.nextPageToken());
   }
+
+  @Test
+  void testInvalidPageSizeWithoutPageTokenIsRejected() {
+    ListNamespacesResponse namespaces =
+        ListNamespacesResponse.builder().add(Namespace.of("db")).build();
+    ListTablesResponse tables =
+        ListTablesResponse.builder().add(TableIdentifier.of("db", "table")).build();
+    for (int size : new int[] {0, -1}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              IcebergPaginationHelper.paginateNamespaces(
+                  namespaces, Optional.empty(), Optional.of(size)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              IcebergPaginationHelper.paginateTables(tables, Optional.empty(), Optional.of(size)));
+    }
+  }
 }
