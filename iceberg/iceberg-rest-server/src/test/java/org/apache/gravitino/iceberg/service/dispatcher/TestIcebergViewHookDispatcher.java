@@ -38,10 +38,12 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -56,6 +58,7 @@ import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
 import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -174,6 +177,16 @@ public class TestIcebergViewHookDispatcher {
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockExecutor.createView(mockContext, namespace, createRequest)).thenReturn(mockResponse);
 
+    when(mockInternalViewDispatcher.loadView(any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit =
+                  EntityImportAuditContext.auditInfo(invocation.getArgument(0), AuditInfo.EMPTY);
+              Assertions.assertEquals(USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
 
     // Verify view was created in underlying catalog
@@ -184,9 +197,9 @@ public class TestIcebergViewHookDispatcher {
     verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
     verify(mockViewDispatcher, never()).loadView(any());
 
-    // Verify the creator was recorded on the imported view
-    verify(mockEntityStore)
-        .update(eq(expectedIdent), eq(ViewEntity.class), eq(Entity.EntityType.VIEW), any());
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
+    Assertions.assertNull(
+        EntityImportAuditContext.auditInfo(expectedIdent, AuditInfo.EMPTY).creator());
 
     // Verify ownership was set
     verify(mockInternalOwnerDispatcher, times(1)).setOwner(any(), any(), eq(USER), any());

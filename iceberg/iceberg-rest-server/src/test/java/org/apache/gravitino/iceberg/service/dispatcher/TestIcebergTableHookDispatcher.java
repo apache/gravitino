@@ -34,7 +34,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -44,6 +43,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -586,37 +586,30 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertEquals(TEST_USER, userCaptor.getValue());
   }
 
+  /** The creator is available during import without a separate audit update. */
   @Test
-  @SuppressWarnings("unchecked")
-  public void testCreateTableRecordsTheCreator() throws IOException {
+  public void testCreateTableRecordsTheCreatorDuringImport() throws IOException {
     Namespace namespace = Namespace.of("test_schema");
     CreateTableRequest request =
         CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
-    when(mockDispatcher.createTable(mockContext, namespace, request))
-        .thenReturn(mock(LoadTableResponse.class));
-
-    hookDispatcher.createTable(mockContext, namespace, request);
-
     NameIdentifier identifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"), ":");
-    ArgumentCaptor<Function<TableEntity, TableEntity>> updater =
-        ArgumentCaptor.forClass(Function.class);
-    verify(mockEntityStore)
-        .update(
-            eq(identifier), eq(TableEntity.class), eq(Entity.EntityType.TABLE), updater.capture());
-    TableEntity imported =
-        TableEntity.builder()
-            .withId(1L)
-            .withName("test_table")
-            .withNamespace(identifier.namespace())
-            .withColumns(Collections.emptyList())
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
-    TableEntity recorded = updater.getValue().apply(imported);
-    Assertions.assertEquals(TEST_USER, recorded.auditInfo().creator());
-    Assertions.assertNotNull(recorded.auditInfo().createTime());
-    Assertions.assertEquals(imported.id(), recorded.id());
+    when(mockInternalTableDispatcher.loadTable(identifier))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit = EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
+    hookDispatcher.createTable(mockContext, namespace, request);
+
+    verify(mockInternalTableDispatcher).loadTable(identifier);
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
+    Assertions.assertNull(
+        EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY).creator());
   }
 
   @Test
@@ -718,6 +711,10 @@ public class TestIcebergTableHookDispatcher {
             () -> hookDispatcher.createTable(mockContext, namespace, request));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
+    NameIdentifier identifier =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_table");
+    Assertions.assertNull(
+        EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY).creator());
     verify(mockDispatcher).createTable(mockContext, namespace, request);
     verify(mockInternalTableDispatcher).loadTable(any());
     verify(mockTableDispatcher, never()).loadTable(any());

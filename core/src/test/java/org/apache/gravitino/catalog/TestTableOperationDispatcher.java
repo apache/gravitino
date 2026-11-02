@@ -127,6 +127,45 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
+  /** The first import writes creator information without a separate store update. */
+  @Test
+  public void testImportIncludesCreatorInInitialWrite() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_audit_table");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "table_import_audit");
+    Column[] columns = {
+      TestColumn.builder().withName("col").withPosition(0).withType(Types.StringType.get()).build()
+    };
+    tableOperationDispatcher.createTable(identifier, columns, "comment", props, new Transform[0]);
+    TestTable catalogTable = (TestTable) operations.loadTable(identifier);
+    FieldUtils.writeField(catalogTable, "auditInfo", AuditInfo.EMPTY, true);
+    entityStore.delete(identifier, TABLE);
+    clearInvocations(entityStore);
+
+    EntityImportAuditContext.withCreator(
+        identifier, "alice", () -> tableOperationDispatcher.loadTable(identifier));
+
+    TableEntity imported = entityStore.get(identifier, TABLE, TableEntity.class);
+    Assertions.assertEquals("alice", imported.auditInfo().creator());
+    Assertions.assertNotNull(imported.auditInfo().createTime());
+    verify(entityStore).put(any(TableEntity.class), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
+
+    clearInvocations(entityStore);
+    EntityImportAuditContext.withCreator(
+        identifier, "bob", () -> tableOperationDispatcher.loadTable(identifier));
+    Assertions.assertEquals(
+        "alice", entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
+  }
+
   @Test
   public void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");

@@ -26,6 +26,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -256,15 +257,14 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context, Namespace namespace, String tableName) {
     // Validate request metadata before the backend operation. An unexpected import failure must
     // propagate without deleting a table that another client may already have updated or recreated.
-    importTableEntity(context.catalogName(), namespace, tableName);
-    IcebergEntityAuditUtils.recordCreator(
+    EntityImportAuditContext.withCreator(
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake,
             context.catalogName(),
             TableIdentifier.of(namespace, tableName),
             HierarchicalSchemaUtil.schemaSeparator()),
-        Entity.EntityType.TABLE,
-        context.userName());
+        context.userName(),
+        () -> importTableEntity(context.catalogName(), namespace, tableName));
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),

@@ -599,13 +599,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       uid = idGenerator.nextId();
     }
 
-    AuditInfo audit =
-        AuditInfo.builder()
-            .withCreator(table.auditInfo().creator())
-            .withCreateTime(table.auditInfo().createTime())
-            .withLastModifier(table.auditInfo().lastModifier())
-            .withLastModifiedTime(table.auditInfo().lastModifiedTime())
-            .build();
+    AuditInfo audit = EntityImportAuditContext.auditInfo(identifier, table.auditInfo());
     List<ColumnEntity> columnEntityList =
         toColumnEntities(table.tableFromCatalog().columns(), audit);
     TableEntity tableEntity =

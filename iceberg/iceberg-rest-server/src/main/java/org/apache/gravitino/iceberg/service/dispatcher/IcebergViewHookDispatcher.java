@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -72,15 +73,14 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
 
     // Then import it into Gravitino so Gravitino is aware of the view
-    importView(context.catalogName(), namespace, createViewRequest.name());
-    IcebergEntityAuditUtils.recordCreator(
+    EntityImportAuditContext.withCreator(
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             metalake,
             context.catalogName(),
             TableIdentifier.of(namespace, createViewRequest.name()),
             HierarchicalSchemaUtil.schemaSeparator()),
-        Entity.EntityType.VIEW,
-        context.userName());
+        context.userName(),
+        () -> importView(context.catalogName(), namespace, createViewRequest.name()));
 
     // Set ownership for the newly created view.
     IcebergOwnershipUtils.setViewOwner(

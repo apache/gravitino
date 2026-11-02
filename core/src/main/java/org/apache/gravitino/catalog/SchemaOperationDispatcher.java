@@ -691,13 +691,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .withNamespace(identifier.namespace())
             .withProperties(
                 schema.properties() == null ? Collections.emptyMap() : schema.properties())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(schema.auditInfo().creator())
-                    .withCreateTime(schema.auditInfo().createTime())
-                    .withLastModifier(schema.auditInfo().lastModifier())
-                    .withLastModifiedTime(schema.auditInfo().lastModifiedTime())
-                    .build())
+            .withAuditInfo(EntityImportAuditContext.auditInfo(identifier, schema.auditInfo()))
             .build();
     try {
       if (previousEntity == null) {

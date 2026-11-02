@@ -24,10 +24,13 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -49,6 +52,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.TestCatalog;
+import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -83,6 +88,40 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doReturn(1000L).when(config).get(Configs.TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(Configs.TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+  }
+
+  /** The first import writes creator information without a separate store update. */
+  @Test
+  public void testImportIncludesCreatorInInitialWrite() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_audit_schema");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier = schemaIdent;
+    TestSchema catalogSchema = (TestSchema) operations.loadSchema(identifier);
+    FieldUtils.writeField(catalogSchema, "auditInfo", AuditInfo.EMPTY, true);
+    entityStore.delete(identifier, SCHEMA);
+    clearInvocations(entityStore);
+
+    EntityImportAuditContext.withCreator(
+        identifier, "alice", () -> dispatcher.loadSchema(identifier));
+
+    SchemaEntity imported = entityStore.get(identifier, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals("alice", imported.auditInfo().creator());
+    Assertions.assertNotNull(imported.auditInfo().createTime());
+    verify(entityStore).put(any(SchemaEntity.class), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
+
+    clearInvocations(entityStore);
+    EntityImportAuditContext.withCreator(
+        identifier, "bob", () -> dispatcher.loadSchema(identifier));
+    Assertions.assertEquals(
+        "alice", entityStore.get(identifier, SCHEMA, SchemaEntity.class).auditInfo().creator());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
   }
 
   @Test

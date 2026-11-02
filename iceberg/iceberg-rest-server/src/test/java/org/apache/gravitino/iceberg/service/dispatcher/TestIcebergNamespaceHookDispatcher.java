@@ -42,6 +42,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -50,7 +51,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
-import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -311,7 +312,18 @@ public class TestIcebergNamespaceHookDispatcher {
         NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
     when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
 
+    when(mockInternalViewDispatcher.loadView(any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit =
+                  EntityImportAuditContext.auditInfo(invocation.getArgument(0), AuditInfo.EMPTY);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadViewResponse response = hookDispatcher.registerView(mockContext, namespace, request);
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
 
     verify(mockDispatcher).registerView(mockContext, namespace, request);
     verify(mockInternalViewDispatcher).loadView(eq(expectedIdent));
@@ -458,7 +470,18 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
         .thenReturn(mockResponse);
 
+    when(mockInternalTableDispatcher.loadTable(any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit =
+                  EntityImportAuditContext.auditInfo(invocation.getArgument(0), AuditInfo.EMPTY);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
 
     Assertions.assertSame(mockResponse, response);
     verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
@@ -531,6 +554,20 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.createNamespace(mockContext, request))
         .thenReturn(mock(CreateNamespaceResponse.class));
 
+    when(mockInternalSchemaDispatcher.loadSchema(any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit =
+                  EntityImportAuditContext.auditInfo(invocation.getArgument(0), AuditInfo.EMPTY);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              Assertions.assertNull(
+                  EntityImportAuditContext.auditInfo(
+                          NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "A"), AuditInfo.EMPTY)
+                      .creator());
+              return null;
+            });
+
     hookDispatcher.createNamespace(mockContext, request);
 
     @SuppressWarnings("unchecked")
@@ -544,13 +581,7 @@ public class TestIcebergNamespaceHookDispatcher {
         Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
         names);
 
-    // Each namespace the request created gets its creator recorded; the existing A does not.
-    ArgumentCaptor<NameIdentifier> recorded = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, times(3))
-        .update(recorded.capture(), eq(SchemaEntity.class), eq(Entity.EntityType.SCHEMA), any());
-    Assertions.assertEquals(
-        Arrays.asList("A:B", "A:B:C", "A:B:C:D"),
-        recorded.getAllValues().stream().map(NameIdentifier::name).collect(Collectors.toList()));
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
   }
 
   @Test

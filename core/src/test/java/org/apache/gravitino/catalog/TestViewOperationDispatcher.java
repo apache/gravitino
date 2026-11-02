@@ -28,10 +28,13 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -147,6 +150,40 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         return auditInfo;
       }
     };
+  }
+
+  /** The first import writes creator information without a separate store update. */
+  @Test
+  public void testImportIncludesCreatorInInitialWrite() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_audit_view");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "view_import_audit");
+    operations.views.put(identifier, createMockView(identifier.name(), props, AuditInfo.EMPTY));
+    entityStore.delete(identifier, VIEW);
+    clearInvocations(entityStore);
+
+    EntityImportAuditContext.withCreator(
+        identifier, "alice", () -> viewOperationDispatcher.loadView(identifier));
+
+    ViewEntity imported = entityStore.get(identifier, VIEW, ViewEntity.class);
+    Assertions.assertEquals("alice", imported.auditInfo().creator());
+    Assertions.assertNotNull(imported.auditInfo().createTime());
+    verify(entityStore).put(any(ViewEntity.class), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
+
+    clearInvocations(entityStore);
+    EntityImportAuditContext.withCreator(
+        identifier, "bob", () -> viewOperationDispatcher.loadView(identifier));
+    Assertions.assertEquals(
+        "alice", entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    verify(entityStore, never()).update(any(), any(), any(), any());
   }
 
   @Test

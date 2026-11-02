@@ -564,13 +564,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     }
 
     View catalogView = entityCombinedView.viewFromCatalog();
-    AuditInfo audit =
-        AuditInfo.builder()
-            .withCreator(catalogView.auditInfo().creator())
-            .withCreateTime(catalogView.auditInfo().createTime())
-            .withLastModifier(catalogView.auditInfo().lastModifier())
-            .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
-            .build();
+    AuditInfo audit = EntityImportAuditContext.auditInfo(ident, catalogView.auditInfo());
     ViewEntity viewEntity =
         ViewEntity.builder()
             .withId(uid)
