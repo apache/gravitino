@@ -48,9 +48,11 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * The service that stores the parent edge of sub-domains in the {@code domain_rel} table. A domain
  * has at most one active edge, enforced by the unique key on {@code (child_id, deleted_at)}.
  *
- * <p>It is also the one parent resolver of domains: domain names carry no parent, so every reader
- * that needs a domain's parent, such as domain reads and the inherited authorization checks, gets
- * it from {@link #getParentDomainName(Long)} or {@link #batchGetParentDomainNames(List)}.
+ * <p>For parent-name-only lookups, this service provides the shared resolver through {@link
+ * #getParentDomainName(Long)} and {@link #batchGetParentDomainNames(List)}. Future inherited
+ * authorization checks can reuse these methods. Domain entity reads instead join the live parent
+ * into the same query as the domain metadata, preserving a consistent statement snapshot without a
+ * separate resolver lookup.
  *
  * <p>Every change of the hierarchy first locks the metalake row, then locks the {@code domain_meta}
  * rows of the domains involved in domain ID order: the sub-domain exclusively and the parent

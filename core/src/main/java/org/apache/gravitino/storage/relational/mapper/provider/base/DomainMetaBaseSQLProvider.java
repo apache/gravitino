@@ -47,16 +47,22 @@ public class DomainMetaBaseSQLProvider {
   // Reads take the backing tag name from the live tag, so a deleted tag reads as no backing tag.
   // Locking reads do not join: they must lock the domain row only, and PostgreSQL rejects FOR
   // UPDATE on the nullable side of an outer join.
-  private static final String DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME =
+  private static final String DOMAIN_COLUMNS_WITH_RESOLVED_NAMES =
       DOMAIN_COLUMNS + ", bt.tag_name as backingTagName, pd.domain_name as parentName";
 
   private static final String BACKING_TAG_JOIN =
       " LEFT JOIN "
           + TagMetaMapper.TAG_TABLE_NAME
           + " bt ON dm.backing_tag_id = bt.tag_id AND dm.metalake_id = bt.metalake_id"
-          + " AND bt.deleted_at = 0"
-          + " LEFT JOIN domain_rel pr ON dm.domain_id = pr.child_id AND pr.deleted_at = 0"
-          + " LEFT JOIN domain_meta pd ON pr.parent_id = pd.domain_id AND pd.deleted_at = 0";
+          + " AND bt.deleted_at = 0";
+
+  private static final String PARENT_JOIN =
+      " LEFT JOIN "
+          + DomainRelMapper.DOMAIN_REL_TABLE_NAME
+          + " pr ON dm.domain_id = pr.child_id AND pr.deleted_at = 0"
+          + " LEFT JOIN "
+          + DOMAIN_TABLE_NAME
+          + " pd ON pr.parent_id = pd.domain_id AND pd.deleted_at = 0";
 
   /**
    * Returns SQL that lists the active domains of a metalake.
@@ -66,13 +72,14 @@ public class DomainMetaBaseSQLProvider {
    */
   public String listDomainPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName} AND dm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
@@ -86,13 +93,14 @@ public class DomainMetaBaseSQLProvider {
   public String selectDomainMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("domainName") String domainName) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName} AND dm.domain_name = #{domainName}"
         + " AND dm.deleted_at = 0 AND mm.deleted_at = 0";
   }
@@ -134,11 +142,12 @@ public class DomainMetaBaseSQLProvider {
    */
   public String selectDomainMetaById(@Param("domainId") Long domainId) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE dm.domain_id = #{domainId} AND dm.deleted_at = 0";
   }
 
@@ -194,13 +203,14 @@ public class DomainMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("domainNames") List<String> domainNames) {
     return "<script>"
         + "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS_WITH_RESOLVED_NAMES
         + " FROM "
         + DOMAIN_TABLE_NAME
         + " dm JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON dm.metalake_id = mm.metalake_id"
         + BACKING_TAG_JOIN
+        + PARENT_JOIN
         + " WHERE mm.metalake_name = #{metalakeName}"
         + " AND dm.domain_name IN ("
         + "<foreach collection='domainNames' item='domainName' separator=','>"
