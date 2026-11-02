@@ -44,7 +44,7 @@ public class DomainRelPO {
 
   private Long metalakeId;
   private Long parentId;
-  private String parentName;
+  @EqualsAndHashCode.Exclude private String parentName;
   private Long childId;
   private String auditInfo;
   private Long currentVersion;

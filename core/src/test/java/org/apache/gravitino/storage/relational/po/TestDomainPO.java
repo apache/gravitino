@@ -38,6 +38,20 @@ public class TestDomainPO {
       AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
   @Test
+  public void testDerivedNamesDoNotChangeEquality() throws Exception {
+    DomainPO plain = new DomainPO();
+    DomainPO joined = new DomainPO();
+    var parentName = DomainPO.class.getDeclaredField("parentName");
+    parentName.setAccessible(true);
+    parentName.set(joined, "derived name");
+    var backingTagName = DomainPO.class.getDeclaredField("backingTagName");
+    backingTagName.setAccessible(true);
+    backingTagName.set(joined, "derived name");
+    Assertions.assertEquals(plain, joined);
+    Assertions.assertEquals(plain.hashCode(), joined.hashCode());
+  }
+
+  @Test
   public void testInitializeAndConvertDomainPO() {
     DomainEntity domain = newDomain(10L, "Finance/Trading", "comment", ImmutableMap.of("k", "v"));
 

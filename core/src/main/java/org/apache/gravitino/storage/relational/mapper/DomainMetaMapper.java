@@ -171,12 +171,17 @@ public interface DomainMetaMapper {
   /**
    * Lists the active sub-domains of a domain.
    *
-   * @param parentId The ID of the parent domain.
-   * @return The active sub-domains.
+   * @param metalakeName The metalake name.
+   * @param parentName The parent domain name.
+   * @return The active sub-domains, or one row with a null domain ID for a childless parent. An
+   *     absent parent produces no rows.
    */
   @Options(useCache = false, flushCache = FlushCachePolicy.TRUE)
-  @SelectProvider(type = DomainMetaSQLProviderFactory.class, method = "listDomainPOsByParentId")
-  List<DomainPO> listDomainPOsByParentId(@Param("parentId") Long parentId);
+  @SelectProvider(
+      type = DomainMetaSQLProviderFactory.class,
+      method = "listDomainPOsByParentIdentifier")
+  List<DomainPO> listDomainPOsByParentIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("parentName") String parentName);
 
   /**
    * Inserts a domain.

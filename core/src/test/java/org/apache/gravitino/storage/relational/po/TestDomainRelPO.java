@@ -33,6 +33,17 @@ public class TestDomainRelPO {
       AuditInfo.builder().withCreator("creator").withCreateTime(CREATE_TIME).build();
 
   @Test
+  public void testDerivedNamesDoNotChangeEquality() throws Exception {
+    DomainRelPO plain = new DomainRelPO();
+    DomainRelPO joined = new DomainRelPO();
+    var parentName = DomainRelPO.class.getDeclaredField("parentName");
+    parentName.setAccessible(true);
+    parentName.set(joined, "derived name");
+    Assertions.assertEquals(plain, joined);
+    Assertions.assertEquals(plain.hashCode(), joined.hashCode());
+  }
+
+  @Test
   public void testInitializeDomainRelPO() throws JsonProcessingException {
     DomainRelPO domainRelPO = DomainRelPO.initializeDomainRelPO(1L, 10L, 11L, AUDIT_INFO);
 

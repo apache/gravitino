@@ -212,21 +212,31 @@ public class DomainMetaBaseSQLProvider {
   }
 
   /**
-   * Returns SQL that lists the active sub-domains of a domain.
+   * Returns SQL that resolves the live parent and lists its sub-domains in one statement.
    *
-   * @param parentId The ID of the parent domain.
-   * @return The SQL.
+   * @param metalakeName The metalake name.
+   * @param parentName The parent domain name.
+   * @return The SQL. An existing childless parent produces a row with a null domain ID.
    */
-  public String listDomainPOsByParentId(@Param("parentId") Long parentId) {
+  public String listDomainPOsByParentIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("parentName") String parentName) {
     return "SELECT "
-        + DOMAIN_COLUMNS_WITH_BACKING_TAG_NAME
+        + DOMAIN_COLUMNS
+        + ", bt.tag_name as backingTagName, lp.domain_name as parentName"
         + " FROM "
         + DOMAIN_TABLE_NAME
-        + " dm JOIN "
+        + " lp JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON lp.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " LEFT JOIN "
         + DomainRelMapper.DOMAIN_REL_TABLE_NAME
-        + " dr ON dm.domain_id = dr.child_id AND dr.deleted_at = 0"
+        + " dr ON lp.domain_id = dr.parent_id AND dr.deleted_at = 0"
+        + " LEFT JOIN "
+        + DOMAIN_TABLE_NAME
+        + " dm ON dr.child_id = dm.domain_id AND dm.deleted_at = 0"
         + BACKING_TAG_JOIN
-        + " WHERE dr.parent_id = #{parentId} AND dm.deleted_at = 0";
+        + " WHERE mm.metalake_name = #{metalakeName} AND lp.domain_name = #{parentName}"
+        + " AND lp.deleted_at = 0";
   }
 
   /**

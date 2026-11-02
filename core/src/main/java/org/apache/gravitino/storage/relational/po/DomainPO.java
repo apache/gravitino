@@ -60,8 +60,8 @@ public class DomainPO {
   private String comment;
   private String status;
   private Long backingTagId;
-  private String backingTagName;
-  private String parentName;
+  @EqualsAndHashCode.Exclude private String backingTagName;
+  @EqualsAndHashCode.Exclude private String parentName;
   private String backingTagValue;
   private String properties;
   private String auditInfo;

@@ -630,7 +630,7 @@ public class TestDomainRelService extends TestJDBCBackend {
                     ? "listDomainPOsByMetalake"
                     : path.equals("batch")
                         ? "listDomainPOsByMetalakeAndDomainNames"
-                        : "listDomainPOsByParentId";
+                        : "listDomainPOsByParentIdentifier";
         ReadProbe.AFTER_READ.set(
             id -> {
               if (id.endsWith("." + method) && triggered.compareAndSet(false, true)) {
@@ -698,7 +698,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     ExecutorService executor = Executors.newSingleThreadExecutor();
     ReadProbe.AFTER_READ.set(
         id -> {
-          if (id.endsWith(".selectDomainMetaByMetalakeAndName")
+          if (id.endsWith(".listDomainPOsByParentIdentifier")
               && triggered.compareAndSet(false, true)) {
             try {
               executor
@@ -730,8 +730,8 @@ public class TestDomainRelService extends TestJDBCBackend {
     try {
       DomainEntity read = domainRelService.listSubDomains(parent.nameIdentifier()).get(0);
       Assertions.assertTrue(triggered.get());
-      Assertions.assertEquals("new", read.comment());
-      Assertions.assertEquals("Renamed", read.parent().orElse(null));
+      Assertions.assertNull(read.comment());
+      Assertions.assertEquals("Parent", read.parent().orElse(null));
     } finally {
       ReadProbe.clear();
       executor.shutdownNow();
@@ -757,6 +757,58 @@ public class TestDomainRelService extends TestJDBCBackend {
         });
     Assertions.assertEquals(2, countDomainRelRows(child.id()));
     Assertions.assertNull(selectDomainRel(child.id()));
+  }
+
+  @TestTemplate
+  public void testSubDomainsResolveRecreatedParentInOneStatement() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity parent = insertDomain(METALAKE_NAME, "Parent");
+    DomainEntity child = insertDomain(METALAKE_NAME, "Child");
+    insertDomainRel(child, parent);
+    installReadProbe();
+    AtomicBoolean triggered = new AtomicBoolean();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    ReadProbe.BEFORE_READ.set(
+        id -> {
+          // Replace the parent after any preliminary lookup but before the children query.
+          // A two-statement implementation would keep the original parent's ID.
+          if (id.endsWith(".listDomainPOsByParentIdentifier")
+              && triggered.compareAndSet(false, true)) {
+            try {
+              executor
+                  .submit(
+                      () ->
+                          SessionUtils.doMultipleWithCommit(
+                              () -> {
+                                Assertions.assertTrue(
+                                    domainMetaService.deleteDomain(child.nameIdentifier()));
+                                Assertions.assertTrue(
+                                    domainMetaService.deleteDomain(parent.nameIdentifier()));
+                                try {
+                                  DomainEntity replacement = insertDomain(METALAKE_NAME, "Parent");
+                                  DomainEntity replacementChild =
+                                      insertDomain(METALAKE_NAME, "ReplacementChild");
+                                  insertDomainRel(replacementChild, replacement);
+                                } catch (IOException e) {
+                                  throw new RuntimeException(e);
+                                }
+                              }))
+                  .get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          }
+        });
+    try {
+      List<DomainEntity> children = domainRelService.listSubDomains(parent.nameIdentifier());
+      Assertions.assertTrue(triggered.get());
+      Assertions.assertEquals(1, children.size());
+      Assertions.assertEquals("ReplacementChild", children.get(0).name());
+      Assertions.assertEquals("Parent", children.get(0).parent().orElse(null));
+    } finally {
+      ReadProbe.clear();
+      executor.shutdownNow();
+    }
   }
 
   private void installReadProbe() {

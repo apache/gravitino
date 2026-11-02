@@ -113,9 +113,10 @@ public class DomainMetaSQLProviderFactory {
     return getProvider().listDomainPOsByMetalakeAndDomainNames(metalakeName, domainNames);
   }
 
-  /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByParentId}. */
-  public static String listDomainPOsByParentId(@Param("parentId") Long parentId) {
-    return getProvider().listDomainPOsByParentId(parentId);
+  /** Delegates {@link DomainMetaBaseSQLProvider#listDomainPOsByParentIdentifier}. */
+  public static String listDomainPOsByParentIdentifier(
+      @Param("metalakeName") String metalakeName, @Param("parentName") String parentName) {
+    return getProvider().listDomainPOsByParentIdentifier(metalakeName, parentName);
   }
 
   /** Delegates {@link DomainMetaBaseSQLProvider#insertDomainMeta}. */

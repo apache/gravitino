@@ -123,11 +123,17 @@ public class DomainRelService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listSubDomains")
   public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) {
-    DomainPO parentPO = getDomainPO(parentIdent);
     List<DomainPO> subDomainPOs =
         SessionUtils.getWithoutCommit(
-            DomainMetaMapper.class, mapper -> mapper.listDomainPOsByParentId(parentPO.domainId()));
+            DomainMetaMapper.class,
+            mapper ->
+                mapper.listDomainPOsByParentIdentifier(
+                    parentIdent.namespace().level(0), parentIdent.name()));
+    if (subDomainPOs.isEmpty()) {
+      throw new NoSuchEntityException("The domain %s does not exist", parentIdent);
+    }
     return subDomainPOs.stream()
+        .filter(po -> po.domainId() != null)
         .map(po -> DomainPO.fromDomainPO(po, parentIdent.namespace()))
         .collect(Collectors.toList());
   }
