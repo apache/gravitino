@@ -145,6 +145,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       CreateViewRequest createViewRequest) {
+    IcebergRESTUtils.validateRequest(createViewRequest, "CreateViewRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -227,6 +228,7 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
+    IcebergRESTUtils.validateRequest(replaceViewRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
