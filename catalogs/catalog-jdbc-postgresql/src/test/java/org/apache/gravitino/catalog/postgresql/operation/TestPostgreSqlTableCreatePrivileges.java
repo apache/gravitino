@@ -46,6 +46,8 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** A hidden search-path entry must not make an existing inaccessible schema look absent. */
 public class TestPostgreSqlTableCreatePrivileges {
@@ -117,13 +119,30 @@ public class TestPostgreSqlTableCreatePrivileges {
     verify(createConnection).close();
   }
 
-  @Test
-  void testProbeConnectionFailureRemainsConnectionFailure() throws Exception {
-    when(source.getConnection())
-        .thenReturn(createConnection)
-        .thenThrow(new SQLException("connection lost", "08006"));
-    Assertions.assertThrows(ConnectionFailedException.class, this::create);
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testProbeFailurePreservesCreateFailure(boolean queryFailure) throws Exception {
+    SQLException probeFailure = new SQLException("connection lost", "08006");
+    if (queryFailure) {
+      when(probeStatement.executeQuery()).thenThrow(probeFailure);
+    } else {
+      when(source.getConnection()).thenReturn(createConnection).thenThrow(probeFailure);
+    }
+    ConnectionFailedException error =
+        Assertions.assertThrows(ConnectionFailedException.class, this::create);
+    Assertions.assertSame(probeFailure, error.getCause());
+    Assertions.assertEquals(1, error.getSuppressed().length);
+    NoSuchSchemaException createFailure =
+        Assertions.assertInstanceOf(NoSuchSchemaException.class, error.getSuppressed()[0]);
+    SQLException createCause =
+        Assertions.assertInstanceOf(SQLException.class, createFailure.getCause());
+    Assertions.assertEquals("3F000", createCause.getSQLState());
+    Assertions.assertEquals("no schema has been selected to create in", createCause.getMessage());
     verify(createConnection).close();
+    if (queryFailure) {
+      verify(probeConnection).close();
+      verify(probeStatement).close();
+    }
   }
 
   private void create() {

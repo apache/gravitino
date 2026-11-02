@@ -24,9 +24,36 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** PostgreSQL source permission errors remain distinct from missing objects and outages. */
 public class TestPostgreSqlExceptionConverter {
+  @SuppressWarnings("OrphanedFormatString") // Source messages are literal, not format templates.
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(
+      strings = {
+        "42501", "42P04", "42P06", "42P07", "3D000", "3F000", "42P01", "08006", "08P01", "XX000"
+      })
+  void testSqlFailuresPreserveCauseAndLiteralMessage(String state) {
+    SQLException failure = new SQLException("source failure containing literal %s", state);
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertEquals(failure.getMessage(), error.getMessage());
+  }
+
+  @SuppressWarnings("OrphanedFormatString") // Source messages are literal, not format templates.
+  @Test
+  void testAuthenticationFailureWithoutSqlStatePreservesCause() {
+    SQLException failure = new SQLException("password authentication failed for role %s");
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Assertions.assertInstanceOf(ConnectionFailedException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertEquals(failure.getMessage(), error.getMessage());
+  }
+
   @Test
   void testInsufficientPrivilegePreservesCauseAndReason() {
     SQLException failure = new SQLException("permission denied for schema restricted", "42501");

@@ -45,7 +45,6 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
    */
   private static final String CONNECTION_EXCEPTION = "08";
 
-  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     if (null != se.getSQLState()) {
@@ -54,27 +53,27 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
           return new ForbiddenException(se, "%s", se.getMessage());
         case DUPLICATE_DATABASE:
         case DUPLICATE_SCHEMA:
-          return new SchemaAlreadyExistsException(se.getMessage(), se);
+          return new SchemaAlreadyExistsException(se, "%s", se.getMessage());
         case DUPLICATE_TABLE:
-          return new TableAlreadyExistsException(se.getMessage(), se);
+          return new TableAlreadyExistsException(se, "%s", se.getMessage());
         case INVALID_SCHEMA_NAME:
         case INVALID_SCHEMA:
-          return new NoSuchSchemaException(se.getMessage(), se);
+          return new NoSuchSchemaException(se, "%s", se.getMessage());
         case UNDEFINED_TABLE:
-          return new NoSuchTableException(se.getMessage(), se);
+          return new NoSuchTableException(se, "%s", se.getMessage());
         default:
           {
             if (se.getSQLState().startsWith(CONNECTION_EXCEPTION)) {
-              return new ConnectionFailedException(se.getMessage(), se);
+              return new ConnectionFailedException(se, "%s", se.getMessage());
             }
-            return new GravitinoRuntimeException(se.getMessage(), se);
+            return new GravitinoRuntimeException(se, "%s", se.getMessage());
           }
       }
     } else {
       if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
-        return new ConnectionFailedException(se.getMessage(), se);
+        return new ConnectionFailedException(se, "%s", se.getMessage());
       }
-      return new GravitinoRuntimeException(se.getMessage(), se);
+      return new GravitinoRuntimeException(se, "%s", se.getMessage());
     }
   }
 }

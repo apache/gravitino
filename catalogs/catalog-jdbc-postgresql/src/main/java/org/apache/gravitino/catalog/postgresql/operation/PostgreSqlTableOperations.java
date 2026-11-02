@@ -128,7 +128,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     } catch (NoSuchSchemaException e) {
       // PostgreSQL removes unusable schemas from search_path. An unqualified CREATE can therefore
       // report 3F000 even when the requested schema exists but the source role has no USAGE.
-      if (schemaLacksUsage(schema)) {
+      boolean lacksUsage;
+      try {
+        lacksUsage = schemaLacksUsage(schema);
+      } catch (RuntimeException diagnosisFailure) {
+        diagnosisFailure.addSuppressed(e);
+        throw diagnosisFailure;
+      }
+      if (lacksUsage) {
         throw new ForbiddenException(
             e, "Insufficient source privileges for schema %s: USAGE is required", schema);
       }
