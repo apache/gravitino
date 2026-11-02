@@ -132,6 +132,19 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
   }
 
   @Test
+  void testUnnamedIndexesKeepNativeTableAndColumnQuotes() {
+    for (String name : new String[] {null, ""}) {
+      Assertions.assertEquals(
+          "ALTER TABLE \"native\"\"table\" ADD UNIQUE (\"quoted\"\"column\");",
+          PostgreSqlTableOperations.addIndexDefinition(
+              "native\"table",
+              (TableChange.AddIndex)
+                  TableChange.addIndex(
+                      IndexType.UNIQUE_KEY, name, new String[][] {{"quoted\"column"}})));
+    }
+  }
+
+  @Test
   void testUnnamedIndexesUsePostgreSqlGeneratedNames() {
     for (String name : new String[] {null, ""}) {
       Assertions.assertEquals(
