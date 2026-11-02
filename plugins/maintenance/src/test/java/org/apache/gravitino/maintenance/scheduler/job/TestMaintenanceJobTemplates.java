@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.job.cron;
+package org.apache.gravitino.maintenance.scheduler.job;
 
 import org.apache.gravitino.policy.Policy;
 import org.junit.jupiter.api.Assertions;

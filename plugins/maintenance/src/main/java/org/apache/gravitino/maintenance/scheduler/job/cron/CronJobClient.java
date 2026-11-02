@@ -44,6 +44,7 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandTableCandidate;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -631,6 +632,15 @@ public class CronJobClient {
       }
     }
     return max + 1L;
+  }
+
+  /**
+   * @param tableId table entity id
+   * @param policyId policy entity id
+   * @return true when a queued cron-job already covers the table for this policy
+   */
+  public boolean isTableAlreadyQueued(long tableId, long policyId) {
+    return isTableAlreadyQueued(schedulerClient(dataSource), tableId, policyId);
   }
 
   /**

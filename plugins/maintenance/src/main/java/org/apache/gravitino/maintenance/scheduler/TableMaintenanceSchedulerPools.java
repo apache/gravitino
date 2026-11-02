@@ -34,16 +34,13 @@ import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
-import org.apache.gravitino.maintenance.scheduler.job.commit.CommitOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.scheduler.job.commit.MaintenanceCommitSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.job.cron.CronJobClient;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobConfBuilder;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobSubmitter;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceSparkSubmitPipeline;
-import org.apache.gravitino.maintenance.scheduler.job.cron.PendingCronExpandOccupancyGate;
-import org.apache.gravitino.maintenance.scheduler.policy.expand.ExpandOccupancyGate;
+import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceCronSubmitPipeline;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandPipeline;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -118,33 +115,32 @@ public class TableMaintenanceSchedulerPools implements AutoCloseable {
     Preconditions.checkNotNull(dataSource, "dataSource must not be null");
     Preconditions.checkNotNull(gravitinoConfig, "gravitinoConfig must not be null");
 
-    OccupancyGate occupancyGate =
-        new OccupancyGate(TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
-    ExpandOccupancyGate expandGate =
-        new PendingCronExpandOccupancyGate(occupancyGate::shouldSkip, dataSource);
+    MaintenanceActionManager actionManager =
+        new MaintenanceActionManager(
+            TableMaintenanceActionMetaService.getInstance(), config.claimTimeoutMs());
     PolicyExpandPipeline pipeline =
         new PolicyExpandPipeline(
             new NearestPolicyTableEnumerator(),
             new CronJobClient(dataSource, gravitinoConfig),
-            expandGate,
+            actionManager,
             gravitinoConfig,
             config.expandEnqueueBatchSize());
     EXPAND_PIPELINE.set(() -> pipeline);
 
-    MaintenanceSparkSubmitPipeline cronSubmit =
-        new MaintenanceSparkSubmitPipeline(
-            occupancyGate::isInFlight,
+    MaintenanceCronSubmitPipeline cronSubmit =
+        new MaintenanceCronSubmitPipeline(
+            actionManager,
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobSubmitter.fromEnv(),
+            MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     CRON_SUBMIT.set(cronSubmit::submit);
 
     MaintenanceCommitSubmitPipeline commitSubmit =
         new MaintenanceCommitSubmitPipeline(
-            CommitOccupancyGate.of(occupancyGate),
+            actionManager,
             TableMaintenanceActionMetaService.getInstance(),
-            MaintenanceJobSubmitter.fromEnv(),
+            MaintenanceJobManager.getInstance(),
             new MaintenanceJobConfBuilder(gravitinoConfig),
             config.claimTimeoutMs());
     COMMIT_SUBMIT.set(commitSubmit::submit);

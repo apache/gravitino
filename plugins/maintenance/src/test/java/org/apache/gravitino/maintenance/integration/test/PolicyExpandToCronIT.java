@@ -35,9 +35,9 @@ import javax.sql.DataSource;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.integration.test.MaintenanceSchedulerITSupport.SeededTable;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
@@ -110,7 +110,13 @@ public class PolicyExpandToCronIT extends BaseIT {
     PolicyEntity policy = PolicyMetaService.getInstance().getPolicyById(seeded.policyId);
     List<ExpandTableCandidate> candidates =
         new NearestPolicyTableEnumerator()
-            .listTableIds(policy, 10, new OccupancyGate()::shouldSkip, 0L);
+            .listTableIds(
+                policy,
+                10,
+                (tableId, policyId, minIntervalMs, nowMs) ->
+                    !new MaintenanceActionManager()
+                        .canStart(tableId, policyId, minIntervalMs, nowMs),
+                0L);
     assertEquals(
         List.of(seeded.tableId),
         candidates.stream().map(ExpandTableCandidate::tableId).toList(),

@@ -33,8 +33,8 @@ import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
-import org.apache.gravitino.maintenance.occupancy.OccupancyGate;
 import org.apache.gravitino.maintenance.policy.MaintenanceMinIntervalConfigs;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
@@ -62,7 +62,7 @@ public class CommitJobClient {
   private final DataSource dataSource;
   private final Config gravitinoConfig;
   private final Function<Long, Optional<CollectedCommitChain>> chainCollector;
-  private final CommitOccupancyGate occupancyGate;
+  private final MaintenanceActionManager actionManager;
   private final CommitJobSpecFactory specFactory;
 
   /**
@@ -74,10 +74,9 @@ public class CommitJobClient {
         dataSource,
         gravitinoConfig,
         new CommitChainCollector()::collect,
-        CommitOccupancyGate.of(
-            new OccupancyGate(
-                TableMaintenanceActionMetaService.getInstance(),
-                TableMaintenanceConfig.from(gravitinoConfig).claimTimeoutMs())));
+        new MaintenanceActionManager(
+            TableMaintenanceActionMetaService.getInstance(),
+            TableMaintenanceConfig.from(gravitinoConfig).claimTimeoutMs()));
   }
 
   /**
@@ -86,18 +85,18 @@ public class CommitJobClient {
    * @param dataSource JDBC pool
    * @param gravitinoConfig server config
    * @param chainCollector returns the collected onCommit chain for a table id
-   * @param occupancyGate cooldown / in-flight checks for enqueue gating
+   * @param actionManager cooldown checks for enqueue gating
    */
   @VisibleForTesting
   public CommitJobClient(
       DataSource dataSource,
       Config gravitinoConfig,
       Function<Long, Optional<CollectedCommitChain>> chainCollector,
-      CommitOccupancyGate occupancyGate) {
+      MaintenanceActionManager actionManager) {
     this.dataSource = Preconditions.checkNotNull(dataSource);
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.chainCollector = Preconditions.checkNotNull(chainCollector);
-    this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.specFactory = new CommitJobSpecFactory(gravitinoConfig);
   }
 
@@ -190,7 +189,7 @@ public class CommitJobClient {
       long minIntervalMs =
           MaintenanceMinIntervalConfigs.resolve(
               gravitinoConfig, member.policyType(), policyMinIntervalMs(member.policy().content()));
-      if (occupancyGate.withinMinInterval(tableId, member.policy().id(), minIntervalMs, nowMs)) {
+      if (actionManager.isCoolingDown(tableId, member.policy().id(), minIntervalMs, nowMs)) {
         LOG.debug(
             "Dropping type {} policy {} from commit-job enqueue for table {} (within minIntervalMs={})",
             member.policyType(),

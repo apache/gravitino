@@ -29,11 +29,13 @@ import java.util.Set;
 import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceTableRefs.ResolvedTableRef;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
@@ -111,38 +113,49 @@ class TestCommitJobClient extends TestJDBCBackend {
         Policy.BuiltInType.ICEBERG_COMPACTION, policy(policyId), "rewrite_data_files");
   }
 
-  private static CommitOccupancyGate allowAllGate() {
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return false;
-      }
-    };
+  private static MaintenanceActionManager allowAllGate() {
+    TableMaintenanceActionMetaService meta =
+        org.mockito.Mockito.mock(TableMaintenanceActionMetaService.class);
+    org.mockito.Mockito.when(
+            meta.hasLiveUnboundClaim(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(false);
+    org.mockito.Mockito.when(
+            meta.listInFlight(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(List.of());
+    org.mockito.Mockito.when(
+            meta.maxFinishedAt(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(null);
+    return new MaintenanceActionManager(meta, 60_000L);
   }
 
-  private static CommitOccupancyGate coolingGate(long... policyIds) {
+  private static MaintenanceActionManager coolingGate(long... policyIds) {
     Set<Long> cooling = new HashSet<>();
     for (long id : policyIds) {
       cooling.add(id);
     }
-    return new CommitOccupancyGate() {
-      @Override
-      public boolean isInFlight(long tableId, long policyId) {
-        return false;
-      }
-
-      @Override
-      public boolean withinMinInterval(
-          long tableId, long policyId, long minIntervalMs, long nowMs) {
-        return cooling.contains(policyId);
-      }
-    };
+    TableMaintenanceActionMetaService meta =
+        org.mockito.Mockito.mock(TableMaintenanceActionMetaService.class);
+    org.mockito.Mockito.when(
+            meta.hasLiveUnboundClaim(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(false);
+    org.mockito.Mockito.when(
+            meta.listInFlight(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenReturn(List.of());
+    org.mockito.Mockito.when(
+            meta.maxFinishedAt(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+        .thenAnswer(
+            inv -> cooling.contains((Long) inv.getArgument(1)) ? System.currentTimeMillis() : null);
+    return new MaintenanceActionManager(meta, 60_000L);
   }
 
   private static DataSource dataSource() {

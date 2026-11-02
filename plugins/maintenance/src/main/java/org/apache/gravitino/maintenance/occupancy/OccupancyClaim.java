@@ -16,16 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.storage.service;
+package org.apache.gravitino.maintenance.occupancy;
 
 import java.util.Objects;
 
 /**
  * Immutable occupancy claim returned by acquire.
  *
- * <p>Callers must pass {@link #createdAt()} to {@link TableMaintenanceActionMetaService#bindJobId}
- * and {@link TableMaintenanceActionMetaService#deleteUnboundClaim} without re-reading {@code
- * created_at} from the row.
+ * <p>Callers must pass {@link #createdAt()} to {@link
+ * org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService#bindJobId} and
+ * {@link
+ * org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService#deleteUnboundClaim}
+ * without re-reading {@code created_at} from the row.
  *
  * <p>{@link #actionId()} is injected into Spark jobConf. Expired unbound slots are abandoned
  * ({@code finished_at = now}) and replaced with a new row / {@code action_id}, so a stale claim

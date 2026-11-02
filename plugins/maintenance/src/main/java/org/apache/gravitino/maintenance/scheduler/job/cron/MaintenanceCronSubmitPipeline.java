@@ -19,55 +19,61 @@
 package org.apache.gravitino.maintenance.scheduler.job.cron;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
+import org.apache.gravitino.maintenance.occupancy.OccupancyClaim;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpec.Task;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceJobSpecFactory;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobConfBuilder;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Cron-pool control-plane submit (§5.2.2): consume enqueue-time {@link MaintenanceJobSpec} →
- * in-flight gate → soft-slot claim → {@code runJob} → bind job id.
+ * occupancy gate → soft-slot claim → {@link MaintenanceJobManager#submitAndBind}.
  *
  * <p>Single-table {@code table:...} and snapshot-expiry {@code batch:...} rows share the same spec
- * shape; each {@link Task} becomes one Spark job. If any task table is in-flight, the whole pick
- * stops without partial submits (one-shot row is still removed by the caller).
+ * shape; each {@link Task} becomes one Spark job. After coalesce, a {@code table:} instance may
+ * still hold multiple tasks (members live in {@code task_data}); occupancy uses each task's own
+ * {@code policyId}. If any task is occupied, the whole pick stops without partial submits (one-shot
+ * row is still removed by the caller).
  *
  * <p>Does not sample metrics or evaluate trigger-expr (both run inside Spark from enqueue-time
  * {@code rules} in task parameters).
  */
-public final class MaintenanceSparkSubmitPipeline {
+public final class MaintenanceCronSubmitPipeline {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceSparkSubmitPipeline.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceCronSubmitPipeline.class);
 
-  private final CronSubmitGate occupancyGate;
+  private final MaintenanceActionManager actionManager;
   private final TableMaintenanceActionMetaService actionMetaService;
-  private final MaintenanceJobSubmitter jobSubmitter;
+  private final MaintenanceJobManager jobManager;
   private final MaintenanceJobConfBuilder jobConfBuilder;
   private final long claimTimeoutMs;
 
   /**
-   * @param occupancyGate in-flight gate (minInterval already applied at enqueue)
-   * @param actionMetaService soft-slot claim / bind
-   * @param jobSubmitter Gravitino Job submitter
-   * @param jobConfBuilder resolves enqueue-time conf-key refs before {@code runJob}
+   * @param actionManager occupancy checks (minInterval already applied at enqueue)
+   * @param actionMetaService soft-slot claim
+   * @param jobManager runJob + bind (and orphan cancel)
+   * @param jobConfBuilder resolves enqueue-time conf-key refs before submit
    * @param claimTimeoutMs unbound claim TTL
    */
-  public MaintenanceSparkSubmitPipeline(
-      CronSubmitGate occupancyGate,
+  public MaintenanceCronSubmitPipeline(
+      MaintenanceActionManager actionManager,
       TableMaintenanceActionMetaService actionMetaService,
-      MaintenanceJobSubmitter jobSubmitter,
+      MaintenanceJobManager jobManager,
       MaintenanceJobConfBuilder jobConfBuilder,
       long claimTimeoutMs) {
-    this.occupancyGate = Preconditions.checkNotNull(occupancyGate);
+    this.actionManager = Preconditions.checkNotNull(actionManager);
     this.actionMetaService = Preconditions.checkNotNull(actionMetaService);
-    this.jobSubmitter = Preconditions.checkNotNull(jobSubmitter);
+    this.jobManager = Preconditions.checkNotNull(jobManager);
     this.jobConfBuilder = Preconditions.checkNotNull(jobConfBuilder);
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
     this.claimTimeoutMs = claimTimeoutMs;
@@ -85,55 +91,47 @@ public final class MaintenanceSparkSubmitPipeline {
       return;
     }
 
-    Optional<long[]> tableIds = MaintenanceTaskIds.parseCronTable(instanceId);
-    Optional<long[]> batchIds = MaintenanceTaskIds.parseCronBatch(instanceId);
-    if (tableIds.isEmpty() && batchIds.isEmpty()) {
+    Optional<long[]> tableInstance = MaintenanceTaskIds.parseCronTable(instanceId);
+    Optional<long[]> batchInstance = MaintenanceTaskIds.parseCronBatch(instanceId);
+    if (tableInstance.isEmpty() && batchInstance.isEmpty()) {
       LOG.warn("Skipping cron-job submit for unparseable instance id {}", instanceId);
       return;
     }
 
-    long policyId = spec.getTasks().get(0).getPolicyId();
-    // parseCron* returns [leftId, policyId]
-    long expectedPolicyId = tableIds.isPresent() ? tableIds.get()[1] : batchIds.get()[1];
-    if (policyId != expectedPolicyId) {
-      LOG.warn(
-          "Skipping cron-job submit for {}: spec policyId {} != instance policyId {}",
-          instanceId,
-          policyId,
-          expectedPolicyId);
-      return;
-    }
-    for (Task task : spec.getTasks()) {
-      if (task.getPolicyId() != policyId) {
+    // Instance id is row identity; member tables live in task_data (a table: row may hold peers
+    // after coalesce). Soft slot stays per task.policyId.
+    if (tableInstance.isPresent()) {
+      long instanceTableId = tableInstance.get()[0];
+      long instancePolicyId = tableInstance.get()[1];
+      Optional<Task> instanceTask =
+          spec.getTasks().stream().filter(t -> t.getTableId() == instanceTableId).findFirst();
+      if (instanceTask.isEmpty()) {
         LOG.warn(
-            "Skipping cron-job submit for {}: mixed policyIds in tasks ({} vs {})",
+            "Skipping cron-job submit for {}: instance tableId {} missing from spec tables {}",
             instanceId,
-            policyId,
-            task.getPolicyId());
+            instanceTableId,
+            spec.tableIds());
         return;
       }
-    }
-    if (tableIds.isPresent()) {
-      long expectedTableId = tableIds.get()[0];
-      if (spec.getTasks().size() != 1 || spec.getTasks().get(0).getTableId() != expectedTableId) {
+      if (instanceTask.get().getPolicyId() != instancePolicyId) {
         LOG.warn(
-            "Skipping cron-job submit for {}: spec tables {} do not match instance tableId {}",
+            "Skipping cron-job submit for {}: instance task policyId {} != instance policyId {}",
             instanceId,
-            spec.tableIds(),
-            expectedTableId);
+            instanceTask.get().getPolicyId(),
+            instancePolicyId);
         return;
       }
     }
 
-    // minInterval was gated at expand enqueue; pick only blocks on in-flight. Any in-flight
-    // member aborts the whole pick so a batch row is not partially submitted then deleted.
+    // minInterval was gated at expand enqueue; pick only blocks on occupied soft slots. Any
+    // occupied member aborts the whole pick so a batch row is not partially submitted then deleted.
     for (Task task : spec.getTasks()) {
-      if (occupancyGate.isInFlight(task.getTableId(), policyId)) {
+      if (actionManager.isOccupied(task.getTableId(), task.getPolicyId())) {
         LOG.info(
-            "Skipping cron-job {} entirely (table {} in-flight for policy {})",
+            "Skipping cron-job {} entirely (table {} occupied for policy {})",
             instanceId,
             task.getTableId(),
-            policyId);
+            task.getPolicyId());
         return;
       }
     }
@@ -167,48 +165,19 @@ public final class MaintenanceSparkSubmitPipeline {
           e.toString());
       return;
     }
-    runAndBind(spec.metalake(), jobConf, claim.get(), task.getTableId(), policyId);
-  }
 
-  private void runAndBind(
-      String metalake,
-      Map<String, String> jobConf,
-      OccupancyClaim claim,
-      long tableId,
-      long policyId) {
-    jobConf.put(MaintenanceJobTemplates.ACTION_IDS_KEY, Long.toString(claim.actionId()));
-    Long jobId = null;
-    try {
-      jobId =
-          jobSubmitter.runJob(
-              metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
-      actionMetaService.bindJobId(claim, jobId);
-      LOG.info("Submitted cron-job for table {} policy {} as job {}", tableId, policyId, jobId);
-    } catch (RuntimeException e) {
-      if (jobId != null) {
-        cancelJobQuietly(metalake, jobId);
-      }
-      releaseClaimQuietly(claim);
-      LOG.warn(
-          "Failed cron-job submit for table {} policy {}: {}", tableId, policyId, e.toString());
-    }
-  }
-
-  private void cancelJobQuietly(String metalake, long jobId) {
-    try {
-      jobSubmitter.cancelJob(metalake, jobId);
-    } catch (RuntimeException cancelError) {
-      LOG.warn(
-          "Failed to cancel orphaned cron Spark job {} under metalake {} after bind failure",
-          jobId,
-          metalake,
-          cancelError);
+    Optional<Long> jobId = jobManager.submitAndBind(spec.metalake(), jobConf, List.of(claim.get()));
+    if (jobId.isPresent()) {
+      LOG.info(
+          "Submitted cron-job for table {} policy {} as job {}",
+          task.getTableId(),
+          policyId,
+          jobId.get());
     }
   }
 
   private void releaseClaimQuietly(OccupancyClaim claim) {
     try {
-      // Fence on (id, created_at) + unbound so a concurrent reclaim's live claim is not deleted.
       if (!actionMetaService.deleteUnboundClaim(claim)) {
         LOG.debug(
             "Occupancy claim {} created_at={} was not released (reclaimed or already bound)",
@@ -217,7 +186,7 @@ public final class MaintenanceSparkSubmitPipeline {
       }
     } catch (RuntimeException releaseError) {
       LOG.warn(
-          "Failed to release occupancy claim {} after submit failure",
+          "Failed to release occupancy claim {} after conf resolve failure",
           claim.actionId(),
           releaseError);
     }

@@ -396,25 +396,6 @@ class TestCronJobClient extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testPendingCronGateSkipsQueuedTables() {
-    DataSource dataSource = dataSource();
-    CronJobClient scheduler = scheduler(dataSource);
-    Assertions.assertEquals(
-        1,
-        scheduler.enqueueNow(
-            expirePolicy(9L),
-            List.of(
-                candidate(10L, MetadataObject.Type.SCHEMA),
-                candidate(11L, MetadataObject.Type.SCHEMA)),
-            10));
-
-    PendingCronExpandOccupancyGate gate =
-        new PendingCronExpandOccupancyGate((t, p, m, n) -> false, dataSource);
-    Assertions.assertTrue(gate.shouldSkip(10L, 9L, 0L, System.currentTimeMillis()));
-    Assertions.assertFalse(gate.shouldSkip(12L, 9L, 0L, System.currentTimeMillis()));
-  }
-
-  @TestTemplate
   void testCronJobTaskRemovesRowAfterPick() throws Exception {
     DataSource dataSource = dataSource();
     CronJobClient enqueue = scheduler(dataSource);

@@ -95,20 +95,23 @@ class TestPolicyExpandSnapshotEnqueue extends TestJDBCBackend {
                     TableMaintenanceSchedulerPools.CRON_JOB,
                     MaintenanceTaskIds.forCronTable(21L, 9L)))
             .isEmpty());
+    TaskInstanceId table22 =
+        TaskInstanceId.of(
+            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronTable(22L, 10L));
+    Assertions.assertTrue(client.getScheduledExecution(table22).isPresent());
     Assertions.assertTrue(
         client
             .getScheduledExecution(
                 TaskInstanceId.of(
                     TableMaintenanceSchedulerPools.CRON_JOB,
-                    MaintenanceTaskIds.forCronTable(22L, 10L)))
+                    MaintenanceTaskIds.forCronBatch(0L, 10L)))
             .isEmpty());
-    TaskInstanceId batch =
-        TaskInstanceId.of(
-            TableMaintenanceSchedulerPools.CRON_JOB, MaintenanceTaskIds.forCronBatch(0L, 10L));
-    Assertions.assertTrue(client.getScheduledExecution(batch).isPresent());
     MaintenanceJobSpec data =
-        (MaintenanceJobSpec) client.getScheduledExecution(batch).get().getData();
+        (MaintenanceJobSpec) client.getScheduledExecution(table22).get().getData();
     Assertions.assertEquals(List.of(22L, 21L), data.tableIds());
+    Assertions.assertEquals(2, data.getTasks().size());
+    Assertions.assertEquals(10L, data.getTasks().get(0).getPolicyId());
+    Assertions.assertEquals(9L, data.getTasks().get(1).getPolicyId());
   }
 
   @TestTemplate

@@ -16,17 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.maintenance.scheduler.job.cron;
+package org.apache.gravitino.maintenance.scheduler.job;
 
 import java.util.Optional;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.policy.Policy;
 
 /**
- * Maps maintenance {@link Policy.BuiltInType} to the cron Spark job template and procedure kind.
+ * Shared TMS job template name, jobConf keys, and {@link Policy.BuiltInType} → wire-type mapping
+ * for cron and commit submits.
  *
- * <p>Cron always submits {@link #ICEBERG_MAINTENANCE_TEMPLATE}; standalone {@code
- * builtin-iceberg-*} templates remain for CLI / optimizer.
+ * <p>TMS always submits {@link #ICEBERG_MAINTENANCE_TEMPLATE}; standalone {@code builtin-iceberg-*}
+ * templates remain for CLI / optimizer.
  */
 public final class MaintenanceJobTemplates {
 

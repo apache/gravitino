@@ -19,7 +19,6 @@
 package org.apache.gravitino.maintenance;
 
 import java.util.Objects;
-import java.util.function.LongFunction;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
@@ -40,42 +39,35 @@ import org.slf4j.LoggerFactory;
  * <p>Callbacks are keyed by {@code action_id} injected at submit time. Metrics writes require the
  * row to be bound ({@code job_id IS NOT NULL}).
  */
-public class MaintenanceMetricsService {
+public class MaintenanceMetricsManager {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceMetricsService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MaintenanceMetricsManager.class);
+
+  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
+      TableMaintenanceActionMetaService.getInstance();
+  private static final TableSnapshotMetricsMetaService METRICS_SERVICE =
+      TableSnapshotMetricsMetaService.getInstance();
   private static final TableMetaService TABLE_SERVICE = TableMetaService.getInstance();
 
-  private final TableMaintenanceActionMetaService actionMetaService;
-  private final TableSnapshotMetricsMetaService metricsMetaService;
-  private final LongFunction<String> metalakeLookup;
+  private static volatile MaintenanceMetricsManager instance;
 
   /**
-   * Production wiring.
+   * Returns the shared TMS metrics manager for the server process.
    *
-   * @return service bound into the Jersey feature
+   * @return singleton manager
    */
-  public static MaintenanceMetricsService create() {
-    return new MaintenanceMetricsService(
-        TableMaintenanceActionMetaService.getInstance(),
-        TableSnapshotMetricsMetaService.getInstance(),
-        TABLE_SERVICE::getMetalakeNameByTableId);
+  public static MaintenanceMetricsManager getInstance() {
+    if (instance == null) {
+      synchronized (MaintenanceMetricsManager.class) {
+        if (instance == null) {
+          instance = new MaintenanceMetricsManager();
+        }
+      }
+    }
+    return instance;
   }
 
-  /**
-   * Creates a service with explicit collaborators.
-   *
-   * @param actionMetaService action rows
-   * @param metricsMetaService snapshot metrics rows
-   * @param metalakeLookup resolves a table id to its metalake name
-   */
-  public MaintenanceMetricsService(
-      TableMaintenanceActionMetaService actionMetaService,
-      TableSnapshotMetricsMetaService metricsMetaService,
-      LongFunction<String> metalakeLookup) {
-    this.actionMetaService = actionMetaService;
-    this.metricsMetaService = metricsMetaService;
-    this.metalakeLookup = metalakeLookup;
-  }
+  private MaintenanceMetricsManager() {}
 
   /**
    * S0 report: stores metrics, records {@code before_metrics_id}, optionally closes the soft slot
@@ -88,17 +80,36 @@ public class MaintenanceMetricsService {
    */
   public void reportBeforeMetrics(
       String metalake, long actionId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, actionId, request);
+    TableMaintenanceActionPO action =
+        loadInFlight(metalake, actionId, request.getTableId(), request.getPolicyId());
     long metricsId =
         action.beforeMetricsId() != null
             ? action.beforeMetricsId()
-            : metricsMetaService.insertMetrics(
+            : METRICS_SERVICE.insertMetrics(
                 action.tableId(),
                 action.policyId(),
                 request.getSnapshotId(),
                 request.getMetricsJson());
-    actionMetaService.recordBeforeMetrics(actionId, metricsId);
-    maybeFinish(actionId, action, finish, "before", metalake, metricsId);
+    ACTION_SERVICE.recordBeforeMetrics(actionId, metricsId);
+    if (finish) {
+      ACTION_SERVICE.markFinished(actionId, System.currentTimeMillis());
+      LOG.info(
+          "before metrics reported and action finished for action_id {} metalake {} table {}"
+              + " policy {} metricsId {}",
+          actionId,
+          metalake,
+          action.tableId(),
+          action.policyId(),
+          metricsId);
+    } else {
+      LOG.info(
+          "before metrics reported for action_id {} metalake {} table {} policy {} metricsId {}",
+          actionId,
+          metalake,
+          action.tableId(),
+          action.policyId(),
+          metricsId);
+    }
   }
 
   /**
@@ -111,17 +122,36 @@ public class MaintenanceMetricsService {
    */
   public void reportAfterMetrics(
       String metalake, long actionId, boolean finish, MaintenanceActionMetricsRequest request) {
-    TableMaintenanceActionPO action = loadInFlight(metalake, actionId, request);
+    TableMaintenanceActionPO action =
+        loadInFlight(metalake, actionId, request.getTableId(), request.getPolicyId());
     long metricsId =
         action.afterMetricsId() != null
             ? action.afterMetricsId()
-            : metricsMetaService.insertMetrics(
+            : METRICS_SERVICE.insertMetrics(
                 action.tableId(),
                 action.policyId(),
                 request.getSnapshotId(),
                 request.getMetricsJson());
-    actionMetaService.recordAfterMetrics(actionId, metricsId);
-    maybeFinish(actionId, action, finish, "after", metalake, metricsId);
+    ACTION_SERVICE.recordAfterMetrics(actionId, metricsId);
+    if (finish) {
+      ACTION_SERVICE.markFinished(actionId, System.currentTimeMillis());
+      LOG.info(
+          "after metrics reported and action finished for action_id {} metalake {} table {}"
+              + " policy {} metricsId {}",
+          actionId,
+          metalake,
+          action.tableId(),
+          action.policyId(),
+          metricsId);
+    } else {
+      LOG.info(
+          "after metrics reported for action_id {} metalake {} table {} policy {} metricsId {}",
+          actionId,
+          metalake,
+          action.tableId(),
+          action.policyId(),
+          metricsId);
+    }
   }
 
   /**
@@ -133,13 +163,8 @@ public class MaintenanceMetricsService {
    */
   public void finishAction(String metalake, long actionId, MaintenanceActionFinishRequest request) {
     TableMaintenanceActionPO action =
-        loadInFlight(
-            metalake,
-            actionId,
-            request.getTableId(),
-            request.getPolicyId(),
-            /*requireBound=*/ true);
-    actionMetaService.markFinished(actionId, System.currentTimeMillis());
+        loadInFlight(metalake, actionId, request.getTableId(), request.getPolicyId());
+    ACTION_SERVICE.markFinished(actionId, System.currentTimeMillis());
     LOG.info(
         "action finished for action_id {} metalake {} table {} policy {}",
         actionId,
@@ -148,44 +173,9 @@ public class MaintenanceMetricsService {
         action.policyId());
   }
 
-  private void maybeFinish(
-      long actionId,
-      TableMaintenanceActionPO action,
-      boolean finish,
-      String phase,
-      String metalake,
-      long metricsId) {
-    if (!finish) {
-      LOG.info(
-          "{} metrics reported for action_id {} metalake {} table {} policy {} metricsId {}",
-          phase,
-          actionId,
-          metalake,
-          action.tableId(),
-          action.policyId(),
-          metricsId);
-      return;
-    }
-    actionMetaService.markFinished(actionId, System.currentTimeMillis());
-    LOG.info(
-        "{} metrics reported and action finished for action_id {} metalake {} table {} policy {} metricsId {}",
-        phase,
-        actionId,
-        metalake,
-        action.tableId(),
-        action.policyId(),
-        metricsId);
-  }
-
-  private TableMaintenanceActionPO loadInFlight(
-      String metalake, long actionId, MaintenanceActionMetricsRequest request) {
-    return loadInFlight(
-        metalake, actionId, request.getTableId(), request.getPolicyId(), /*requireBound=*/ true);
-  }
-
-  private TableMaintenanceActionPO loadInFlight(
-      String metalake, long actionId, long tableId, long policyId, boolean requireBound) {
-    TableMaintenanceActionPO action = actionMetaService.getById(actionId);
+  private static TableMaintenanceActionPO loadInFlight(
+      String metalake, long actionId, long tableId, long policyId) {
+    TableMaintenanceActionPO action = ACTION_SERVICE.getById(actionId);
     if (action == null) {
       throw new NoSuchEntityException("no maintenance action for action_id=%s", actionId);
     }
@@ -194,24 +184,15 @@ public class MaintenanceMetricsService {
       throw new NoSuchEntityException(
           "action_id=%s does not match table_id=%s policy_id=%s", actionId, tableId, policyId);
     }
-    requireActionInFlight(action);
-    if (requireBound && action.jobId() == null) {
-      throw new NoSuchEntityException(
-          "maintenance action action_id=%s is not bound to a job yet", actionId);
-    }
-    requireActionInMetalake(action, metalake);
-    return action;
-  }
-
-  private static void requireActionInFlight(TableMaintenanceActionPO action) {
     if (action.finishedAt() == null || action.finishedAt() != 0L) {
       throw new NoSuchEntityException(
           "no in-flight maintenance action for action_id=%s", action.actionId());
     }
-  }
-
-  private void requireActionInMetalake(TableMaintenanceActionPO action, String metalake) {
-    String actionMetalake = metalakeLookup.apply(action.tableId());
+    if (action.jobId() == null) {
+      throw new NoSuchEntityException(
+          "maintenance action action_id=%s is not bound to a job yet", actionId);
+    }
+    String actionMetalake = TABLE_SERVICE.getMetalakeNameByTableId(action.tableId());
     if (actionMetalake == null) {
       throw new NoSuchEntityException(
           "no metalake for table_id=%s (action_id=%s)", action.tableId(), action.actionId());
@@ -220,5 +201,6 @@ public class MaintenanceMetricsService {
       throw new NoSuchEntityException(
           "no maintenance action for action_id=%s under metalake %s", action.actionId(), metalake);
     }
+    return action;
   }
 }
