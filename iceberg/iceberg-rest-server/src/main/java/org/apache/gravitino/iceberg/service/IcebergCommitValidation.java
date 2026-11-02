@@ -26,18 +26,30 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.iceberg.DataOperations;
+import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.RetryableValidationException;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.SnapshotRefType;
+import org.apache.iceberg.SortField;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.TypeUtil;
+import org.apache.iceberg.types.Types;
 
 /**
  * Checks a table commit against the metadata it is applied to, before Iceberg applies it.
@@ -57,10 +69,18 @@ public final class IcebergCommitValidation implements UpdateRequirement {
           DataOperations.OVERWRITE,
           DataOperations.DELETE);
 
-  private final List<MetadataUpdate> updates;
+  /** Transforms the table spec defines; anything else is an unknown transform. */
+  private static final Pattern KNOWN_TRANSFORM =
+      Pattern.compile("identity|year|month|day|hour|void|bucket\\[\\d+]|truncate\\[\\d+]");
 
-  private IcebergCommitValidation(List<MetadataUpdate> updates) {
+  private static final int PARTITION_DATA_ID_START = 1000;
+
+  private final List<MetadataUpdate> updates;
+  private final Supplier<FileIO> fileIO;
+
+  private IcebergCommitValidation(List<MetadataUpdate> updates, Supplier<FileIO> fileIO) {
     this.updates = updates;
+    this.fileIO = fileIO;
   }
 
   /**
@@ -72,6 +92,19 @@ public final class IcebergCommitValidation implements UpdateRequirement {
    */
   @Nullable
   public static UpdateTableRequest withValidation(@Nullable UpdateTableRequest request) {
+    return withValidation(request, () -> null);
+  }
+
+  /**
+   * Returns the request with commit checks that use the table's FileIO to read manifest lists.
+   *
+   * @param request the table commit request
+   * @param fileIO supplies the table's FileIO only when a check reads manifest lists
+   * @return a request with validation, or the original request when it has no updates
+   */
+  @Nullable
+  public static UpdateTableRequest withValidation(
+      @Nullable UpdateTableRequest request, Supplier<FileIO> fileIO) {
     if (request == null || request.updates() == null || request.updates().isEmpty()) {
       return request;
     }
@@ -80,25 +113,30 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     for (UpdateRequirement requirement : request.requirements()) {
       if (requirement instanceof UpdateRequirement.AssertTableDoesNotExist) {
         // CatalogHandlers accepts only AssertTableDoesNotExist requirements for a staged create.
-        requirements.add(new CreateValidation(request.updates()));
+        requirements.add(new CreateValidation(request.updates(), fileIO));
         create = true;
       } else {
         requirements.add(requirement);
       }
     }
     if (!create) {
-      requirements.add(new IcebergCommitValidation(request.updates()));
+      requirements.add(new IcebergCommitValidation(request.updates(), fileIO));
     }
     return new UpdateTableRequest(requirements.build(), request.updates());
   }
 
   @Override
   public void validate(@Nullable TableMetadata base) {
-    validate(base, updates);
+    TableMetadata updated = validate(base, updates);
+    checkRemovedSpecsAreUnused(updated);
+    if (base != null) {
+      checkSchemas(base, updated);
+    }
+    checkPartitionSpecs(base, updated);
   }
 
   @VisibleForTesting
-  static void validate(@Nullable TableMetadata base, List<MetadataUpdate> updates) {
+  static TableMetadata validate(@Nullable TableMetadata base, List<MetadataUpdate> updates) {
     Set<Long> removedSnapshots = new HashSet<>();
     Map<String, Long> remainingRefs = new HashMap<>();
     if (base != null) {
@@ -152,6 +190,215 @@ public final class IcebergCommitValidation implements UpdateRequirement {
         checkSnapshot(updated, ((MetadataUpdate.AddSnapshot) update).snapshot());
       }
     }
+    return updated;
+  }
+
+  /**
+   * A partition spec can only be removed when no manifest of any snapshot was written with it:
+   * readers look up every manifest's spec in the table metadata.
+   */
+  private void checkRemovedSpecsAreUnused(TableMetadata base) {
+    Set<Integer> removed = new HashSet<>();
+    for (MetadataUpdate update : updates) {
+      if (update instanceof MetadataUpdate.RemovePartitionSpecs) {
+        removed.addAll(((MetadataUpdate.RemovePartitionSpecs) update).specIds());
+      }
+    }
+    if (removed.isEmpty() || base.snapshots().isEmpty()) {
+      return;
+    }
+    FileIO io = fileIO.get();
+    if (io == null) {
+      throw new ValidationException(
+          "Cannot remove partition specs %s: their use by existing manifests cannot be checked",
+          removed);
+    }
+    for (Snapshot snapshot : base.snapshots()) {
+      for (ManifestFile manifest : snapshot.allManifests(io)) {
+        if (removed.contains(manifest.partitionSpecId())) {
+          throw new ValidationException(
+              "Cannot remove partition spec %s: snapshot %s has manifests written with it",
+              manifest.partitionSpecId(), snapshot.snapshotId());
+        }
+      }
+    }
+  }
+
+  /**
+   * An added schema must keep the data already written readable: a field id that exists in the
+   * current schema keeps its kind and may only change type by an allowed promotion, a field id not
+   * in the current schema must be new (above last-column-id) or identical to the field that had the
+   * id before, and a new required field needs a default. A replace (which removes main) starts from
+   * no data, so only the id rule applies to it.
+   */
+  private void checkSchemas(TableMetadata base, TableMetadata updated) {
+    boolean replacesTable =
+        updates.stream()
+            .anyMatch(
+                u ->
+                    u instanceof MetadataUpdate.RemoveSnapshotRef
+                        && SnapshotRef.MAIN_BRANCH.equals(
+                            ((MetadataUpdate.RemoveSnapshotRef) u).name()))
+            && (updated.currentSnapshot() == null
+                || base.snapshot(updated.currentSnapshot().snapshotId()) == null);
+    boolean hasData = !base.snapshots().isEmpty();
+    Map<Integer, Types.NestedField> current = TypeUtil.indexById(base.schema().asStruct());
+    for (MetadataUpdate update : updates) {
+      if (!(update instanceof MetadataUpdate.AddSchema)) {
+        continue;
+      }
+      Schema schema = ((MetadataUpdate.AddSchema) update).schema();
+      for (Types.NestedField field : TypeUtil.indexById(schema.asStruct()).values()) {
+        Types.NestedField existing = current.get(field.fieldId());
+        if (existing == null) {
+          checkNewField(base, field, hasData && !replacesTable);
+        } else if (hasData && !replacesTable) {
+          checkTypeChange(existing, field);
+        }
+      }
+    }
+  }
+
+  private static void checkNewField(
+      TableMetadata base, Types.NestedField field, boolean checkRequired) {
+    if (field.fieldId() <= base.lastColumnId()) {
+      Types.NestedField previous = previousField(base, field.fieldId());
+      boolean sameField =
+          previous != null
+              && previous.name().equals(field.name())
+              && previous.type().equals(field.type());
+      if (!sameField) {
+        throw new ValidationException(
+            "Invalid schema: field %s reuses id %s, which the table assigned before (last column"
+                + " id %s); new fields need new ids",
+            field.name(), field.fieldId(), base.lastColumnId());
+      }
+    }
+    if (checkRequired && field.isRequired() && field.initialDefault() == null) {
+      throw new ValidationException(
+          "Invalid schema: required field %s has no initial default, so existing rows cannot be"
+              + " read",
+          field.name());
+    }
+  }
+
+  private static Types.NestedField previousField(TableMetadata base, int fieldId) {
+    for (Schema schema : base.schemas()) {
+      Types.NestedField field = schema.findField(fieldId);
+      if (field != null) {
+        return field;
+      }
+    }
+    return null;
+  }
+
+  private static void checkTypeChange(Types.NestedField existing, Types.NestedField field) {
+    Type from = existing.type();
+    Type to = field.type();
+    if (from.equals(to)) {
+      return;
+    }
+    if (from.isPrimitiveType() && to.isPrimitiveType()) {
+      if (!TypeUtil.isPromotionAllowed(from, to.asPrimitiveType())) {
+        throw new ValidationException(
+            "Invalid schema: field %s cannot change type from %s to %s", field.name(), from, to);
+      }
+    } else if (from.typeId() != to.typeId()) {
+      throw new ValidationException(
+          "Invalid schema: field %s cannot change from %s to %s", field.name(), from, to);
+    }
+  }
+
+  /**
+   * Partition field ids identify partition data across specs (v2+): a field id another spec uses
+   * for a different field, or a new field id at or below last-partition-id, would mix up partition
+   * values. A spec or sort order with a transform the table spec does not define cannot be the
+   * default: writers are not allowed to commit data with it.
+   */
+  private void checkPartitionSpecs(@Nullable TableMetadata base, TableMetadata updated) {
+    boolean setsDefaultSpec = false;
+    boolean setsDefaultOrder = false;
+    for (MetadataUpdate update : updates) {
+      if (update instanceof MetadataUpdate.SetDefaultPartitionSpec) {
+        setsDefaultSpec = true;
+      } else if (update instanceof MetadataUpdate.SetDefaultSortOrder) {
+        setsDefaultOrder = true;
+      }
+    }
+
+    // Check the actual defaults, not every spec/order added by the request. An unknown transform
+    // is allowed in a retained, non-default spec/order.
+    if (setsDefaultSpec || base == null) {
+      checkKnownTransforms(updated.spec().fields(), "partition spec " + updated.defaultSpecId());
+    }
+    if (setsDefaultOrder || base == null) {
+      checkKnownSortTransforms(updated.sortOrder(), "sort order " + updated.defaultSortOrderId());
+    }
+
+    if (updated.formatVersion() < 2) {
+      return;
+    }
+    Map<Integer, PartitionField> existingFields = new HashMap<>();
+    if (base != null) {
+      for (PartitionSpec existing : base.specs()) {
+        for (PartitionField field : existing.fields()) {
+          existingFields.putIfAbsent(field.fieldId(), field);
+        }
+      }
+    }
+    int lastAssigned =
+        base == null
+            ? PARTITION_DATA_ID_START - 1
+            : Math.max(base.lastAssignedPartitionId(), PARTITION_DATA_ID_START - 1);
+    for (PartitionSpec spec : updated.specs()) {
+      if (base == null || !base.specsById().containsKey(spec.specId())) {
+        lastAssigned = checkPartitionFieldIds(existingFields, lastAssigned, spec);
+      }
+    }
+  }
+
+  private static int checkPartitionFieldIds(
+      Map<Integer, PartitionField> existingFields, int lastAssigned, PartitionSpec spec) {
+    int highestId = lastAssigned;
+    for (PartitionField field : spec.fields()) {
+      PartitionField existing = existingFields.get(field.fieldId());
+      if (existing != null) {
+        if (existing.sourceId() != field.sourceId()
+            || !existing.transform().toString().equals(field.transform().toString())) {
+          throw new ValidationException(
+              "Invalid partition spec: field id %s is already used for %s, not %s",
+              field.fieldId(), existing, field);
+        }
+      } else if (field.fieldId() <= lastAssigned) {
+        throw new ValidationException(
+            "Invalid partition spec: new field %s needs an id above last-partition-id %s",
+            field, lastAssigned);
+      }
+      existingFields.putIfAbsent(field.fieldId(), field);
+      highestId = Math.max(highestId, field.fieldId());
+    }
+    return highestId;
+  }
+
+  private static void checkKnownTransforms(List<PartitionField> fields, String what) {
+    for (PartitionField field : fields) {
+      checkKnownTransform(field.transform().toString(), field.name(), what);
+    }
+  }
+
+  private static void checkKnownSortTransforms(SortOrder order, String what) {
+    for (SortField field : order.fields()) {
+      checkKnownTransform(field.transform().toString(), "source " + field.sourceId(), what);
+    }
+  }
+
+  private static void checkKnownTransform(String transform, String field, String what) {
+    if (!KNOWN_TRANSFORM.matcher(transform).matches()) {
+      throw new ValidationException(
+          "Cannot make %s the default: field %s uses transform %s, which the table spec does not"
+              + " define, and writers cannot commit data with it",
+          what, field, transform);
+    }
   }
 
   private static void checkMainIsBranch(MetadataUpdate.SetSnapshotRef setRef) {
@@ -184,16 +431,16 @@ public final class IcebergCommitValidation implements UpdateRequirement {
   }
 
   private static final class CreateValidation extends UpdateRequirement.AssertTableDoesNotExist {
-    private final List<MetadataUpdate> updates;
+    private final IcebergCommitValidation validation;
 
-    private CreateValidation(List<MetadataUpdate> updates) {
-      this.updates = updates;
+    private CreateValidation(List<MetadataUpdate> updates, Supplier<FileIO> fileIO) {
+      this.validation = new IcebergCommitValidation(updates, fileIO);
     }
 
     @Override
     public void validate(@Nullable TableMetadata base) {
       super.validate(base);
-      IcebergCommitValidation.validate(base, updates);
+      validation.validate(base);
     }
   }
 }

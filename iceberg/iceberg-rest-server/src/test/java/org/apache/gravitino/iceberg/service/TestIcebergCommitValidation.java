@@ -24,8 +24,10 @@ import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.MetadataUpdateParser;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.SnapshotParser;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.SnapshotRefType;
@@ -282,6 +284,219 @@ public class TestIcebergCommitValidation {
     Assertions.assertEquals(2, validated.requirements().size());
     Assertions.assertEquals(request.updates(), validated.updates());
     Assertions.assertInstanceOf(IcebergCommitValidation.class, validated.requirements().get(1));
+  }
+
+  @Test
+  public void testSchemaChangesMustKeepDataReadable() {
+    // id 1 is "id long" and the table has data.
+    commitFails(
+        ValidationException.class,
+        addSchema("{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"int\"}"));
+    commitFails(
+        ValidationException.class,
+        addSchema("{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"string\"}"));
+    commitFails(
+        ValidationException.class,
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":{\"type\":\"struct\","
+                + "\"fields\":[{\"id\":9,\"name\":\"z\",\"required\":false,\"type\":\"long\"}]}}"));
+    // A new required field without a default.
+    commitFails(
+        ValidationException.class,
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"r\",\"required\":true,\"type\":\"string\"}"));
+    Assertions.assertEquals(1, catalog.loadTable(IDENT).schemas().size());
+
+    // Allowed: an optional new field with a new id.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"}"));
+    Assertions.assertEquals(2, catalog.loadTable(IDENT).schemas().size());
+  }
+
+  @Test
+  public void testReusingADroppedFieldIdIsRefused() {
+    // Schema 1 adds b (id 2); schema 2 drops it; a later schema may not give id 2 to another field.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"b\",\"required\":false,\"type\":\"int\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    // Going back to the original schema drops b again.
+    commit(new MetadataUpdate.SetCurrentSchema(0));
+    commitFails(
+        ValidationException.class,
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"c\",\"required\":false,\"type\":\"string\"}"));
+  }
+
+  @Test
+  public void testReplaceMayRedefineColumns() {
+    // A replace removes main, so no existing data is read with the new schema.
+    commit(
+        new MetadataUpdate.RemoveSnapshotRef(SnapshotRef.MAIN_BRANCH),
+        addSchema("{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertEquals(
+        Types.StringType.get(), catalog.loadTable(IDENT).schema().findType("id"));
+  }
+
+  @Test
+  public void testPartitionFieldIdsAreChecked() {
+    Table partitioned = createPartitionedTable("p");
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "p");
+    // Spec 0 has 1000: s identity(2). The same id for another source field is refused.
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog,
+                ident,
+                request(
+                    addSpec(
+                        "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1000}"))));
+    // A new field with an id below last-partition-id is refused.
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog,
+                ident,
+                request(
+                    addSpec(
+                        "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":999}"))));
+    // Keeping 1000 for the same field and adding 1001 is valid.
+    CatalogHandlers.updateTable(
+        catalog,
+        ident,
+        request(
+            addSpec(
+                "{\"name\":\"s\",\"transform\":\"identity\",\"source-id\":2,\"field-id\":1000},"
+                    + "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1001}")));
+    Assertions.assertEquals(2, catalog.loadTable(ident).specs().size());
+    Assertions.assertNotNull(partitioned);
+  }
+
+  @Test
+  public void testRemovingASpecWithLiveManifestsIsRefused() {
+    Table partitioned = createPartitionedTable("rm");
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "rm");
+    append(partitioned, "/data/rm1.parquet", "s=a");
+    // Make a new default spec, so spec 0 is no longer the default but is still used by data.
+    CatalogHandlers.updateTable(
+        catalog,
+        ident,
+        request(
+            addSpec(
+                "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1001}"),
+            new MetadataUpdate.SetDefaultPartitionSpec(-1)));
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog,
+                ident,
+                IcebergCommitValidation.withValidation(
+                    new UpdateTableRequest(
+                        ImmutableList.of(),
+                        ImmutableList.of(
+                            new MetadataUpdate.RemovePartitionSpecs(ImmutableSet.of(0)))),
+                    () -> catalog.loadTable(ident).io())));
+    Assertions.assertNotNull(catalog.loadTable(ident).specs().get(0));
+
+    // An unused spec can be removed.
+    CatalogHandlers.updateTable(
+        catalog,
+        ident,
+        request(
+            addSpec(
+                "{\"name\":\"s_b\",\"transform\":\"bucket[4]\",\"source-id\":2,\"field-id\":1002}")));
+    CatalogHandlers.updateTable(
+        catalog,
+        ident,
+        IcebergCommitValidation.withValidation(
+            new UpdateTableRequest(
+                ImmutableList.of(),
+                ImmutableList.of(new MetadataUpdate.RemovePartitionSpecs(ImmutableSet.of(2)))),
+            () -> catalog.loadTable(ident).io()));
+    Assertions.assertNull(catalog.loadTable(ident).specs().get(2));
+  }
+
+  @Test
+  public void testUnknownTransformCannotBecomeTheDefault() {
+    MetadataUpdate zorder =
+        MetadataUpdateParser.fromJson(
+            "{\"action\":\"add-sort-order\",\"sort-order\":{\"order-id\":1,\"fields\":["
+                + "{\"transform\":\"zorder\",\"source-id\":1,\"direction\":\"asc\","
+                + "\"null-order\":\"nulls-first\"}]}}");
+    commitFails(ValidationException.class, zorder, new MetadataUpdate.SetDefaultSortOrder(-1));
+    Assertions.assertTrue(catalog.loadTable(IDENT).sortOrder().isUnsorted());
+    // Adding it without making it the default is allowed by the table spec.
+    commit(zorder);
+  }
+
+  @Test
+  public void testPartitionSpecWithoutSpecIdIsAccepted() throws Exception {
+    // The REST spec makes spec-id read-only; the server assigns the id.
+    CreateTableRequest create =
+        IcebergObjectMapper.getInstance()
+            .readValue(
+                "{\"name\":\"t\",\"schema\":"
+                    + SchemaParser.toJson(SCHEMA)
+                    + ",\"partition-spec\":{\"fields\":[{\"name\":\"id_b\","
+                    + "\"transform\":\"bucket[4]\",\"source-id\":1}]}}",
+                CreateTableRequest.class);
+    Assertions.assertEquals(1, create.spec().fields().size());
+
+    UpdateTableRequest update =
+        IcebergObjectMapper.getInstance()
+            .readValue(
+                "{\"requirements\":[],\"updates\":[{\"action\":\"add-spec\",\"spec\":"
+                    + "{\"fields\":[{\"name\":\"id_b\",\"transform\":\"bucket[4]\","
+                    + "\"source-id\":1,\"field-id\":1000}]}}]}",
+                UpdateTableRequest.class);
+    CatalogHandlers.updateTable(catalog, IDENT, IcebergCommitValidation.withValidation(update));
+    // The new spec gets the next free id, not the placeholder.
+    Assertions.assertEquals(2, catalog.loadTable(IDENT).specs().size());
+    Assertions.assertTrue(catalog.loadTable(IDENT).specs().containsKey(1));
+  }
+
+  private Table createPartitionedTable(String name) {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    return catalog.createTable(
+        TableIdentifier.of(Namespace.of("db"), name),
+        schema,
+        PartitionSpec.builderFor(schema).identity("s").build(),
+        ImmutableMap.of("format-version", "2"));
+  }
+
+  private static MetadataUpdate addSchema(String fields) {
+    return new MetadataUpdate.AddSchema(
+        SchemaParser.fromJson("{\"type\":\"struct\",\"schema-id\":7,\"fields\":[" + fields + "]}"));
+  }
+
+  private static MetadataUpdate addSpec(String fields) {
+    return MetadataUpdateParser.fromJson(
+        "{\"action\":\"add-spec\",\"spec\":{\"spec-id\":0,\"fields\":[" + fields + "]}}");
+  }
+
+  private static void append(Table table, String path, String partition) {
+    table
+        .newFastAppend()
+        .appendFile(
+            DataFiles.builder(table.spec())
+                .withPath(path)
+                .withFileSizeInBytes(10)
+                .withRecordCount(1)
+                .withPartitionPath(partition)
+                .build())
+        .commit();
   }
 
   private MetadataUpdate addSnapshot(String extraFields) {
