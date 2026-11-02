@@ -70,6 +70,10 @@ class SupportsSchemas(ABC):
 
         Returns:
             True if the schema exists, false otherwise.
+
+        Raises:
+            SchemaAlreadyExistsException: If loading detects another existing schema's identifier.
+                The conflict is propagated instead of returning False.
         """
         try:
             self.load_schema(schema_name)
@@ -106,6 +110,8 @@ class SupportsSchemas(ABC):
 
         Raises:
             NoSuchSchemaException: If the schema does not exist (optional).
+            SchemaAlreadyExistsException: If the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             A schema.

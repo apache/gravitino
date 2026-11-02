@@ -203,6 +203,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    * @param schemaName The name identifier of the schema.
    * @return The {@link Schema} with specified identifier.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
+   * @throws SchemaAlreadyExistsException if an external schema carries another existing schema's
+   *     identifier. Remove the copied source marker before importing an independent copy.
    */
   @Override
   public Schema loadSchema(String schemaName) throws NoSuchSchemaException {

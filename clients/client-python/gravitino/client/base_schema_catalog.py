@@ -201,6 +201,8 @@ class BaseSchemaCatalog(
 
         Raises:
             NoSuchSchemaException if the schema with specified identifier does not exist.
+            SchemaAlreadyExistsException if the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             The Schema with specified identifier.
