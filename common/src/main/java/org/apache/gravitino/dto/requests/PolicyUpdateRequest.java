@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -195,9 +196,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
       Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
-      // Same ordering as PolicyCreateRequest: type before content for EXTERNAL_PROPERTY +
-      // defaultImpl custom fallback.
-      PolicyCreateRequest.validatePolicyType(policyType);
+      // Type before content: same Jackson EXTERNAL_PROPERTY + defaultImpl pitfall as create.
+      Policy.BuiltInType.fromPolicyType(policyType);
       newContent.validate();
     }
   }
