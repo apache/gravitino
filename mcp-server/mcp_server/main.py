@@ -17,6 +17,7 @@
 
 import argparse
 import logging
+import math
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
@@ -34,6 +35,7 @@ def do_main():
     args = _parse_args()
     setting = Setting(
         metalake=args.metalake,
+        gravitino_read_timeout=args.gravitino_read_timeout,
         gravitino_uri=args.gravitino_uri,
         tags=args.include_tool_tags,
         transport=args.transport,
@@ -80,6 +82,20 @@ def _comma_separated_set(value) -> set:
     return set(item.strip() for item in value.split(",") if item.strip())
 
 
+def _positive_timeout(value):
+    try:
+        timeout = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        ) from exc
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        )
+    return timeout
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
@@ -97,6 +113,14 @@ def _parse_args():
         type=str,
         default=DefaultSetting.default_gravitino_uri,
         help=f"The uri of Gravitino server. (default: {DefaultSetting.default_gravitino_uri})",
+    )
+
+    parser.add_argument(
+        "--gravitino-read-timeout",
+        type=_positive_timeout,
+        default=os.environ.get("GRAVITINO_READ_TIMEOUT", "60"),
+        help="Gravitino response read timeout in seconds (default: 60). "
+        "Can also be set with GRAVITINO_READ_TIMEOUT. Must be finite and positive.",
     )
 
     parser.add_argument(

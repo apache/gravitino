@@ -148,11 +148,33 @@ def _service_auth(setting: Setting):
 class GravitinoContext:
     def __init__(self, setting: Setting):
         self._setting = setting
+<<<<<<< HEAD
         self._default_client = RESTClientFactory.create_rest_client(
             setting.metalake,
             setting.gravitino_uri,
             startup_authorization(setting),
             auth=_service_auth(setting),
+=======
+        # Built once and shared by every service-identity client. Separate
+        # instances share the token cache key but each owns its own refresh
+        # lock and 401 retry state, so per-metalake instances would bypass
+        # refresh coalescing and hit the IdP once per metalake.
+        self._service_auth = _service_auth(setting)
+        # Eagerly built only when a startup default is configured, so the
+        # common single-metalake deployment pays no extra cost. Left unset
+        # (None) when metalake resolution must come from a per-request header
+        # on every call (HTTP transport with no --metalake default).
+        self._default_client = (
+            RESTClientFactory.create_rest_client(
+                setting.metalake,
+                setting.gravitino_uri,
+                startup_authorization(setting),
+                auth=self._service_auth,
+                read_timeout=setting.gravitino_read_timeout,
+            )
+            if setting.metalake
+            else None
+>>>>>>> 696efe1c2 ([#14498] fix(mcp): configure Gravitino response read timeout (#14506))
         )
         # LRU cache of per-principal clients keyed by the raw Authorization header.
         # Safe without locking: rest_client() runs on the single asyncio event
@@ -190,6 +212,72 @@ class GravitinoContext:
                     "HTTP request omitted Authorization and "
                     "--no-service-identity-fallback is set"
                 )
+<<<<<<< HEAD
+=======
+            return self._borrow(self._service_client(metalake))
+
+        key = (authorization, metalake)
+        cached = self._clients_by_auth.get(key)
+        if cached is not None:
+            self._clients_by_auth.move_to_end(key)
+            return self._borrow(cached)
+
+        client = RESTClientFactory.create_rest_client(
+            metalake,
+            self._setting.gravitino_uri,
+            authorization,
+            read_timeout=self._setting.gravitino_read_timeout,
+        )
+        self._cache_put(key, client)
+        return self._borrow(client)
+
+    def _resolve_metalake(self) -> str:
+        """Resolve the metalake for the current call, tool argument first.
+
+        Raises ``ValueError`` (an invalid/missing request parameter, mapped
+        by FastMCP's error middleware to a client-facing "Invalid params"
+        error rather than an internal-error code) when the call names none and
+        no startup default (``--metalake``) is configured. The message is
+        written for the agent that will read it: it names the recovery path so
+        a model can correct itself instead of just reporting the failure.
+        """
+        requested = _REQUEST_METALAKE.get()
+        if isinstance(requested, InvalidMetalakeArgument):
+            raise ValueError(requested.reason)
+        if requested is not MISSING_METALAKE and not isinstance(
+            requested, (str, type(None))
+        ):
+            # An explicitly supplied non-string must not be silently treated as
+            # an omitted argument: `false`, `0` and `[]` would otherwise route
+            # a call - including a mutation - to the default metalake.
+            raise ValueError(
+                f"The '{METALAKE_ARGUMENT}' argument must be a string naming a "
+                f"metalake, but got {type(requested).__name__}."
+            )
+
+        metalake = get_request_metalake() or self._setting.metalake
+        if not metalake:
+            # Only point at the discovery tool when this deployment actually
+            # exposes it; a tag filter can hide it, and naming a tool the
+            # agent cannot call leaves it with no way forward.
+            recovery = (
+                "Call 'list_metalakes' to see the metalakes you can access, "
+                f"then retry this call with the '{METALAKE_ARGUMENT}' "
+                "argument set to one of them."
+                if self._setting.exposes_metalake_discovery()
+                else f"Retry this call with the '{METALAKE_ARGUMENT}' argument "
+                "set to the metalake to use, or ask the user which one to use."
+            )
+            raise ValueError(f"No metalake specified. {recovery}")
+        return metalake
+
+    def _service_client(self, metalake: str):
+        """Return the service-identity client (static token / OAuth) for ``metalake``."""
+        if (
+            metalake == self._setting.metalake
+            and self._default_client is not None
+        ):
+>>>>>>> 696efe1c2 ([#14498] fix(mcp): configure Gravitino response read timeout (#14506))
             return self._default_client
 
         cached = self._clients_by_auth.get(authorization)
@@ -200,7 +288,13 @@ class GravitinoContext:
         client = RESTClientFactory.create_rest_client(
             self._setting.metalake,
             self._setting.gravitino_uri,
+<<<<<<< HEAD
             authorization,
+=======
+            startup_authorization(self._setting),
+            auth=self._service_auth,
+            read_timeout=self._setting.gravitino_read_timeout,
+>>>>>>> 696efe1c2 ([#14498] fix(mcp): configure Gravitino response read timeout (#14506))
         )
         self._clients_by_auth[authorization] = client
         if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
