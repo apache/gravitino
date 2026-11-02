@@ -62,6 +62,23 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   private static Type INT = Types.IntegerType.get();
 
   @Test
+  void testNativeUnboundedVarcharLoadsAsString() throws SQLException {
+    String name = RandomNameUtils.genRandomName("unbounded_varchar");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE " + TEST_DB_NAME + "." + name + " (label varchar, bounded varchar(255))");
+    }
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+      Assertions.assertEquals(Types.StringType.get(), table.columns()[0].dataType());
+      Assertions.assertEquals(Types.VarCharType.of(255), table.columns()[1].dataType());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomNameUtils.genRandomName("op_table_");
     String tableComment = "test_comment";

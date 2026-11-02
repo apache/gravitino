@@ -52,6 +52,13 @@ public class TestPostgreSqlTypeConverter {
   private static final String USER_DEFINED_TYPE = "user-defined";
 
   @Test
+  void testUnboundedVarcharDriverSentinelMapsToString() {
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, Integer.MAX_VALUE, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.VarCharType.of(255), VARCHAR, 255, null, 0);
+  }
+
+  @Test
   public void testToGravitinoType() {
     checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null, 0);
