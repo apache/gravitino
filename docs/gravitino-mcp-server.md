@@ -217,20 +217,23 @@ indicating whether it was dropped. It removes semantic metadata without deleting
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument                         | Description                                                                                                                     | Default value               | Required |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                       | none                        | No       |
-| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
-| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
-| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
-| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.              | none (anonymous)            | No       |
-| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                   | none                        | No       |
-| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                               | none                        | No       |
-| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                       | none                        | No       |
-| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                              | none                        | No       |
-| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`. | `false`                     | No       |
-| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                         | none                        | No       |
-| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                        | none                        | No       |
+| Argument                         | Description                                                                                                                                                  | Default value               | Required |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | -------- |
+| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                                                    | none                        | No       |
+| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                                                 | `http://127.0.0.1:8090`     | No       |
+| `--gravitino-read-timeout`       | Gravitino response read timeout in seconds; or set `GRAVITINO_READ_TIMEOUT`. Must be finite and positive. Connect, write and pool timeouts remain 5 seconds. | `60`                        | No       |
+| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                                                 | `stdio`                     | No       |
+| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                                               | `http://127.0.0.1:8000/mcp` | No       |
+| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.                                           | none (anonymous)            | No       |
+| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                                                | none                        | No       |
+| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                                                            | none                        | No       |
+| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                                                    | none                        | No       |
+| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                                                           | none                        | No       |
+| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`.                              | `false`                     | No       |
+| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                                                      | none                        | No       |
+| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                                                     | none                        | No       |
+
+A response read timeout means the MCP server stopped waiting for Gravitino. The operation may still complete on the server. Check the result before retrying, especially for writes. This timeout bounds waiting for response data, not the total duration of the server operation.
 
 ## Authentication
 
