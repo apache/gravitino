@@ -53,6 +53,7 @@ import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -750,6 +751,29 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   protected ResultSet getPrimaryKeys(String schemaName, String tableName, DatabaseMetaData metaData)
       throws SQLException {
     return metaData.getPrimaryKeys(metaData.getConnection().getCatalog(), schemaName, tableName);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>PostgreSQL uses the duplicate-relation SQLSTATE for index and constraint name conflicts as
+   * well as table conflicts. During an alter this is an invalid change, not an existing table.
+   */
+  @Override
+  public void alterTable(String schema, String tableName, TableChange... changes) {
+    try {
+      super.alterTable(schema, tableName, changes);
+    } catch (TableAlreadyExistsException e) {
+      throw new IllegalArgumentException(
+          "PostgreSQL relation name conflict while altering table "
+              + schema
+              + "."
+              + tableName
+              + ": an index or constraint may already use this name. Choose an unused name. "
+              + "PostgreSQL reason: "
+              + e.getMessage(),
+          e);
+    }
   }
 
   @Override

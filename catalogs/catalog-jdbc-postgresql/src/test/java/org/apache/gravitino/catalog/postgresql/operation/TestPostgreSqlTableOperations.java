@@ -39,6 +39,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefault
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -61,6 +62,37 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
+
+  @Test
+  void testIndexNameConflictDoesNotReportExistingTable() throws SQLException {
+    String table = RandomNameUtils.genRandomName("index_conflict");
+    String index = RandomNameUtils.genRandomName("index_name");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE TABLE " + TEST_DB_NAME + "." + table + "(id int, other int)");
+      try {
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.addIndex(IndexType.UNIQUE_KEY, index, new String[][] {{"id"}}));
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    TABLE_OPERATIONS.alterTable(
+                        TEST_DB_NAME,
+                        table,
+                        TableChange.addIndex(
+                            IndexType.UNIQUE_KEY, index, new String[][] {{"other"}})));
+        Assertions.assertTrue(error.getMessage().contains(index));
+        Assertions.assertTrue(error.getMessage().contains("index or constraint"));
+        Assertions.assertTrue(error.getCause() instanceof TableAlreadyExistsException);
+        Assertions.assertEquals(1, TABLE_OPERATIONS.load(TEST_DB_NAME, table).index().length);
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      }
+    }
+  }
 
   @Test
   void testUnnamedUniqueIndexesDoNotCollideAcrossTables() {
