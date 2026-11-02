@@ -131,7 +131,15 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
    */
   private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getSchemas(connection.getCatalog(), schemaName);
+    String escape = metaData.getSearchStringEscape();
+    String pattern =
+        schemaName == null
+            ? null
+            : schemaName
+                .replace(escape, escape + escape)
+                .replace("%", escape + "%")
+                .replace("_", escape + "_");
+    return metaData.getSchemas(connection.getCatalog(), pattern);
   }
 
   @Override

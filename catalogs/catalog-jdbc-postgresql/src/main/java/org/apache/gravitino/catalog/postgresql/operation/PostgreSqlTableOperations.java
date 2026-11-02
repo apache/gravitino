@@ -50,6 +50,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -718,18 +719,37 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     return connection;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  protected ResultSet getTables(Connection connection) throws SQLException {
+    DatabaseMetaData metadata = connection.getMetaData();
+    return metadata.getTables(
+        connection.getCatalog(),
+        metadataPattern(metadata, connection.getSchema()),
+        null,
+        JdbcConnectorUtils.getTableTypes());
+  }
+
   @Override
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getTables(connection.getCatalog(), schema, tableName, null);
+    return metaData.getTables(
+        connection.getCatalog(),
+        metadataPattern(metaData, schema),
+        metadataPattern(metaData, tableName),
+        null);
   }
 
   @Override
   protected ResultSet getColumns(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getColumns(connection.getCatalog(), schema, tableName, null);
+    return metaData.getColumns(
+        connection.getCatalog(),
+        metadataPattern(metaData, schema),
+        metadataPattern(metaData, tableName),
+        null);
   }
 
   @Override
@@ -755,5 +775,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new IllegalArgumentException(
           "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
     }
+  }
+
+  @Nullable
+  private static String metadataPattern(DatabaseMetaData metadata, @Nullable String name)
+      throws SQLException {
+    if (name == null) {
+      return null;
+    }
+    String escape = metadata.getSearchStringEscape();
+    return name.replace(escape, escape + escape)
+        .replace("%", escape + "%")
+        .replace("_", escape + "_");
   }
 }
