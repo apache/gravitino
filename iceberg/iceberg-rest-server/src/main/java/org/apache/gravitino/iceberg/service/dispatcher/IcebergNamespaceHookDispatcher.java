@@ -92,6 +92,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.
     newlyOwned.add(leaf);
+    for (Namespace created : newlyOwned) {
+      IcebergEntityAuditUtils.recordCreator(
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, catalogName, created, HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.SCHEMA,
+          context.userName());
+    }
     IcebergOwnershipUtils.setSchemaOwners(
         metalake,
         catalogName,
@@ -199,6 +206,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
     importTable(context.catalogName(), namespace, registerTableRequest.name());
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, registerTableRequest.name()),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.TABLE,
+        context.userName());
 
     IcebergOwnershipUtils.setTableOwner(
         metalake,
@@ -226,6 +241,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
     importView(context.catalogName(), namespace, registerViewRequest.name());
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, registerViewRequest.name()),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.VIEW,
+        context.userName());
 
     IcebergOwnershipUtils.setViewOwner(
         metalake,

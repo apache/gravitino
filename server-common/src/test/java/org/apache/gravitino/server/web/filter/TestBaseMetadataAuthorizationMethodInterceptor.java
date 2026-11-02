@@ -60,6 +60,10 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
+import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -73,6 +77,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /** Tests for {@link BaseMetadataAuthorizationMethodInterceptor}. */
@@ -176,6 +181,77 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     ForbiddenException failure = assertInstanceOf(ForbiddenException.class, response);
     assertTrue(failure.getMessage().contains("metalake.catalog.schema"));
     verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testExpressionDenialIsRecordedAgainstTheTarget() throws Throwable {
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+
+      assertInstanceOf(
+          ForbiddenException.class,
+          interceptor.invoke(invocation("canAccessMetadata", "authorized")));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      AuthorizationDenialFailureEvent denial =
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue());
+      assertEquals("tester", denial.user());
+      assertEquals(
+          NameIdentifierUtil.ofSchema("metalake", "catalog", "schema"), denial.identifier());
+      assertEquals("canAccessMetadata", denial.methodName());
+      assertEquals(CAN_ACCESS_METADATA, denial.expression());
+      assertEquals(EventSource.GRAVITINO_ICEBERG_REST_SERVER, denial.eventSource());
+    }
+  }
+
+  @Test
+  public void testUserValidationDenialIsRecordedAgainstTheMetalake() throws Throwable {
+    authorizationUtils
+        .when(
+            () ->
+                AuthorizationUtils.checkCurrentUser(
+                    eq("metalake"), eq("tester"), any(AuthorizationRequestContext.class)))
+        .thenThrow(new ForbiddenException("not a metalake user"));
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+
+      interceptor.invoke(invocation("canAccessMetadata", "authorized"));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      assertEquals(
+          NameIdentifierUtil.ofMetalake("metalake"),
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
+  }
+
+  @Test
+  public void testNoDenialEventWithoutEventSourceOrForOtherFailures() throws Throwable {
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      new TestInterceptor(Entity.EntityType.SCHEMA)
+          .invoke(invocation("canAccessMetadata", "authorized"));
+
+      TestInterceptor failing = new TestInterceptor(Entity.EntityType.SCHEMA);
+      failing.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+      failing.resolutionFailure = new IllegalStateException("resolver failed");
+      failing.invoke(invocation("canAccessMetadata", "authorized"));
+
+      verify(eventBus, never()).dispatchEvent(any());
+    }
+  }
+
+  private static MockedStatic<GravitinoEnv> mockGravitinoEnv(EventBus eventBus) {
+    MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+    when(env.eventBus()).thenReturn(eventBus);
+    return envStatic;
   }
 
   @Test
@@ -462,6 +538,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     private boolean includeMetalake = true;
     private boolean skipAuthorization;
     private boolean skipExpressionEvaluation;
+    private Optional<EventSource> denialEventSource = Optional.empty();
 
     private TestInterceptor(Entity.EntityType targetType) {
       this.targetType = targetType;
@@ -493,6 +570,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     @Override
     protected Object toErrorResponse(Method method, Object[] args, Throwable throwable) {
       return throwable;
+    }
+
+    @Override
+    protected Optional<EventSource> authorizationDenialEventSource() {
+      return denialEventSource;
     }
 
     @Override
