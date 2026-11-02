@@ -722,14 +722,22 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getTables(connection.getCatalog(), schema, tableName, null);
+    return metaData.getTables(
+        connection.getCatalog(),
+        metadataPattern(metaData, schema),
+        metadataPattern(metaData, tableName),
+        null);
   }
 
   @Override
   protected ResultSet getColumns(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getColumns(connection.getCatalog(), schema, tableName, null);
+    return metaData.getColumns(
+        connection.getCatalog(),
+        metadataPattern(metaData, schema),
+        metadataPattern(metaData, tableName),
+        null);
   }
 
   @Override
@@ -755,5 +763,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new IllegalArgumentException(
           "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
     }
+  }
+
+  @Nullable
+  private static String metadataPattern(DatabaseMetaData metadata, @Nullable String name)
+      throws SQLException {
+    if (name == null) {
+      return null;
+    }
+    String escape = metadata.getSearchStringEscape();
+    return name.replace(escape, escape + escape)
+        .replace("%", escape + "%")
+        .replace("_", escape + "_");
   }
 }
