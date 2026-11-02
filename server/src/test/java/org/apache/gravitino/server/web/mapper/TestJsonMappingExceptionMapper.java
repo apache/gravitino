@@ -34,12 +34,15 @@ public class TestJsonMappingExceptionMapper {
   public void testJsonMappingExceptionMapper() {
     JsonParser mockParser = Mockito.mock(JsonParser.class);
     Response response =
-        jsonMappingExceptionMapper.toResponse(JsonMappingException.from(mockParser, ""));
+        jsonMappingExceptionMapper.toResponse(
+            JsonMappingException.from(mockParser, "from String value ('MY-SECRET-VALUE-123')"));
     ErrorResponse errorResponse = ErrorResponse.illegalArguments("Malformed json request");
     ErrorResponse entity = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     Assertions.assertEquals(errorResponse.getCode(), entity.getCode());
     Assertions.assertEquals(errorResponse.getMessage(), entity.getMessage());
     Assertions.assertEquals(errorResponse.getType(), entity.getType());
+    Assertions.assertNull(entity.getStack());
+    Assertions.assertFalse(entity.getMessage().contains("MY-SECRET-VALUE-123"));
   }
 }

@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -105,7 +104,7 @@ public class MetadataObjectSecretOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (!supportsSecretOperations(object)) {
-              throw new NotSupportedException(
+              throw new IllegalArgumentException(
                   "Doesn't support secret property operations for metadata object type");
             }
 

@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import com.google.common.annotations.VisibleForTesting;
+import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -816,10 +817,15 @@ public class ExceptionHandlers {
     @Override
     public Response handle(OperationType op, String secret, String parent, Exception e) {
       String reason = e instanceof ServiceUnavailableException ? e.getMessage() : getErrorMsg(e);
-      String errorMsg = getSecretErrorMsg(parent, reason);
+      // metadataObjectName is passed as {@code secret}; parent is unused for this handler.
+      String errorMsg = getSecretErrorMsg(secret, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotSupportedException) {
+        // Legacy path: unsupported object types used to throw NotSupportedException and became 500.
         return Utils.illegalArguments(errorMsg, e);
 
       } else if (e instanceof ServiceUnavailableException) {
