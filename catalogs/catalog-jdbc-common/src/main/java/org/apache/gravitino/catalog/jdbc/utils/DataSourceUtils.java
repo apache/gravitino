@@ -71,6 +71,22 @@ public class DataSourceUtils {
 
   public static DataSource createDataSource(JdbcConfig jdbcConfig)
       throws GravitinoRuntimeException {
+    validateConfiguration(jdbcConfig);
+    try {
+      return createDBCPDataSource(jdbcConfig);
+    } catch (Exception exception) {
+      throw new GravitinoRuntimeException(exception, "Error creating datasource");
+    }
+  }
+
+  /**
+   * Validates JDBC settings without creating a pool or opening a connection.
+   *
+   * @param jdbcConfig the effective JDBC configuration
+   * @throws IllegalArgumentException if a boolean, pool bound, driver or URL is invalid
+   * @throws GravitinoRuntimeException if a dangerous URL or driver setting is rejected
+   */
+  public static void validateConfiguration(JdbcConfig jdbcConfig) {
     // H2 is bundled as an embedded backend and must not be used through user-facing catalog
     // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
     // to execute at connection time, and the H2 driver class must also be blocked to prevent
@@ -107,11 +123,6 @@ public class DataSourceUtils {
       throw new GravitinoRuntimeException(e, "Error creating datasource");
     }
     configuredDriver(jdbcConfig);
-    try {
-      return createDBCPDataSource(jdbcConfig);
-    } catch (Exception exception) {
-      throw new GravitinoRuntimeException(exception, "Error creating datasource");
-    }
   }
 
   /**

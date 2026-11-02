@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -84,6 +85,12 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   public boolean supportsPathBasedCredentials() {
     return false;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    DataSourceUtils.validateConfiguration(new JdbcConfig(configuration));
   }
 
   /**

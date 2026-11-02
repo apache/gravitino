@@ -1280,7 +1280,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchCatalogException, IllegalArgumentException, IOException {
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
-    try {
+    try (CatalogLease lease = acquireCatalogLease(ident)) {
       CatalogEntity updatedCatalog =
           store.update(
               ident,
@@ -1305,7 +1305,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     existing.getProperties() == null
                         ? new HashMap<>()
                         : new HashMap<>(existing.getProperties());
-                return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+                CatalogEntity candidate =
+                    updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+                Map<String, String> proposedConfiguration =
+                    secretManager.toPlaintextProperties(candidate.getProperties());
+                lease
+                    .wrapper()
+                    .classLoader
+                    .withClassLoader(
+                        cl -> {
+                          lease.catalog().validateConfiguration(proposedConfiguration);
+                          return null;
+                        },
+                        IllegalArgumentException.class);
+                return candidate;
               });
       alterCommitted = true;
       return updatedCatalog;
@@ -1847,6 +1860,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           cl -> {
             validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
             catalog.validateCredentialProviders(propsToValidate);
+            if (propsToValidate != null) {
+              catalog.validateConfiguration();
+            }
             if (propsToValidate == null) {
               // Loading stays lenient for catalogs persisted with unsupported providers, so only
               // warn about them. Providers persisted as a secret are checked by their plaintext.

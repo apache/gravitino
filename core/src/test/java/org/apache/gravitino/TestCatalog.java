@@ -65,6 +65,16 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
     return new TestCatalogOperations(config);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    int minimum = Integer.parseInt(configuration.getOrDefault("validation-min", "0"));
+    int maximum = Integer.parseInt(configuration.getOrDefault("validation-max", "2"));
+    if (minimum > maximum) {
+      throw new IllegalArgumentException("validation-min must not exceed validation-max");
+    }
+  }
+
   @Override
   public boolean shouldValidateOnCreate() {
     Map<String, String> properties = entity().getProperties();
