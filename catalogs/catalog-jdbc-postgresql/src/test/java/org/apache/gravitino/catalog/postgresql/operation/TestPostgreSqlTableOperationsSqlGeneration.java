@@ -81,6 +81,36 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
     }
   }
 
+  @Test
+  void testQuotedTableAndColumnNamesCannotEscapeIdentifiers() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    String name = "t\"; DROP TABLE victim; --";
+    String quoted = "\"t\"\"; DROP TABLE victim; --\"";
+    Assertions.assertEquals("DROP TABLE " + quoted, ops.generateDropTableSql(name));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " RENAME TO " + quoted, ops.generateRenameTableSql(name, name));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " RENAME COLUMN " + quoted + " TO " + quoted + ";",
+        ops.alterTableSql(name, TableChange.renameColumn(new String[] {name}, name)));
+    Assertions.assertEquals(
+        "ALTER TABLE " + quoted + " DROP CONSTRAINT " + quoted + ";",
+        ops.alterTableSql(name, TableChange.deleteIndex(name, false)));
+    Assertions.assertEquals(
+        quoted, PostgreSqlTableOperations.getIndexFieldStr(new String[][] {{name}}));
+    String sql =
+        ops.createTableSql(
+            name,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName(name)
+                  .withType(Types.IntegerType.get())
+                  .withNullable(true)
+                  .build()
+            });
+    Assertions.assertTrue(sql.startsWith("CREATE TABLE " + quoted + " ("));
+    Assertions.assertTrue(sql.contains("    " + quoted + " int4"));
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testDeleteIndexesDropsOnlyConstraints(boolean ifExists) {

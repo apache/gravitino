@@ -61,6 +61,33 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
 
+  @ParameterizedTest
+  @ValueSource(strings = {"quoted\";CREATE TABLE injected_marker (id int);--"})
+  void testQuotedTableNamesStayIdentifiersDuringAlter(String name) {
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        name,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+        },
+        "comment",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, name, TableChange.renameColumn(new String[] {"id"}, "id\"quoted"));
+      Assertions.assertEquals(
+          "id\"quoted", TABLE_OPERATIONS.load(TEST_DB_NAME, name).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, name, TableChange.updateComment("updated"));
+      Assertions.assertEquals("updated", TABLE_OPERATIONS.load(TEST_DB_NAME, name).comment());
+      Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("injected_marker"));
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
   @Test
   public void testOperationTable() {
     String tableName = RandomNameUtils.genRandomName("op_table_");

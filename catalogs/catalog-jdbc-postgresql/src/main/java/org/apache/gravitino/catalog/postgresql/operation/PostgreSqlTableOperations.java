@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -171,16 +172,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("CREATE TABLE ")
-        .append(PG_QUOTE)
-        .append(tableName)
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(tableName))
         .append(" (")
         .append(NEW_LINE);
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder.append("    ").append(PG_QUOTE).append(column.name()).append(PG_QUOTE);
+      sqlBuilder.append("    ").append(quotedIdentifier(column.name()));
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -203,9 +202,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       sqlBuilder
           .append(NEW_LINE)
           .append(TABLE_COMMENT)
-          .append(PG_QUOTE)
-          .append(tableName)
-          .append(PG_QUOTE)
+          .append(quotedIdentifier(tableName))
           .append(IS)
           .append(escapeSqlLiteral(comment, '\''))
           .append("';");
@@ -217,13 +214,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
                 sqlBuilder
                     .append(NEW_LINE)
                     .append(COLUMN_COMMENT)
-                    .append(PG_QUOTE)
-                    .append(tableName)
-                    .append(PG_QUOTE)
+                    .append(quotedIdentifier(tableName))
                     .append(".")
-                    .append(PG_QUOTE)
-                    .append(jdbcColumn.name())
-                    .append(PG_QUOTE)
+                    .append(quotedIdentifier(jdbcColumn.name()))
                     .append(IS)
                     .append(escapeSqlLiteral(jdbcColumn.comment(), '\''))
                     .append("';"));
@@ -243,13 +236,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       switch (index.type()) {
         case PRIMARY_KEY:
           if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+            sqlBuilder.append("CONSTRAINT ").append(quotedIdentifier(index.name()));
           }
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case UNIQUE_KEY:
           if (StringUtils.isNotEmpty(index.name())) {
-            sqlBuilder.append("CONSTRAINT ").append(PG_QUOTE).append(index.name()).append(PG_QUOTE);
+            sqlBuilder.append("CONSTRAINT ").append(quotedIdentifier(index.name()));
           }
           sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
           break;
@@ -267,7 +260,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
                 throw new IllegalArgumentException(
                     "Index does not support complex fields in PostgreSQL");
               }
-              return PG_QUOTE + colNames[0] + PG_QUOTE;
+              return quotedIdentifier(colNames[0]);
             })
         .collect(Collectors.joining(", "));
   }
@@ -300,18 +293,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
     return ALTER_TABLE
-        + PG_QUOTE
-        + oldTableName
-        + PG_QUOTE
+        + quotedIdentifier(oldTableName)
         + " RENAME TO "
-        + PG_QUOTE
-        + newTableName
-        + PG_QUOTE;
+        + quotedIdentifier(newTableName);
   }
 
   @Override
   protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + PG_QUOTE + tableName + PG_QUOTE;
+    return "DROP TABLE " + quotedIdentifier(tableName);
   }
 
   @Override
@@ -380,14 +369,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
             && Column.DEFAULT_VALUE_NOT_SET.equals(pendingColumn.defaultValue())) {
           alterSql.add(
               ALTER_TABLE
-                  + PG_QUOTE
-                  + tableName
-                  + PG_QUOTE
+                  + quotedIdentifier(tableName)
                   + " "
                   + ALTER_COLUMN
-                  + PG_QUOTE
-                  + updateColumnNullability.fieldName()[0]
-                  + PG_QUOTE
+                  + quotedIdentifier(updateColumnNullability.fieldName()[0])
                   + " DROP DEFAULT;");
         }
       } else if (change instanceof TableChange.AddIndex) {
@@ -427,7 +412,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
     return String.format(
         "ALTER TABLE %s %s %s %s;",
-        PG_QUOTE + tableName + PG_QUOTE, ALTER_COLUMN, PG_QUOTE + fieldName + PG_QUOTE, action);
+        quotedIdentifier(tableName), ALTER_COLUMN, quotedIdentifier(fieldName), action);
   }
 
   @VisibleForTesting
@@ -435,14 +420,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     // Gravitino creates primary and unique indexes as constraints. Dropping the constraint
     // also removes its backing index, so a second DROP INDEX would fail after a successful drop.
     return String.format(
-        "ALTER TABLE %s%s%s DROP CONSTRAINT %s%s%s%s;",
-        PG_QUOTE,
-        tableName,
-        PG_QUOTE,
+        "ALTER TABLE %s DROP CONSTRAINT %s%s;",
+        quotedIdentifier(tableName),
         deleteIndex.isIfExists() ? "IF EXISTS " : "",
-        PG_QUOTE,
-        deleteIndex.getName(),
-        PG_QUOTE);
+        quotedIdentifier(deleteIndex.getName()));
   }
 
   @VisibleForTesting
@@ -450,13 +431,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("ALTER TABLE ")
-        .append(PG_QUOTE)
-        .append(tableName)
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(tableName))
         .append(" ADD CONSTRAINT ")
-        .append(PG_QUOTE)
-        .append(addIndex.getName())
-        .append(PG_QUOTE);
+        .append(quotedIdentifier(addIndex.getName()));
     switch (addIndex.getType()) {
       case PRIMARY_KEY:
         sqlBuilder.append(" PRIMARY KEY ");
@@ -479,25 +456,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     String col = updateColumnNullability.fieldName()[0];
     if (updateColumnNullability.nullable()) {
       return ALTER_TABLE
-          + PG_QUOTE
-          + tableName
-          + PG_QUOTE
+          + quotedIdentifier(tableName)
           + " "
           + ALTER_COLUMN
-          + PG_QUOTE
-          + col
-          + PG_QUOTE
+          + quotedIdentifier(col)
           + " DROP NOT NULL;";
     } else {
       return ALTER_TABLE
-          + PG_QUOTE
-          + tableName
-          + PG_QUOTE
+          + quotedIdentifier(tableName)
           + " "
           + ALTER_COLUMN
-          + PG_QUOTE
-          + col
-          + PG_QUOTE
+          + quotedIdentifier(col)
           + " SET NOT NULL;";
     }
   }
@@ -515,9 +484,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       }
     }
     return TABLE_COMMENT
-        + PG_QUOTE
-        + jdbcTable.name()
-        + PG_QUOTE
+        + quotedIdentifier(jdbcTable.name())
         + IS
         + escapeSqlLiteral(newComment, '\'')
         + "';";
@@ -539,13 +506,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       }
     }
     return ALTER_TABLE
-        + PG_QUOTE
-        + table.name()
-        + PG_QUOTE
+        + quotedIdentifier(table.name())
         + " DROP COLUMN "
-        + PG_QUOTE
-        + deleteColumn.fieldName()[0]
-        + PG_QUOTE
+        + quotedIdentifier(deleteColumn.fieldName()[0])
         + ";";
   }
 
@@ -565,14 +528,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
 
-    StringBuilder sqlBuilder =
-        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + quotedIdentifier(jdbcTable.name()));
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
-        .append(PG_QUOTE)
-        .append(col)
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(col))
         .append(" SET DEFAULT ")
         .append(
             columnDefaultValueConverter.fromGravitino(
@@ -595,23 +555,18 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (null == column) {
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
-    StringBuilder sqlBuilder =
-        new StringBuilder(ALTER_TABLE + PG_QUOTE + jdbcTable.name() + PG_QUOTE);
+    StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + quotedIdentifier(jdbcTable.name()));
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
-        .append(PG_QUOTE)
-        .append(col)
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(col))
         .append(" SET DATA TYPE ")
         .append(typeConverter.fromGravitino(updateColumnType.getNewDataType()));
     if (!column.nullable()) {
       sqlBuilder
           .append(",\n")
           .append(ALTER_COLUMN)
-          .append(PG_QUOTE)
-          .append(col)
-          .append(PG_QUOTE)
+          .append(quotedIdentifier(col))
           .append(" SET NOT NULL");
     }
     return sqlBuilder.append(";").toString();
@@ -623,19 +578,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     return ALTER_TABLE
-        + PG_QUOTE
-        + tableName
-        + PG_QUOTE
+        + quotedIdentifier(tableName)
         + " RENAME COLUMN "
-        + PG_QUOTE
-        + renameColumn.fieldName()[0]
-        + PG_QUOTE
+        + quotedIdentifier(renameColumn.fieldName()[0])
         + SPACE
         + "TO"
         + SPACE
-        + PG_QUOTE
-        + renameColumn.getNewName()
-        + PG_QUOTE
+        + quotedIdentifier(renameColumn.getNewName())
         + ";";
   }
 
@@ -650,14 +599,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append(ALTER_TABLE)
-        .append(PG_QUOTE)
-        .append(lazyLoadTable.name())
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(lazyLoadTable.name()))
         .append(SPACE)
         .append("ADD COLUMN ")
-        .append(PG_QUOTE)
-        .append(col)
-        .append(PG_QUOTE)
+        .append(quotedIdentifier(col))
         .append(SPACE)
         .append(typeConverter.fromGravitino(addColumn.getDataType()))
         .append(SPACE);
@@ -697,13 +642,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       result.add(
           COLUMN_COMMENT
-              + PG_QUOTE
-              + lazyLoadTable.name()
-              + PG_QUOTE
+              + quotedIdentifier(lazyLoadTable.name())
               + "."
-              + PG_QUOTE
-              + col
-              + PG_QUOTE
+              + quotedIdentifier(col)
               + IS
               + escapeSqlLiteral(addColumn.getComment(), '\'')
               + "';");
@@ -719,13 +660,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
     String col = updateColumnComment.fieldName()[0];
     return COLUMN_COMMENT
-        + PG_QUOTE
-        + tableName
-        + PG_QUOTE
+        + quotedIdentifier(tableName)
         + "."
-        + PG_QUOTE
-        + col
-        + PG_QUOTE
+        + quotedIdentifier(col)
         + IS
         + escapeSqlLiteral(newComment, '\'')
         + "';";
@@ -778,5 +715,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       default:
         return null;
     }
+  }
+
+  private static String quotedIdentifier(@Nullable String name) {
+    return PG_QUOTE + String.valueOf(name).replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
   }
 }
