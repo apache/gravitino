@@ -34,12 +34,25 @@ from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_association_selector import (
+    AllValuesSelector,
+    PolicyAssociationSelector,
+)
+from gravitino.api.policy.policy_change import PolicyChange
+from gravitino.api.policy.policy_content import PolicyContent
+from gravitino.api.policy.policy_operations import PolicyOperations
+from gravitino.api.policy.policy_tag_association import PolicyTagAssociation
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.generic_job_handle import GenericJobHandle
+from gravitino.client.generic_policy import GenericPolicy
+from gravitino.client.generic_policy_tag_association import (
+    GenericPolicyTagAssociation,
+)
 from gravitino.client.generic_tag import GenericTag
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
@@ -58,7 +71,12 @@ from gravitino.dto.requests.job_template_register_request import (
 from gravitino.dto.requests.job_template_updates_request import (
     JobTemplateUpdatesRequest,
 )
+from gravitino.dto.policy_dto import PolicyAssociationSelectorDTO
 from gravitino.dto.requests.owner_set_request import OwnerSetRequest
+from gravitino.dto.requests.policy_create_request import PolicyCreateRequest
+from gravitino.dto.requests.policy_set_request import PolicySetRequest
+from gravitino.dto.requests.policy_tag_add_request import PolicyTagAddRequest
+from gravitino.dto.requests.policy_updates_request import PolicyUpdatesRequest
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.requests.user_add_request import UserAddRequest
@@ -79,6 +97,14 @@ from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
 from gravitino.dto.responses.owner_response import OwnerResponse
+from gravitino.dto.responses.policy_response import (
+    PolicyForTagAssociationListResponse,
+    PolicyListResponse,
+    PolicyNameListResponse,
+    PolicyResponse,
+    PolicyTagAssociationResponse,
+    TagForPolicyAssociationListResponse,
+)
 from gravitino.dto.responses.remove_response import RemoveResponse
 from gravitino.dto.responses.set_response import SetResponse
 from gravitino.dto.responses.tag_response import (
@@ -108,6 +134,7 @@ from gravitino.exceptions.handlers.permission_error_handler import (
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
+from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
@@ -126,6 +153,7 @@ class GravitinoMetalake(
     SupportsJobs,
     SupportsRoles,
     TagOperations,
+    PolicyOperations,
     SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors
     """
@@ -142,6 +170,11 @@ class GravitinoMetalake(
     API_METALAKES_OWNERS_PATH = "api/metalakes/{}/owners/{}"
     API_METALAKES_TAG_PATH = "api/metalakes/{}/tags/{}"
     API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags"
+    API_METALAKES_POLICIES_PATH = "api/metalakes/{}/policies"
+    API_METALAKES_POLICY_PATH = "api/metalakes/{}/policies/{}"
+    API_METALAKES_POLICY_TAGS_PATH = "api/metalakes/{}/policies/{}/tags"
+    API_METALAKES_TAG_POLICIES_PATH = "api/metalakes/{}/tags/{}/policies"
+    API_METALAKES_TAG_POLICY_PATH = "api/metalakes/{}/tags/{}/policies/{}"
 
     # Authorization paths
     API_METALAKES_USERS_PATH = "api/metalakes/{}/users"
@@ -845,6 +878,377 @@ class GravitinoMetalake(
         drop_response.validate()
 
         return drop_response.dropped()
+
+    def list_policy_associations_for_tag(self, tag_name) -> list[PolicyTagAssociation]:
+        """
+        List the policy associations of a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            list[PolicyTagAssociation]: The policy associations of the tag.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+        """
+        url = self.API_METALAKES_TAG_POLICIES_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        resp = PolicyForTagAssociationListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        resp.validate()
+
+        tag = self.get_tag(tag_name)
+        return [
+            GenericPolicyTagAssociation(
+                GenericPolicy(association.policy()),
+                tag,
+                association.selector().to_selector(),
+            )
+            for association in resp.associations()
+        ]
+
+    def add_policy_for_tag(
+        self,
+        tag_name,
+        policy_name,
+        selector: PolicyAssociationSelector = None,
+    ) -> PolicyTagAssociation:
+        """
+        Associate a policy with a tag under a metalake. When no selector is
+        given, the association applies to all values of the tag.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+            selector (PolicyAssociationSelector): The selector scoping the
+                association, or None for all tag values.
+
+        Returns:
+            PolicyTagAssociation: The created policy association.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchPolicyException: If the policy does not exist.
+            PolicyAlreadyAssociatedException: If the policy is already
+                associated with the tag.
+        """
+        if selector is None:
+            selector = AllValuesSelector.get()
+        add_request = PolicyTagAddRequest(
+            PolicyAssociationSelectorDTO.from_selector(selector)
+        )
+        add_request.validate()
+
+        url = self.API_METALAKES_TAG_POLICY_PATH.format(
+            encode_string(self.name()),
+            encode_string(tag_name),
+            encode_string(policy_name),
+        )
+        response = self.rest_client.post(
+            url,
+            json=add_request,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        resp = PolicyTagAssociationResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return GenericPolicyTagAssociation(
+            self.get_policy(resp.policy()),
+            self.get_tag(resp.tag()),
+            resp.selector().to_selector(),
+        )
+
+    def remove_policy_from_tag(self, tag_name, policy_name) -> None:
+        """
+        Remove the association between a policy and a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        url = self.API_METALAKES_TAG_POLICY_PATH.format(
+            encode_string(self.name()),
+            encode_string(tag_name),
+            encode_string(policy_name),
+        )
+        response = self.rest_client.delete(
+            url,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        resp = BaseResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+    #########
+    # Policy operations
+    #########
+    def list_policies(self) -> list[str]:
+        """List all the policy names under a metalake.
+
+        Returns:
+            list[str]: The list of policy names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_POLICIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(url, error_handler=POLICY_ERROR_HANDLER)
+        resp = PolicyNameListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return resp.names
+
+    def list_policy_infos(self) -> List[Policy]:
+        """
+        List policies information under a metalake.
+
+        Returns:
+            list[Policy]: The list of policy information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_POLICIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        list_info_resp = PolicyListResponse.from_json(response.body, infer_missing=True)
+        list_info_resp.validate()
+
+        return [GenericPolicy(policy_dto) for policy_dto in list_info_resp.policies()]
+
+    def get_policy(self, policy_name) -> Policy:
+        """
+        Get a policy by its name under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            Policy: The policy information.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        Precondition.check_string_not_empty(
+            policy_name, "policy name must not be null or empty"
+        )
+        url = self.API_METALAKES_POLICY_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        response = self.rest_client.get(url, error_handler=POLICY_ERROR_HANDLER)
+
+        policy_resp = PolicyResponse.from_json(response.body, infer_missing=True)
+        policy_resp.validate()
+
+        return GenericPolicy(policy_resp.policy())
+
+    def create_policy(
+        self,
+        policy_name,
+        policy_type,
+        comment,
+        enabled,
+        content: PolicyContent,
+    ) -> Policy:
+        """
+        Create a new policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+            policy_type (str): The type of the policy.
+            comment (str): The comment of the policy.
+            enabled (bool): Whether the policy is enabled.
+            content (PolicyContent): The content of the policy.
+
+        Returns:
+            Policy: The policy information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            PolicyAlreadyExistsException: If the policy already exists.
+        """
+        policy_create_request = PolicyCreateRequest(
+            _name=policy_name,
+            _policy_type=policy_type,
+            _comment=comment,
+            _enabled=enabled,
+            _content=DTOConverters.to_policy_content_dto(content),
+        )
+        policy_create_request.validate()
+
+        url = self.API_METALAKES_POLICIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.post(
+            url,
+            json=policy_create_request,
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        policy_resp = PolicyResponse.from_json(response.body, infer_missing=True)
+        policy_resp.validate()
+
+        return GenericPolicy(policy_resp.policy())
+
+    def enable_policy(self, policy_name) -> None:
+        """
+        Enable a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        self._set_policy_enabled(policy_name, True)
+
+    def disable_policy(self, policy_name) -> None:
+        """
+        Disable a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        self._set_policy_enabled(policy_name, False)
+
+    def _set_policy_enabled(self, policy_name, enabled: bool) -> None:
+        url = self.API_METALAKES_POLICY_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        self.rest_client.patch(
+            url,
+            json=PolicySetRequest(enabled),
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+
+    def alter_policy(self, policy_name, *changes: PolicyChange) -> Policy:
+        """
+        Alter a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+            changes (PolicyChange): The changes to apply to the policy.
+
+        Returns:
+            Policy: The altered policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+            IllegalArgumentException: If the changes cannot be applied to
+                the policy.
+            PolicyAlreadyExistsException: If a policy with the new name
+                already exists.
+        """
+        Precondition.check_argument(
+            StringUtils.is_not_blank(policy_name),
+            "policy name must not be null or empty",
+        )
+        Precondition.check_argument(
+            changes is not None and len(changes) > 0,
+            "at least one change is required",
+        )
+        updates = [DTOConverters.to_policy_update_request(change) for change in changes]
+        update_req = PolicyUpdatesRequest(updates)
+        update_req.validate()
+
+        url = self.API_METALAKES_POLICY_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        response = self.rest_client.put(
+            url,
+            json=update_req,
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        policy_resp = PolicyResponse.from_json(response.body, infer_missing=True)
+
+        policy_resp.validate()
+        return GenericPolicy(policy_resp.policy())
+
+    def delete_policy(self, policy_name) -> bool:
+        """
+        Delete a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            bool: True if the policy was deleted, False otherwise.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_argument(
+            StringUtils.is_not_blank(policy_name),
+            "policy name must not be null or empty",
+        )
+
+        url = self.API_METALAKES_POLICY_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        response = self.rest_client.delete(
+            url,
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
+
+        return drop_response.dropped()
+
+    def list_tag_associations_for_policy(
+        self, policy_name
+    ) -> list[PolicyTagAssociation]:
+        """
+        List the tag associations of a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            list[PolicyTagAssociation]: The tag associations of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        url = self.API_METALAKES_POLICY_TAGS_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        resp = TagForPolicyAssociationListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        resp.validate()
+
+        policy = self.get_policy(policy_name)
+        return [
+            GenericPolicyTagAssociation(
+                policy,
+                GenericTag(self.name(), association.tag(), self.rest_client),
+                association.selector().to_selector(),
+            )
+            for association in resp.associations()
+        ]
 
     #########
     # Owner operations
