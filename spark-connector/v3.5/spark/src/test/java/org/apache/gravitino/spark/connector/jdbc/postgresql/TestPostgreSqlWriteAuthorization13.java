@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.spark.connector.jdbc.postgresql;
 
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -35,9 +39,16 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
+import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -45,9 +56,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Release-branch PostgreSQL writes must use the MODIFY_TABLE metadata load. */
 public class TestPostgreSqlWriteAuthorization13 {
+  private static Catalog sqlClient;
+  private static org.apache.spark.sql.connector.catalog.TableCatalog sqlDelegate;
   private Catalog client;
   private TableCatalog metadata;
   private org.apache.spark.sql.connector.catalog.TableCatalog spark;
@@ -95,6 +109,94 @@ public class TestPostgreSqlWriteAuthorization13 {
         ForbiddenException.class,
         () -> catalog.loadTable(identifier, Set.of(TableWritePrivilege.INSERT)));
     verifyNoInteractions(spark);
+  }
+
+  @SuppressWarnings("deprecation")
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "INSERT INTO guarded.schema.table VALUES (1)",
+        "INSERT OVERWRITE guarded.schema.table VALUES (2)"
+      })
+  void testActualSparkSqlRequestsWriteAuthorization(String query) throws Exception {
+    SupportsWrite physical = mock(SupportsWrite.class);
+    when(physical.name()).thenReturn("schema.table");
+    when(physical.schema()).thenReturn(new StructType().add("id", DataTypes.IntegerType));
+    when(physical.partitioning()).thenReturn(new Transform[0]);
+    when(physical.properties()).thenReturn(Map.of());
+    when(physical.capabilities())
+        .thenReturn(
+            EnumSet.of(
+                TableCapability.BATCH_WRITE,
+                TableCapability.OVERWRITE_BY_FILTER,
+                TableCapability.TRUNCATE));
+    when(physical.newWriteBuilder(any()))
+        .thenThrow(new AssertionError("Write reached physical table"));
+    when(spark.loadTable(identifier)).thenReturn(physical);
+    when(metadata.loadTable(metadataIdentifier))
+        .thenReturn(mock(org.apache.gravitino.rel.Table.class));
+    when(metadata.loadTable(metadataIdentifier, Set.of(Privilege.Name.MODIFY_TABLE)))
+        .thenThrow(new ForbiddenException("MODIFY_TABLE is required"));
+    sqlClient = client;
+    sqlDelegate = spark;
+    try (SparkSession session =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("PostgreSQL write authorization")
+            .config("spark.ui.enabled", "false")
+            .config("spark.driver.host", "127.0.0.1")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.sql.catalog.guarded", SqlCatalog.class.getName())
+            .getOrCreate()) {
+      Exception failure =
+          Assertions.assertThrows(Exception.class, () -> session.sql(query).collect());
+      Throwable cause = failure;
+      while (!(cause instanceof ForbiddenException) && cause.getCause() != null) {
+        cause = cause.getCause();
+      }
+      Assertions.assertTrue(cause instanceof ForbiddenException, failure.toString());
+      verify(metadata, atLeastOnce())
+          .loadTable(metadataIdentifier, Set.of(Privilege.Name.MODIFY_TABLE));
+      verify(physical, never()).newWriteBuilder(any());
+    }
+  }
+
+  /** A real Spark catalog plugin using controlled metadata and physical-table boundaries. */
+  public static class SqlCatalog extends GravitinoPostgreSqlCatalogSpark35 {
+    private String catalogName;
+
+    /** {@inheritDoc} */
+    @Override
+    public void initialize(String name, CaseInsensitiveStringMap options) {
+      catalogName = name;
+      gravitinoCatalogClient = sqlClient;
+      sparkCatalog = sqlDelegate;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String name() {
+      return catalogName;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String[] defaultNamespace() {
+      return new String[] {"schema"};
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected Table createSparkTable(
+        Identifier identifier,
+        org.apache.gravitino.rel.Table gravitinoTable,
+        Table sparkTable,
+        org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog,
+        PropertiesConverter propertiesConverter,
+        SparkTransformConverter sparkTransformConverter,
+        SparkTypeConverter sparkTypeConverter) {
+      return sparkTable;
+    }
   }
 
   private static class TestCatalog extends GravitinoPostgreSqlCatalogSpark35 {
