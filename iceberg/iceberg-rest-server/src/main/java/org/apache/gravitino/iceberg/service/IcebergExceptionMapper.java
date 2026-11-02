@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -47,6 +51,7 @@ import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.glassfish.jersey.server.ParamException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,9 +104,13 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
    * @return the HTTP status code
    */
   public static int getErrorCode(Exception ex) {
-    Integer code = EXCEPTION_ERROR_CODES.get(ex.getClass());
-    if (code != null) {
-      return code;
+    // Match the exception's own class first, then its superclasses, so a subclass such as
+    // NumberFormatException gets the status of IllegalArgumentException.
+    for (Class<?> c = ex.getClass(); c != null; c = c.getSuperclass()) {
+      Integer code = EXCEPTION_ERROR_CODES.get(c);
+      if (code != null) {
+        return code;
+      }
     }
     if (ex instanceof WebApplicationException) {
       return ((WebApplicationException) ex).getResponse().getStatus();
@@ -150,6 +159,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
+    ex = toClientFacingException(ex);
     int status =
         ex instanceof Exception
             ? getErrorCode((Exception) ex)
@@ -164,5 +174,146 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getMessage());
     }
     return IcebergRESTUtils.errorResponse(ex, status);
+  }
+
+  /**
+   * Replaces exceptions whose type or message would expose server internals, and client errors that
+   * reach the server as framework or storage-SDK exceptions, with the Iceberg exception the REST
+   * spec expects for the condition.
+   *
+   * @param ex the failure raised while processing the request
+   * @return the exception to report to the client
+   */
+  static Throwable toClientFacingException(Throwable ex) {
+    JsonProcessingException jsonError = findCause(ex, JsonProcessingException.class);
+    if (jsonError != null) {
+      return new BadRequestException("%s", describeJsonError(jsonError));
+    }
+    if (ex instanceof ParamException) {
+      return new BadRequestException(
+          "Invalid value for parameter '%s'", ((ParamException) ex).getParameterName());
+    }
+    Throwable storageError = findStorageError(ex);
+    if (storageError != null) {
+      RuntimeException mapped = toStorageException(storageError);
+      return mapped == null ? ex : mapped;
+    }
+    return ex;
+  }
+
+  private static String describeJsonError(JsonProcessingException e) {
+    // Iceberg's parsers report invalid input (an unknown update action or requirement type) as
+    // IllegalArgumentException or UnsupportedOperationException with a message meant for users.
+    for (Throwable t = e.getCause(); t != null; t = t.getCause()) {
+      if ((t instanceof IllegalArgumentException || t instanceof UnsupportedOperationException)
+          && t.getMessage() != null) {
+        return "Invalid request body: " + t.getMessage();
+      }
+    }
+    if (e instanceof JsonMappingException && !((JsonMappingException) e).getPath().isEmpty()) {
+      String field =
+          ((JsonMappingException) e)
+              .getPath().stream()
+                  .map(
+                      r ->
+                          r.getFieldName() != null
+                              ? r.getFieldName()
+                              : String.valueOf(r.getIndex()))
+                  .collect(Collectors.joining("."));
+      return "Invalid request body: unexpected value for field '" + field + "'";
+    }
+    return "Invalid request body: malformed JSON";
+  }
+
+  private static Throwable findStorageError(Throwable ex) {
+    for (Throwable t = ex; t != null; t = t.getCause()) {
+      String name = t.getClass().getName();
+      if (name.startsWith("software.amazon.awssdk.")
+          || name.startsWith("com.google.cloud.storage.")
+          || name.startsWith("com.google.cloud.BaseServiceException")
+          || name.startsWith("com.azure.")) {
+        return t;
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return null;
+  }
+
+  private static RuntimeException toStorageException(Throwable storageError) {
+    Integer status = storageStatusCode(storageError);
+    String reason = storageErrorCode(storageError);
+    String message = storageError.getMessage() == null ? "" : storageError.getMessage();
+    // A missing object (for example a deleted metadata file) keeps its existing handling: it is not
+    // a problem with the request.
+    if (status != null && status == 404 && !"NoSuchBucket".equals(reason)) {
+      return null;
+    }
+    // A bucket that does not exist, a bucket in another region or behind another endpoint (301,
+    // 307), a request the storage service rejects as malformed (400), and a request the SDK cannot
+    // even build (a location without a bucket) are problems with the location the client asked
+    // for. Anything else is the storage service failing. The SDK message is never returned: it
+    // carries request ids and SDK details.
+    boolean clientLocation =
+        status != null && (status == 400 || status == 404 || status == 301 || status == 307);
+    if (clientLocation || (status == null && message.startsWith("Unable to marshall request"))) {
+      return new BadRequestException(
+          "The storage location cannot be used by this catalog (%s%s). Check the location"
+              + " and that the catalog's storage configuration can reach it.",
+          reason, status == null ? "" : ", HTTP " + status);
+    }
+    return new ServiceUnavailableException(
+        "The catalog's storage service did not complete the request (%s%s)",
+        reason, status == null ? "" : ", HTTP " + status);
+  }
+
+  private static String storageErrorCode(Throwable storageError) {
+    // AWS SDK v2 reports the service error code (for example NoSuchBucket) in awsErrorDetails().
+    Object details = invoke(storageError, "awsErrorDetails");
+    Object code = details == null ? null : invoke(details, "errorCode");
+    if (code instanceof String && !((String) code).isEmpty()) {
+      return (String) code;
+    }
+    return storageError.getClass().getSimpleName().replaceAll("Exception$", "");
+  }
+
+  private static Integer storageStatusCode(Throwable storageError) {
+    // AWS SDK v2: statusCode(); Google Cloud: getCode(); Azure: getResponse().getStatusCode().
+    Integer status = invokeInt(storageError, "statusCode");
+    if (status == null) {
+      status = invokeInt(storageError, "getCode");
+    }
+    if (status == null) {
+      Object response = invoke(storageError, "getResponse");
+      status = response == null ? null : invokeInt(response, "getStatusCode");
+    }
+    return status != null && status > 0 ? status : null;
+  }
+
+  private static Integer invokeInt(Object target, String methodName) {
+    Object value = invoke(target, methodName);
+    return value instanceof Integer ? (Integer) value : null;
+  }
+
+  private static Object invoke(Object target, String methodName) {
+    try {
+      Method method = target.getClass().getMethod(methodName);
+      return method.invoke(target);
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      return null;
+    }
+  }
+
+  private static <T extends Throwable> T findCause(Throwable ex, Class<T> type) {
+    for (Throwable t = ex; t != null; t = t.getCause()) {
+      if (type.isInstance(t)) {
+        return type.cast(t);
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return null;
   }
 }
