@@ -29,6 +29,8 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -78,6 +80,36 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
                     .build()
               })
           .build();
+    }
+  }
+
+  @Test
+  void testOversizedIndexNamesAreRejectedOnCreateAndAlter() {
+    String name = "表".repeat(22);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PostgreSqlTableOperations.addIndexDefinition(
+                "t",
+                (TableChange.AddIndex)
+                    TableChange.addIndex(IndexType.UNIQUE_KEY, name, new String[][] {{"col1"}})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PostgreSqlTableOperations.appendIndexesSql(
+                new Index[] {Indexes.unique(name, new String[][] {{"col1"}})},
+                new StringBuilder()));
+  }
+
+  @Test
+  void testUnnamedIndexesUsePostgreSqlGeneratedNames() {
+    for (String name : new String[] {null, ""}) {
+      Assertions.assertEquals(
+          "ALTER TABLE \"t\" ADD UNIQUE (\"col1\");",
+          PostgreSqlTableOperations.addIndexDefinition(
+              "t",
+              (TableChange.AddIndex)
+                  TableChange.addIndex(IndexType.UNIQUE_KEY, name, new String[][] {{"col1"}})));
     }
   }
 

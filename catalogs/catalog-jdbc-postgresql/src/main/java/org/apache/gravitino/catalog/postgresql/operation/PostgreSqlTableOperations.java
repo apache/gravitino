@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeS
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -238,6 +240,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @VisibleForTesting
   static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
+      validateIndexName(index.name());
       String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",").append(NEW_LINE);
       switch (index.type()) {
@@ -447,16 +450,21 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   @VisibleForTesting
   static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
+    validateIndexName(addIndex.getName());
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("ALTER TABLE ")
         .append(PG_QUOTE)
         .append(tableName)
         .append(PG_QUOTE)
-        .append(" ADD CONSTRAINT ")
-        .append(PG_QUOTE)
-        .append(addIndex.getName())
-        .append(PG_QUOTE);
+        .append(" ADD");
+    if (StringUtils.isNotEmpty(addIndex.getName())) {
+      sqlBuilder
+          .append(" CONSTRAINT ")
+          .append(PG_QUOTE)
+          .append(addIndex.getName())
+          .append(PG_QUOTE);
+    }
     switch (addIndex.getType()) {
       case PRIMARY_KEY:
         sqlBuilder.append(" PRIMARY KEY ");
@@ -777,6 +785,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         return Math.max(scale, 0);
       default:
         return null;
+    }
+  }
+
+  private static void validateIndexName(@Nullable String name) {
+    if (name != null && name.getBytes(StandardCharsets.UTF_8).length > 63) {
+      throw new IllegalArgumentException(
+          "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
     }
   }
 }

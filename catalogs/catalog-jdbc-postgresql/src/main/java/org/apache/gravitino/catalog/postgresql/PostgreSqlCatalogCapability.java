@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.postgresql;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -42,7 +43,8 @@ public class PostgreSqlCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    if (!name.matches(POSTGRESQL_NAME_PATTERN)) {
+    if (!name.matches(POSTGRESQL_NAME_PATTERN)
+        || name.getBytes(StandardCharsets.UTF_8).length > 63) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is illegal.", scope, name));
     }

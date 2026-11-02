@@ -28,6 +28,18 @@ public class TestPostgreSqlCatalogCapability {
   private final PostgreSqlCatalogCapability capability = new PostgreSqlCatalogCapability();
 
   @Test
+  void testNamesAreLimitedByUtf8Bytes() {
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      Assertions.assertTrue(capability.specificationOnName(scope, "表".repeat(21)).supported());
+      Assertions.assertFalse(
+          capability.specificationOnName(scope, "表".repeat(21) + "a").supported());
+      Assertions.assertTrue(
+          capability.specificationOnName(scope, "é".repeat(31) + "a").supported());
+      Assertions.assertFalse(capability.specificationOnName(scope, "é".repeat(32)).supported());
+    }
+  }
+
+  @Test
   void testValidNames() {
     // testing valid names for all scopes
     for (Capability.Scope scope : Capability.Scope.values()) {
