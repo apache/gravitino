@@ -50,6 +50,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -513,7 +514,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedNamespaceOwnsMissingAncestorsAndLeaf() {
+  public void testCreateNestedNamespaceOwnsMissingAncestorsAndLeaf() throws IOException {
     // Depth-4 leaf, only A exists. Expect setOwners with [A:B, A:B:C, A:B:C:D] —
     // missing ancestors (outermost first) + leaf; existing A is not re-owned.
     Namespace leaf = Namespace.of("A", "B", "C", "D");
@@ -542,6 +543,14 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertEquals(
         Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
         names);
+
+    // Each namespace the request created gets its creator recorded; the existing A does not.
+    ArgumentCaptor<NameIdentifier> recorded = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockEntityStore, times(3))
+        .update(recorded.capture(), eq(SchemaEntity.class), eq(Entity.EntityType.SCHEMA), any());
+    Assertions.assertEquals(
+        Arrays.asList("A:B", "A:B:C", "A:B:C:D"),
+        recorded.getAllValues().stream().map(NameIdentifier::name).collect(Collectors.toList()));
   }
 
   @Test
