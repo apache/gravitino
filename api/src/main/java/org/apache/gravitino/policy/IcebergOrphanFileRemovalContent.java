@@ -21,6 +21,7 @@ package org.apache.gravitino.policy;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -143,6 +144,44 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
         MAX_OLDER_THAN_DAYS);
   }
 
+  /**
+   * Validates orphan-scan location syntax shared by policy write-time checks and job submission.
+   *
+   * <p>Mirrors {@code OrphanFileLocationUtils.normalizeLocation} lexical rules so values that would
+   * fail {@link URI#create(String)} or absolute-path checks are rejected when the policy is stored,
+   * not only when a cleanup job later runs.
+   *
+   * @param location non-null scan location
+   * @return parsed URI after syntax checks
+   * @throws IllegalArgumentException if the location is blank, ambiguous, or not a usable URI
+   */
+  public static URI parseAndValidateLocation(String location) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(location), "location must not be blank");
+    Preconditions.checkArgument(
+        location.equals(StringUtils.strip(location.trim())),
+        "location must not have leading or trailing whitespace");
+    Preconditions.checkArgument(
+        !location.contains(".."), "location must not contain '..' path segments: %s", location);
+    Preconditions.checkArgument(
+        !location.contains("\\"), "location must not contain '\\': %s", location);
+    Preconditions.checkArgument(
+        !location.contains("%"), "location must not contain percent-encoding: %s", location);
+    final URI uri;
+    try {
+      uri = URI.create(location);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("location must be a valid URI: " + location, e);
+    }
+    Preconditions.checkArgument(
+        uri.getQuery() == null
+            && uri.getFragment() == null
+            && uri.getPath() != null
+            && uri.getPath().startsWith("/"),
+        "location must be an absolute path without query or fragment: %s",
+        location);
+    return uri;
+  }
+
   @Override
   public void validate() {
     super.validate();
@@ -150,23 +189,8 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
         !Boolean.TRUE.equals(executionSpec().commitTrigger()),
         "commitTrigger is not allowed for orphan file removal");
     validateOlderThanDays(olderThanDays);
-    Preconditions.checkArgument(
-        location == null || StringUtils.isNotBlank(location), "location must not be blank");
-    Preconditions.checkArgument(
-        location == null || location.equals(StringUtils.strip(location.trim())),
-        "location must not have leading or trailing whitespace");
     if (location != null) {
-      // Mirror OrphanFileLocationUtils.normalizeLocation safety without needing a table root.
-      Preconditions.checkArgument(
-          !location.contains(".."), "location must not contain '..' path segments: %s", location);
-      Preconditions.checkArgument(
-          !location.contains("\\"), "location must not contain '\\': %s", location);
-      Preconditions.checkArgument(
-          !location.contains("%"), "location must not contain percent-encoding: %s", location);
-      Preconditions.checkArgument(
-          !location.contains("?") && !location.contains("#"),
-          "location must not contain query or fragment: %s",
-          location);
+      parseAndValidateLocation(location);
     }
   }
 

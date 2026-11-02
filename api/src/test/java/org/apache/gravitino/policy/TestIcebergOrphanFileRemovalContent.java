@@ -103,7 +103,9 @@ class TestIcebergOrphanFileRemovalContent {
           "s3://bucket/table/%2e%2e/other",
           "s3://bucket/table\\data",
           "s3://bucket/table/data?query",
-          "s3://bucket/table/data#frag"
+          "s3://bucket/table/data#frag",
+          "s3://bucket/tbl/da ta",
+          "s3://bucket/tbl/da\tta"
         }) {
       IllegalArgumentException error =
           Assertions.assertThrows(

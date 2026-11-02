@@ -73,7 +73,11 @@ class TestManifestRewritePolicyDTO {
     "manifest_count_warning,100.5",
     "manifest_count_warning,false",
     "avg_manifest_size_threshold_bytes,4096.5",
-    "avg_manifest_size_threshold_bytes,\"4096\""
+    "avg_manifest_size_threshold_bytes,\"4096\"",
+    "minIntervalMs,1.5",
+    "minIntervalMs,\"100\"",
+    "commitTrigger,1",
+    "commitTrigger,\"true\""
   })
   void testRejectInvalidValuesInCreateAndUpdate(String field, String value) {
     String content = "{\"" + field + "\":" + value + "}";
