@@ -38,6 +38,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.IcebergRequestBodyReaderInterceptor;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
@@ -117,8 +118,11 @@ public class IcebergRestTestUtil {
       WrapperManagerFactory wrapperManagerFactory) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
-    resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    resourceConfig
+        .register(IcebergObjectMapperProvider.class)
+        .register(JacksonFeature.withoutExceptionMappers());
     resourceConfig.register(IcebergExceptionMapper.class);
+    resourceConfig.register(IcebergRequestBodyReaderInterceptor.class);
 
     if (DEBUG_SERVER_LOG_ENABLED) {
       resourceConfig.register(
