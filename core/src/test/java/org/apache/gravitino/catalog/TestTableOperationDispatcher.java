@@ -394,7 +394,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new TableOperationDispatcher(
             catalogManager, entityStore, idGenerator, () -> schemaDispatcher, secretManager);
     try {
+      clearInvocations(entityStore);
       Assertions.assertEquals("managed", dispatcher.loadTable(ident).comment());
+      verify(entityStore, times(1)).get(ident, TABLE, TableEntity.class);
       verifyNoInteractions(schemaDispatcher);
       Assertions.assertFalse(entityStore.exists(ident, TABLE));
     } finally {
@@ -434,7 +436,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertTrue(entityStore.exists(ident, TABLE));
       verify(operations, times(1)).loadTable(ident);
       long importedId = entityStore.get(ident, TABLE, TableEntity.class).id();
+      clearInvocations(entityStore);
       tableOperationDispatcher.loadTable(ident);
+      // Accepted cost: the preflight and warm metadata path each read the registration.
+      verify(entityStore, times(2)).get(ident, TABLE, TableEntity.class);
       verify(operations, times(2)).loadTable(ident);
       Assertions.assertEquals(importedId, entityStore.get(ident, TABLE, TableEntity.class).id());
     } finally {
