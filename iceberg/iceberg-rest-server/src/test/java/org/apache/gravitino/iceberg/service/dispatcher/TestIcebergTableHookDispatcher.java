@@ -28,11 +28,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -53,6 +55,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
@@ -581,6 +584,79 @@ public class TestIcebergTableHookDispatcher {
         .setOwner(eq(TEST_METALAKE), any(), userCaptor.capture(), eq(Owner.Type.USER));
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     Assertions.assertEquals(TEST_USER, userCaptor.getValue());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testCreateTableRecordsTheCreator() throws IOException {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+    when(mockDispatcher.createTable(mockContext, namespace, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.createTable(mockContext, namespace, request);
+
+    NameIdentifier identifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"), ":");
+    ArgumentCaptor<Function<TableEntity, TableEntity>> updater =
+        ArgumentCaptor.forClass(Function.class);
+    verify(mockEntityStore)
+        .update(
+            eq(identifier), eq(TableEntity.class), eq(Entity.EntityType.TABLE), updater.capture());
+    TableEntity imported =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("test_table")
+            .withNamespace(identifier.namespace())
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    TableEntity recorded = updater.getValue().apply(imported);
+    Assertions.assertEquals(TEST_USER, recorded.auditInfo().creator());
+    Assertions.assertNotNull(recorded.auditInfo().createTime());
+    Assertions.assertEquals(imported.id(), recorded.id());
+  }
+
+  @Test
+  public void testSchemaChangeCommitSyncsColumnsWhileRunningAsTheCommitter() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    Schema newSchema =
+        new Schema(
+            1,
+            NestedField.required(1, "test_field", StringType.get()),
+            NestedField.optional(2, "c", StringType.get()));
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Arrays.asList(
+                new MetadataUpdate.AddSchema(newSchema), new MetadataUpdate.SetCurrentSchema(-1)));
+    when(mockDispatcher.updateTable(mockContext, tableId, request))
+        .thenReturn(mock(LoadTableResponse.class));
+
+    hookDispatcher.updateTable(mockContext, tableId, request);
+
+    verify(mockInternalTableDispatcher)
+        .loadTable(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                TEST_METALAKE, TEST_CATALOG, tableId, ":"));
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testOnlySchemaUpdatesCountAsSchemaChanges() {
+    Assertions.assertFalse(
+        IcebergTableHookDispatcher.changesSchema(
+            new UpdateTableRequest(
+                Collections.emptyList(),
+                Collections.singletonList(
+                    new MetadataUpdate.SetProperties(ImmutableMap.of("k", "v"))))));
+    Assertions.assertTrue(
+        IcebergTableHookDispatcher.changesSchema(
+            new UpdateTableRequest(
+                Collections.emptyList(),
+                Collections.singletonList(new MetadataUpdate.SetCurrentSchema(0)))));
   }
 
   @Test

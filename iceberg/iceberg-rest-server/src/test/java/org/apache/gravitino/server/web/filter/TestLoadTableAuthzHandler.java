@@ -22,6 +22,8 @@ package org.apache.gravitino.server.web.filter;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,12 +49,14 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Test for {@link LoadTableAuthzHandler}. */
@@ -153,6 +157,63 @@ public class TestLoadTableAuthzHandler {
     // A 404 would make the client fall back to the metadata table of a.b, so the request goes on
     // to authorization and the real load reports the failure.
     assertDoesNotThrow(() -> handler.process(baseIdentifierMap()));
+  }
+
+  @Test
+  public void testViewNameIsForbiddenToCallersWhoCannotSeeTheView() throws Exception {
+    InMemoryCatalog catalog = newCatalog();
+    resetContextWithView(catalog);
+    LoadTableAuthzHandler handler = createHandler(new Object[] {TEST_CATALOG + "/", "db", "v"});
+
+    try (MockedStatic<IcebergLoadAuthzHandlerHelper> helper =
+        Mockito.mockStatic(IcebergLoadAuthzHandlerHelper.class, Mockito.CALLS_REAL_METHODS)) {
+      helper
+          .when(() -> IcebergLoadAuthzHandlerHelper.isAllowed(any(), anyString()))
+          .thenReturn(false);
+      helper
+          .when(() -> IcebergLoadAuthzHandlerHelper.isAllowed(any(), anyString(), any()))
+          .thenReturn(false);
+
+      // Same answer as for a table the caller may not load, so the view's name is not revealed.
+      assertThrows(ForbiddenException.class, () -> handler.process(baseIdentifierMap()));
+    }
+  }
+
+  @Test
+  public void testViewNameIs404ToCallersWhoCanSeeTheView() throws Exception {
+    InMemoryCatalog catalog = newCatalog();
+    resetContextWithView(catalog);
+    LoadTableAuthzHandler handler = createHandler(new Object[] {TEST_CATALOG + "/", "db", "v"});
+
+    try (MockedStatic<IcebergLoadAuthzHandlerHelper> helper =
+        Mockito.mockStatic(IcebergLoadAuthzHandlerHelper.class, Mockito.CALLS_REAL_METHODS)) {
+      helper
+          .when(
+              () ->
+                  IcebergLoadAuthzHandlerHelper.isAllowed(
+                      any(),
+                      eq(
+                          AuthorizationExpressionConstants
+                              .ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION)))
+          .thenReturn(true);
+      helper
+          .when(() -> IcebergLoadAuthzHandlerHelper.isAllowed(any(), anyString(), any()))
+          .thenReturn(false);
+
+      // The client falls back to /views/ on 404.
+      assertThrows(NoSuchTableException.class, () -> handler.process(baseIdentifierMap()));
+    }
+  }
+
+  private static void resetContextWithView(InMemoryCatalog catalog) {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST catalogWrapper = Mockito.mock(CatalogWrapperForREST.class);
+    when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(catalogWrapper);
+    when(catalogWrapper.getCatalog()).thenReturn(catalog);
+    when(catalogWrapper.supportsViewOperations()).thenReturn(true);
+    when(catalogWrapper.viewExists(TableIdentifier.of("db", "v"))).thenReturn(true);
+    when(catalogWrapper.tableExists(any(TableIdentifier.class))).thenReturn(false);
+    resetContext(wrapperManager);
   }
 
   private static LoadTableAuthzHandler createHandler(Object[] args) throws Exception {

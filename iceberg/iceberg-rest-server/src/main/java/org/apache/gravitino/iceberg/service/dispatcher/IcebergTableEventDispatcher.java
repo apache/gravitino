@@ -50,6 +50,9 @@ import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergReportTableMetricsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsFailureEvent;
@@ -60,6 +63,7 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.metrics.MetricsReport;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
@@ -242,6 +246,25 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(new IcebergTableExistsEvent(context, gravitinoNameIdentifier, isExists));
     return isExists;
+  }
+
+  @Override
+  public void checkTableMetricsReport(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, MetricsReport report) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergReportTableMetricsPreEvent(context, gravitinoNameIdentifier));
+    try {
+      // The delegate checks existence without a table-exists event of its own: the client
+      // reported metrics, it did not ask whether the table exists.
+      icebergTableOperationDispatcher.checkTableMetricsReport(context, tableIdentifier, report);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergReportTableMetricsFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergReportTableMetricsEvent(context, gravitinoNameIdentifier));
   }
 
   @Override

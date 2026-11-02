@@ -300,6 +300,8 @@ public interface AuditLog {
 
     TABLE_EXISTS,
 
+    REPORT_TABLE_METRICS,
+
     PARTITION_EXIST,
 
     ADD_PARTITION,
