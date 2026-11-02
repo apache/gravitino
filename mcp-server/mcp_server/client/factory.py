@@ -35,6 +35,7 @@ class RESTClientFactory:
         authorization: str = "",
         *,
         auth=None,
+        read_timeout: float = 60.0,
     ) -> "PlainRESTClientOperation":
         """
         Create a new rest client instance with the specified parameters.
@@ -45,13 +46,18 @@ class RESTClientFactory:
             authorization: Full Authorization header value forwarded verbatim
                 (e.g. "Bearer <token>" or "Basic <base64(user:dummy)>").
                 Empty string means anonymous.
+            read_timeout: Response read timeout in seconds.
             auth: Optional httpx auth hook. ``None`` for static or anonymous.
 
         Returns:
             New instance of the configured rest client class
         """
         return cls._rest_client_class(
-            metalake_name, uri, authorization, auth=auth
+            metalake_name,
+            uri,
+            authorization,
+            auth=auth,
+            read_timeout=read_timeout,
         )
 
     @classmethod

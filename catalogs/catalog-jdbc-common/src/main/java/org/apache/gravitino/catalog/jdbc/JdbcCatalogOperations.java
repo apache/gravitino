@@ -592,13 +592,10 @@ public class JdbcCatalogOperations
           Arrays.stream(changes)
               .filter(tableChange -> !(tableChange instanceof TableChange.RenameTable))
               .map(String::valueOf)
-              .collect(Collectors.joining("\n"));
+              .collect(Collectors.joining(", "));
       Preconditions.checkArgument(
           StringUtils.isEmpty(otherChange),
-          String.format(
-              "The operation to change the table name cannot be performed together with other operations."
-                  + "The list of operations that you cannot perform includes: \n %s",
-              otherChange));
+          String.format("A table rename cannot be combined with other changes: %s", otherChange));
       return renameTable(tableIdent, (TableChange.RenameTable) renameTableOptional.get());
     }
     return internalAlterTable(tableIdent, changes);
@@ -641,11 +638,13 @@ public class JdbcCatalogOperations
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     JdbcTableOperations jdbcTableOperations = (JdbcTableOperations) tableOperation;
-    if (!jdbcTableOperations.supportsTableSortOrder()) {
-      Preconditions.checkArgument(
-          null == sortOrders || sortOrders.length == 0,
-          "The current JDBC connector: %s does not support sort orders",
-          jdbcTableOperations.getClass().getName());
+    if (!jdbcTableOperations.supportsTableSortOrder()
+        && sortOrders != null
+        && sortOrders.length > 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot create table %s: %s",
+              tableIdent, jdbcTableOperations.unsupportedTableSortOrderMessage()));
     }
 
     StringIdentifier identifier = StringIdentifier.fromProperties(properties);

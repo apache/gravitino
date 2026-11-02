@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -37,6 +39,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterViewRequest;
@@ -69,6 +72,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     String catalogName = context.catalogName();
     Namespace leaf = createRequest.namespace();
+    checkGravitinoSchemaName(leaf);
     List<Namespace> newlyOwned = new ArrayList<>();
     // Lock the top-level branch root rather than the whole catalog: any race on shared ancestor
     // ownership has to share leaf.level(0), so serializing per top-level branch is sufficient
@@ -86,12 +90,20 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
     // Gravitino entity row for each ancestor, so a single leaf import covers the branch.
     // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
-    // that Gravitino doesn't know about.
+    // that Gravitino doesn't know about. Do not drop the namespace on import failure: another
+    // client may already have created objects in it.
     importSchema(catalogName, leaf);
 
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.
     newlyOwned.add(leaf);
+    for (Namespace created : newlyOwned) {
+      IcebergEntityAuditUtils.recordCreator(
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, catalogName, created, HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.SCHEMA,
+          context.userName());
+    }
     IcebergOwnershipUtils.setSchemaOwners(
         metalake,
         catalogName,
@@ -99,6 +111,33 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         context.userName(),
         GravitinoEnv.getInstance().internalOwnerDispatcher());
     return createNamespaceResponse;
+  }
+
+  /**
+   * Rejects a namespace Gravitino cannot hold as a schema before anything is created: a level
+   * containing '.', which is reserved as the qualified-name separator (and which the JDBC backend
+   * would store as a different, nested namespace), or a full name longer than the schema name
+   * column.
+   */
+  @VisibleForTesting
+  static void checkGravitinoSchemaName(Namespace namespace) {
+    if (GravitinoEnv.getInstance().internalSchemaDispatcher() == null) {
+      return;
+    }
+    for (String level : namespace.levels()) {
+      if (level.contains(".")) {
+        throw new BadRequestException(
+            "Invalid namespace %s: the level '%s' contains '.', which is reserved as the"
+                + " qualified-name separator",
+            namespace, level);
+      }
+    }
+    String name = String.join(HierarchicalSchemaUtil.schemaSeparator(), namespace.levels());
+    if (name.codePointCount(0, name.length()) > EntityFieldLimits.MAX_NAME_LENGTH) {
+      throw new BadRequestException(
+          "Invalid namespace %s: the full name must not exceed %s characters",
+          namespace, EntityFieldLimits.MAX_NAME_LENGTH);
+    }
   }
 
   /**
@@ -199,6 +238,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
     importTable(context.catalogName(), namespace, registerTableRequest.name());
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, registerTableRequest.name()),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.TABLE,
+        context.userName());
 
     IcebergOwnershipUtils.setTableOwner(
         metalake,
@@ -226,6 +273,14 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
     importView(context.catalogName(), namespace, registerViewRequest.name());
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, registerViewRequest.name()),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.VIEW,
+        context.userName());
 
     IcebergOwnershipUtils.setViewOwner(
         metalake,
