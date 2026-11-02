@@ -46,7 +46,9 @@ public class PostgreSqlCatalogCapability implements Capability {
     if (!name.matches(POSTGRESQL_NAME_PATTERN)
         || name.getBytes(StandardCharsets.UTF_8).length > 63) {
       return CapabilityResult.unsupported(
-          String.format("The %s name '%s' is illegal.", scope, name));
+          String.format(
+              "The %s name '%s' is illegal. Names must use supported characters and contain at most 63 UTF-8 bytes.",
+              scope, name));
     }
 
     if (scope == Scope.SCHEMA && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase())) {

@@ -191,6 +191,14 @@ public class TestPostgreSqlCatalogCapability {
   }
 
   @Test
+  void testByteLimitDiagnostic() {
+    CapabilityResult result =
+        capability.specificationOnName(Capability.Scope.TABLE, "表".repeat(22));
+    Assertions.assertFalse(result.supported());
+    Assertions.assertTrue(result.unsupportedMessage().contains("63 UTF-8 bytes"));
+  }
+
+  @Test
   void testMixedValidAndInvalidCharacters() {
     // names that start valid but contain invalid characters should be rejected
     CapabilityResult result =
