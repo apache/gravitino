@@ -102,7 +102,10 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .updateNamespaceProperties(namespace, updateNamespacePropertiesRequest);
+        .updateNamespaceProperties(
+            namespace,
+            IcebergOwnerPropertyGuard.protect(
+                updateNamespacePropertiesRequest, context.userName()));
   }
 
   @Override
