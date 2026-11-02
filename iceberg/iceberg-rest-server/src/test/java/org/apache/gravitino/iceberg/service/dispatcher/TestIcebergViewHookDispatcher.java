@@ -184,6 +184,10 @@ public class TestIcebergViewHookDispatcher {
     verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
     verify(mockViewDispatcher, never()).loadView(any());
 
+    // Verify the creator was recorded on the imported view
+    verify(mockEntityStore)
+        .update(eq(expectedIdent), eq(ViewEntity.class), eq(Entity.EntityType.VIEW), any());
+
     // Verify ownership was set
     verify(mockInternalOwnerDispatcher, times(1)).setOwner(any(), any(), eq(USER), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
