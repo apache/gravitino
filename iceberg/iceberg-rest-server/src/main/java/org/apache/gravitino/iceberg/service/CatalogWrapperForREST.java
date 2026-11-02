@@ -59,6 +59,7 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -68,6 +69,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -138,9 +140,41 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return loadTableResponse;
   }
 
+  /**
+   * Registers a table. An overwrite with a metadata file that belongs to a different table (another
+   * table UUID) is refused before anything is written: Iceberg would replace the table and then
+   * fail the request when it reads the replaced table back.
+   *
+   * @param namespace the namespace of the table
+   * @param request the register request
+   * @return the registered table
+   */
+  @Override
+  public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    checkOverwriteKeepsTableUuid(namespace, request);
+    return super.registerTable(namespace, request);
+  }
+
+  /**
+   * Commits table updates, with {@link IcebergCommitValidation} checking the updates against the
+   * metadata they are applied to.
+   *
+   * @param tableIdentifier the table to update
+   * @param updateTableRequest the updates and requirements
+   * @return the updated table
+   */
+  @Override
+  public LoadTableResponse updateTable(
+      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    return super.updateTable(
+        tableIdentifier,
+        IcebergCommitValidation.withValidation(
+            updateTableRequest, () -> getCatalog().loadTable(tableIdentifier).io()));
+  }
+
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
+    LoadTableResponse loadTableResponse = registerTable(namespace, request);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       // Vend WRITE credentials: the registering user becomes the table owner
       // (IcebergNamespaceHookDispatcher.setTableOwner runs after this call
@@ -696,5 +730,29 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private static String withoutSchemaStruct(String message) {
     // Iceberg's binding errors append the whole table struct; it is not useful to a client.
     return message == null ? null : message.replaceAll(" in struct: .*$", "");
+  }
+
+  private void checkOverwriteKeepsTableUuid(Namespace namespace, RegisterTableRequest request) {
+    if (request == null || !request.overwrite() || request.metadataLocation() == null) {
+      return;
+    }
+    TableIdentifier identifier = TableIdentifier.of(namespace, request.name());
+    if (!tableExists(identifier)) {
+      return;
+    }
+    String currentUuid = super.loadTable(identifier).tableMetadata().uuid();
+    String newUuid;
+    try {
+      newUuid = loadTableMetadataFromLocation(request.metadataLocation()).uuid();
+    } catch (RuntimeException e) {
+      // A metadata file that cannot be read is reported by the register itself.
+      return;
+    }
+    if (currentUuid != null && newUuid != null && !currentUuid.equals(newUuid)) {
+      throw new BadRequestException(
+          "Cannot overwrite table %s with metadata of a different table: current table UUID %s,"
+              + " metadata location %s has table UUID %s",
+          identifier, currentUuid, request.metadataLocation(), newUuid);
+    }
   }
 }

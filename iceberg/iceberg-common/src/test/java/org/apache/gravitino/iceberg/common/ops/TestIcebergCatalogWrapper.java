@@ -21,9 +21,11 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,9 +39,12 @@ import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
@@ -59,6 +64,8 @@ import org.apache.iceberg.view.ViewOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
@@ -303,6 +310,53 @@ public class TestIcebergCatalogWrapper {
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.registerTable(namespace, request));
       Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(
+      boolean gcEnabled, @TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier ident = TableIdentifier.of(namespace, "purged");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      Table table =
+          wrapper
+              .getCatalog()
+              .createTable(
+                  ident,
+                  new Schema(Types.NestedField.required(1, "id", Types.LongType.get())),
+                  PartitionSpec.unpartitioned(),
+                  ImmutableMap.of("gc.enabled", Boolean.toString(gcEnabled)));
+      Path first = Files.createFile(warehouseDir.resolve("first.parquet"));
+      Path second = Files.createFile(warehouseDir.resolve("second.parquet"));
+      for (Path data : new Path[] {first, second}) {
+        table
+            .newFastAppend()
+            .appendFile(
+                DataFiles.builder(table.spec())
+                    .withPath(data.toUri().toString())
+                    .withFileSizeInBytes(1)
+                    .withRecordCount(1)
+                    .build())
+            .commit();
+      }
+      table.refresh();
+      String metadataFile =
+          ((HasTableOperations) table).operations().current().metadataFileLocation();
+      // The first snapshot's manifest list is gone.
+      Files.delete(
+          Paths.get(URI.create(table.snapshots().iterator().next().manifestListLocation())));
+
+      wrapper.purgeTable(ident);
+
+      Assertions.assertFalse(wrapper.getCatalog().tableExists(ident));
+      // Files reachable through the remaining manifest list, and the metadata, are deleted.
+      Assertions.assertEquals(!gcEnabled, Files.exists(first));
+      Assertions.assertEquals(!gcEnabled, Files.exists(second));
+      Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
     }
   }
 

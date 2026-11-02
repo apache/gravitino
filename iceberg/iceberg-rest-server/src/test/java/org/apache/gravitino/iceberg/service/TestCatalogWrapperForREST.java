@@ -32,6 +32,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +46,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -59,6 +61,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
@@ -77,6 +80,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponseParser;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestCatalogWrapperForREST {
 
@@ -431,6 +435,74 @@ public class TestCatalogWrapperForREST {
     Assertions.assertTrue(
         withProvider.shouldGenerateCredential(
             withProvider.loadTable(table, false, CredentialPrivilege.READ), true));
+  }
+
+  @Test
+  void testRegisterOverwriteWithAnotherTablesMetadataIsRefused(@TempDir Path warehouse)
+      throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.<String, String>builder()
+                .put(IcebergConstants.CATALOG_BACKEND, "jdbc")
+                .put(IcebergConstants.URI, "jdbc:sqlite:" + warehouse.resolve("catalog.db"))
+                .put(IcebergConstants.WAREHOUSE, warehouse.toUri().toString())
+                .put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC")
+                .put(IcebergConstants.ICEBERG_JDBC_USER, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test")
+                .put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")
+                .build());
+    try (CatalogWrapperForREST wrapper = new CatalogWrapperForREST("register-test", config)) {
+      Namespace namespace = Namespace.of("db");
+      Catalog catalog = wrapper.getCatalog();
+      ((SupportsNamespaces) catalog).createNamespace(namespace);
+      Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+      TableIdentifier target = TableIdentifier.of(namespace, "target");
+      TableIdentifier other = TableIdentifier.of(namespace, "other");
+      catalog.createTable(target, schema);
+      catalog.createTable(other, schema);
+      String targetMetadata =
+          ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation();
+      String otherMetadata =
+          ((BaseTable) catalog.loadTable(other)).operations().current().metadataFileLocation();
+
+      RegisterTableRequest otherTable =
+          ImmutableRegisterTableRequest.builder()
+              .name("target")
+              .metadataLocation(otherMetadata)
+              .overwrite(true)
+              .build();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.registerTable(namespace, otherTable));
+      Assertions.assertTrue(e.getMessage().contains("different table"), e.getMessage());
+      // The REST executor uses the overload carrying the credential-vending flag.
+      for (boolean requestCredential : new boolean[] {false, true}) {
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> wrapper.registerTable(namespace, otherTable, requestCredential));
+      }
+      Assertions.assertEquals(
+          targetMetadata,
+          ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation());
+
+      // Matching metadata passes UUID validation. The OSS JDBC backend on branch-1.3 still rejects
+      // overwrite, so preserve that backend response rather than adding overwrite support here.
+      RegisterTableRequest sameTable =
+          ImmutableRegisterTableRequest.builder()
+              .name("target")
+              .metadataLocation(targetMetadata)
+              .overwrite(true)
+              .build();
+      UnsupportedOperationException unsupported =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class,
+              () -> wrapper.registerTable(namespace, sameTable));
+      Assertions.assertEquals(
+          "Registering tables with overwrite is not supported", unsupported.getMessage());
+      Assertions.assertEquals(
+          targetMetadata,
+          ((BaseTable) catalog.loadTable(target)).operations().current().metadataFileLocation());
+    }
   }
 
   @Test
