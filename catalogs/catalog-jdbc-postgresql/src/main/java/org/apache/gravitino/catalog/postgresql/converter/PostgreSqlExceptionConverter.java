@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.postgresql.converter;
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -35,6 +36,7 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   private static final String INVALID_SCHEMA_NAME = "3D000";
   private static final String INVALID_SCHEMA = "3F000";
   private static final String UNDEFINED_TABLE = "42P01";
+  private static final String INSUFFICIENT_PRIVILEGE = "42501";
 
   /**
    * SQLSTATE '08' is the class code of connection exceptions See <a
@@ -48,6 +50,8 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     if (null != se.getSQLState()) {
       switch (se.getSQLState()) {
+        case INSUFFICIENT_PRIVILEGE:
+          return new ForbiddenException(se, "%s", se.getMessage());
         case DUPLICATE_DATABASE:
         case DUPLICATE_SCHEMA:
           return new SchemaAlreadyExistsException(se.getMessage(), se);

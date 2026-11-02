@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -48,6 +50,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -56,6 +59,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
@@ -96,6 +100,40 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @Override
   public void setDatabaseOperation(DatabaseOperation databaseOperation) {
     this.schemaOperations = (PostgreSqlSchemaOperations) databaseOperation;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void create(
+      String schema,
+      String tableName,
+      JdbcColumn[] columns,
+      @Nullable String comment,
+      Map<String, String> properties,
+      @Nullable Transform[] partitioning,
+      Distribution distribution,
+      Index[] indexes,
+      @Nullable SortOrder[] sortOrders) {
+    try {
+      super.create(
+          schema,
+          tableName,
+          columns,
+          comment,
+          properties,
+          partitioning,
+          distribution,
+          indexes,
+          sortOrders);
+    } catch (NoSuchSchemaException e) {
+      // PostgreSQL removes unusable schemas from search_path. An unqualified CREATE can therefore
+      // report 3F000 even when the requested schema exists but the source role has no USAGE.
+      if (schemaLacksUsage(schema)) {
+        throw new ForbiddenException(
+            e, "Insufficient source privileges for schema %s: USAGE is required", schema);
+      }
+      throw e;
+    }
   }
 
   @Override
@@ -207,7 +245,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           .append(tableName)
           .append(PG_QUOTE)
           .append(IS)
-          .append(escapeSqlLiteral(comment, '\''))
+          .append(escapeSqlLiteral(validateText(comment, "table comment"), '\''))
           .append("';");
     }
     Arrays.stream(columns)
@@ -225,7 +263,11 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
                     .append(jdbcColumn.name())
                     .append(PG_QUOTE)
                     .append(IS)
-                    .append(escapeSqlLiteral(jdbcColumn.comment(), '\''))
+                    .append(
+                        escapeSqlLiteral(
+                            validateText(
+                                jdbcColumn.comment(), "comment for column " + jdbcColumn.name()),
+                            '\''))
                     .append("';"));
 
     // Return the generated SQL statement
@@ -504,7 +546,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private String updateCommentDefinition(
       TableChange.UpdateComment updateComment, JdbcTable jdbcTable) {
-    String newComment = StringUtils.defaultString(updateComment.getNewComment());
+    String newComment =
+        StringUtils.defaultString(validateText(updateComment.getNewComment(), "table comment"));
     if (null == StringIdentifier.fromComment(newComment)) {
       // Detect and add Gravitino id.
       if (StringUtils.isNotEmpty(jdbcTable.comment())) {
@@ -519,7 +562,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         + jdbcTable.name()
         + PG_QUOTE
         + IS
-        + escapeSqlLiteral(newComment, '\'')
+        + escapeSqlLiteral(validateText(newComment, "table comment"), '\'')
         + "';";
   }
 
@@ -705,7 +748,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
               + col
               + PG_QUOTE
               + IS
-              + escapeSqlLiteral(addColumn.getComment(), '\'')
+              + escapeSqlLiteral(
+                  validateText(addColumn.getComment(), "comment for column " + col), '\'')
               + "';");
     }
     return result;
@@ -727,7 +771,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         + col
         + PG_QUOTE
         + IS
-        + escapeSqlLiteral(newComment, '\'')
+        + escapeSqlLiteral(validateText(newComment, "comment for column " + col), '\'')
         + "';";
   }
 
@@ -778,5 +822,28 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       default:
         return null;
     }
+  }
+
+  private boolean schemaLacksUsage(String schema) {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT pg_catalog.has_schema_privilege(n.oid, 'USAGE') "
+                    + "FROM pg_catalog.pg_namespace n WHERE n.nspname = ?")) {
+      statement.setString(1, schema);
+      try (ResultSet rows = statement.executeQuery()) {
+        return rows.next() && !rows.getBoolean(1);
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @Nullable
+  private static String validateText(@Nullable String text, String field) {
+    if (text != null && text.indexOf('\0') >= 0) {
+      throw new IllegalArgumentException("PostgreSQL " + field + " must not contain U+0000 (NUL)");
+    }
+    return text;
   }
 }
