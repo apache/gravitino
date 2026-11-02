@@ -82,6 +82,7 @@ public final class BoundedConnectionDriver implements Driver {
    *
    * @param delegate the driver to call, without registering the wrapper with DriverManager
    * @param timeoutMs a positive timeout in milliseconds
+   * @throws IllegalArgumentException if timeoutMs is not positive
    */
   public BoundedConnectionDriver(Driver delegate, long timeoutMs) {
     this(delegate, timeoutMs, WORKERS);

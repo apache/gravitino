@@ -192,8 +192,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Write secrets before createSchema: create paths that resolve URNs (e.g. Fileset FS
     // mergeUpLevelConfigurations, catalog createBaseCatalog) require secrets to exist first.
-    // Roll back on any create failure (same pattern as CatalogManager /
-    // FilesetOperationDispatcher).
+    // Roll back secrets only if external creation has not succeeded. Once the source schema
+    // exists, it may reference these secrets even if registration fails.
     secretManager.writeSecrets(secretMaterials);
     AtomicBoolean createdInCatalog = new AtomicBoolean();
     try {

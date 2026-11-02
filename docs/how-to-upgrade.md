@@ -274,11 +274,9 @@ After restoring, verify that your Gravitino instance starts
 successfully with the restored database before attempting the
 upgrade again.
 
-<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />
-
 ### Column name capacity in 2.0
 
-The entity store supports table column names up to 300 characters; other entity names retain
+The entity store supports top-level table column names up to 300 characters; other entity names retain
 their 128-character limit. Catalog-specific name restrictions still apply. Fresh 2.0 installs
 and the 1.3-to-2.0 upgrade scripts include this column expansion.
 
@@ -293,3 +291,5 @@ The 300-character boundary is consistent for ASCII/BMP names. Java validation co
 code points, whereas H2 counts UTF-16 code units for `VARCHAR` capacity. Names containing
 supplementary characters can reach H2's storage limit sooner; this existing backend difference
 is not changed by the expansion.
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />

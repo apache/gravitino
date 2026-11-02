@@ -170,6 +170,52 @@ class TestBoundedConnectionDriver {
   }
 
   @Test
+  void testBlockedLateCloseKeepsQuarantineUntilCleanupCompletes() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    Connection healthy = mock(Connection.class);
+    CountDownLatch connectEntered = new CountDownLatch(1);
+    CountDownLatch releaseConnect = new CountDownLatch(1);
+    CountDownLatch closeEntered = new CountDownLatch(1);
+    CountDownLatch releaseClose = new CountDownLatch(1);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              connectEntered.countDown();
+              awaitIgnoringInterrupts(releaseConnect);
+              return late;
+            })
+        .thenReturn(healthy);
+    doAnswer(
+            invocation -> {
+              closeEntered.countDown();
+              awaitIgnoringInterrupts(releaseClose);
+              return null;
+            })
+        .when(late)
+        .close();
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(connectEntered.await(10, TimeUnit.SECONDS));
+      releaseConnect.countDown();
+      assertTrue(closeEntered.await(10, TimeUnit.SECONDS));
+      SQLTransientConnectionException error =
+          assertThrows(
+              SQLTransientConnectionException.class,
+              () -> bounded.connect("jdbc:test", new Properties()));
+      assertEquals("08001", error.getSQLState());
+      verify(driver, times(1)).connect(anyString(), any());
+    } finally {
+      releaseConnect.countDown();
+      releaseClose.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertSame(healthy, bounded.connect("jdbc:test", new Properties()));
+    verify(late, times(1)).close();
+  }
+
+  @Test
   void testCallerInterruptClosesLateConnection() throws Exception {
     Driver driver = mock(Driver.class);
     Connection late = mock(Connection.class);
