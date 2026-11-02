@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeS
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -231,6 +232,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @VisibleForTesting
   static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
+      validateIndexName(index.name());
       String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",").append(NEW_LINE);
       switch (index.type()) {
@@ -428,12 +430,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   @VisibleForTesting
   static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
+    validateIndexName(addIndex.getName());
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("ALTER TABLE ")
         .append(quotedIdentifier(tableName))
-        .append(" ADD CONSTRAINT ")
-        .append(quotedIdentifier(addIndex.getName()));
+        .append(" ADD");
+    if (StringUtils.isNotEmpty(addIndex.getName())) {
+      sqlBuilder.append(" CONSTRAINT ").append(quotedIdentifier(addIndex.getName()));
+    }
     switch (addIndex.getType()) {
       case PRIMARY_KEY:
         sqlBuilder.append(" PRIMARY KEY ");
@@ -719,5 +724,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private static String quotedIdentifier(@Nullable String name) {
     return PG_QUOTE + String.valueOf(name).replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
+  }
+
+  private static void validateIndexName(@Nullable String name) {
+    if (name != null && name.getBytes(StandardCharsets.UTF_8).length > 63) {
+      throw new IllegalArgumentException(
+          "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
+    }
   }
 }

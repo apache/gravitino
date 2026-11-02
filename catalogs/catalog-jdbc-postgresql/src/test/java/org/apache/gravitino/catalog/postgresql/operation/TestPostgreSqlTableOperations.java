@@ -45,6 +45,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -85,6 +86,39 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
       Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("injected_marker"));
     } finally {
       TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
+  @Test
+  void testUnnamedUniqueIndexesDoNotCollideAcrossTables() {
+    String first = RandomNameUtils.genRandomName("unnamed_first");
+    String second = RandomNameUtils.genRandomName("unnamed_second");
+    for (String name : new String[] {first, second}) {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          name,
+          new JdbcColumn[] {
+            JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+          },
+          null,
+          Map.of(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+    }
+    try {
+      for (String name : new String[] {first, second}) {
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            name,
+            TableChange.addIndex(IndexType.UNIQUE_KEY, null, new String[][] {{"id"}}));
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(1, table.index().length);
+        Assertions.assertNotEquals("null", table.index()[0].name());
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, first);
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, second);
     }
   }
 
