@@ -71,7 +71,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
               + TEST_DB_NAME
               + "."
               + name
-              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[])");
+              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[], wide numeric(39,0)[])");
       try {
         JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
         Assertions.assertEquals(
@@ -83,6 +83,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         Assertions.assertEquals(
             Types.ListType.nullable(Types.TimestampType.withoutTimeZone(3)),
             table.columns()[3].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric(39,0)")),
+            table.columns()[4].dataType());
       } finally {
         TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
       }
