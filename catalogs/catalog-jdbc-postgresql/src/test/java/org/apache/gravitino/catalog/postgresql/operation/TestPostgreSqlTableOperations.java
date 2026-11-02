@@ -57,6 +57,34 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   private static Type INT = Types.IntegerType.get();
 
   @Test
+  void testArrayElementMetadataFromSource() throws SQLException {
+    String name = RandomNameUtils.genRandomName("array_metadata");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[])");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.FixedCharType.of(3)), table.columns()[0].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.VarCharType.of(12)), table.columns()[1].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.DecimalType.of(10, 2)), table.columns()[2].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimestampType.withoutTimeZone(3)),
+            table.columns()[3].dataType());
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomNameUtils.genRandomName("op_table_");
     String tableComment = "test_comment";

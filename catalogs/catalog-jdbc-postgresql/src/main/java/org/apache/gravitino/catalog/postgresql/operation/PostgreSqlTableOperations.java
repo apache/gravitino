@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -766,7 +767,10 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   @Override
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
-    String upperTypeName = typeName.toUpperCase();
+    String upperTypeName = typeName.toUpperCase(Locale.ROOT);
+    if (upperTypeName.startsWith("_")) {
+      upperTypeName = upperTypeName.substring(1);
+    }
     switch (upperTypeName) {
       case "TIME":
       case "TIMETZ":

@@ -92,7 +92,10 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
             ? Types.StringType.get()
             : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
-        return Types.FixedCharType.of(typeBean.getColumnSize());
+        Integer length = typeBean.getColumnSize();
+        return length == null || length <= 0
+            ? Types.StringType.get()
+            : Types.FixedCharType.of(length);
       case TEXT:
         return Types.StringType.get();
       case BYTEA:
