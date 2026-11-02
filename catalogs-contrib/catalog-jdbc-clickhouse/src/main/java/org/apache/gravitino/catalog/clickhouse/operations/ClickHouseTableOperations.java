@@ -947,7 +947,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
       String partitionKey = getPartitionKey(connection, databaseName, tableName);
-      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey));
+      Map<String, Type> columnTypes = new HashMap<>();
+      for (JdbcColumn column : jdbcColumns) {
+        columnTypes.put(column.name(), column.dataType());
+      }
+      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey, columnTypes));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -1765,6 +1769,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   Transform[] parsePartitioning(@Nullable String partitionKey) {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
+  }
+
+  @VisibleForTesting
+  Transform[] parsePartitioning(@Nullable String partitionKey, Map<String, Type> columnTypes) {
+    return ClickHouseTableSqlUtils.parsePartitioning(partitionKey, columnTypes);
   }
 
   // Parses "key1 = val1, key2 = val2" from a SETTINGS clause. Keys are prefixed with

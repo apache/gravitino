@@ -627,6 +627,29 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testLoadTableWithNestedTypeConversion() {
+    // A nested pure type conversion over a DateTime column (toDate is lossless for the month
+    // granularity) is unwrapped to a structured transform.
+    String name = GravitinoITUtils.genRandomName("nested_type_conversion");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `event_time` DateTime,\n"
+                + "  `v` UInt32\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY toYYYYMM(toDate(event_time))\n"
+                + "ORDER BY event_time",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(Transforms.NAME_OF_MONTH, loaded.partitioning()[0].name());
+    Assertions.assertEquals(
+        "toYYYYMM(toDate(event_time))", loaded.properties().get(TableConstants.PARTITION_KEY));
+  }
+
+  @Test
   void testLoadTableWithoutPartition() {
     // An unpartitioned table exposes an empty partition-key property so the key is always present,
     // and partitioning() stays empty.

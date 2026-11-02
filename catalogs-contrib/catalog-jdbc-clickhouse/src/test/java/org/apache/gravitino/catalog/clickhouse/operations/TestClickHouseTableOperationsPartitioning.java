@@ -17,9 +17,12 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import java.util.Map;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -142,6 +145,51 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(
         0, operations.parsePartitioning("toStartOfQuarter(event_time, 1)").length);
     Assertions.assertEquals(0, operations.parsePartitioning("toStartOfYear(event_time, 1)").length);
+  }
+
+  @Test
+  public void testPureTypeConversionIsUnwrapped() {
+    Map<String, Type> dateColumns = Map.of("event_time", Types.DateType.get());
+    Transform[] monthPartitions =
+        operations.parsePartitioning("toYYYYMM(toDate(event_time))", dateColumns);
+    Assertions.assertEquals(1, monthPartitions.length);
+    assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "event_time");
+
+    Map<String, Type> timestampColumns = Map.of("ts", Types.TimestampType.withoutTimeZone(0));
+    Transform[] yearPartitions =
+        operations.parsePartitioning("toYear(toDateTime(ts))", timestampColumns);
+    Assertions.assertEquals(1, yearPartitions.length);
+    assertSingleFieldTransform(yearPartitions[0], Transforms.NAME_OF_YEAR, "ts");
+  }
+
+  @Test
+  public void testNonEquivalentExpressionsRemainUnstructured() {
+    // A String column requires the toDate cast, so it must not be unwrapped.
+    Map<String, Type> stringColumns = Map.of("event_time", Types.StringType.get());
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYYYYMM(toDate(event_time))", stringColumns).length);
+
+    Map<String, Type> dateColumns = Map.of("statis_ymd", Types.DateType.get());
+    // An arithmetic offset changes the semantics, so it must not be unwrapped.
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYYYYMM(toDate(statis_ymd + 1))", dateColumns).length);
+
+    Map<String, Type> timestampColumns = Map.of("ts", Types.TimestampType.withoutTimeZone(0));
+    // A nested granularity function changes the granularity, so it must not be unwrapped.
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toDate(toStartOfMonth(x))", dateColumns).length);
+    // A cast function (toString) is not a pure conversion.
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYear(toString(ts))", timestampColumns).length);
+  }
+
+  @Test
+  public void testPureTypeConversionRoundTrips() {
+    Map<String, Type> dateColumns = Map.of("event_time", Types.DateType.get());
+    Transform[] parsed = operations.parsePartitioning("toYYYYMM(toDate(event_time))", dateColumns);
+    Assertions.assertEquals(1, parsed.length);
+    Assertions.assertEquals(
+        "toYYYYMM(`event_time`)", ClickHouseTableSqlUtils.toPartitionExpression(parsed[0]));
   }
 
   private void assertFunctionTransform(
