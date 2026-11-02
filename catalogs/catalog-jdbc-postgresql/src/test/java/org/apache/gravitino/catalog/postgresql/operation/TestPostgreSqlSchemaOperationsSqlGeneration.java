@@ -62,6 +62,7 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
     String name = "a\\b_%'; SELECT 1; --";
     when(source.getConnection()).thenReturn(connection);
     when(connection.getMetaData()).thenReturn(metadata);
+    when(metadata.getSearchStringEscape()).thenReturn("\\");
     when(connection.getCatalog()).thenReturn("db");
     when(metadata.getSchemas(eq("db"), anyString())).thenReturn(schemas);
     when(schemas.next()).thenReturn(true, false);
@@ -74,7 +75,7 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
         new PostgreSqlExceptionConverter(),
         Collections.singletonMap(JdbcConfig.JDBC_DATABASE.getKey(), "db"));
     Assertions.assertEquals(name, operations.load(name).name());
-    verify(metadata).getSchemas("db", name);
+    verify(metadata).getSchemas("db", "a\\\\b\\_\\%'; SELECT 1; --");
     verify(statement).setString(1, name);
     verify(connection)
         .prepareStatement(
