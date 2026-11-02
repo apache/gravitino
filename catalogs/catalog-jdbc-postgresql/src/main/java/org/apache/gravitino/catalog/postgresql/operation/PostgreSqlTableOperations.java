@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeS
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -52,6 +53,7 @@ import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -231,6 +233,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @VisibleForTesting
   static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
+      validateIndexName(index.name());
       String fieldStr = getIndexFieldStr(index.fieldNames());
       sqlBuilder.append(",").append(NEW_LINE);
       switch (index.type()) {
@@ -428,12 +431,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   @VisibleForTesting
   static String addIndexDefinition(String tableName, TableChange.AddIndex addIndex) {
+    validateIndexName(addIndex.getName());
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder
         .append("ALTER TABLE ")
         .append(quotedIdentifier(tableName))
-        .append(" ADD CONSTRAINT ")
-        .append(quotedIdentifier(addIndex.getName()));
+        .append(" ADD");
+    if (StringUtils.isNotEmpty(addIndex.getName())) {
+      sqlBuilder.append(" CONSTRAINT ").append(quotedIdentifier(addIndex.getName()));
+    }
     switch (addIndex.getType()) {
       case PRIMARY_KEY:
         sqlBuilder.append(" PRIMARY KEY ");
@@ -681,6 +687,29 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     return metaData.getPrimaryKeys(metaData.getConnection().getCatalog(), schemaName, tableName);
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>PostgreSQL uses the duplicate-relation SQLSTATE for index and constraint name conflicts as
+   * well as table conflicts. During an alter this is an invalid change, not an existing table.
+   */
+  @Override
+  public void alterTable(String schema, String tableName, TableChange... changes) {
+    try {
+      super.alterTable(schema, tableName, changes);
+    } catch (TableAlreadyExistsException e) {
+      throw new IllegalArgumentException(
+          "PostgreSQL relation name conflict while altering table "
+              + schema
+              + "."
+              + tableName
+              + ": an index or constraint may already use this name. Choose an unused name. "
+              + "PostgreSQL reason: "
+              + e.getMessage(),
+          e);
+    }
+  }
+
   @Override
   protected Connection getConnection(String schema) throws SQLException {
     Connection connection = dataSource.getConnection();
@@ -719,5 +748,12 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
 
   private static String quotedIdentifier(@Nullable String name) {
     return PG_QUOTE + String.valueOf(name).replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
+  }
+
+  private static void validateIndexName(@Nullable String name) {
+    if (name != null && name.getBytes(StandardCharsets.UTF_8).length > 63) {
+      throw new IllegalArgumentException(
+          "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
+    }
   }
 }
