@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -40,6 +41,9 @@ import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
  * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
+
+  private static final Set<String> WRITE_THROUGH_ENTITY_TYPES =
+      Set.of("catalog", "schema", "fileset");
 
   /** Empty metadata: every property key is undeclared (used for historical fuzzy recovery). */
   private static final PropertiesMetadata EMPTY_PROPERTIES_METADATA =
@@ -246,7 +250,8 @@ public final class SecretPropertyUtils {
   /**
    * Returns whether {@code value} is a write-through secret URN owned by this entity property.
    *
-   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}.
+   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}, or
+   * {@code entityType:entityId:writeId:propertyKey} when written with a write id.
    *
    * @param propertyKey the property key
    * @param value the property value
@@ -262,13 +267,34 @@ public final class SecretPropertyUtils {
     try {
       SecretUrn urn = SecretUrn.parse(value);
       List<String> segments = urn.identifierSegments();
-      return segments.size() == 3
+      return isWriteThroughShape(urn)
           && entityType.equals(segments.get(0))
           && String.valueOf(entityId).equals(segments.get(1))
-          && propertyKey.equals(segments.get(2));
+          && propertyKey.equals(urn.propertyKey());
     } catch (IllegalArgumentException e) {
       return false;
     }
+  }
+
+  /**
+   * Returns whether {@code urn} has the shape of a write-through URN: {@code
+   * entityType:entityId:propertyKey}, or {@code entityType:entityId:writeId:propertyKey} with a
+   * UUID write id, where the entity type is {@code catalog}, {@code schema} or {@code fileset} and
+   * the entity id is numeric.
+   *
+   * @param urn the secret URN
+   * @return true when the URN has a write-through shape
+   */
+  public static boolean isWriteThroughShape(SecretUrn urn) {
+    List<String> segments = urn.identifierSegments();
+    if (segments.size() != 3 && segments.size() != 4) {
+      return false;
+    }
+    if (!WRITE_THROUGH_ENTITY_TYPES.contains(segments.get(0))
+        || !StringUtils.isNumeric(segments.get(1))) {
+      return false;
+    }
+    return segments.size() == 3 || SecretUrn.isWriteId(segments.get(2));
   }
 
   /**

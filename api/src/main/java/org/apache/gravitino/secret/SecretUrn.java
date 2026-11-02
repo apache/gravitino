@@ -22,6 +22,7 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
 import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_WRITE_ID;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import java.util.Arrays;
@@ -29,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -85,7 +87,10 @@ public final class SecretUrn {
    * Builds a write-through secret URN for an entity property secret.
    *
    * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link
-   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}.
+   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}. When {@link
+   * SecretConstants#ATTR_WRITE_ID} (a lowercase UUID) is present, the identifier is {@code
+   * entityType:entityId:writeId:propertyKey}; otherwise it is {@code
+   * entityType:entityId:propertyKey}.
    *
    * @param providerName the configured provider name
    * @param attributes write-through attributes
@@ -98,6 +103,7 @@ public final class SecretUrn {
     String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
     String entityId = requiredAttribute(attributes, ATTR_ENTITY_ID);
     String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
+    String writeId = attributes.get(ATTR_WRITE_ID);
     try {
       Long.parseLong(entityId);
     } catch (NumberFormatException e) {
@@ -108,9 +114,32 @@ public final class SecretUrn {
     validateSegment(entityType);
     validateSegment(entityId);
     validateSegment(propertyKey);
+    if (writeId == null) {
+      return new SecretUrn(
+          providerName,
+          Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
+    }
+    if (!isWriteId(writeId)) {
+      throw new IllegalArgumentException(
+          "attributes." + ATTR_WRITE_ID + " must be a lowercase UUID: " + writeId);
+    }
     return new SecretUrn(
         providerName,
-        Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
+        Collections.unmodifiableList(Arrays.asList(entityType, entityId, writeId, propertyKey)));
+  }
+
+  /**
+   * Returns whether {@code segment} is a write id: a UUID in its lowercase string form.
+   *
+   * @param segment the URN segment
+   * @return true when the segment is a write id
+   */
+  public static boolean isWriteId(String segment) {
+    try {
+      return segment != null && UUID.fromString(segment).toString().equals(segment);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   /**

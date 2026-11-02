@@ -305,10 +305,11 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+      Pair<FilesetChange[], SecretMaterialsHolder> secretResult =
           SecretAlterChanges.prepareFilesetChanges(
               secretManager, currentProperties, filesetId, changes);
-      writtenSecretMaterials.set(secretResult.getRight());
+      writtenSecretMaterials.set(secretResult.getRight().get());
+      writtenSecretMaterials.setReplacedUrns(secretResult.getRight().getReplacedUrns());
       FilesetChange[] effectiveChanges = secretResult.getLeft();
 
       Fileset altered =
@@ -318,6 +319,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
               NoSuchFilesetException.class,
               IllegalArgumentException.class);
       alterCommitted = true;
+      writtenSecretMaterials.deleteReplaced(secretManager);
       return altered;
     } finally {
       if (!alterCommitted) {
