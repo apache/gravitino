@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -167,5 +168,25 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
                     .toFlinkCatalogProperties(catalogPropertiesWithoutUrl));
 
     Assertions.assertTrue(ex.getMessage().contains(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
+  }
+
+  @Test
+  public void testInjectedTableOptionsDoNotBecomeGravitinoTableProperties() {
+    JdbcPropertiesConverter converter = getConverter(catalogProperties);
+    Map<String, String> flinkTableOptions =
+        new HashMap<>(
+            converter.toFlinkTableProperties(
+                converter.toFlinkCatalogProperties(catalogProperties),
+                ImmutableMap.of(),
+                new ObjectPath("db", "source_table")));
+    // CREATE TABLE ... LIKE copies the scan options alongside the user's own options.
+    flinkTableOptions.put("engine", "InnoDB");
+
+    Map<String, String> gravitinoProperties =
+        converter.toGravitinoTableProperties(flinkTableOptions);
+
+    Assertions.assertEquals(ImmutableMap.of("engine", "InnoDB"), gravitinoProperties);
+    Assertions.assertEquals(
+        password, flinkTableOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
   }
 }

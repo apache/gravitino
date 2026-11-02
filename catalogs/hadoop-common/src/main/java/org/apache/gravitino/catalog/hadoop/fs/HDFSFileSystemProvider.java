@@ -84,14 +84,17 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   public static Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
     Map<String, String> additionalConfigs = Maps.newHashMap(configs);
 
-    // Avoid multiple retries to speed up failure in test cases.
+    // Avoid multiple retries to speed up failure in test cases. A user value, plain or with the
+    // bypass prefix, takes precedence over these defaults.
     // Use hard code instead of CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_TIMEOUT_KEY to
     // avoid dependency on a specific Hadoop version.
-    if (!configs.containsKey(HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY)) {
+    if (!configs.containsKey(HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY)
+        && !configs.containsKey(GRAVITINO_BYPASS + HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY)) {
       additionalConfigs.put(HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
     }
 
-    if (!configs.containsKey(HDFS_IPC_PING_KEY)) {
+    if (!configs.containsKey(HDFS_IPC_PING_KEY)
+        && !configs.containsKey(GRAVITINO_BYPASS + HDFS_IPC_PING_KEY)) {
       additionalConfigs.put(HDFS_IPC_PING_KEY, DEFAULT_HDFS_IPC_PING);
     }
 

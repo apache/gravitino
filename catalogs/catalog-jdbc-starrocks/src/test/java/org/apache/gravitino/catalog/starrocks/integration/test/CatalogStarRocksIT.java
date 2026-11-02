@@ -1004,5 +1004,33 @@ public class CatalogStarRocksIT extends BaseIT {
         Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
         colDefaultValues[1].defaultValue());
     Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, colDefaultValues[2].defaultValue());
+
+    // add a column with nullability and default value
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addColumn(
+            new String[] {"col_add_default_value"},
+            Types.TimestampType.withoutTimeZone(),
+            "col_add_default_value",
+            TableChange.ColumnPosition.defaultPos(),
+            false,
+            false,
+            Literals.timestampLiteral("2024-01-01T01:01:01")));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column addedColumn =
+                  Arrays.stream(tableCatalog.loadTable(tableIdentifier).columns())
+                      .filter(c -> c.name().equals("col_add_default_value"))
+                      .findFirst()
+                      .orElseThrow(() -> new AssertionError("Column is not added"));
+              Assertions.assertFalse(addedColumn.nullable());
+              Assertions.assertEquals(
+                  Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
+                  addedColumn.defaultValue());
+            });
   }
 }

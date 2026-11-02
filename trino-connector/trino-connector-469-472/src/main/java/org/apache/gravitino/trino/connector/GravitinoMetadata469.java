@@ -108,6 +108,16 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
   }
 
   @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  @Override
   public void executeTableExecute(
       ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
     internalMetadata.executeTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle));

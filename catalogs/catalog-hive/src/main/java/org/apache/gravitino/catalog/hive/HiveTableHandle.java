@@ -66,10 +66,6 @@ public class HiveTableHandle extends BaseTable {
     return (SupportsPartitions) ops();
   }
 
-  public void close() {
-    clientPool.close();
-  }
-
   public String getTableType() {
     return properties.getOrDefault(TABLE_TYPE, "MANAGED_TABLE");
   }

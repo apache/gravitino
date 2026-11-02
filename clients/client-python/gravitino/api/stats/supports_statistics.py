@@ -49,9 +49,16 @@ class SupportsStatistics(ABC):
         Args:
             statistics: a map of statistic names to their values
 
+        For Gravitino-managed table statistics, a concurrent creation, modification or deletion
+        can fail the entire update with `OptimisticLockException`. No part of that update is
+        committed. The caller decides whether to abort or retry against the current state;
+        Gravitino does not automatically retry the write.
+
         Raises:
             IllegalStatisticNameException: If the statistic name is illegal
             UnmodifiableStatisticException: If the statistic is unmodifiable
+            OptimisticLockException: If a Gravitino-managed table statistic was concurrently
+                created, modified or deleted
         """
 
     @abstractmethod
@@ -68,7 +75,14 @@ class SupportsStatistics(ABC):
                 `True` if the statistics were successfully dropped,
                 `False` if no statistics were dropped
 
+        For Gravitino-managed table statistics, a concurrent modification or same-name
+        replacement can fail the entire drop with `OptimisticLockException`. No part of that drop
+        is committed. A statistic already removed by another drop is not a conflict and is not
+        counted as dropped by this call.
+
         Raises:
             UnmodifiableStatisticException:
                 if any of the statistics to be dropped are unmodifiable
+            OptimisticLockException:
+                if a Gravitino-managed table statistic was concurrently modified or replaced
         """

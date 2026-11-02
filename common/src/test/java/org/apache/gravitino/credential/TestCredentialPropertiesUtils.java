@@ -20,6 +20,7 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -146,5 +147,43 @@ public class TestCredentialPropertiesUtils {
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         refreshEndpointProperties.get(
             CredentialPropertyUtils.ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testApplyPaimonCredentials() {
+    Map<String, String> props = new HashMap<>();
+    CredentialPropertyUtils.applyPaimonCredentials(
+        new Credential[] {
+          new JdbcCredential("jdbc-user", "jdbc-password"),
+          new S3SecretKeyCredential("s3-key", "s3-secret"),
+          new OSSSecretKeyCredential("oss-key", "oss-secret"),
+          new DlfSecretKeyCredential("dlf-ak", "dlf-sk", "dlf-token")
+        },
+        props);
+
+    Assertions.assertEquals("jdbc-user", props.get(CredentialPropertyUtils.ICEBERG_JDBC_USER));
+    Assertions.assertEquals(
+        "jdbc-password", props.get(CredentialPropertyUtils.ICEBERG_JDBC_PASSWORD));
+    Assertions.assertEquals("s3-key", props.get("s3.access-key"));
+    Assertions.assertEquals("s3-secret", props.get("s3.secret-key"));
+    Assertions.assertEquals("oss-key", props.get("fs.oss.accessKeyId"));
+    Assertions.assertEquals("oss-secret", props.get("fs.oss.accessKeySecret"));
+    Assertions.assertEquals("dlf-ak", props.get(CredentialPropertyUtils.PAIMON_DLF_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "dlf-sk", props.get(CredentialPropertyUtils.PAIMON_DLF_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "dlf-token", props.get(CredentialPropertyUtils.PAIMON_DLF_SECURITY_TOKEN));
+  }
+
+  @Test
+  void testApplyPaimonDlfCredentialsWithoutToken() {
+    Map<String, String> props = new HashMap<>();
+    CredentialPropertyUtils.applyPaimonCredentials(
+        new Credential[] {new DlfSecretKeyCredential("dlf-ak", "dlf-sk")}, props);
+
+    Assertions.assertEquals("dlf-ak", props.get(CredentialPropertyUtils.PAIMON_DLF_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "dlf-sk", props.get(CredentialPropertyUtils.PAIMON_DLF_ACCESS_KEY_SECRET));
+    Assertions.assertFalse(props.containsKey(CredentialPropertyUtils.PAIMON_DLF_SECURITY_TOKEN));
   }
 }

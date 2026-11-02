@@ -22,6 +22,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import { Empty, Input, Spin, Tabs, Tooltip, Tree } from 'antd'
 
@@ -324,6 +325,12 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             <Icons.iconify icon='ic:outline-table-view' className='my-icon-small' />
           </span>
         )
+      case 'semanticModel':
+        return (
+          <span role='img' aria-label='semantic model' className='anticon anticon-frown'>
+            <Icons.iconify icon='mdi:graph-outline' className='my-icon-small' />
+          </span>
+        )
       default:
         return <></>
     }
@@ -350,7 +357,8 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       const topic = searchParams.get('topic')
       const model = searchParams.get('model')
       const func = searchParams.get('function')
-      const entity = table || view || fileset || topic || model || func
+      const semanticModel = searchParams.get('semanticModel')
+      const entity = table || view || semanticModel || fileset || topic || model || func
 
       if (!metalake) {
         dispatch(setExpanded([]))
@@ -374,7 +382,9 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
           nextSelectedKey = schemaKey
 
           if (entity) {
-            nextSelectedKey = `${schemaKey}{{${entity}}}`
+            nextSelectedKey = semanticModel
+              ? semanticModelNodeKey({ metalake, catalog, schema, semanticModel })
+              : `${schemaKey}{{${entity}}}`
           }
         }
       }

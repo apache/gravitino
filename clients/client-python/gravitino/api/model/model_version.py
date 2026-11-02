@@ -19,8 +19,6 @@
 from abc import abstractmethod
 from typing import Optional, Dict, List
 from gravitino.api.auditable import Auditable
-from gravitino.api.secret.supports_secrets import SupportsSecrets
-from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class ModelVersion(Auditable):
@@ -104,8 +102,3 @@ class ModelVersion(Auditable):
             The properties of the model version. An empty dictionary is returned if no properties are set.
         """
         pass
-
-    def support_secrets(self) -> SupportsSecrets:
-        raise UnsupportedOperationException(
-            "Model version does not support secret property operations."
-        )

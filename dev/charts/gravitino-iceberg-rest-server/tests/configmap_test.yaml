@@ -154,3 +154,58 @@ tests:
       - matchRegex:
           path: data["hdfs-site.xml"]
           pattern: "<value>3</value>"
+
+  - it: renders log rotation and retention defaults
+    release:
+      name: iceberg-rest
+    asserts:
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "property\\.logMaxAge = 30d"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "property\\.serverLogMaxTotalSize = 2GB"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.filePattern = \\$\\{basePath\\}/\\$\\{serverName\\}_%d\\{yyyyMMdd\\}\\.%i\\.log\\.gz"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.policies\\.size\\.size = 100MB"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.fileIndex = nomax"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.maxDepth = 1"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.glob = \\$\\{serverName\\}_\\*\\.log\\.gz"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.ifAny\\.ifAccumulatedFileSize\\.exceeds = \\$\\{serverLogMaxTotalSize\\}"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.ifAny\\.ifLastModified\\.age = \\$\\{logMaxAge\\}"
+
+  - it: renders customized log retention
+    release:
+      name: iceberg-rest
+    set:
+      log4j2Properties:
+        logMaxAge: 7d
+        serverLogMaxTotalSize: 500MB
+        rollingAppenderPoliciesSizeSize: 20MB
+        rollingAppenderStrategyDeleteIfFileNameGlob: "app_*.log.gz"
+    asserts:
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "property\\.logMaxAge = 7d"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "property\\.serverLogMaxTotalSize = 500MB"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.policies\\.size\\.size = 20MB"
+      - matchRegex:
+          path: data["gravitino-iceberg-rest-log4j2.properties"]
+          pattern: "appender\\.rolling\\.strategy\\.delete\\.ifFileName\\.glob = app_\\*\\.log\\.gz"

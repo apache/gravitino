@@ -1,0 +1,71 @@
+name: Ray Iceberg REST Contract Test Action
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  RayIcebergIT:
+    name: Ray Iceberg REST contract (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Free up disk space
+        run: dev/ci/util_free_space.sh
+
+      - name: Package Gravitino
+        run: ./gradlew compileDistribution -PskipWeb=true -x test
+
+      - name: Run Ray Iceberg REST contract test
+        id: rayIcebergIT
+        run: |
+          ./gradlew -PpythonVersion=3.12 -PskipDockerTests=true -PskipWeb=true \
+            :clients:client-python:rayIcebergIT
+
+      - name: Upload Ray Iceberg IT reports and logs
+        uses: actions/upload-artifact@v7
+        if: ${{ failure() && steps.rayIcebergIT.outcome == 'failure' }}
+        with:
+          name: ray-iceberg-it-reports
+          path: |
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log

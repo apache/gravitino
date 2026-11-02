@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -59,7 +60,9 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -402,6 +405,28 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameMetalakeToExistingName() {
+    MetalakeAlreadyExistsException exception =
+        new MetalakeAlreadyExistsException("Metalake existing already exists");
+    doThrow(exception).when(metalakeManager).alterMetalake(any(), any(MetalakeChange.class));
+    MetalakeUpdatesRequest request =
+        new MetalakeUpdatesRequest(
+            Collections.singletonList(new MetalakeUpdateRequest.RenameMetalakeRequest("existing")));
+    try (Response response =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(
+          MetalakeAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testAlterMetalake() {
     String metalakeName = "test";
     Long id = 1L;
@@ -524,6 +549,27 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(
         errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
+  }
+
+  @Test
+  public void testDropNonEmptyMetalake() {
+    doThrow(
+            new NonEmptyMetalakeException(
+                "Metalake test has catalogs, please drop them first or use force option"))
+        .when(metalakeManager)
+        .dropMetalake(any(), anyBoolean());
+
+    Response response =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+    Assertions.assertEquals(NonEmptyMetalakeException.class.getSimpleName(), error.getType());
+    Assertions.assertTrue(error.getMessage().contains("Metalake test has catalogs"));
   }
 
   @Test

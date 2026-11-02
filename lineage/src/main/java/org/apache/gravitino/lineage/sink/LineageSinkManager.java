@@ -20,13 +20,11 @@
 package org.apache.gravitino.lineage.sink;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.io.Closeable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -64,26 +62,27 @@ public class LineageSinkManager implements Closeable {
   static Map<String, String> transformToEventListenerConfigs(
       List<String> sinks, Map<String, String> lineageConfigs) {
     Map<String, String> eventListenerConfigs = new HashMap<>();
-    eventListenerConfigs.putAll(generateEventListenerConfigs(sinks, lineageConfigs));
     eventListenerConfigs.putAll(lineageConfigs);
+    // Generated listener settings must override the lineage total queue capacity.
+    eventListenerConfigs.putAll(generateEventListenerConfigs(sinks, lineageConfigs));
     return eventListenerConfigs;
   }
 
   private static Map<String, String> generateEventListenerConfigs(
       List<String> sinks, Map<String, String> lineageConfigs) {
-    HashMap eventListenerConfigs = new HashMap();
+    Map<String, String> eventListenerConfigs = new HashMap<>();
     if (sinks.isEmpty()) {
       return eventListenerConfigs;
     }
 
-    String queueCapacity = lineageConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(queueCapacity), "Lineage sink queue capacity is not set");
-
-    int totalCapacity = Integer.parseInt(queueCapacity);
-    Preconditions.checkArgument(totalCapacity > 0, "Lineage sink queue capacity must be positive");
+    int totalCapacity = new LineageConfig(lineageConfigs).get(LineageConfig.SINK_QUEUE_CAPACITY);
     int capacityPerSink = Math.max(1, totalCapacity / sinks.size());
 
+    // All lineage sinks use isolated queues of equal size. The listener manager reads the
+    // top-level queue capacity rather than a per-listener setting.
+    eventListenerConfigs.put(
+        EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY,
+        String.valueOf(capacityPerSink));
     eventListenerConfigs.put(
         EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", sinks));
     sinks.forEach(
@@ -91,9 +90,6 @@ public class LineageSinkManager implements Closeable {
           eventListenerConfigs.put(
               sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
               LineageSinkEventListener.class.getName());
-          eventListenerConfigs.put(
-              sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY,
-              String.valueOf(capacityPerSink));
         });
     return eventListenerConfigs;
   }

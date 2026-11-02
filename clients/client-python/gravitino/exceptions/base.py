@@ -157,6 +157,14 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
+class ServiceUnavailableException(GravitinoRuntimeException):
+    """An exception thrown when a configured dependency is temporarily unavailable."""
+
+
+class OptimisticLockException(GravitinoRuntimeException):
+    """Raised when another update changes an entity before a write completes."""
+
+
 class UnauthorizedException(GravitinoRuntimeException):
     """An exception thrown when a user is not authorized to perform an action."""
 
@@ -243,6 +251,18 @@ class NoSuchFunctionException(NotFoundException):
 
 class FunctionAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a function already exists."""
+
+
+class NoSuchSemanticModelException(NotFoundException):
+    """An exception thrown when a Semantic Model with specified name is not found."""
+
+
+class SemanticModelAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a Semantic Model already exists."""
+
+
+class IllegalSemanticModelException(IllegalArgumentException):
+    """An exception thrown when a Semantic Model definition is invalid."""
 
 
 class IllegalPrivilegeException(IllegalArgumentException):

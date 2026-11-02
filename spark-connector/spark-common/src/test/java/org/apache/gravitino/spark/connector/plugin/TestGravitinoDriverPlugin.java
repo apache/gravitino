@@ -22,6 +22,8 @@ package org.apache.gravitino.spark.connector.plugin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -29,8 +31,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
@@ -314,16 +318,12 @@ public class TestGravitinoDriverPlugin {
     SparkConf sparkConf = tokenAuthConf();
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, "a-token");
 
-    // The client cannot reach a server here, but it must get past auth configuration first: an
-    // unsupported auth type or a missing token would fail before any connection is attempted.
-    Exception e =
-        Assertions.assertThrows(
-            Exception.class,
-            () ->
-                GravitinoDriverPlugin.createGravitinoClient(
-                    "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of()));
-    Assertions.assertFalse(e instanceof UnsupportedOperationException, e.toString());
-    Assertions.assertFalse(e instanceof IllegalArgumentException, e.toString());
+    // build() no longer contacts the server; the token is resolved on first use.
+    GravitinoClient client =
+        GravitinoDriverPlugin.createGravitinoClient(
+            "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of());
+    Assertions.assertNotNull(client);
+    client.close();
   }
 
   @Test
@@ -373,14 +373,29 @@ public class TestGravitinoDriverPlugin {
   void testTokenAuthTypeWithoutTokenFails() {
     SparkConf sparkConf = tokenAuthConf();
 
+    // build() succeeds without a token; the failure surfaces on first use when the
+    // token provider tries to resolve the token.
+    GravitinoClient client =
+        GravitinoDriverPlugin.createGravitinoClient(
+            "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of());
     IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                GravitinoDriverPlugin.createGravitinoClient(
-                    "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of()));
+        Assertions.assertThrows(IllegalArgumentException.class, client::listCatalogs);
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+    client.close();
+  }
+
+  @Test
+  void testSkipsCatalogAlreadyConfiguredInSpark() {
+    SparkConf sparkConf =
+        new SparkConf(false).set("spark.sql.catalog.existing", "example.UserCatalog");
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.provider()).thenReturn("hive");
+
+    new GravitinoDriverPlugin(withoutPaimon())
+        .registerGravitinoCatalogs(sparkConf, Collections.singletonMap("existing", catalog));
+
+    assertEquals("example.UserCatalog", sparkConf.get("spark.sql.catalog.existing"));
   }
 
   private static SparkConf tokenAuthConf() {

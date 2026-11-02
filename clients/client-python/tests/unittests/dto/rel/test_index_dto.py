@@ -70,3 +70,29 @@ class TestIndexDTO(unittest.TestCase):
         dto_dict[slack_dto] = len(names)
         self.assertEqual(len(dto_dict), len(names))
         self.assertEqual(dto_dict[slack_dto], len(names))
+
+    def test_index_dto_properties_are_part_of_equality_and_hash(self):
+        field_names = [["embedding"]]
+        l2_index = IndexDTO(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "vector_index",
+            field_names,
+            {"distance_function": "L2Distance", "dimensions": "3"},
+        )
+        cosine_index = IndexDTO(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "vector_index",
+            field_names,
+            {"distance_function": "cosineDistance", "dimensions": "3"},
+        )
+        same_l2_index = IndexDTO(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "vector_index",
+            field_names,
+            {"dimensions": "3", "distance_function": "L2Distance"},
+        )
+
+        self.assertNotEqual(l2_index, cosine_index)
+        self.assertEqual(l2_index, same_l2_index)
+        self.assertEqual(hash(l2_index), hash(same_l2_index))
+        self.assertEqual(len({l2_index, cosine_index}), 2)

@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
-import static java.lang.Thread.sleep;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,33 +76,7 @@ public class TrinoUDFIT extends TrinoQueryITBase {
   private static void createHiveCatalog() throws Exception {
     Map<String, String> properties = new HashMap<>();
     properties.put("metastore.uris", hiveMetastoreUri);
-
-    boolean exists = metalake.catalogExists(CATALOG_NAME);
-    if (!exists) {
-      metalake.createCatalog(
-          CATALOG_NAME, Catalog.Type.RELATIONAL, "hive", "UDF test catalog", properties);
-    }
-
-    // Wait for catalog to sync to Trino
-    boolean catalogReady = false;
-    int tries = 180;
-    while (!catalogReady && tries-- >= 0) {
-      try {
-        String result = trinoQueryRunner.runQuery("show catalogs");
-        if (result.contains(metalakeName + "." + CATALOG_NAME)) {
-          catalogReady = true;
-          break;
-        }
-      } catch (Exception e) {
-        LOG.info("Waiting for catalog to sync to Trino");
-      }
-      sleep(1000);
-    }
-
-    if (!catalogReady) {
-      throw new Exception("Catalog " + CATALOG_NAME + " sync timeout");
-    }
-
+    createCatalog(CATALOG_NAME, "hive", properties);
     catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 
@@ -156,9 +128,8 @@ public class TrinoUDFIT extends TrinoQueryITBase {
     Assertions.assertNotNull(function);
 
     // Query Trino to verify the function is listed
-    String trinoCatalogName = metalakeName + "." + CATALOG_NAME;
     String showFunctionsQuery =
-        String.format("SHOW FUNCTIONS FROM %s.%s", trinoCatalogName, SCHEMA_NAME);
+        String.format("SHOW FUNCTIONS FROM %s.%s", CATALOG_NAME, SCHEMA_NAME);
     String result = trinoQueryRunner.runQuery(showFunctionsQuery);
 
     LOG.info("SHOW FUNCTIONS result: {}", result);
@@ -192,22 +163,47 @@ public class TrinoUDFIT extends TrinoQueryITBase {
     Assertions.assertNotNull(function);
 
     // Invoke the function via SELECT and verify the result
-    String trinoCatalogName = metalakeName + "." + CATALOG_NAME;
     String selectQuery =
-        String.format("SELECT %s.%s.%s(5)", trinoCatalogName, SCHEMA_NAME, functionName);
+        String.format("SELECT %s.%s.%s(5)", CATALOG_NAME, SCHEMA_NAME, functionName);
     String result = trinoQueryRunner.runQuery(selectQuery);
 
     LOG.info("SELECT result: {}", result);
-    // Parse the query result and verify the exact numeric output
-    String trimmedResult = result.trim();
-    Assertions.assertTrue(
-        trimmedResult.contains("10"),
-        "Expected SELECT test_add_five(5) to return 10. Got: " + trimmedResult);
-    Assertions.assertFalse(
-        trimmedResult.contains("100"),
-        "Result should be exactly 10, not a number containing 10. Got: " + trimmedResult);
+    Assertions.assertEquals("\"10\"", result.trim(), "Expected test_add_five(5) to return 10");
 
     // Cleanup
+    functionCatalog.dropFunction(NameIdentifier.of(SCHEMA_NAME, functionName));
+  }
+
+  @Test
+  public void testBareExpressionBodyCanBeListedAndInvoked() throws Exception {
+    String functionName = "test_double";
+    FunctionCatalog functionCatalog = catalog.asFunctionCatalog();
+
+    // SQL body is a bare expression without the RETURN keyword
+    functionCatalog.registerFunction(
+        NameIdentifier.of(SCHEMA_NAME, functionName),
+        "Doubles the input",
+        FunctionType.SCALAR,
+        true,
+        FunctionDefinitions.of(
+            FunctionDefinitions.of(
+                FunctionParams.of(FunctionParams.of("n", Types.IntegerType.get())),
+                Types.IntegerType.get(),
+                FunctionImpls.of(FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "n * 2")))));
+
+    String showResult =
+        trinoQueryRunner.runQuery(
+            String.format("SHOW FUNCTIONS FROM %s.%s", CATALOG_NAME, SCHEMA_NAME));
+    Assertions.assertTrue(
+        showResult.contains(functionName),
+        "Expected function " + functionName + " to be listed. Got: " + showResult);
+
+    String selectResult =
+        trinoQueryRunner
+            .runQuery(String.format("SELECT %s.%s.%s(21)", CATALOG_NAME, SCHEMA_NAME, functionName))
+            .trim();
+    Assertions.assertEquals("\"42\"", selectResult, "Expected test_double(21) to return 42");
+
     functionCatalog.dropFunction(NameIdentifier.of(SCHEMA_NAME, functionName));
   }
 
@@ -233,9 +229,8 @@ public class TrinoUDFIT extends TrinoQueryITBase {
     Assertions.assertNotNull(function);
 
     // Query Trino - SPARK runtime function should be filtered out
-    String trinoCatalogName = metalakeName + "." + CATALOG_NAME;
     String showFunctionsQuery =
-        String.format("SHOW FUNCTIONS FROM %s.%s", trinoCatalogName, SCHEMA_NAME);
+        String.format("SHOW FUNCTIONS FROM %s.%s", CATALOG_NAME, SCHEMA_NAME);
     String result = trinoQueryRunner.runQuery(showFunctionsQuery);
 
     LOG.info("SHOW FUNCTIONS result (should not contain spark_only_func): {}", result);
@@ -283,9 +278,8 @@ public class TrinoUDFIT extends TrinoQueryITBase {
                     FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "RETURN concat(a, b)")))));
 
     // Query Trino to verify both functions are listed
-    String trinoCatalogName = metalakeName + "." + CATALOG_NAME;
     String showFunctionsQuery =
-        String.format("SHOW FUNCTIONS FROM %s.%s", trinoCatalogName, SCHEMA_NAME);
+        String.format("SHOW FUNCTIONS FROM %s.%s", CATALOG_NAME, SCHEMA_NAME);
     String result = trinoQueryRunner.runQuery(showFunctionsQuery);
 
     LOG.info("SHOW FUNCTIONS result: {}", result);
@@ -308,9 +302,8 @@ public class TrinoUDFIT extends TrinoQueryITBase {
       catalog.asSchemas().createSchema(emptySchema, "empty schema", Collections.emptyMap());
     }
 
-    String trinoCatalogName = metalakeName + "." + CATALOG_NAME;
     String showFunctionsQuery =
-        String.format("SHOW FUNCTIONS FROM %s.%s", trinoCatalogName, emptySchema);
+        String.format("SHOW FUNCTIONS FROM %s.%s", CATALOG_NAME, emptySchema);
     String result = trinoQueryRunner.runQuery(showFunctionsQuery);
 
     LOG.info("SHOW FUNCTIONS for empty schema: {}", result);

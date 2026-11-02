@@ -37,7 +37,8 @@ concurrency:
 jobs:
   conflict-marker-check:
     name: conflict-marker-check
-    runs-on: ubuntu-latest
+    # Only git and grep; ubuntu-slim avoids queueing behind integration tests on ubuntu-latest.
+    runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@v4
         with:

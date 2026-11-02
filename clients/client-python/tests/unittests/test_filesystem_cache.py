@@ -44,6 +44,10 @@ from tests.unittests import mock_base
 
 
 @patch(
+    "gravitino.client.fileset_catalog.FilesetCatalog.get_credentials",
+    return_value=[],
+)
+@patch(
     "gravitino.client.generic_fileset.GenericFileset.get_credentials",
     return_value=[],
 )
@@ -182,8 +186,8 @@ class TestFileSystemCache(unittest.TestCase):
             self.assertEqual(len(results), 10, "All threads should complete")
             self.assertTrue(all(results), "All threads should see file exists")
 
-            # With thread-specific caching (like fsspec), each thread gets its own entry
-            # This is different from Java GVFS but matches Python ecosystem conventions
+            # Main-thread touch() plus one entry per worker thread (thread_id is in the
+            # cache key). Default TTLCache maxsize is 20, so all of them can remain.
             # pylint: disable=protected-access
             cache_size = len(fs._operations._filesystem_cache)
             self.assertGreaterEqual(
@@ -193,8 +197,9 @@ class TestFileSystemCache(unittest.TestCase):
             )
             self.assertLessEqual(
                 cache_size,
-                10,
-                f"Expected at most 10 cached filesystems (one per thread), but found {cache_size}",
+                11,
+                f"Expected at most 11 cached filesystems (main thread + 10 workers), "
+                f"but found {cache_size}",
             )
 
     def test_thread_isolation(self, *mock_methods):

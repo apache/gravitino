@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Field;
@@ -39,6 +40,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -421,5 +423,53 @@ public class TestEntity {
             .build();
 
     Assertions.assertEquals(table1.hashCode(), table2.hashCode(), "hashCode should be the same");
+  }
+
+  @Test
+  public void testTableEntityHashCodeConsistentWithBagEquality() {
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator("a")
+            .withCreateTime(Instant.parse("2026-01-01T00:00:00Z"))
+            .build();
+    Types.IntegerType integerType = Types.IntegerType.get();
+    ColumnEntity c1 =
+        ColumnEntity.builder()
+            .withId(1L)
+            .withName("col1")
+            .withPosition(0)
+            .withDataType(integerType)
+            .withAuditInfo(audit)
+            .build();
+    ColumnEntity c2 =
+        ColumnEntity.builder()
+            .withId(2L)
+            .withName("col2")
+            .withPosition(1)
+            .withDataType(integerType)
+            .withAuditInfo(audit)
+            .build();
+    TableEntity table1 =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema"))
+            .withColumns(Lists.newArrayList(c1, c2))
+            .withAuditInfo(audit)
+            .build();
+    TableEntity table2 =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema"))
+            .withColumns(Lists.newArrayList(c2, c1))
+            .withAuditInfo(audit)
+            .build();
+
+    // equals() compares columns as an unordered collection, so equal tables
+    // must hash equally — otherwise HashSet/HashMap drop them.
+    Assertions.assertEquals(table1, table2);
+    Assertions.assertEquals(table1.hashCode(), table2.hashCode());
+    Assertions.assertTrue(new HashSet<>(Collections.singletonList(table1)).contains(table2));
   }
 }

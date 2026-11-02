@@ -26,8 +26,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
@@ -40,10 +42,12 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -225,6 +229,65 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public boolean shouldValidateOnCreate() {
     return false;
+  }
+
+  /**
+   * Validates this catalog at create time when {@link #shouldValidateOnCreate()} returns true. The
+   * default eagerly initializes {@link #ops()}, which preserves the current behavior for every
+   * existing opt-in (for example Iceberg REST, which only needs eager initialization). Subclasses
+   * that can cheaply probe their backend — such as JDBC — override this to run a real connection
+   * check and throw a connection-failed error when the backend is unreachable.
+   *
+   * <p>This is {@code public} rather than {@code protected} because {@code CatalogManager}, in a
+   * different package, invokes it on the create-time validation path (mirroring {@link #ops()} and
+   * {@link #shouldValidateOnCreate()}).
+   */
+  public void validateOnCreate() {
+    ops();
+  }
+
+  /**
+   * Whether this catalog provides path-based credential contexts, which token credential providers
+   * such as {@code s3-token} require to vend credentials.
+   *
+   * <p>A catalog that cannot provide path-based contexts, neither through operations implementing
+   * {@link SupportsPathBasedCredentials} nor through another server such as the Iceberg REST
+   * server, should override this method to return {@code false}, so that creating or altering it
+   * with a token provider fails.
+   *
+   * @return {@code true} (default) if path-based credentials are supported; {@code false} otherwise
+   */
+  public boolean supportsPathBasedCredentials() {
+    return true;
+  }
+
+  /**
+   * Validates that the credential providers set in {@code properties} can vend credentials for this
+   * catalog. Token providers listed in {@link CredentialUtils#PATH_BASED_CREDENTIAL_TYPES} are
+   * rejected when {@link #supportsPathBasedCredentials()} returns {@code false}.
+   *
+   * @param properties the catalog properties to validate, may be null
+   * @throws IllegalArgumentException if a credential provider cannot be vended by this catalog
+   */
+  public void validateCredentialProviders(@Nullable Map<String, String> properties) {
+    if (properties == null || supportsPathBasedCredentials()) {
+      return;
+    }
+    List<String> unsupportedProviders =
+        CredentialUtils.getCredentialProvidersByOrder(() -> properties).stream()
+            // Provider lookup ignores case, so match the type names case-insensitively too.
+            .filter(
+                p ->
+                    CredentialUtils.PATH_BASED_CREDENTIAL_TYPES.contains(
+                        p.toLowerCase(Locale.ROOT)))
+            .sorted()
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        unsupportedProviders.isEmpty(),
+        "Credential providers %s are not supported by catalog provider %s, it cannot vend"
+            + " path-based credentials",
+        unsupportedProviders,
+        provider());
   }
 
   public void checkMetalakeAndCatalogInUse() {
@@ -503,6 +566,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+          // Expose the inferred provider names (never the credential values) so that clients
+          // make routing decisions from the same provider list the server vends credentials
+          // with. An explicitly configured list is returned as-is.
+          if (StringUtils.isBlank(tempProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+            String inferredProviders =
+                propertiesWithCredentialProviders().get(CredentialConstants.CREDENTIAL_PROVIDERS);
+            if (StringUtils.isNotBlank(inferredProviders)) {
+              tempProperties.put(CredentialConstants.CREDENTIAL_PROVIDERS, inferredProviders);
+            }
+          }
 
           properties = tempProperties;
         }
@@ -535,6 +608,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
+      // s3-secret-key beside s3-token), which breaks path-based credential selection. Catalogs that
+      // must keep jdbc/aws/dlf listed call ensureCredentialProviderListed in their overrides.
       return props;
     }
     List<String> credentialProviders = new ArrayList<>();
@@ -560,6 +636,30 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
+   * not already listed. Used by subclasses that must keep catalog-specific providers (jdbc / aws /
+   * dlf) available even when the property was set explicitly (so {@link
+   * #addCatalogSpecificCredentialProviders} was skipped).
+   *
+   * @param props mutable catalog properties
+   * @param credentialType provider type name to ensure
+   */
+  protected static void ensureCredentialProviderListed(
+      Map<String, String> props, String credentialType) {
+    String providers = props.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    if (StringUtils.isBlank(providers)) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialType);
+      return;
+    }
+    for (String part : providers.split(",")) {
+      if (credentialType.equals(part.trim())) {
+        return;
+      }
+    }
+    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, providers + "," + credentialType);
+  }
+
+  /**
    * Returns whether hidden credentials should be backfilled into catalog properties for backward
    * compatibility with connectors that do not support credential vending. Controlled by
    * server-level config {@code gravitino.catalog.credential.backfillToProperties}.
@@ -579,22 +679,49 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
       credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(s3AccessKeyId) || StringUtils.isNotBlank(s3SecretAccessKey)) {
+      LOG.warn(
+          "Incomplete S3 static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          StringUtils.isBlank(s3AccessKeyId),
+          StringUtils.isBlank(s3SecretAccessKey));
     }
 
     String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
     String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
     if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
       credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(ossAccessKeyId)
+        || StringUtils.isNotBlank(ossSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete OSS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(ossAccessKeyId),
+          StringUtils.isBlank(ossSecretAccessKey));
     }
 
     String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
     String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
     if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
       credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(azureAccountName)
+        || StringUtils.isNotBlank(azureAccountKey)) {
+      LOG.warn(
+          "Incomplete Azure static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accountNameBlank={}, accountKeyBlank={}",
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          StringUtils.isBlank(azureAccountName),
+          StringUtils.isBlank(azureAccountKey));
     }
 
     String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-    if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
+    // gcs-token only vends credentials for path-based contexts.
+    if (StringUtils.isNotBlank(gcsServiceAccountFile) && supportsPathBasedCredentials()) {
       credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
     }
 
@@ -602,6 +729,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
     if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
       credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(cosAccessKeyId)
+        || StringUtils.isNotBlank(cosSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete COS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(cosAccessKeyId),
+          StringUtils.isBlank(cosSecretAccessKey));
     }
   }
 

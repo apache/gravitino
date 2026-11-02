@@ -576,11 +576,15 @@ class GravitinoMetalake(
 
         return [GenericJobHandle(dto) for dto in resp.jobs()]
 
-    def get_job(self, job_id: str) -> JobHandle:
-        """Retrieves a job by its ID.
+    def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
+        """Retrieves a job by its ID, optionally including its captured stdout/stderr output.
+
+        Output is fetched live from the job executor on every call, not persisted, so
+        ``include_output`` should only be set to ``True`` when the output is actually needed.
 
         Args:
             job_id: The ID of the job to retrieve.
+            include_output: Whether to also fetch and populate the job's stdout/stderr output.
 
         Returns:
             The JobHandle representing the job if found, otherwise raises an exception.
@@ -595,7 +599,10 @@ class GravitinoMetalake(
             f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
             f"/{encode_string(job_id)}"
         )
-        response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
+        params = {"includeOutput": "true"} if include_output else {}
+        response = self.rest_client.get(
+            url, params=params, error_handler=JOB_ERROR_HANDLER
+        )
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()
 

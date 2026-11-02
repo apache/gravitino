@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 
 public class JdbcPropertiesConverter implements PropertiesConverter {
 
@@ -86,7 +87,10 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
       }
       return new HashMap<>();
     } else {
-      return new HashMap<>(properties);
+      Map<String, String> tableProperties = new HashMap<>(properties);
+      // Spark adds ownership to CREATE TABLE properties; JDBC ownership is not a table option.
+      tableProperties.keySet().removeIf(TableCatalog.PROP_OWNER::equalsIgnoreCase);
+      return tableProperties;
     }
   }
 

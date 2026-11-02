@@ -222,11 +222,12 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         """
         return self.get_metalake().list_jobs(job_template_name)
 
-    def get_job(self, job_id: str) -> JobHandle:
-        """Retrieves a job by its ID.
+    def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
+        """Retrieves a job by its ID, optionally including its captured stdout/stderr output.
 
         Args:
             job_id: The ID of the job to retrieve.
+            include_output: Whether to also fetch and populate the job's stdout/stderr output.
 
         Returns:
             The JobHandle object corresponding to the specified job ID.
@@ -234,7 +235,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         Raises:
             NoSuchJobException: If no job with the specified ID exists.
         """
-        return self.get_metalake().get_job(job_id)
+        return self.get_metalake().get_job(job_id, include_output)
 
     def run_job(self, job_template_name: str, job_conf: Dict[str, str]) -> JobHandle:
         """Runs a job using the specified job template and configuration.

@@ -27,7 +27,6 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.rel.Table;
 
@@ -64,10 +63,6 @@ final class FlinkGenericTableUtil {
     return !"hive".equalsIgnoreCase(connector);
   }
 
-  static Map<String, String> toGravitinoGenericTableProperties(ResolvedCatalogTable resolvedTable) {
-    return toGravitinoGenericTableProperties(resolvedTable, DefaultCatalogCompat.INSTANCE);
-  }
-
   static Map<String, String> toGravitinoGenericTableProperties(
       ResolvedCatalogTable resolvedTable, CatalogCompat catalogCompat) {
     Map<String, String> properties = catalogCompat.serializeCatalogTable(resolvedTable);
@@ -77,10 +72,6 @@ final class FlinkGenericTableUtil {
     Map<String, String> masked = maskFlinkProperties(properties);
     masked.put(CatalogPropertiesUtil.IS_GENERIC, "true");
     return masked;
-  }
-
-  static CatalogTable toFlinkGenericTable(Table table) {
-    return toFlinkGenericTable(table, DefaultCatalogCompat.INSTANCE);
   }
 
   static CatalogTable toFlinkGenericTable(Table table, CatalogCompat catalogCompat) {

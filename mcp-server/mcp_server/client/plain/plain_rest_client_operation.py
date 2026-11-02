@@ -54,6 +54,9 @@ from mcp_server.client.plain.plain_rest_client_policy_operation import (
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
 )
+from mcp_server.client.plain.plain_rest_client_semantic_model_operation import (
+    PlainRESTClientSemanticModelOperation,
+)
 from mcp_server.client.plain.plain_rest_client_statistic_operation import (
     PlainRESTClientStatisticOperation,
 )
@@ -69,6 +72,7 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.plain.plain_rest_client_view_operation import (
     PlainRESTClientViewOperation,
 )
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.topic_operation import TopicOperation
 
 
@@ -138,6 +142,9 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._view_operation = PlainRESTClientViewOperation(
             metalake_name, _rest_client
         )
+        self._semantic_model_operation = PlainRESTClientSemanticModelOperation(
+            metalake_name, _rest_client
+        )
         # Not metalake-scoped: addresses the server's top-level endpoint.
         self._metalake_operation = PlainRESTClientMetalakeOperation(
             _rest_client
@@ -185,3 +192,6 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_view_operation(self):
         return self._view_operation
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return self._semantic_model_operation

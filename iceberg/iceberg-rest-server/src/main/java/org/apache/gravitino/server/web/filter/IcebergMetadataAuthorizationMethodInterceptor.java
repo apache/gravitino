@@ -35,6 +35,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
@@ -205,5 +206,16 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
     // authorization. IRC2 handles authorization.
     return catalogWrapper.isRESTCatalog();
+  }
+
+  /** Metrics are stored locally, so a downstream REST catalog cannot authorize the report. */
+  @Override
+  protected boolean shouldSkipAuthorization(
+      Method method, Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    if (method.getDeclaringClass() == IcebergTableOperations.class
+        && method.getName().equals("reportTableMetrics")) {
+      return false;
+    }
+    return super.shouldSkipAuthorization(method, nameIdentifierMap);
   }
 }

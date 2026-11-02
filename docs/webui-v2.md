@@ -125,9 +125,9 @@ Overview for Catalog in the Web V2.
 On the catalogs page, use the catalog type selector at the top-left to switch between `relational`, `messaging`, `fileset`, and `model`. The list updates to show catalogs of the selected type.
 
 
-#### Tags and Policies Association
+#### Tags and Derived Policies
 
-The catalog list shows basic catalog information along with associated **Tags** and **Policies**. Use **Associate Tag** and **Associate Policy** in the list to add associations. Click the **X** on a tag to remove it.
+The catalog list shows basic catalog information along with **Tags** and policies derived from those tags. Use **Associate Tag** to assign a tag to a catalog. To associate a policy with a tag, use the [Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) API. Click the **X** on a tag to remove its catalog assignment.
 
 ![catalogs-list](./assets/webui-v2/catalogs-list.png)
 
@@ -313,11 +313,12 @@ Click **Create Policy** to open the create form. Fill in the required fields and
 
 ![policies-create](./assets/webui-v2/policies-create.png)
 
-#### Policy Metadata Objects
+To find the tags associated with a policy and inspect their selectors, use the
+[policy-to-tag association API](./manage-policies-in-gravitino.md#list-associations).
 
-Click a policy tag to navigate to the **Metadata Objects** page, which lists all metadata objects associated with the selected policy.
-
-![policy-metadata-objects](./assets/webui-v2/policy-metadata-objects.png)
+The current **Metadata Objects** view and direct policy controls still call the removed direct
+object-policy association APIs and do not work. Use the REST API or Java client for policy-to-tag
+associations until these UI controls are updated.
 
 ### Access
 
@@ -367,6 +368,6 @@ Overview for Access Roles in the Web V2.
 
 #### Create Role
 
-Click **Create Role** to open the create form. A role can include multiple securable objects. Different securable object types have different available privileges. For details, see [Securable Objects](security/access-control.md#securable-objects) and [Privilege Types](security/access-control.md#privilege-types).
+Click **Create Role** to open the create form. A role can include multiple securable objects. Different securable object types have different available privileges. For details, see [Access control](security/access-control.md).
 
 ![roles-create](./assets/webui-v2/roles-create.png)

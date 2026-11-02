@@ -31,6 +31,9 @@ import lombok.ToString;
 @EqualsAndHashCode(callSuper = true)
 public class SecretsResponse extends BaseResponse {
 
+  // Excluded from toString: the map holds secret material, and the response object ending up in
+  // a log line must not leak it.
+  @ToString.Exclude
   @JsonProperty("secrets")
   private final Map<String, String> secrets;
 

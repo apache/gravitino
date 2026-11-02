@@ -44,7 +44,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
  * Factory for creating instances of {@link GravitinoHiveCatalog}. It will be created by SPI
  * discovery in Flink.
  */
-public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
   private HiveCatalogFactory hiveCatalogFactory;
 
   @Override
@@ -75,23 +75,16 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
   }
 
-  protected Catalog newCatalog(
+  // GravitinoHiveCatalog is abstract (its inner-catalog construction differs per Flink version);
+  // every concrete, version-specific factory overrides this hook.
+  protected abstract Catalog newCatalog(
       String catalogName,
       String defaultDatabase,
       Map<String, String> catalogOptions,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       @Nullable HiveConf hiveConf,
-      @Nullable String hiveVersion) {
-    return new GravitinoHiveCatalog(
-        catalogName,
-        defaultDatabase,
-        catalogOptions,
-        schemaAndTablePropertiesConverter,
-        partitionConverter,
-        hiveConf,
-        hiveVersion);
-  }
+      @Nullable String hiveVersion);
 
   @Override
   public String factoryIdentifier() {

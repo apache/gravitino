@@ -65,12 +65,24 @@ public class EventBus {
    *     with this EventBus for event dispatch.
    */
   public EventBus(List<EventListenerPlugin> eventListeners) {
-    this.eventListeners = eventListeners;
-    this.asyncQueueListeners =
+    this(
+        eventListeners,
         eventListeners.stream()
             .filter(AsyncQueueListener.class::isInstance)
             .map(AsyncQueueListener.class::cast)
-            .collect(Collectors.toList());
+            .collect(Collectors.toList()));
+  }
+
+  /**
+   * Constructs an EventBus with the event listeners and the async queues among them. The lists are
+   * kept by reference, so listeners the caller adds to them later are dispatched and checked too.
+   *
+   * @param eventListeners The listeners to dispatch events to.
+   * @param asyncQueueListeners The {@link AsyncQueueListener} instances in {@code eventListeners}.
+   */
+  EventBus(List<EventListenerPlugin> eventListeners, List<AsyncQueueListener> asyncQueueListeners) {
+    this.eventListeners = eventListeners;
+    this.asyncQueueListeners = asyncQueueListeners;
   }
 
   /**

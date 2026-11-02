@@ -39,8 +39,8 @@ public class EntityChangeLogBaseSQLProvider {
   private static final String CURRENT_TIME_MILLIS_SQL = DatabaseTimeSQL.MYSQL;
 
   /**
-   * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so
-   * callers only need to remember the last consumed id.
+   * Reads the incremental ID stream. IDs are unique but allocation order is not commit order;
+   * callers also replay recent rows to catch late commits below the cursor.
    *
    * <p>This table is a short-lived broadcast log for local cache invalidation, not a queue. In a
    * multi-node deployment every server instance has its own local cache and should independently
@@ -56,6 +56,35 @@ public class EntityChangeLogBaseSQLProvider {
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
         + " WHERE id > #{lastConsumedId} ORDER BY id LIMIT #{maxRows}";
+  }
+
+  /**
+   * Reads a page of recent rows at or behind the incremental cursor using the database clock.
+   * Timestamp and ID together preserve page boundaries when timestamps are equal.
+   *
+   * @param afterCreatedAt exclusive timestamp/ID page cursor timestamp
+   * @param afterId exclusive timestamp/ID page cursor ID
+   * @param upperId inclusive incremental high-water ID captured at the start of the sweep
+   * @param windowMs maximum recorded created_at age in milliseconds
+   * @param maxRows maximum rows in this page
+   * @return recent records ordered by recorded created_at timestamp and ID
+   */
+  public String selectRecentEntityChanges(
+      @Param("afterCreatedAt") long afterCreatedAt,
+      @Param("afterId") long afterId,
+      @Param("upperId") long upperId,
+      @Param("windowMs") long windowMs,
+      @Param("maxRows") int maxRows) {
+    return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
+        + " entity_full_name as fullName, operate_type as operateType, created_at as createdAt"
+        + " FROM "
+        + ENTITY_CHANGE_LOG_TABLE_NAME
+        + " WHERE created_at >= "
+        + currentTimeMillisSql()
+        + " - #{windowMs}"
+        + " AND id <= #{upperId}"
+        + " AND (created_at > #{afterCreatedAt} OR (created_at = #{afterCreatedAt} AND id > #{afterId}))"
+        + " ORDER BY created_at, id LIMIT #{maxRows}";
   }
 
   public String selectMaxChangeId() {
@@ -90,5 +119,14 @@ public class EntityChangeLogBaseSQLProvider {
         + CURRENT_TIME_MILLIS_SQL
         + " - #{retentionMs} LIMIT "
         + ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE;
+  }
+
+  /**
+   * Returns the database-specific current-time expression.
+   *
+   * @return the database-specific current-time expression in epoch milliseconds
+   */
+  protected String currentTimeMillisSql() {
+    return CURRENT_TIME_MILLIS_SQL;
   }
 }

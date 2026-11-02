@@ -45,6 +45,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
 
+  /** Whether to expose metrics endpoints when the Iceberg REST service runs standalone. */
+  public static final ConfigEntry<Boolean> METRICS_ENABLED =
+      new ConfigBuilder("metrics.enabled")
+          .doc(
+              "Whether to expose /metrics and /prometheus/metrics in standalone mode. "
+                  + "This setting is ignored when running as an auxiliary service.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND)
           .doc("Catalog backend of Gravitino Iceberg catalog")

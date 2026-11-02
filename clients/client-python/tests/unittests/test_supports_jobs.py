@@ -263,6 +263,38 @@ class TestSupportsJobs(unittest.TestCase):
                 job_handle.runtime_job_template(),
             )
 
+    def test_get_job_with_output(self, *mock_methods):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+        )
+
+        job_template_name = "test_shell_job"
+        job_dto = self._new_job_dto(
+            job_template_name,
+            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(timezone.utc),
+            stdout=["line1", "line2"],
+            stderr=["err1"],
+        )
+        resp = JobResponse(_job=job_dto, _code=0)
+        mock_resp = self._mock_http_response(resp.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        ):
+            job_handle = gravitino_client.get_job(job_dto.job_id(), include_output=True)
+            self._compare_job_handle(job_handle, job_dto)
+            self.assertEqual(["line1", "line2"], job_handle.stdout())
+            self.assertEqual(["err1"], job_handle.stderr())
+
+        # test with invalid input
+        with self.assertRaises(ValueError):
+            gravitino_client.get_job("", include_output=True)
+
+        with self.assertRaises(ValueError):
+            gravitino_client.get_job(None, include_output=True)
+
     def test_cancel_job(self, *mock_methods):
         gravitino_client = GravitinoClient(
             uri="http://localhost:8090",
@@ -357,6 +389,8 @@ class TestSupportsJobs(unittest.TestCase):
         finished_at: Optional[datetime] = None,
         started_at: Optional[datetime] = None,
         runtime_job_template: Optional[JobTemplateDTO] = None,
+        stdout: Optional[list] = None,
+        stderr: Optional[list] = None,
     ) -> JobDTO:
         return JobDTO(
             _job_id="job-123",
@@ -367,6 +401,8 @@ class TestSupportsJobs(unittest.TestCase):
             _started_at=started_at,
             _finished_at=finished_at,
             _runtime_job_template=runtime_job_template,
+            _stdout=stdout,
+            _stderr=stderr,
         )
 
     def _compare_job_handle(self, job_handle: JobHandle, job_dto: JobDTO):

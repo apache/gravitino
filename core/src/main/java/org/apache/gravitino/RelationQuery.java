@@ -27,9 +27,7 @@ import javax.annotation.Nullable;
  * relation edge, and the returned entities come from the opposite endpoint.
  *
  * <p>For reverse lookups, callers still use the same relation type. For example, querying all
- * metadata objects that have a specific policy uses {@link
- * SupportsRelationOperations.Type#POLICY_METADATA_OBJECT_REL} with the policy as the anchor entity,
- * and querying all metadata objects that have a specific tag uses {@link
+ * metadata objects that have a specific tag uses {@link
  * SupportsRelationOperations.Type#TAG_METADATA_OBJECT_REL} with the tag as the anchor entity.
  *
  * <p>The optional relation value is an exact string value carried by the relation edge, such as a

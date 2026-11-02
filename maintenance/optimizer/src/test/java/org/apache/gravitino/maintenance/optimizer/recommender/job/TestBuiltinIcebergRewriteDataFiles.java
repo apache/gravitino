@@ -281,6 +281,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
             NameIdentifier.of(SPARK_CATALOG_NAME, "db", tableName),
             jobOptions,
             JOB_TEMPLATE_NAME,
+            "binpack",
+            "",
             columns,
             partitioning,
             partitions);

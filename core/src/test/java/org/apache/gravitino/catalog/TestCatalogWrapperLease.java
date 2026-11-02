@@ -50,6 +50,7 @@ import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.ClassLoaderPool;
@@ -132,7 +133,26 @@ public class TestCatalogWrapperLease {
     CatalogWrapper wrapper = lease.wrapper();
     Assertions.assertEquals(1, wrapper.activeOperations());
 
-    catalogManager.getCatalogCache().invalidate(ident);
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L,
+                METALAKE,
+                "CATALOG",
+                EntityChangeLogNameIdentifierCodec.encode(ident),
+                OperateType.ALTER,
+                0L)));
+    // Repeated delivery must be safe while the operation is still using the retired wrapper.
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L,
+                METALAKE,
+                "CATALOG",
+                EntityChangeLogNameIdentifierCodec.encode(ident),
+                OperateType.ALTER,
+                0L)));
     // Caffeine runs the removal listener asynchronously, so wait for the retirement to land.
     await().atMost(Duration.ofSeconds(10)).until(wrapper::isRetired);
 

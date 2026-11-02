@@ -23,7 +23,8 @@ env_map = {
     "LANCE_REST_GRAVITINO_URI": "gravitino-uri",
     "LANCE_REST_GRAVITINO_METALAKE_NAME": "gravitino-metalake",
     "LANCE_REST_HOST": "host",
-    "LANCE_REST_PORT": "httpPort"
+    "LANCE_REST_PORT": "httpPort",
+    "LANCE_REST_METRICS_ENABLED": "metrics.enabled",
 }
 
 init_config = {

@@ -38,6 +38,10 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String CREATOR = IcebergConstants.CREATOR;
   public static final String LOCATION = IcebergConstants.LOCATION;
   public static final String CURRENT_SNAPSHOT_ID = IcebergConstants.CURRENT_SNAPSHOT_ID;
+
+  /** Read-only partition spec ID projected from Iceberg table metadata. */
+  public static final String DEFAULT_SPEC_ID = IcebergConstants.DEFAULT_SPEC_ID;
+
   public static final String CHERRY_PICK_SNAPSHOT_ID = IcebergConstants.CHERRY_PICK_SNAPSHOT_ID;
   public static final String SORT_ORDER = IcebergConstants.SORT_ORDER;
   public static final String IDENTIFIER_FIELDS = IcebergConstants.IDENTIFIER_FIELDS;
@@ -77,6 +81,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
                 CURRENT_SNAPSHOT_ID,
                 "The snapshot represents the current state of the table",
                 false),
+            stringReservedPropertyEntry(
+                DEFAULT_SPEC_ID, "The current default partition spec from Iceberg metadata", false),
             stringReservedPropertyEntry(
                 CHERRY_PICK_SNAPSHOT_ID,
                 "Selecting a specific snapshot in a merge operation",

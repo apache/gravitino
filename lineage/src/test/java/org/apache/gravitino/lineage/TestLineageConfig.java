@@ -24,8 +24,44 @@ import java.util.Map;
 import org.apache.gravitino.lineage.sink.LineageLogSink;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestLineageConfig {
+
+  @Test
+  void testDefaultQueueCapacity() {
+    Assertions.assertEquals(
+        "10000", new LineageConfig(ImmutableMap.of()).getSinkConfigs().get("queueCapacity"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"queueCapacity,120", "sinkQueueCapacity,120"})
+  void testQueueCapacityKeys(String key, String value) {
+    Assertions.assertEquals(
+        value,
+        new LineageConfig(ImmutableMap.of(key, value)).getSinkConfigs().get("queueCapacity"));
+  }
+
+  @Test
+  void testDocumentedQueueCapacityTakesPrecedence() {
+    Assertions.assertEquals(
+        "120",
+        new LineageConfig(ImmutableMap.of("queueCapacity", "120", "sinkQueueCapacity", "240"))
+            .getSinkConfigs()
+            .get("queueCapacity"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "queueCapacity,0", "queueCapacity,-1", "queueCapacity,invalid",
+    "sinkQueueCapacity,0", "sinkQueueCapacity,-1", "sinkQueueCapacity,invalid"
+  })
+  void testInvalidQueueCapacity(String key, String value) {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new LineageConfig(ImmutableMap.of(key, value)).getSinkConfigs());
+  }
 
   @Test
   void testLineageSource() {
@@ -64,7 +100,7 @@ public class TestLineageConfig {
         sinkConfigs.get(
             LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME);
     Assertions.assertEquals(LineageLogSink.class.getName(), className);
-    String capacity = sinkConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
+    String capacity = sinkConfigs.get(LineageConfig.LINEAGE_QUEUE_CAPACITY);
     Assertions.assertEquals(
         LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY_DEFAULT, Integer.parseInt(capacity));
 

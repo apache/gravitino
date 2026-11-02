@@ -18,14 +18,23 @@
  */
 package org.apache.gravitino.storage.relational;
 
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -36,15 +45,15 @@ import org.slf4j.LoggerFactory;
  * Global poller for {@code entity_change_log}.
  *
  * <p>There is one poller per Gravitino server process, and it keeps one read position (the id of
- * the last row it has read). It reads a batch of rows, hands that batch to every listener once, and
+ * the last incremental row it has read). It reads a batch of rows, hands it to every listener, and
  * then always moves the read position forward, even if a listener failed. The read position is
  * shared by all listeners, so holding it back to retry one listener would stop every other listener
  * from seeing new changes, and all the caches in this process would fall behind.
  *
- * <p>Because a batch is handed out only once and is never sent again, every listener must be able
- * to fix itself when it fails. The usual way to do that is to clear its whole cache: clearing
- * everything also covers whatever the listener failed to remove, so nothing stale is left behind.
- * The three listeners registered today do exactly that:
+ * <p>Listener failures are not retried, so every listener must be able to fix itself when it fails.
+ * The usual way to do that is to clear its whole cache: clearing everything also covers whatever
+ * the listener failed to remove, so nothing stale is left behind. The three listeners registered
+ * today do exactly that:
  *
  * <ul>
  *   <li>{@code EntityCacheChangeLogListener} clears its whole entity cache.
@@ -62,31 +71,130 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Every listener failure is logged at {@code ERROR}, so a listener that keeps failing stays
  * visible in the logs even though the poller keeps going.
+ *
+ * <p>Each poll cycle reads at most one incremental batch and one recent-history replay page. Replay
+ * catches out-of-order commits within a configured record-age window, deduplicates recently
+ * delivered IDs, and never moves the incremental cursor backwards. It does not guarantee delivery
+ * beyond the window or after log pruning. Replay is delivered only to listeners opting into {@link
+ * EntityChangeLogListener#supportsReplay()}. Their callbacks must be idempotent because bounded
+ * deduplication may evict IDs and startup replay can include historical rows.
+ *
+ * <p>Each replay sweep rereads every row in the window, so a new sweep starts at most once per
+ * {@code max(pollIntervalSecs, replayWindowSecs / 4)}. This bounds rereads to about four per row
+ * and delays recovery of a late row by up to one sweep interval; a row is caught only if it becomes
+ * visible before its recorded age exceeds the window minus one sweep interval.
+ *
+ * <p>A full incremental batch or replay page means more rows may be waiting, so the next cycle
+ * starts right away instead of after the poll interval. When both reads are empty or partial, or
+ * the cycle fails, the poller waits the full interval. A backlog is therefore drained as fast as
+ * batches can be read and delivered, while an idle or failing poller still polls only once per
+ * interval.
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityChangeLogPoller.class);
-
-  /** Max entity-change rows to fetch per batch. */
-  private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 2000;
 
   /** Max records rendered in a batch summary log line. */
   private static final int MAX_SUMMARIZED_RECORDS = 20;
 
   private final List<EntityChangeLogListener> listeners = new CopyOnWriteArrayList<>();
   private final long pollIntervalSecs;
+  private final int batchSize;
+  private final EntityChangeLogMetricsSource metrics;
+  private final long replayWindowMs;
+  private final int replayMaxEntries;
+  // Minimum gap between the starts of two replay sweeps. Each sweep rereads the whole window, so
+  // starting one every poll would reread every recent row about window/interval times.
+  private final long replaySweepIntervalNanos;
+  // Guarded by doPollChanges' monitor. Insertion order makes expiry and capacity eviction bounded.
+  private final Map<Long, Long> rememberedIds = new LinkedHashMap<>();
+  private long replayAfterCreatedAt = -1;
+  private long replayAfterId;
+  private long replayUpperId;
+  private long startupHighWaterId;
+  private boolean replayFailed;
+  private long replayFailureNanos;
+  private boolean capacityWarningReported;
+  private long capacityWarningNanos;
+  private long pendingDedupEvictions;
+  private boolean replaySweepStarted;
+  // The dedup set is empty until the first sweep completes, so every row it finds is expected
+  // startup history rather than evidence of a late commit.
+  private boolean replaySweepCompleted;
+  private long lastReplaySweepStartNanos;
 
   private ScheduledExecutorService scheduler;
+  private volatile boolean closed = false;
   private volatile long entityPollHighWaterId = 0;
+  private boolean tailSampleAttempted;
+  private long lastTailSampleNanos;
 
   /**
-   * Creates an {@link EntityChangeLogPoller}.
+   * Creates an {@link EntityChangeLogPoller} with an unregistered metrics source for callers that
+   * do not use the server metrics system.
    *
-   * @param pollIntervalSecs interval between successive polling cycles
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
    */
   public EntityChangeLogPoller(long pollIntervalSecs) {
+    this(pollIntervalSecs, new EntityChangeLogMetricsSource());
+  }
+
+  /**
+   * Creates a poller using the metrics source registered by the entity store.
+   *
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
+   * @param metrics process-local change log metrics
+   */
+  public EntityChangeLogPoller(long pollIntervalSecs, EntityChangeLogMetricsSource metrics) {
+    this(pollIntervalSecs, Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE, metrics);
+  }
+
+  /**
+   * Creates a poller with a custom batch size, using the metrics source registered by the entity
+   * store.
+   *
+   * @param pollIntervalSecs interval between polling cycles once the poller has caught up
+   * @param batchSize maximum number of change log rows read per polling cycle
+   * @param metrics process-local change log metrics
+   */
+  public EntityChangeLogPoller(
+      long pollIntervalSecs, int batchSize, EntityChangeLogMetricsSource metrics) {
+    this(
+        pollIntervalSecs,
+        batchSize,
+        Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS,
+        Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES,
+        metrics);
+  }
+
+  /**
+   * Creates a poller with bounded recent-history replay.
+   *
+   * @param pollIntervalSecs interval between caught-up polling cycles
+   * @param batchSize maximum records per query
+   * @param replayWindowSecs maximum stored timestamp age replayed, or zero to disable replay
+   * @param replayMaxEntries maximum remembered IDs; eviction permits duplicate delivery
+   * @param metrics process-local change log metrics
+   */
+  public EntityChangeLogPoller(
+      long pollIntervalSecs,
+      int batchSize,
+      long replayWindowSecs,
+      int replayMaxEntries,
+      EntityChangeLogMetricsSource metrics) {
+    Preconditions.checkArgument(
+        replayWindowSecs >= 0 && replayWindowSecs <= 86400,
+        "replayWindowSecs must be between 0 and 86400");
+    Preconditions.checkArgument(replayMaxEntries > 0, "replayMaxEntries must be positive");
+    this.replayWindowMs = TimeUnit.SECONDS.toMillis(replayWindowSecs);
+    this.replayMaxEntries = replayMaxEntries;
     Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
+    this.replaySweepIntervalNanos =
+        TimeUnit.SECONDS.toNanos(Math.max(pollIntervalSecs, replayWindowSecs / 4));
+    Preconditions.checkArgument(batchSize > 0, "batchSize must be positive");
+    this.metrics = Preconditions.checkNotNull(metrics, "metrics cannot be null");
     this.pollIntervalSecs = pollIntervalSecs;
+    this.batchSize = batchSize;
   }
 
   /**
@@ -121,40 +229,45 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   /**
-   * Initializes the high-water cursor to the current DB tail and schedules periodic polling.
+   * Initializes the high-water cursor to the current DB tail and schedules the first poll one
+   * interval later. A poller cannot be started again after {@link #close()}.
    *
    * <p>On every start (including restarts), the cursor is set to the current maximum change ID in
-   * the DB, so historical change records written before this server process started are NOT
-   * replayed. This is intentional: on startup the local cache is cold, so there is no stale state
-   * to invalidate. Only changes written after this server started need to be applied to the warming
-   * cache.
+   * the DB for the incremental stream. Recent-history replay also examines records at or below that
+   * initial cursor: a transaction may have allocated a lower ID before startup but commit after the
+   * local cache warms. Already committed recent rows can therefore be replayed too.
    */
   public void start() {
+    Preconditions.checkState(!closed, "A closed entity change log poller cannot be restarted");
     entityPollHighWaterId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+    startupHighWaterId = entityPollHighWaterId;
     LOG.info(
-        "Starting entity change log poller at high-water id {} with a {} second interval, "
-            + "{} listener(s) registered",
+        "Entity change log replay windowMs={} maxRememberedIds={}; recorded created_at age is not commit age; "
+            + "transactions older than the window or pruned history may still be missed",
+        replayWindowMs,
+        replayMaxEntries);
+    metrics.setDbTailId(entityPollHighWaterId);
+    tailSampleAttempted = true;
+    lastTailSampleNanos = nanoTime();
+    metrics.setCursorId(entityPollHighWaterId);
+    LOG.info(
+        "Starting entity change log poller at high-water id {} with a {} second interval and a "
+            + "batch size of {}, {} listener(s) registered",
         entityPollHighWaterId,
         pollIntervalSecs,
+        batchSize,
         listeners.size());
 
-    scheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r);
-              t.setName("Gravitino-EntityChangeLogPoller");
-              t.setDaemon(true);
-              return t;
-            });
-    scheduler.scheduleWithFixedDelay(
-        this::pollChanges, pollIntervalSecs, pollIntervalSecs, TimeUnit.SECONDS);
+    scheduler = createScheduler();
+    scheduleNextPoll(TimeUnit.SECONDS.toMillis(pollIntervalSecs));
   }
 
   @Override
   public void close() {
+    closed = true;
     if (scheduler != null) {
       scheduler.shutdown();
       try {
@@ -173,33 +286,343 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   @VisibleForTesting
-  void pollChanges() {
+  ScheduledExecutorService createScheduler() {
+    ScheduledThreadPoolExecutor executor =
+        new ScheduledThreadPoolExecutor(
+            1,
+            r -> {
+              Thread t = new Thread(r);
+              t.setName("Gravitino-EntityChangeLogPoller");
+              t.setDaemon(true);
+              return t;
+            });
+    // Drop polls whose delay has not elapsed so close() does not wait for an idle poll. Already-due
+    // tasks, including zero-delay drain hops, can still run after shutdown(); runPollCycle's closed
+    // guard prevents those tasks from accessing the closing store.
+    executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+    return executor;
+  }
+
+  @VisibleForTesting
+  long nanoTime() {
+    return System.nanoTime();
+  }
+
+  /**
+   * Runs one poll cycle and schedules the next one: immediately when the cycle read a full batch,
+   * otherwise after the poll interval. A failed cycle also waits the full interval, so a database
+   * outage is not retried in a tight loop.
+   */
+  private void runPollCycle() {
+    if (closed) {
+      return;
+    }
+    long nextDelayMillis = TimeUnit.SECONDS.toMillis(pollIntervalSecs);
     try {
-      doPollChanges();
-    } catch (Throwable e) {
-      // Catch Throwable, not Exception: this method is the task handed to
-      // scheduleWithFixedDelay(), and anything that escapes it cancels all future runs for good,
-      // silently. A listener or its recovery path can throw an Error as well as an Exception.
-      // Losing the poller would stop cache invalidation for every listener in this process, so we
-      // log and let the next cycle run.
-      if (handleInterruptIfAny(e, "Entity change poll")) {
-        return;
+      if (pollChanges()) {
+        // Full batches advance the incremental cursor or the replay page cursor. Each query is
+        // bounded by batchSize. Tail sampling is rate-limited during full incremental batches;
+        // replay-only drains still sample the tail when their incremental query is partial.
+        nextDelayMillis = 0;
       }
-      LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
+    } finally {
+      // pollChanges() catches Throwable, but scheduling in finally keeps the poller alive even if
+      // that ever changes: a cycle that is not rescheduled stops cache invalidation for good.
+      scheduleNextPoll(nextDelayMillis);
     }
   }
 
-  private synchronized void doPollChanges() {
+  private void scheduleNextPoll(long delayMillis) {
+    if (closed) {
+      return;
+    }
+    try {
+      scheduler.schedule(this::runPollCycle, delayMillis, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      // Only a shut-down scheduler rejects work, and close() sets closed before shutting down.
+      if (!closed) {
+        LOG.error("Could not schedule the next entity change log poll", e);
+      }
+    }
+  }
+
+  /**
+   * Polls an incremental batch and a bounded recent-history page, delivering unseen records.
+   *
+   * @return true if the incremental batch or the replay page was full, so more rows may be waiting
+   *     and the next poll should not wait for the interval; false if both caught up or the poll
+   *     failed
+   */
+  @VisibleForTesting
+  boolean pollChanges() {
+    try (Timer.Context ignored = metrics.timePoll()) {
+      return doPollChanges();
+    } catch (Throwable e) {
+      // Catch Throwable, not Exception: a listener or its recovery path can throw an Error as well
+      // as an Exception. Losing the poller would stop cache invalidation for every listener in
+      // this process, so we log and let the next cycle run after the normal interval.
+      if (handleInterruptIfAny(e, "Entity change poll")) {
+        return false;
+      }
+      metrics.pollFailed();
+      LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
+      return false;
+    }
+  }
+
+  private synchronized boolean doPollChanges() {
     BatchDelivery delivery = fetchNextDelivery();
+    if (replayWindowMs > 0) {
+      expireRememberedIds();
+    }
+    boolean incrementalBacklog = delivery != null && delivery.changes.size() >= batchSize;
     if (delivery != null) {
       deliver(delivery);
+      remember(delivery.changes);
+    }
+    // Replay failure must not discard or delay delivery of a successfully fetched new batch.
+    boolean replayBacklog = false;
+    if (replayWindowMs > 0
+        && entityPollHighWaterId > 0
+        && (replayUpperId != 0 || replaySweepDue())
+        && (!replayFailed
+            || nanoTime() - replayFailureNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs))) {
+      try {
+        replayBacklog = replayRecentChanges();
+        replayFailed = false;
+      } catch (RuntimeException e) {
+        if (handleInterruptIfAny(e, "Entity change log replay")) {
+          return false;
+        }
+        replayFailed = true;
+        metrics.replayFailed();
+        replayFailureNanos = nanoTime();
+        LOG.warn(
+            "Entity change log replay failed cursor={} replayAfterCreatedAt={} replayAfterId={} "
+                + "replayUpperId={} windowMs={}; incremental delivery continues; replay retries after the poll interval",
+            entityPollHighWaterId,
+            replayAfterCreatedAt,
+            replayAfterId,
+            replayUpperId,
+            replayWindowMs,
+            e);
+      }
+    }
+    return incrementalBacklog || replayBacklog;
+  }
+
+  private boolean replayRecentChanges() {
+    if (replayUpperId == 0) {
+      replaySweepStarted = true;
+      lastReplaySweepStartNanos = nanoTime();
+      replayUpperId = entityPollHighWaterId;
+    }
+    List<EntityChangeRecord> page =
+        SessionUtils.getWithoutCommit(
+            EntityChangeLogMapper.class,
+            m ->
+                m.selectRecentEntityChanges(
+                    replayAfterCreatedAt, replayAfterId, replayUpperId, replayWindowMs, batchSize));
+    List<EntityChangeRecord> unseen = new ArrayList<>();
+    for (EntityChangeRecord change : page) {
+      if (!rememberedIds.containsKey(change.getId())) {
+        unseen.add(change);
+        // Absence from this bounded set is evidence of a possible late commit, not proof:
+        // startup history and capacity eviction can also produce previously unseen IDs.
+        LOG.debug(
+            "Replaying previously unseen entity change behind cursor: changeId={} cursor={} "
+                + "startupCursor={} entityType={} fullName={} operation={} createdAt={} approximateAgeMs={} "
+                + "windowMs={}; possible late commit, startup history, or dedup eviction; "
+                + "age uses JVM time and is not transaction duration",
+            change.getId(),
+            entityPollHighWaterId,
+            startupHighWaterId,
+            change.getEntityType(),
+            change.getFullName(),
+            change.getOperateType(),
+            change.getCreatedAt(),
+            System.currentTimeMillis() - change.getCreatedAt(),
+            replayWindowMs);
+      }
+    }
+    if (!unseen.isEmpty()) {
+      metrics.replayRecordsFound(unseen.size());
+      unseen.sort(Comparator.comparingLong(EntityChangeRecord::getId));
+      if (!replaySweepCompleted) {
+        LOG.info(
+            "Entity change log startup replay delivered {} recent record(s) behind cursor={} "
+                + "startupCursor={} windowMs={} records={}; expected after a restart because "
+                + "deduplication starts empty",
+            unseen.size(),
+            entityPollHighWaterId,
+            startupHighWaterId,
+            replayWindowMs,
+            summarize(unseen));
+      } else {
+        LOG.warn(
+            "Entity change log replay found {} previously unseen record(s) behind cursor={} "
+                + "startupCursor={} windowMs={} approximateOldestAgeMs={} records={}; "
+                + "possible late commit or dedup eviction; record details at DEBUG; "
+                + "age uses JVM time, not transaction duration",
+            unseen.size(),
+            entityPollHighWaterId,
+            startupHighWaterId,
+            replayWindowMs,
+            System.currentTimeMillis()
+                - unseen.stream().mapToLong(EntityChangeRecord::getCreatedAt).min().orElse(0),
+            summarize(unseen));
+      }
+      List<EntityChangeRecord> immutable = List.copyOf(unseen);
+      notifyListeners(
+          new BatchDelivery(
+              immutable, immutable.get(immutable.size() - 1).getId(), replayListeners()));
+      remember(immutable);
+    }
+    if (page.size() < batchSize) {
+      LOG.debug(
+          "Entity change log replay sweep complete cursor={} upperId={} fetched={} replayed={} "
+              + "deduplicated={} windowMs={}",
+          entityPollHighWaterId,
+          replayUpperId,
+          page.size(),
+          unseen.size(),
+          page.size() - unseen.size(),
+          replayWindowMs);
+      replaySweepCompleted = true;
+      replayAfterCreatedAt = -1;
+      replayAfterId = 0;
+      replayUpperId = 0;
+      return false;
+    }
+    EntityChangeRecord last = page.get(page.size() - 1);
+    replayAfterCreatedAt = last.getCreatedAt();
+    replayAfterId = last.getId();
+    LOG.debug(
+        "Entity change log replay page cursor={} upperId={} afterCreatedAt={} afterId={} "
+            + "fetched={} replayed={} deduplicated={}",
+        entityPollHighWaterId,
+        replayUpperId,
+        replayAfterCreatedAt,
+        replayAfterId,
+        page.size(),
+        unseen.size(),
+        page.size() - unseen.size());
+    return true;
+  }
+
+  /**
+   * A new sweep starts at most once per sweep interval; pages of a sweep in progress are not
+   * throttled. The first sweep after startup runs at once to cover history below the start cursor.
+   * A row is caught when it becomes visible before its recorded age exceeds the window minus one
+   * sweep interval.
+   */
+  private boolean replaySweepDue() {
+    return !replaySweepStarted
+        || nanoTime() - lastReplaySweepStartNanos >= replaySweepIntervalNanos;
+  }
+
+  private List<EntityChangeLogListener> replayListeners() {
+    List<EntityChangeLogListener> eligible = new ArrayList<>();
+    for (EntityChangeLogListener listener : listeners) {
+      try {
+        if (listener.supportsReplay()) {
+          eligible.add(listener);
+        }
+      } catch (Throwable e) {
+        LOG.warn(
+            "Entity change log replay capability check failed listener={}; skipping its replay",
+            listener.getClass().getName(),
+            e);
+      }
+    }
+    return List.copyOf(eligible);
+  }
+
+  private void expireRememberedIds() {
+    long now = nanoTime();
+    Iterator<Map.Entry<Long, Long>> entries = rememberedIds.entrySet().iterator();
+    while (entries.hasNext()) {
+      if (now - entries.next().getValue() < TimeUnit.MILLISECONDS.toNanos(replayWindowMs)) {
+        break;
+      }
+      entries.remove();
+    }
+  }
+
+  private void remember(List<EntityChangeRecord> changes) {
+    if (replayWindowMs == 0) {
+      return;
+    }
+    long now = nanoTime();
+    int evicted = 0;
+    for (EntityChangeRecord change : changes) {
+      // Keep first-delivery time and insertion order aligned with prefix expiry. Seeing an ID
+      // again in a replay query does not deliver it again or extend its deduplication lifetime.
+      rememberedIds.putIfAbsent(change.getId(), now);
+      if (rememberedIds.size() > replayMaxEntries) {
+        Iterator<Long> ids = rememberedIds.keySet().iterator();
+        ids.next();
+        ids.remove();
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      metrics.dedupEvicted(evicted);
+    }
+    pendingDedupEvictions += evicted;
+    if (pendingDedupEvictions > 0
+        && (!capacityWarningReported
+            || now - capacityWarningNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs))) {
+      capacityWarningReported = true;
+      capacityWarningNanos = now;
+      LOG.warn(
+          "Entity change log replay dedup capacity reached cursor={} evictedIds={} maxEntries={} "
+              + "windowMs={}; duplicate invalidations may occur; consider increasing replayMaxEntries",
+          entityPollHighWaterId,
+          pendingDedupEvictions,
+          replayMaxEntries,
+          replayWindowMs);
+      pendingDedupEvictions = 0;
     }
   }
 
   @Nullable
   private BatchDelivery fetchNextDelivery() {
+    long fetchStartNanos = System.nanoTime();
     List<EntityChangeRecord> changes = fetchEntityChanges();
+    // The tail is for observability only. A failed sample must not suppress delivery of rows
+    // already fetched successfully or hold the cursor back.
+    @Nullable Long dbTailId = null;
+    long nowNanos = nanoTime();
+    if (changes.size() < batchSize
+        || !tailSampleAttempted
+        || nowNanos - lastTailSampleNanos >= TimeUnit.SECONDS.toNanos(pollIntervalSecs)) {
+      // A full batch already signals backlog. Sample at most once per interval during a drain,
+      // including failed attempts, while partial/empty polls refresh the caught-up state.
+      tailSampleAttempted = true;
+      lastTailSampleNanos = nowNanos;
+      try {
+        dbTailId =
+            getOrDefault(
+                SessionUtils.getWithoutCommit(
+                    EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
+        metrics.setDbTailId(dbTailId);
+      } catch (RuntimeException e) {
+        if (handleInterruptIfAny(e, "Entity change log tail sample")) {
+          throw e;
+        }
+        metrics.tailSampleFailed();
+        LOG.warn("Could not sample entity change log tail; retaining the previous gauge value", e);
+      }
+    }
+    metrics.pollSucceeded(changes.size());
+    long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - fetchStartNanos);
     if (changes.isEmpty()) {
+      LOG.debug(
+          "entityChangeLog poll cursor={} fetched=0 tailId={} durationMs={}",
+          entityPollHighWaterId,
+          dbTailId,
+          durationMs);
       return null;
     }
 
@@ -208,11 +631,13 @@ public class EntityChangeLogPoller implements AutoCloseable {
     BatchDelivery delivery =
         new BatchDelivery(immutableChanges, lastChangeId, List.copyOf(listeners));
     LOG.debug(
-        "Fetched {} entity change log record(s) after cursor {}, id range [{}, {}]: {}",
-        immutableChanges.size(),
+        "entityChangeLog poll cursor={} fetched={} firstId={} lastId={} tailId={} durationMs={} records={}",
         entityPollHighWaterId,
+        immutableChanges.size(),
         delivery.firstChangeId(),
         delivery.lastChangeId,
+        dbTailId,
+        durationMs,
         summarize(immutableChanges));
     return delivery;
   }
@@ -247,8 +672,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private List<EntityChangeRecord> fetchEntityChanges() {
     return SessionUtils.getWithoutCommit(
-        EntityChangeLogMapper.class,
-        m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
+        EntityChangeLogMapper.class, m -> m.selectEntityChanges(entityPollHighWaterId, batchSize));
   }
 
   private static boolean handleInterruptIfAny(Throwable e, String context) {
@@ -280,6 +704,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private void advanceCursor(BatchDelivery delivery) {
     long previousHighWaterId = entityPollHighWaterId;
     entityPollHighWaterId = delivery.lastChangeId;
+    metrics.setCursorId(entityPollHighWaterId);
     LOG.info(
         "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to {}; "
             + "newest record is ~{} ms old",
@@ -308,13 +733,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
       }
 
       try {
+        LOG.debug(
+            "entityChangeLog delivery listener={} firstId={} lastId={} count={} attempt=1",
+            listener.getClass().getName(),
+            delivery.firstChangeId(),
+            delivery.lastChangeId,
+            delivery.changes.size());
         listener.onEntityChange(delivery.changes);
+        metrics.recordsDelivered(listenerMetricName(listener), delivery.changes.size());
         LOG.debug(
             "Entity change log listener {} consumed batch id range [{}, {}]",
             listener.getClass().getName(),
             delivery.firstChangeId(),
             delivery.lastChangeId);
       } catch (Throwable e) {
+        metrics.listenerFailed(listenerMetricName(listener));
         // Throwable, not Exception: one faulty listener must not take down the whole poller, even
         // if it fails with an Error rather than an Exception.
         LOG.error(
@@ -326,6 +759,14 @@ public class EntityChangeLogPoller implements AutoCloseable {
             e);
       }
     }
+  }
+
+  /** Uses a bounded, stable metric bucket for lambda and anonymous listener implementations. */
+  private static String listenerMetricName(EntityChangeLogListener listener) {
+    Class<?> listenerClass = listener.getClass();
+    return listenerClass.isSynthetic() || listenerClass.isAnonymousClass()
+        ? "anonymous"
+        : listenerClass.getName();
   }
 
   private static class BatchDelivery {

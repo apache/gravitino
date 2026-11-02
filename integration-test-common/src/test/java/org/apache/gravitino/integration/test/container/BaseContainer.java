@@ -40,16 +40,18 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.startupcheck.IsRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.lifecycle.Startable;
 
 /**
  * The BaseContainer is the base for all containers. It's contains the common methods and settings
  * for all containers. You can extend this class to create your own container to integration test.
  */
-public abstract class BaseContainer implements AutoCloseable {
+public abstract class BaseContainer implements Startable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
   // Host name of the container
   protected final String hostName;
@@ -74,8 +76,27 @@ public abstract class BaseContainer implements AutoCloseable {
       Map<String, String> filesToMount,
       Map<String, String> envVars,
       Optional<Network> network) {
+    this(
+        new GenericContainer<>(requireNonNull(image, "image is null")),
+        hostName,
+        ports,
+        extraHosts,
+        filesToMount,
+        envVars,
+        network);
+  }
+
+  /** Wraps a container a subclass has already created, such as a Testcontainers module. */
+  protected BaseContainer(
+      GenericContainer<?> container,
+      String hostName,
+      Set<Integer> ports,
+      Map<String, String> extraHosts,
+      Map<String, String> filesToMount,
+      Map<String, String> envVars,
+      Optional<Network> network) {
     this.container =
-        new GenericContainer<>(requireNonNull(image, "image is null"))
+        requireNonNull(container, "container is null")
             .withCreateContainerCmdModifier(
                 cmd ->
                     cmd.getHostConfig()
@@ -109,9 +130,13 @@ public abstract class BaseContainer implements AutoCloseable {
     extraHosts.forEach((hostName, ipAddress) -> container.withExtraHost(hostName, ipAddress));
     container
         .withCreateContainerCmdModifier(c -> c.withHostName(hostName))
-        .withStartupCheckStrategy(new IsRunningStartupCheckStrategy())
-        .waitingFor(Wait.forListeningPort())
-        .withStartupTimeout(Duration.ofMinutes(5));
+        .withStartupCheckStrategy(new IsRunningStartupCheckStrategy());
+    // A Testcontainers JDBC module has its own readiness check: PostgreSQL's waits for a log line
+    // through the wait strategy, which a port wait would replace; MySQL's queries the database.
+    if (!(container instanceof JdbcDatabaseContainer)) {
+      container.waitingFor(Wait.forListeningPort());
+    }
+    container.withStartupTimeout(Duration.ofMinutes(5));
     network.ifPresent(net -> container.withNetwork(net).withNetworkAliases(hostName));
   }
 
@@ -151,8 +176,14 @@ public abstract class BaseContainer implements AutoCloseable {
     throw new RuntimeException("Impossible to reach here");
   }
 
+  @Override
   public void start() {
     container.start();
+  }
+
+  @Override
+  public void stop() {
+    container.stop();
   }
 
   protected abstract boolean checkContainerStatus(int retryLimit);
@@ -165,11 +196,6 @@ public abstract class BaseContainer implements AutoCloseable {
       throw new RuntimeException(
           "Exception while running command: " + String.join(" ", commandAndArgs), e);
     }
-  }
-
-  @Override
-  public void close() {
-    container.stop();
   }
 
   protected abstract static class Builder<

@@ -1,0 +1,139 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Checkout and sync
+description: Check out the upstream base branch and merge the contributor branch for fork CI.
+
+inputs:
+  base-ref:
+    description: Fixed upstream branch selected by Fork CI.
+    required: false
+    default: ''
+  base-sha:
+    description: Fixed upstream commit selected by Fork CI.
+    required: false
+    default: ''
+  head-repository:
+    description: Repository containing the contributor commit.
+    required: false
+    default: ''
+  head-sha:
+    description: Fixed contributor commit to test.
+    required: false
+    default: ''
+  sync:
+    description: Whether to merge the contributor commit onto the fixed base.
+    required: false
+    default: ''
+  persist-credentials:
+    description: Whether to keep the token in the git config of the checkout.
+    required: false
+    default: 'false'
+
+outputs:
+  base-ref:
+    description: Upstream branch used as the comparison base.
+    value: ${{ steps.base.outputs.base_ref }}
+  base-sha:
+    description: Upstream commit checked out before merging contributor changes.
+    value: ${{ steps.upstream.outputs.base_sha }}
+  head-sha:
+    description: Commit tested after contributor changes are merged.
+    value: ${{ steps.head.outputs.head_sha }}
+  synced:
+    description: Whether contributor changes were merged onto the upstream base.
+    value: ${{ steps.base.outputs.should_sync }}
+  pull-request:
+    description: Whether a pull request is tested, through Fork CI or a pull_request event.
+    value: ${{ steps.base.outputs.should_sync == 'true' || github.event_name == 'pull_request' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve pull request base branch
+      id: base
+      shell: bash
+      env:
+        EVENT_BASE_REF: ${{ github.base_ref }}
+        GH_TOKEN: ${{ github.token }}
+        HEAD_OWNER: ${{ github.repository_owner }}
+        HEAD_BRANCH: ${{ github.ref_name }}
+        HEAD_REPOSITORY: ${{ inputs.head-repository || github.repository }}
+        HEAD_SHA: ${{ inputs.head-sha || github.sha }}
+        FIXED_BASE_REF: ${{ inputs.base-ref }}
+        FIXED_BASE_SHA: ${{ inputs.base-sha }}
+        FIXED_SYNC: ${{ inputs.sync }}
+      run: |
+        set -euo pipefail
+        if [[ -n "${FIXED_BASE_SHA}" ]]; then
+          [[ "${FIXED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          git check-ref-format "refs/heads/${FIXED_BASE_REF}"
+          [[ "${FIXED_SYNC}" == "true" || "${FIXED_SYNC}" == "false" ]] || exit 1
+          echo "base_ref=${FIXED_BASE_REF}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=${FIXED_SYNC}" >> "${GITHUB_OUTPUT}"
+        else
+          # Legacy direct/manual/nightly callers test their own checkout. Fork CI always
+          # supplies the context resolved once by eligibility; suites never re-query PRs.
+          echo "base_ref=${EVENT_BASE_REF:-${GITHUB_REF_NAME}}" >> "${GITHUB_OUTPUT}"
+          echo "should_sync=false" >> "${GITHUB_OUTPUT}"
+        fi
+
+    - name: Checkout upstream base branch
+      if: steps.base.outputs.should_sync == 'true'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        repository: apache/gravitino
+        ref: ${{ inputs.base-sha }}
+        persist-credentials: ${{ inputs.persist-credentials }}
+
+    - name: Resolve upstream base commit
+      id: upstream
+      shell: bash
+      run: echo "base_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+    - name: Merge contributor branch
+      if: steps.base.outputs.should_sync == 'true'
+      shell: bash
+      env:
+        BASE_REF: ${{ steps.base.outputs.base_ref }}
+        HEAD_REPOSITORY: ${{ inputs.head-repository || github.repository }}
+        HEAD_SHA: ${{ inputs.head-sha || github.sha }}
+      run: |
+        set -euo pipefail
+
+        [[ "${HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]] || exit 1
+        [[ "${HEAD_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || exit 1
+        # Fetch the pushed commit rather than the branch tip, which may have moved since.
+        git fetch "https://github.com/${HEAD_REPOSITORY}.git" "${HEAD_SHA}"
+        if ! git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          merge --no-commit --no-ff "${HEAD_SHA}"; then
+          git diff --name-only --diff-filter=U | sed 's/^/Conflict: /'
+          echo "::error::${HEAD_SHA} does not merge cleanly into ${BASE_REF}. Merge or rebase onto the latest ${BASE_REF} and push again."
+          exit 1
+        fi
+        git \
+          -c user.name='Apache Gravitino CI' \
+          -c user.email='dev@gravitino.apache.org' \
+          commit --allow-empty -m 'Merge contributor branch for CI'
+
+    - name: Resolve tested commit
+      id: head
+      shell: bash
+      run: echo "head_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"

@@ -388,6 +388,8 @@ class FilesetCatalog(
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(
                 change.new_comment()
             )
+        if isinstance(change, FilesetChange.UpdateFilesetType):
+            return FilesetUpdateRequest.UpdateFilesetTypeRequest(change.new_type())
         if isinstance(change, FilesetChange.SetProperty):
             return FilesetUpdateRequest.SetFilesetPropertyRequest(
                 change.property(), change.value()

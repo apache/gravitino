@@ -35,6 +35,8 @@ import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handler for LOAD_TABLE operations. Validates that the requested entity is not a metadata table,
@@ -49,6 +51,8 @@ import org.apache.iceberg.exceptions.NoSuchTableException;
  * clients such as Trino/Spark).
  */
 public class LoadTableAuthzHandler implements AuthorizationHandler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(LoadTableAuthzHandler.class);
   private final AuthorizationExpression authorizationExpression;
   private final Parameter[] parameters;
   private final Object[] args;
@@ -72,11 +76,6 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     String tableName = loadTarget.name();
     Namespace namespace = loadTarget.namespace();
 
-    // Validate that this is not a metadata table access
-    if (isMetadataTable(tableName, namespace)) {
-      throw new NoSuchTableException("Table %s not found", tableName);
-    }
-
     LoadContext loadContext =
         IcebergLoadAuthzHandlerHelper.extractLoadContext(
             nameIdentifierMap,
@@ -89,6 +88,12 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     // 2. Let request proceed - the actual loadTable() call will handle non-existence
     IcebergCatalogWrapper catalogWrapper =
         IcebergLoadAuthzHandlerHelper.getCatalogWrapper(loadContext.catalog());
+
+    // Validate that this is not a metadata table access
+    if (isMetadataTable(tableName, namespace, catalogWrapper)) {
+      throw new NoSuchTableException("Table %s not found", tableName);
+    }
+
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, tableName);
 
     NameIdentifier tableId =
@@ -144,9 +149,11 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
    *
    * @param tableName The table name to check
    * @param namespace The Iceberg namespace of the table
+   * @param catalogWrapper the catalog wrapper used to resolve the table
    * @return true if this is a metadata table access, false otherwise
    */
-  private boolean isMetadataTable(String tableName, Namespace namespace) {
+  private boolean isMetadataTable(
+      String tableName, Namespace namespace, IcebergCatalogWrapper catalogWrapper) {
     MetadataTableType metadataTableType = MetadataTableType.from(tableName);
     if (metadataTableType == null) {
       return false;
@@ -154,6 +161,32 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
 
     // Metadata tables have namespace length > 1 (e.g., catalog.db.table has 3 levels).
     // Regular tables have namespace length = 1 (e.g., catalog.db has 2 levels, but we get "db").
-    return namespace.levels().length > 1;
+    if (namespace.levels().length <= 1) {
+      return false;
+    }
+
+    // A table in a hierarchical schema can have a metadata-table name, so only treat the
+    // request as a metadata-table access when the backend does not resolve it to a real table.
+    // tableExists() cannot tell the two apart: backends resolve [db, t].files to the metadata
+    // table of db.t as well.
+    try {
+      if (!catalogWrapper.namespaceExists(namespace)) {
+        return true;
+      }
+    } catch (Exception e) {
+      // Some backends reject multi-level namespaces. Keep the 404 the client falls back on.
+      LOG.debug("Failed to check whether namespace {} exists", namespace, e);
+      return true;
+    }
+
+    try {
+      return catalogWrapper.resolvesToMetadataTable(TableIdentifier.of(namespace, tableName));
+    } catch (NoSuchTableException e) {
+      return true;
+    } catch (RuntimeException e) {
+      // Let the real load report the failure. A 404 here would make the client fall back and
+      // read the metadata table of another table.
+      return false;
+    }
   }
 }

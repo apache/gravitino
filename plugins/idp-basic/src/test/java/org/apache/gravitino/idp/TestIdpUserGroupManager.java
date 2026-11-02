@@ -35,7 +35,14 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthConstants;
@@ -152,6 +159,22 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+  public void testChangePasswordWithOldPassword() throws IOException {
+    manager.addUser("testChangeWithOld", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithOld", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+  }
+
+  @Test
   public void testUpdateEnabled() throws IOException {
     manager.addUser("testEnabled", VALID_PASSWORD);
     Assertions.assertTrue(manager.getUser("testEnabled").enabled());
@@ -176,16 +199,25 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testCannotDisableServiceAdmin() throws IOException {
+  public void testCannotUpdateEnabledOfServiceAdmin() throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
     manager.addUser("svcAdminDisable", VALID_PASSWORD);
 
-    IllegalArgumentException exception =
+    IllegalArgumentException disableException =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
-    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        disableException.getMessage());
     Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
-    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+
+    IllegalArgumentException enableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", true));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        enableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
   }
 
   @Test
@@ -359,6 +391,36 @@ public class TestIdpUserGroupManager {
         "initAdminSame1", manager.authenticate("initAdminSame1", VALID_PASSWORD).name());
     Assertions.assertEquals(
         "initAdminSame2", manager.authenticate("initAdminSame2", VALID_PASSWORD).name());
+  }
+
+  @Test
+  public void testInitializeConfiguredServiceAdminsIgnoresConcurrentCreateRace() throws Exception {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminRace1");
+
+    int threads = 8;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<?>> futures = new ArrayList<>();
+    try {
+      for (int i = 0; i < threads; i++) {
+        futures.add(
+            executor.submit(
+                () -> {
+                  start.await();
+                  manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
+                  return null;
+                }));
+      }
+      start.countDown();
+      for (Future<?> future : futures) {
+        future.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(
+        "initAdminRace1", manager.authenticate("initAdminRace1", VALID_PASSWORD).name());
   }
 
   private static Config createH2Config(Path h2Path) {

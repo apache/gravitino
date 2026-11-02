@@ -52,9 +52,13 @@ underscores while the catalog and the Java client use hyphens.
 | `cos-token-expire-in-secs` | `cos_token_expire_in_secs` | The COS STS token expire time in seconds. Must not exceed the role's max session duration. Only meaningful when `credential-providers` includes `cos-token`. Defaults to `3600`.                                                                                                                                                                                                                  | No       |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
-automatically loads the filesystem providers found on the classpath, including the built-in
-providers and the cloud providers carried by a bundle jar such as `gravitino-tencent-bundle`.
+- `cos-access-key-id` and `cos-secret-access-key` are hidden from the default load/list catalog
+  response (`******`). Recover them via the [credential vending API](./security/credential-vending.md)
+  (`getCredentials` / `COSSecretKeyCredential`). Other non-credential secrets use
+  `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
+- `default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+  automatically loads the filesystem providers found on the classpath, including the built-in
+  providers and the cloud providers carried by a bundle jar such as `gravitino-tencent-bundle`.
 :::
 
 :::note

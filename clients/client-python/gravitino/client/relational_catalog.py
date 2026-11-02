@@ -37,9 +37,13 @@ from gravitino.api.rel.view_change import (
     SetProperty,
     ViewChange,
 )
+from gravitino.api.semantic.semantic_model_catalog import SemanticModelCatalog
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_view import GenericView
 from gravitino.client.relational_table import RelationalTable
+from gravitino.client.semantic_model_catalog_operations import (
+    SemanticModelCatalogOperations,
+)
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
@@ -97,6 +101,9 @@ class RelationalCatalog(
             audit,
             rest_client,
         )
+        self._semantic_model_operations = SemanticModelCatalogOperations(
+            rest_client, catalog_namespace, name
+        )
 
     def support_secrets(self) -> SupportsSecrets:
         return self
@@ -122,6 +129,18 @@ class RelationalCatalog(
             ViewCatalog: The current catalog instance as a ``ViewCatalog``.
         """
         return self
+
+    def as_semantic_model_catalog(self) -> SemanticModelCatalog:
+        """Return this relational catalog as a :class:`SemanticModelCatalog`.
+
+        Semantic Models are always managed by Gravitino, so this support does not
+        depend on whether the underlying connector implements a semantic-model
+        capability.
+
+        Returns:
+            SemanticModelCatalog: The Semantic Model operations of this catalog.
+        """
+        return self._semantic_model_operations
 
     def _get_entity_full_namespace(self, entity_namespace: Namespace) -> Namespace:
         """Get the full namespace of an entity with the given short namespace.

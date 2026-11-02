@@ -54,8 +54,8 @@ public interface Index {
   }
 
   /**
-   * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
-   * supported.
+   * Identifies an index type in the Gravitino table model. Catalogs may support generic key types
+   * and connector-specific index types, and supported operations may vary by catalog.
    */
   enum IndexType {
     /**
@@ -92,7 +92,8 @@ public interface Index {
     /**
      * Bitmap index is a type of database index that uses bit arrays (bitmaps) to represent the
      * presence or absence of values in a column, enabling efficient querying and data retrieval.
-     * Currently, this type is only applicable to Lance.
+     * Currently, this type is applicable to Lance, is accepted when creating Doris tables, and is
+     * reported when loading StarRocks tables.
      */
     BITMAP,
     /**
@@ -103,12 +104,14 @@ public interface Index {
     /**
      * INVERTED index is a data structure used to optimize full-text searches by mapping terms to
      * their locations within a dataset, allowing for quick retrieval of documents containing
-     * specific words or phrases. Currently, this type is only applicable to Lance.
+     * specific words or phrases. Currently, this type is applicable to Lance and Doris, and is
+     * reported when loading StarRocks tables.
      */
     INVERTED,
     /**
      * VECTOR index is used to optimize similarity searches in high-dimensional vector spaces.
-     * Currently, this type is only applicable to Lance.
+     * Currently, this type is applicable to Lance and Doris, and is reported when loading StarRocks
+     * tables.
      */
     VECTOR,
     /** IVF_FLAT (Inverted File with Flat quantization) is an indexing method used for efficient */
@@ -144,5 +147,19 @@ public interface Index {
      * v19.x.
      */
     DATA_SKIPPING_TOKENBFV1,
+
+    /** Full-text data skipping index in ClickHouse. */
+    DATA_SKIPPING_TEXT,
+
+    /**
+     * Vector similarity data skipping index for approximate nearest-neighbor search in ClickHouse.
+     */
+    DATA_SKIPPING_VECTOR_SIMILARITY,
+
+    /** Legacy Annoy data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_ANNOY,
+
+    /** Legacy USearch data-skipping index metadata in ClickHouse. */
+    DATA_SKIPPING_USEARCH,
   }
 }

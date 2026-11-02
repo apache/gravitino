@@ -199,3 +199,59 @@ components:
           description: The arguments of the partitioning function
           items:
             $ref: "./expression.yaml#/components/schemas/FunctionArg"
+
+    WritablePartitioningSpec:
+      oneOf:
+        - $ref: "#/components/schemas/IdentityPartitioning"
+        - $ref: "#/components/schemas/YearPartitioning"
+        - $ref: "#/components/schemas/MonthPartitioning"
+        - $ref: "#/components/schemas/DayPartitioning"
+        - $ref: "#/components/schemas/HourPartitioning"
+        - $ref: "#/components/schemas/BucketPartitioning"
+        - $ref: "#/components/schemas/TruncatePartitioning"
+        - $ref: "#/components/schemas/WritableListPartitioning"
+        - $ref: "#/components/schemas/WritableRangePartitioning"
+        - $ref: "#/components/schemas/WritableFunctionPartitioning"
+      discriminator:
+        propertyName: strategy
+        mapping:
+          identity: "#/components/schemas/IdentityPartitioning"
+          year: "#/components/schemas/YearPartitioning"
+          month: "#/components/schemas/MonthPartitioning"
+          day: "#/components/schemas/DayPartitioning"
+          hour: "#/components/schemas/HourPartitioning"
+          bucket: "#/components/schemas/BucketPartitioning"
+          truncate: "#/components/schemas/TruncatePartitioning"
+          list: "#/components/schemas/WritableListPartitioning"
+          range: "#/components/schemas/WritableRangePartitioning"
+          function: "#/components/schemas/WritableFunctionPartitioning"
+
+    WritableListPartitioning:
+      allOf:
+        - $ref: "#/components/schemas/ListPartitioning"
+        - type: object
+          properties:
+            assignments:
+              type: array
+              items:
+                $ref: "./partitions.yaml#/components/schemas/WritableListPartition"
+
+    WritableRangePartitioning:
+      allOf:
+        - $ref: "#/components/schemas/RangePartitioning"
+        - type: object
+          properties:
+            assignments:
+              type: array
+              items:
+                $ref: "./partitions.yaml#/components/schemas/WritableRangePartition"
+
+    WritableFunctionPartitioning:
+      allOf:
+        - $ref: "#/components/schemas/FunctionPartitioning"
+        - type: object
+          properties:
+            funcArgs:
+              type: array
+              items:
+                $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"

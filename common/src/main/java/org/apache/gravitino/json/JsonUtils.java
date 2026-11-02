@@ -82,6 +82,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -312,16 +313,28 @@ public class JsonUtils {
             .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
             .registerModule(new JavaTimeModule())
             .registerModule(new Jdk8Module())
-            .registerModule(
-                new SimpleModule()
-                    .addDeserializer(Type.class, new TypeDeserializer())
-                    .addSerializer(Type.class, new TypeSerializer())
-                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
-                    .addSerializer(Partitioning.class, new PartitioningSerializer())
-                    .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
-                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
-                    .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
-                    .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
+            .registerModule(anyFieldModule());
+  }
+
+  private static SimpleModule anyFieldModule() {
+    SimpleModule module =
+        new SimpleModule()
+            .addDeserializer(Type.class, new TypeDeserializer())
+            .addSerializer(Type.class, new TypeSerializer())
+            .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+            .addSerializer(Partitioning.class, new PartitioningSerializer())
+            .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
+            .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
+            .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
+            .addSerializer(StatisticValue.class, new StatisticValueSerializer())
+            .addSerializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer())
+            .addDeserializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer());
+    ExecutablePolicyContentSerde.registerDomainSerdes(module);
+    return module;
   }
 
   /**
@@ -1308,6 +1321,22 @@ public class JsonUtils {
       return builder.build();
     }
   }
+
+  /**
+   * Custom JSON serializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer
+   */
+  public static class PolicyExecutionSpecSerializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer {}
+
+  /**
+   * Custom JSON deserializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer
+   */
+  public static class PolicyExecutionSpecDeserializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer {}
 
   /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {

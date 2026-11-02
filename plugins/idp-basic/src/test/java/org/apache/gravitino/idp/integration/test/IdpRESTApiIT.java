@@ -42,8 +42,9 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
+import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
-import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
@@ -153,22 +154,47 @@ public class IdpRESTApiIT extends BaseIT {
     self.validate();
     Assertions.assertEquals(USER1, self.getUser().name());
 
+    assertError(
+        400,
+        put(
+            "/idp/users/" + USER1 + "/password",
+            new ChangePasswordRequest(UPDATED_PASSWORD),
+            USER1,
+            USER_PASSWORD),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        400,
+        put(
+            "/idp/users/" + USER1 + "/password",
+            new ChangePasswordRequest(UPDATED_PASSWORD, "wrong-password-12"),
+            USER1,
+            USER_PASSWORD),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
     HttpResponse<String> selfUpdate =
-        put("/idp/users/" + USER1, new UpdateUserRequest(UPDATED_PASSWORD), USER1, USER_PASSWORD);
+        put(
+            "/idp/users/" + USER1 + "/password",
+            new ChangePasswordRequest(UPDATED_PASSWORD, USER_PASSWORD),
+            USER1,
+            USER_PASSWORD);
     Assertions.assertEquals(200, selfUpdate.statusCode(), selfUpdate.body());
     Assertions.assertEquals(200, get("/version", USER1, UPDATED_PASSWORD).statusCode());
 
     assertError(
         403,
         put(
-            "/idp/users/" + USER2,
-            new UpdateUserRequest(UPDATED_PASSWORD),
+            "/idp/users/" + USER2 + "/password",
+            new ChangePasswordRequest(UPDATED_PASSWORD),
             USER1,
             UPDATED_PASSWORD),
         ErrorConstants.FORBIDDEN_CODE);
     assertError(
         403,
-        put("/idp/users/" + USER1, new UpdateUserRequest(null, false), USER1, UPDATED_PASSWORD),
+        put(
+            "/idp/users/" + USER1 + "/enabled",
+            new UpdateUserEnabledRequest(false),
+            USER1,
+            UPDATED_PASSWORD),
         ErrorConstants.FORBIDDEN_CODE);
 
     Assertions.assertTrue(deleteUser(USER1));
@@ -202,13 +228,13 @@ public class IdpRESTApiIT extends BaseIT {
     changePassword(USER1, UPDATED_PASSWORD);
     Assertions.assertEquals(USER1, getUser(USER1).getUser().name());
 
-    put("/idp/users/" + USER1, new UpdateUserRequest(null, false));
+    put("/idp/users/" + USER1 + "/enabled", new UpdateUserEnabledRequest(false));
     Assertions.assertFalse(getUser(USER1).getUser().enabled());
-    put("/idp/users/" + USER1, new UpdateUserRequest(null, true));
+    put("/idp/users/" + USER1 + "/enabled", new UpdateUserEnabledRequest(true));
     Assertions.assertTrue(getUser(USER1).getUser().enabled());
     assertError(
         400,
-        put("/idp/users/" + ADMIN, new UpdateUserRequest(null, false)),
+        put("/idp/users/" + ADMIN + "/enabled", new UpdateUserEnabledRequest(false)),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     Assertions.assertTrue(getUser(ADMIN).getUser().enabled());
 
@@ -218,11 +244,13 @@ public class IdpRESTApiIT extends BaseIT {
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         404,
-        put("/idp/users/" + MISSING_USER, new UpdateUserRequest(UPDATED_PASSWORD)),
+        put(
+            "/idp/users/" + MISSING_USER + "/password",
+            new ChangePasswordRequest(UPDATED_PASSWORD)),
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         400,
-        put("/idp/users/" + USER1, new UpdateUserRequest(" ")),
+        put("/idp/users/" + USER1 + "/password", new ChangePasswordRequest(" ")),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
     Assertions.assertTrue(deleteUser(USER1));
@@ -340,7 +368,8 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static void changePassword(String username, String password) throws Exception {
-    HttpResponse<String> response = put("/idp/users/" + username, new UpdateUserRequest(password));
+    HttpResponse<String> response =
+        put("/idp/users/" + username + "/password", new ChangePasswordRequest(password));
     Assertions.assertEquals(200, response.statusCode(), response.body());
   }
 

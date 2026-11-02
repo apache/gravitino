@@ -41,6 +41,18 @@ public class OptimizerConfig extends Config {
   public static final String GRAVITINO_METALAKE = OPTIMIZER_PREFIX + "gravitinoMetalake";
   public static final String GRAVITINO_DEFAULT_CATALOG =
       OPTIMIZER_PREFIX + "gravitinoDefaultCatalog";
+  /**
+   * Canonical auth property keys used when {@code builtin-iceberg-update-stats} loads {@code
+   * --updater-options} into {@link OptimizerConfig}. Not CLI configuration entries.
+   */
+  public static final String AUTH_TYPE = OPTIMIZER_PREFIX + "auth.type";
+
+  public static final String AUTH_USERNAME = OPTIMIZER_PREFIX + "auth.username";
+  public static final String AUTH_PASSWORD = OPTIMIZER_PREFIX + "auth.password";
+  public static final String AUTH_OAUTH_SERVER_URI = OPTIMIZER_PREFIX + "auth.oauth.serverUri";
+  public static final String AUTH_OAUTH_PATH = OPTIMIZER_PREFIX + "auth.oauth.path";
+  public static final String AUTH_OAUTH_CREDENTIAL = OPTIMIZER_PREFIX + "auth.oauth.credential";
+  public static final String AUTH_OAUTH_SCOPE = OPTIMIZER_PREFIX + "auth.oauth.scope";
   public static final String JOB_ADAPTER_PREFIX = OPTIMIZER_PREFIX + "jobAdapter.";
   public static final String JOB_SUBMITTER_CONFIG_PREFIX = OPTIMIZER_PREFIX + "jobSubmitterConfig.";
 

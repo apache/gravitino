@@ -44,6 +44,8 @@ public class RESTUtils {
   private static final Joiner.MapJoiner FORM_JOINER = Joiner.on("&").withKeyValueSeparator("=");
   private static final Splitter.MapSplitter FORM_SPLITTER =
       Splitter.on("&").withKeyValueSeparator("=");
+  private static final String FORM_ENCODED_SPACE = "+";
+  private static final String PERCENT_ENCODED_SPACE = "%20";
 
   private RESTUtils() {}
 
@@ -75,7 +77,7 @@ public class RESTUtils {
     ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
     formData.forEach(
         (key, value) ->
-            builder.put(encodeString(String.valueOf(key)), encodeString(String.valueOf(value))));
+            builder.put(formEncode(String.valueOf(key)), formEncode(String.valueOf(value))));
     return FORM_JOINER.join(builder.build());
   }
 
@@ -93,7 +95,8 @@ public class RESTUtils {
   }
 
   /**
-   * URL encode a string.
+   * URL encode a string. Spaces are encoded as {@code %20}, so the result is valid both as a path
+   * segment and as a query or form value.
    *
    * @param toEncode The string to encode.
    * @return The URL encoded string.
@@ -102,11 +105,9 @@ public class RESTUtils {
    */
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
-    try {
-      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
-    } catch (UnsupportedEncodingException e) {
-      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
-    }
+    // URLEncoder follows the form encoding and turns a space into '+', which is a literal '+'
+    // in a path segment. A literal '+' in the input is already encoded as %2B at this point.
+    return formEncode(toEncode).replace(FORM_ENCODED_SPACE, PERCENT_ENCODED_SPACE);
   }
 
   /**
@@ -168,5 +169,14 @@ public class RESTUtils {
       }
     }
     throw new IOException("No available port in the range: " + portRangeStart + ":" + portRangeEnd);
+  }
+
+  // Encodes in application/x-www-form-urlencoded format, in which a space becomes '+'.
+  private static String formEncode(String toEncode) {
+    try {
+      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
+    }
   }
 }

@@ -19,11 +19,14 @@
 package org.apache.gravitino.spark.connector.integration.test.hive;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
@@ -39,14 +42,24 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.AnalysisException;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.read.InputPartition;
+import org.apache.spark.sql.execution.SparkPlan;
+import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec;
+import org.apache.spark.sql.execution.adaptive.QueryStageExec;
+import org.apache.spark.sql.execution.datasources.FilePartition;
+import org.apache.spark.sql.execution.datasources.PartitionedFile;
+import org.apache.spark.sql.execution.datasources.v2.BatchScanExec;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import scala.collection.JavaConverters;
 
 @Tag("gravitino-docker-test")
 public abstract class SparkHiveCatalogIT extends SparkCommonIT {
@@ -692,5 +705,90 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
       viewCatalog.dropView(viewIdent);
       dropTableIfExists(tableName);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"TEXTFILE", "PARQUET"})
+  void testDynamicPartitionPruning(String format) {
+    String factTable = "dpp_fact_" + format.toLowerCase(Locale.ROOT);
+    String dimTable = "dpp_dim_" + format.toLowerCase(Locale.ROOT);
+    // Parquet tables are read by Spark's native ParquetScan unless the conversion is disabled,
+    // and only the Kyuubi HiveScan supports runtime filtering.
+    String convertParquetConf = "spark.sql.kyuubi.hive.connector.read.convertMetastoreParquet";
+    getSparkSession().conf().set(convertParquetConf, "false");
+
+    dropTableIfExists(factTable);
+    dropTableIfExists(dimTable);
+    try {
+      sql(
+          String.format(
+              "CREATE TABLE %s (id INT, amount INT) PARTITIONED BY (dt STRING) STORED AS %s",
+              factTable, format));
+      sql(String.format("CREATE TABLE %s (dt STRING, flag STRING) STORED AS %s", dimTable, format));
+      sql(
+          String.format(
+              "INSERT INTO %s VALUES (1, 10, '2026-01-01'), (2, 20, '2026-01-02'), "
+                  + "(3, 30, '2026-01-03')",
+              factTable));
+      sql(
+          String.format(
+              "INSERT INTO %s VALUES ('2026-01-01', 'n'), ('2026-01-02', 'y'), "
+                  + "('2026-01-03', 'n')",
+              dimTable));
+
+      Dataset<Row> df =
+          getSparkSession()
+              .sql(
+                  String.format(
+                      "SELECT f.id, f.amount FROM %s f JOIN %s d ON f.dt = d.dt WHERE d.flag = 'y'",
+                      factTable, dimTable));
+      List<Row> rows = df.collectAsList();
+      Assertions.assertEquals(1, rows.size());
+      Assertions.assertEquals(2, rows.get(0).getInt(0));
+      Assertions.assertEquals(20, rows.get(0).getInt(1));
+
+      String plan = df.queryExecution().executedPlan().toString();
+      Assertions.assertTrue(
+          plan.toLowerCase(Locale.ROOT).contains("dynamicpruningexpression"),
+          "Expected dynamic partition pruning in plan:\n" + plan);
+
+      // Spark pushes the runtime filters into the scan before planning input partitions, so
+      // re-planning the executed scan returns only the files of the pruned partitions.
+      BatchScanExec factScan = findBatchScan(df.queryExecution().executedPlan(), factTable);
+      Assertions.assertNotNull(factScan, "No BatchScanExec for " + factTable + " in:\n" + plan);
+      Set<String> scannedPartitions = new HashSet<>();
+      for (InputPartition partition : factScan.scan().toBatch().planInputPartitions()) {
+        for (PartitionedFile file : ((FilePartition) partition).files()) {
+          scannedPartitions.add(file.partitionValues().getUTF8String(0).toString());
+        }
+      }
+      Assertions.assertEquals(ImmutableSet.of("2026-01-02"), scannedPartitions);
+    } finally {
+      getSparkSession().conf().unset(convertParquetConf);
+      dropTableIfExists(factTable);
+      dropTableIfExists(dimTable);
+    }
+  }
+
+  // Walks through adaptive wrappers and query stages, which are leaf nodes in the final plan.
+  @SuppressWarnings("deprecation")
+  private BatchScanExec findBatchScan(SparkPlan plan, String tableName) {
+    if (plan instanceof AdaptiveSparkPlanExec) {
+      return findBatchScan(((AdaptiveSparkPlanExec) plan).executedPlan(), tableName);
+    }
+    if (plan instanceof QueryStageExec) {
+      return findBatchScan(((QueryStageExec) plan).plan(), tableName);
+    }
+    if (plan instanceof BatchScanExec
+        && ((BatchScanExec) plan).table().name().contains(tableName)) {
+      return (BatchScanExec) plan;
+    }
+    for (SparkPlan child : JavaConverters.seqAsJavaList(plan.children())) {
+      BatchScanExec scan = findBatchScan(child, tableName);
+      if (scan != null) {
+        return scan;
+      }
+    }
+    return null;
   }
 }

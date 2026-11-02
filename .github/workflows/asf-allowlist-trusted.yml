@@ -1,0 +1,72 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.
+#
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Trusted ASF Allowlist
+on:
+  workflow_run:
+    workflows: [Fork CI PR Signal]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: 'Pull request whose YAML files should be scanned'
+        required: true
+        type: string
+permissions: {}
+# Serialize scan verdicts too: an older scan must not append success after a newer failure.
+concurrency:
+  group: asf-allowlist-publish
+  queue: max
+  cancel-in-progress: false
+jobs:
+  scan:
+    name: Scan PR workflow files
+    if: >-
+      github.repository == 'apache/gravitino' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request')
+    # Keep this quick check off the shared ubuntu-latest pool, where small jobs can queue for hours.
+    # The allowlist action installs its own Python, so it supports ubuntu-slim.
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        id: data
+        with:
+          script: |
+            await require('./.github/scripts/allowlist-pr.cjs').prepare({ github, context, core });
+      - uses: apache/infrastructure-actions/allowlist-check@main
+        id: scan
+        if: steps.data.outputs.prs != '[]'
+        continue-on-error: true
+        with:
+          scan-glob: ${{ steps.data.outputs.scan-glob }}
+      - uses: actions/github-script@v7
+        if: always() && steps.data.outputs.prs != ''
+        env:
+          SCANNED_PRS: ${{ steps.data.outputs.prs }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        with:
+          script: |
+            await require('./.github/scripts/allowlist-pr.cjs').publish({ github, context, core });

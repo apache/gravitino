@@ -32,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.RoleSessionNameUtils;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -109,7 +110,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
     AssumeRoleRequest.Builder builder =
         AssumeRoleRequest.builder()
             .roleArn(roleArn)
-            .roleSessionName("gravitino_" + userName)
+            .roleSessionName(RoleSessionNameUtils.create("gravitino_", userName))
             .durationSeconds(tokenExpireSecs)
             .policy(policy.toJson());
 

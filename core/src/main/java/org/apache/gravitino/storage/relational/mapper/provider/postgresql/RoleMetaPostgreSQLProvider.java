@@ -27,6 +27,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
+  public String selectRoleMetaByIdForShare(Long roleId) {
+    return selectRoleMetaById(roleId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteRoleMetaByRoleId(
       @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "

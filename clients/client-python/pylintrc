@@ -38,8 +38,6 @@ disable=missing-class-docstring,
         fixme,          
         unnecessary-pass,               
         duplicate-code,                 #TODO-fix
-        too-many-arguments,             #TODO-fix
-        too-many-positional-arguments,  #TODO-fix
 
 [LOGGING]
 
@@ -99,3 +97,9 @@ module-naming-style=snake_case
 
 # Maximum number of return / yield for a function / method body.
 max-returns=10
+
+# Maximum number of arguments for a function / method.
+max-args=10
+
+# Maximum number of positional arguments for a function / method.
+max-positional-arguments=10

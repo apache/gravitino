@@ -1,0 +1,121 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.
+#
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Update Fork CI Status
+on:
+  workflow_run:
+    workflows: [Fork CI PR Signal, Fork CI]
+    types: [completed]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: 'Optional PR number to force-refresh, including settled statuses'
+        required: false
+        type: string
+      sweep:
+        description: 'Run a polling sweep instead (the previous sweep dispatches this)'
+        required: false
+        type: boolean
+        default: false
+permissions: {}
+# Commit statuses are append-only with no compare-and-swap. Signals and dispatches share one
+# queue, so a burst of PR events is processed in order and none replaces another. Sweeps poll
+# every minute for 11 minutes in their own group, so signals never wait behind a sleeping sweep;
+# both re-read the status before writing it, and the next pass repairs any interleaving.
+jobs:
+  update:
+    if: >-
+      github.repository == 'apache/gravitino' && github.event_name != 'schedule' &&
+      !(github.event_name == 'workflow_dispatch' && inputs.sweep) &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.event == 'pull_request' ||
+       github.event.workflow_run.event == 'workflow_dispatch' ||
+       github.event.workflow_run.event == 'push')
+    concurrency:
+      group: fork-ci-status-update
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-slim
+    timeout-minutes: 14
+    permissions:
+      actions: read
+      statuses: write
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            await require('./.github/scripts/update-fork-ci.cjs').update({ github, context, core });
+  sweep:
+    if: >-
+      github.repository == 'apache/gravitino' &&
+      (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.sweep))
+    # One sweep at a time; a newer schedule replaces a pending one instead of queueing.
+    concurrency:
+      group: fork-ci-status-sweep
+      cancel-in-progress: false
+    runs-on: ubuntu-slim
+    # Sweeps poll for 11 minutes; ubuntu-slim stops jobs after 15.
+    timeout-minutes: 14
+    outputs:
+      chain: ${{ steps.sweep.outputs.chain }}
+    permissions:
+      actions: read
+      statuses: write
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - id: sweep
+        uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            await require('./.github/scripts/update-fork-ci.cjs').update({ github, context, core });
+  rearm:
+    # Fork runs cannot notify apache/gravitino, and GitHub starts five-minute schedules only every
+    # 10-36 minutes, so each polling sweep dispatches the next one. The group holds one running
+    # and one pending sweep; a pending sweep that a newer one replaces is cancelled and sets no
+    # output, so chains never multiply. The schedule restarts the chain if it breaks.
+    needs: sweep
+    if: ${{ !cancelled() && needs.sweep.outputs.chain == 'true' }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    # Dispatching a workflow needs actions: write. This job checks out and runs no repository code.
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            const { data: repository } = await github.rest.repos.get(context.repo);
+            // Only the reviewed default-branch workflow continues the chain.
+            if (context.ref !== `refs/heads/${repository.default_branch}`) return;
+            await github.rest.actions.createWorkflowDispatch({ ...context.repo,
+              workflow_id: 'fork-ci-status-update.yml', ref: repository.default_branch, inputs: { sweep: 'true' } });

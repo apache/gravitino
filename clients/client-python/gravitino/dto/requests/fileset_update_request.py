@@ -21,6 +21,7 @@ from typing import Dict, Optional
 
 from dataclasses_json import config
 
+from gravitino.api.file.fileset import Fileset
 from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
@@ -87,6 +88,25 @@ class FilesetUpdateRequest:
         def fileset_change(self):
             """Returns the fileset change"""
             return FilesetChange.update_comment(self._new_comment)
+
+    @dataclass
+    class UpdateFilesetTypeRequest(FilesetUpdateRequestBase):
+        """Represents a request to change the type of a fileset."""
+
+        _new_type: Fileset.Type = field(metadata=config(field_name="newType"))
+
+        def __init__(self, new_type: Fileset.Type):
+            super().__init__("updateType")
+            self._new_type = new_type
+
+        def validate(self):
+            """Rejects a missing or invalid target type."""
+            if not isinstance(self._new_type, Fileset.Type):
+                raise ValueError('"newType" field must be a Fileset.Type')
+
+        def fileset_change(self):
+            """Returns the fileset type change."""
+            return FilesetChange.update_type(self._new_type)
 
     @dataclass
     class SetFilesetPropertyRequest(FilesetUpdateRequestBase):

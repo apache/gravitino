@@ -43,6 +43,11 @@ public class HudiCatalog extends BaseCatalog<HudiCatalog> {
     return "lakehouse-hudi";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link HudiCatalogOperations} with the provided configuration.
    *

@@ -34,6 +34,17 @@ public class TestHologresColumnDefaultValueConverter {
   private final HologresColumnDefaultValueConverter converter =
       new HologresColumnDefaultValueConverter();
 
+  /** Verifies long quoted text defaults can be loaded without recursive regex stack growth. */
+  @Test
+  public void testLongQuotedTextLiteralIsUnescaped() {
+    String value = "text '::quoted \\path ".repeat(2000);
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
+    Assertions.assertEquals(
+        Literals.stringLiteral(value),
+        converter.toGravitino(
+            type, converter.fromGravitino(Literals.stringLiteral(value)) + "::text", false, true));
+  }
+
   @Test
   public void testNullDefaultValueNullable() {
     JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("int4");
@@ -205,5 +216,21 @@ public class TestHologresColumnDefaultValueConverter {
   public void testFromGravitinoDefaultValueNotSet() {
     String result = converter.fromGravitino(DEFAULT_VALUE_NOT_SET);
     Assertions.assertNull(result);
+  }
+
+  @Test
+  public void testStringLiteralDoublesQuotesOnly() {
+    Assertions.assertEquals(
+        "'O''Brien \\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
+  }
+
+  @Test
+  public void testQuotedTextLiteralIsUnescaped() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
+    Assertions.assertEquals(
+        Literals.stringLiteral("O'Brien'::x \\path"),
+        converter.toGravitino(type, "'O''Brien''::x \\path'::text", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral(""), converter.toGravitino(type, "''::text", false, true));
   }
 }

@@ -1,0 +1,866 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.trino.connector.catalog;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import io.airlift.log.Logger;
+import io.trino.spi.TrinoException;
+import io.trino.spi.connector.SchemaTableName;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.NotImplementedException;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionCatalog;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
+import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
+import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.metadata.GravitinoView;
+
+/** This class implements Apache Gravitino metadata operators. */
+public class CatalogConnectorMetadata {
+
+  private static final Logger LOG = Logger.get(CatalogConnectorMetadata.class);
+
+  private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog does not exist";
+  private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema does not exist";
+
+  private final String catalogName;
+  private final boolean singleMetalakeMode;
+  private final SupportsSchemas schemaCatalog;
+  private final TableCatalog tableCatalog;
+  @Nullable private final FunctionCatalog functionCatalog;
+  @Nullable private final ViewCatalog viewCatalog;
+
+  /**
+   * Constructs a new CatalogConnectorMetadata.
+   *
+   * @param metalake the Gravitino metalake
+   * @param catalogIdentifier the name of the catalog
+   * @param config the Gravitino Trino connector configuration
+   */
+  public CatalogConnectorMetadata(
+      GravitinoMetalake metalake, NameIdentifier catalogIdentifier, GravitinoConfig config) {
+    this.singleMetalakeMode = !config.catalogNameWithMetalake();
+    try {
+      this.catalogName = catalogIdentifier.name();
+      Catalog catalog = metalake.loadCatalog(catalogName);
+      // Make sure the catalog support schema operations.
+      this.schemaCatalog = catalog.asSchemas();
+      this.tableCatalog = catalog.asTableCatalog();
+      FunctionCatalog fc = null;
+      try {
+        fc = catalog.asFunctionCatalog();
+      } catch (UnsupportedOperationException e) {
+        LOG.debug("Catalog %s does not support function operations", catalogName);
+      }
+      this.functionCatalog = fc;
+      ViewCatalog vc = null;
+      try {
+        vc = catalog.asViewCatalog();
+      } catch (UnsupportedOperationException e) {
+        LOG.debug("Catalog %s does not support view operations", catalogName);
+      }
+      this.viewCatalog = vc;
+    } catch (NoSuchCatalogException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support schema or table operations." + e.getMessage(),
+          e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Retrieves the name of this Trino catalog.
+   *
+   * @return the catalog name
+   */
+  public String getCatalogName() {
+    return catalogName;
+  }
+
+  /**
+   * Indicates whether the Gravitino Trino connector is running in single-metalake mode.
+   *
+   * @return true if the connector is running in single-metalake mode
+   */
+  public boolean isSingleMetalakeMode() {
+    return singleMetalakeMode;
+  }
+
+  /**
+   * Lists the names of all schemas in the catalog.
+   *
+   * @return a list of schema names
+   */
+  public List<String> listSchemaNames() {
+    try {
+      return Arrays.asList(schemaCatalog.listSchemas());
+    } catch (NoSuchCatalogException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Retrieves the Gravitino schema for the specified name.
+   *
+   * @param schemaName the name of the schema
+   * @return the Gravitino schema
+   * @throws TrinoException if the schema is not found or the request fails
+   */
+  public GravitinoSchema getSchema(String schemaName) {
+    try {
+      Schema schema = schemaCatalog.loadSchema(schemaName);
+      return new GravitinoSchema(schema);
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Retrieves the Gravitino table for the specified name.
+   *
+   * @param schemaName the name of the schema
+   * @param tableName the name of the table
+   * @return the Gravitino table
+   * @throws TrinoException if the table is not found or the request fails
+   */
+  public GravitinoTable getTable(String schemaName, String tableName) {
+    try {
+      Table table = tableCatalog.loadTable(NameIdentifier.of(schemaName, tableName));
+      return new GravitinoTable(schemaName, tableName, table);
+    } catch (NoSuchTableException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Lists the names of all tables in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @return a list of table names
+   */
+  public List<String> listTables(String schemaName) {
+    try {
+      NameIdentifier[] tables = tableCatalog.listTables(Namespace.of(schemaName));
+      return Arrays.stream(tables).map(NameIdentifier::name).toList();
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Checks if a table exists in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @param tableName the name of the table
+   * @return true if the table exists, false otherwise
+   */
+  public boolean tableExists(String schemaName, String tableName) {
+    try {
+      return tableCatalog.tableExists(NameIdentifier.of(schemaName, tableName));
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Checks if a view exists in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   * @return true if the view exists, false otherwise or if the catalog does not support views
+   */
+  public boolean viewExists(String schemaName, String viewName) {
+    if (viewCatalog == null) {
+      return false;
+    }
+    try {
+      return viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName));
+    } catch (UnsupportedOperationException | NoSuchSchemaException e) {
+      // The client exposes a view catalog for every relational catalog, so a catalog without view
+      // support (for example JDBC) only reports it when called. A missing schema has no views.
+      return false;
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Creates a new table in the catalog.
+   *
+   * @param table the Gravitino table
+   * @param ignoreExisting whether to ignore if the table already exists
+   */
+  public void createTable(GravitinoTable table, boolean ignoreExisting) {
+    NameIdentifier identifier = NameIdentifier.of(table.getSchemaName(), table.getName());
+    try {
+      tableCatalog.createTable(
+          identifier,
+          table.getRawColumns(),
+          table.getComment(),
+          table.getProperties(),
+          table.getPartitioning(),
+          table.getDistribution(),
+          table.getSortOrders(),
+          table.getIndexes());
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (TableAlreadyExistsException e) {
+      if (!ignoreExisting) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_TABLE_ALREADY_EXISTS, "Table already exists", e);
+      }
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Creates a new schema in the catalog.
+   *
+   * @param schema the Gravitino schema
+   */
+  public void createSchema(GravitinoSchema schema) {
+    try {
+      schemaCatalog.createSchema(schema.getName(), schema.getComment(), schema.getProperties());
+    } catch (NoSuchCatalogException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS, CATALOG_DOES_NOT_EXIST_MSG, e);
+    } catch (SchemaAlreadyExistsException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_ALREADY_EXISTS, "Schema already exists", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Drops a schema from the catalog.
+   *
+   * @param schemaName the name of the schema
+   * @param cascade whether to cascade drop the schema
+   */
+  public void dropSchema(String schemaName, boolean cascade) {
+    boolean success;
+    try {
+      success = schemaCatalog.dropSchema(schemaName, cascade);
+    } catch (NonEmptySchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+    if (!success) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, "Drop schema failed");
+    }
+  }
+
+  /**
+   * Drops a table from the catalog.
+   *
+   * @param tableName the name of the table
+   */
+  public void dropTable(SchemaTableName tableName) {
+    boolean dropped;
+    try {
+      dropped =
+          tableCatalog.dropTable(
+              NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()));
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+    if (!dropped) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_OPERATION_FAILED, "Failed to drop table " + tableName);
+    }
+  }
+
+  /**
+   * Renames a schema in the catalog.
+   *
+   * @param source the name of the source schema
+   * @param target the name of the target schema
+   */
+  public void renameSchema(String source, String target) {
+    throw new NotImplementedException();
+  }
+
+  private void applyAlter(SchemaTableName tableName, TableChange... change) {
+    try {
+      tableCatalog.alterTable(
+          NameIdentifier.of(tableName.getSchemaName(), tableName.getTableName()), change);
+    } catch (NoSuchTableException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS, "Table does not exist");
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Renames a table in the catalog.
+   *
+   * @param oldTableName the old name of the table
+   * @param newTableName the new name of the table
+   */
+  public void renameTable(SchemaTableName oldTableName, SchemaTableName newTableName) {
+    if (!oldTableName.getSchemaName().equals(newTableName.getSchemaName())) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Cannot rename table across schemas");
+    }
+    if (oldTableName.getTableName().equals(newTableName.getTableName())) {
+      return;
+    }
+    applyAlter(oldTableName, TableChange.rename(newTableName.getTableName()));
+  }
+
+  /**
+   * Sets the comment of the specified table.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param comment the comment to set
+   */
+  public void setTableComment(SchemaTableName schemaTableName, String comment) {
+    applyAlter(schemaTableName, TableChange.updateComment(comment));
+  }
+
+  /**
+   * Sets the properties of the specified table.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param properties the properties to set
+   */
+  public void setTableProperties(SchemaTableName schemaTableName, Map<String, String> properties) {
+    Map<String, String> oldProperties =
+        getTable(schemaTableName.getSchemaName(), schemaTableName.getTableName()).getProperties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (!entry.getValue().equals(oldProperties.get(entry.getKey()))) {
+        applyAlter(schemaTableName, TableChange.setProperty(entry.getKey(), entry.getValue()));
+      }
+    }
+  }
+
+  /**
+   * Adds a new column to the specified table.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param column the Gravitino column to add
+   */
+  public void addColumn(SchemaTableName schemaTableName, GravitinoColumn column) {
+    String[] columnNames = {column.getName()};
+    if (Strings.isNullOrEmpty(column.getComment()))
+      applyAlter(
+          schemaTableName,
+          TableChange.addColumn(columnNames, column.getType(), column.isNullable()));
+    else {
+      applyAlter(
+          schemaTableName,
+          TableChange.addColumn(
+              columnNames, column.getType(), column.getComment(), column.isNullable()));
+    }
+  }
+
+  /**
+   * Adds a new column to the specified table with a position hint.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param column the Gravitino column to add
+   * @param position the target position for the new column
+   */
+  public void addColumn(
+      SchemaTableName schemaTableName,
+      GravitinoColumn column,
+      TableChange.ColumnPosition position) {
+    String[] columnNames = {column.getName()};
+    String comment = Strings.isNullOrEmpty(column.getComment()) ? null : column.getComment();
+    TableChange.ColumnPosition targetPosition =
+        position == null ? TableChange.ColumnPosition.defaultPos() : position;
+    applyAlter(
+        schemaTableName,
+        TableChange.addColumn(
+            columnNames, column.getType(), comment, targetPosition, column.isNullable()));
+  }
+
+  /**
+   * Drops a column from the specified table.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param columnName the name of the column to drop
+   */
+  public void dropColumn(SchemaTableName schemaTableName, String columnName) {
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.deleteColumn(columnNames, true));
+  }
+
+  /**
+   * Sets the comment of the specified column.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param columnName the name of the column to set the comment
+   * @param comment the comment to set
+   */
+  public void setColumnComment(SchemaTableName schemaTableName, String columnName, String comment) {
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.updateColumnComment(columnNames, comment));
+  }
+
+  /**
+   * Renames a column in the specified table.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param columnName the name of the column to rename
+   * @param target the new name of the column
+   */
+  public void renameColumn(SchemaTableName schemaTableName, String columnName, String target) {
+    if (columnName.equals(target)) {
+      return;
+    }
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.renameColumn(columnNames, target));
+  }
+
+  /**
+   * Sets the type of the specified column.
+   *
+   * @param schemaTableName the name of the schema and table
+   * @param columnName the name of the column to set the type
+   * @param type the type to set
+   */
+  public void setColumnType(SchemaTableName schemaTableName, String columnName, Type type) {
+    String[] columnNames = {columnName};
+    applyAlter(schemaTableName, TableChange.updateColumnType(columnNames, type));
+  }
+
+  /**
+   * Checks whether the catalog supports function operations.
+   *
+   * @return true if the catalog supports function operations, false otherwise
+   */
+  public boolean supportsFunctions() {
+    return functionCatalog != null;
+  }
+
+  /**
+   * Lists all functions with details in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @return an array of functions
+   * @throws UnsupportedOperationException if the catalog does not support functions
+   */
+  public Function[] listFunctionInfos(String schemaName) {
+    if (!supportsFunctions()) {
+      throw new UnsupportedOperationException("Catalog does not support functions");
+    }
+    try {
+      return functionCatalog.listFunctionInfos(Namespace.of(schemaName));
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Retrieves a function by its schema and function name.
+   *
+   * @param schemaName the name of the schema
+   * @param functionName the name of the function
+   * @return the function
+   * @throws UnsupportedOperationException if the catalog does not support functions
+   * @throws NoSuchFunctionException if the function does not exist
+   */
+  public Function getFunction(String schemaName, String functionName) {
+    if (!supportsFunctions()) {
+      throw new UnsupportedOperationException("Catalog does not support functions");
+    }
+    try {
+      return functionCatalog.getFunction(NameIdentifier.of(schemaName, functionName));
+    } catch (NoSuchFunctionException e) {
+      // Callers treat a missing function as an empty result.
+      throw e;
+    } catch (RuntimeException e) {
+      throw GravitinoErrorCode.toTrinoException(e);
+    }
+  }
+
+  /**
+   * Checks whether the catalog supports view operations.
+   *
+   * @return true if the catalog supports view operations, false otherwise
+   */
+  public boolean supportsViews() {
+    return viewCatalog != null;
+  }
+
+  /**
+   * Retrieves the Gravitino view for the specified name, if it exists and has a Trino dialect SQL
+   * representation.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   * @return an {@link Optional} containing the Gravitino view, or {@link Optional#empty()} if the
+   *     view does not exist or has no Trino dialect SQL representation
+   */
+  public Optional<GravitinoView> getViewIfPresent(String schemaName, String viewName) {
+    if (!supportsViews()) {
+      return Optional.empty();
+    }
+    try {
+      View view = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+      GravitinoView gravitinoView = new GravitinoView(schemaName, viewName, view);
+      if (gravitinoView.getSql() == null) {
+        // The view exists but has no Trino dialect SQL representation, so it is not visible to
+        // Trino.
+        LOG.debug(
+            "View {}.{} in catalog {} has no Trino dialect SQL representation, hiding it from"
+                + " Trino",
+            schemaName,
+            viewName,
+            catalogName);
+        return Optional.empty();
+      }
+      return Optional.of(gravitinoView);
+    } catch (NoSuchViewException e) {
+      return Optional.empty();
+    } catch (UnsupportedOperationException e) {
+      LOG.debug(
+          "Catalog {} does not support loading view {}.{}", catalogName, schemaName, viewName, e);
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * Retrieves the Gravitino view for the specified name.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   * @return the Gravitino view
+   * @throws TrinoException if the view does not exist or has no Trino dialect SQL representation
+   */
+  public GravitinoView getView(String schemaName, String viewName) {
+    return getViewIfPresent(schemaName, viewName)
+        .orElseThrow(
+            () ->
+                new TrinoException(
+                    GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist"));
+  }
+
+  /**
+   * Lists the names of all views in the specified schema.
+   *
+   * @param schemaName the name of the schema
+   * @return a list of view names, or an empty list if the catalog does not support views or the
+   *     schema does not exist
+   */
+  public List<String> listViews(String schemaName) {
+    if (!supportsViews()) {
+      return List.of();
+    }
+    try {
+      NameIdentifier[] views = viewCatalog.listViews(Namespace.of(schemaName));
+      return Arrays.stream(views)
+          .map(NameIdentifier::name)
+          .filter(viewName -> getViewIfPresent(schemaName, viewName).isPresent())
+          .toList();
+    } catch (UnsupportedOperationException e) {
+      LOG.debug(
+          "Catalog {} does not support listing views for schema {}", catalogName, schemaName, e);
+      return List.of();
+    } catch (NoSuchSchemaException e) {
+      // ConnectorMetadata.listViews() must return an empty list for a non-existent schema rather
+      // than fail, matching the contract Trino relies on for catalog-wide SHOW/information_schema
+      // scans.
+      return List.of();
+    }
+  }
+
+  /**
+   * Creates or replaces a view in the catalog.
+   *
+   * <p>Only views with a Trino dialect SQL representation are considered visible to Trino; if an
+   * entity with the same name already exists but has no Trino representation (e.g. a view created
+   * by another engine), it is never silently replaced.
+   *
+   * @param view the Gravitino view, with the Trino dialect SQL definition set
+   * @param replace whether to replace the view if it already exists
+   */
+  public void createView(GravitinoView view, boolean replace) {
+    if (!supportsViews()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
+    }
+    Preconditions.checkArgument(
+        view.getSql() != null,
+        "View %s.%s has no Trino dialect SQL representation",
+        view.getSchemaName(),
+        view.getName());
+    NameIdentifier identifier = NameIdentifier.of(view.getSchemaName(), view.getName());
+    SQLRepresentation[] representations = {
+      SQLRepresentation.builder().withDialect(Dialects.TRINO).withSql(view.getSql()).build()
+    };
+    try {
+      boolean exists = viewCatalog.viewExists(identifier);
+      if (exists) {
+        View existingView = viewCatalog.loadView(identifier);
+        if (!existingView.sqlFor(Dialects.TRINO).isPresent()) {
+          // An entity with this name already exists but is not visible to Trino (e.g. a view
+          // created by another engine), so it must not be treated as replaceable.
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
+        }
+        if (!replace) {
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
+        }
+        if (hasNonTrinoRepresentation(existingView.representations())) {
+          // Trino cannot regenerate SQL for other engines' dialects, so replacing here would
+          // leave those representations referring to a schema/body that no longer matches.
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+              "Cannot replace view "
+                  + view.getSchemaName()
+                  + "."
+                  + view.getName()
+                  + " because it has SQL representations in other dialects");
+        }
+        // Property changes must precede ReplaceView: Hive's ReplaceView handling encodes the new
+        // native Trino view payload (including the owner) from whatever properties have been
+        // applied so far in this array, so the owner update needs to land before ReplaceView reads
+        // it, not after.
+        List<ViewChange> changes = new ArrayList<>();
+        changes.addAll(computePropertyChanges(existingView.properties(), view.getProperties()));
+        if (existingView
+                .properties()
+                .containsKey(CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY)
+            && !view.getProperties()
+                .containsKey(CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY)) {
+          // computePropertyChanges never removes properties (see its Javadoc), but a replace that
+          // switches the view from SECURITY DEFINER back to SECURITY INVOKER must still clear the
+          // stale owner, or it would incorrectly keep reporting SECURITY DEFINER on reload.
+          changes.add(
+              ViewChange.removeProperty(
+                  CatalogConnectorMetadataAdapter.RESERVED_VIEW_OWNER_PROPERTY));
+        }
+        changes.add(
+            ViewChange.replaceView(
+                view.getRawColumns(),
+                representations,
+                view.getDefaultCatalog(),
+                view.getDefaultSchema(),
+                view.getComment()));
+        viewCatalog.alterView(identifier, changes.toArray(new ViewChange[0]));
+      } else {
+        viewCatalog.createView(
+            identifier,
+            view.getComment(),
+            view.getRawColumns(),
+            representations,
+            view.getDefaultCatalog(),
+            view.getDefaultSchema(),
+            view.getProperties());
+      }
+    } catch (NoSuchSchemaException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
+    } catch (ViewAlreadyExistsException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists", e);
+    } catch (NoSuchViewException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist", e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
+    }
+  }
+
+  /**
+   * Drops a view from the catalog.
+   *
+   * <p>Only views with a Trino dialect SQL representation are considered visible to Trino; views
+   * created by other engines without one are treated as not existing, so this method never drops
+   * them.
+   *
+   * @param schemaName the name of the schema
+   * @param viewName the name of the view
+   */
+  public void dropView(String schemaName, String viewName) {
+    if (!supportsViews()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
+    }
+    // Ensures the view is visible to Trino (exists and has a Trino dialect representation) before
+    // dropping it, so views created by other engines without a Trino representation are never
+    // silently dropped.
+    getView(schemaName, viewName);
+    boolean dropped;
+    try {
+      dropped = viewCatalog.dropView(NameIdentifier.of(schemaName, viewName));
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
+    }
+    if (!dropped) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
+          "Failed to drop view " + schemaName + "." + viewName);
+    }
+  }
+
+  /**
+   * Renames a view in the catalog.
+   *
+   * <p>Only views with a Trino dialect SQL representation are considered visible to Trino; views
+   * created by other engines without one are treated as not existing, so this method never renames
+   * them.
+   *
+   * @param oldViewName the old name of the view
+   * @param newViewName the new name of the view
+   */
+  public void renameView(SchemaTableName oldViewName, SchemaTableName newViewName) {
+    if (!supportsViews()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
+    }
+    if (!oldViewName.getSchemaName().equals(newViewName.getSchemaName())) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Cannot rename view across schemas");
+    }
+    // Ensures the view is visible to Trino before renaming it, for the same reason as dropView.
+    getView(oldViewName.getSchemaName(), oldViewName.getTableName());
+    if (oldViewName.getTableName().equals(newViewName.getTableName())) {
+      return;
+    }
+    try {
+      viewCatalog.alterView(
+          NameIdentifier.of(oldViewName.getSchemaName(), oldViewName.getTableName()),
+          ViewChange.rename(newViewName.getTableName()));
+    } catch (NoSuchViewException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist", e);
+    } catch (ViewAlreadyExistsException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists", e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
+    }
+  }
+
+  /**
+   * Checks whether any of the given representations belongs to a dialect other than {@link
+   * Dialects#TRINO}.
+   *
+   * @param representations the representations to check
+   * @return true if a non-Trino dialect representation is present
+   */
+  private static boolean hasNonTrinoRepresentation(Representation[] representations) {
+    return Arrays.stream(representations)
+        .anyMatch(
+            representation ->
+                representation instanceof SQLRepresentation
+                    && !Dialects.TRINO.equalsIgnoreCase(
+                        ((SQLRepresentation) representation).dialect()));
+  }
+
+  /**
+   * Computes the {@link ViewChange} operations needed to apply {@code desired} on top of a view's
+   * current properties, so that {@code CREATE OR REPLACE VIEW ... WITH (...)} applies the new
+   * properties instead of silently leaving them unset ({@link ViewChange#replaceView} does not
+   * affect properties).
+   *
+   * <p>Only additions/updates are applied, never removals: {@code current} is the view's full
+   * underlying property map, which can include catalog-internal/reserved entries (e.g. Hive's
+   * {@code transient_lastDdlTime}) that this connector does not own and must not attempt to remove,
+   * so a key absent from {@code desired} is left untouched rather than being deleted.
+   *
+   * @param current the view's current properties
+   * @param desired the view's desired properties after the replace
+   * @return the property changes needed to apply {@code desired} onto {@code current}
+   */
+  private static List<ViewChange> computePropertyChanges(
+      Map<String, String> current, Map<String, String> desired) {
+    List<ViewChange> changes = new ArrayList<>();
+    for (Map.Entry<String, String> entry : desired.entrySet()) {
+      if (!Objects.equals(current.get(entry.getKey()), entry.getValue())) {
+        changes.add(ViewChange.setProperty(entry.getKey(), entry.getValue()));
+      }
+    }
+    return changes;
+  }
+}

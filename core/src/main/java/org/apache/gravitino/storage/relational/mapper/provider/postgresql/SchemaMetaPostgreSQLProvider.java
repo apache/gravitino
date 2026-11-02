@@ -159,7 +159,11 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE deleted_at = 0 AND "
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

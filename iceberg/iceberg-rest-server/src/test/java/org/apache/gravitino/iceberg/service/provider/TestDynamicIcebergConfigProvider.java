@@ -611,8 +611,13 @@ public class TestDynamicIcebergConfigProvider {
     String metalakeName = "test_metalake";
     String catalogName = "jdbc_catalog";
 
-    Catalog mockCatalog = Mockito.mock(Catalog.class);
-    SupportsSecrets supportsSecrets = Mockito.mock(SupportsSecrets.class);
+    Catalog mockCatalog =
+        Mockito.mock(
+            Catalog.class,
+            Mockito.withSettings()
+                .extraInterfaces(SupportsCredentials.class, SupportsSecrets.class));
+    SupportsSecrets supportsSecrets = (SupportsSecrets) mockCatalog;
+    SupportsCredentials supportsCredentials = (SupportsCredentials) mockCatalog;
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties())
         .thenReturn(
@@ -624,8 +629,10 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
     Mockito.when(mockCatalog.supportsSecrets()).thenReturn(supportsSecrets);
-    Mockito.when(supportsSecrets.getSecrets())
-        .thenReturn(Map.of(IcebergConstants.GRAVITINO_JDBC_PASSWORD, "secret-pwd"));
+    Mockito.when(supportsSecrets.getSecrets()).thenReturn(Map.of("custom-token", "tok"));
+    Mockito.when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    Mockito.when(supportsCredentials.getCredentials())
+        .thenReturn(new Credential[] {new JdbcCredential("iceberg", "secret-pwd")});
 
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
@@ -640,6 +647,10 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertEquals(
         "secret-pwd",
         config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+    Assertions.assertEquals(
+        "iceberg",
+        config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertEquals("tok", config.get().getIcebergCatalogProperties().get("custom-token"));
   }
 
   @Test
@@ -665,13 +676,8 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
     Mockito.when(mockCatalog.supportsSecrets()).thenReturn(supportsSecrets);
-    Mockito.when(supportsSecrets.getSecrets())
-        .thenReturn(
-            Map.of(
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                "from-secret",
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                "secret-pwd"));
+    Mockito.when(supportsSecrets.getSecrets()).thenReturn(Map.of("shared", "from-secret"));
+    Mockito.when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
     Mockito.when(supportsCredentials.getCredentials())
         .thenReturn(new Credential[] {new JdbcCredential("cred-user", "cred-pwd")});
 
@@ -688,30 +694,34 @@ public class TestDynamicIcebergConfigProvider {
     Map<String, String> icebergProps = config.get().getIcebergCatalogProperties();
     Assertions.assertEquals("cred-user", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_USER));
     Assertions.assertEquals("cred-pwd", icebergProps.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+    Assertions.assertEquals("from-secret", icebergProps.get("shared"));
   }
 
   @Test
   public void testMergeMemorySecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
-      entityProps.put(IcebergConstants.GRAVITINO_JDBC_USER, "root");
+      entityProps.put("custom-token", "placeholder");
       List<SecretMaterial> writes =
           sm.assembleSecretMaterials(
-              Map.of(IcebergConstants.GRAVITINO_JDBC_USER, "root"),
+              Map.of(),
               entityProps,
               "catalog",
               3L,
-              Map.of(
-                  IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                  new SecretBinding("memory", "mem-jdbc-pwd")),
+              Map.of("custom-token", new SecretBinding("memory", "mem-custom-tok")),
               Map.of());
       sm.writeSecrets(writes);
       Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       String metalakeName = "test_metalake";
       String catalogName = "jdbc_catalog";
-      Catalog mockCatalog = Mockito.mock(Catalog.class);
-      SupportsSecrets supportsSecrets = Mockito.mock(SupportsSecrets.class);
+      Catalog mockCatalog =
+          Mockito.mock(
+              Catalog.class,
+              Mockito.withSettings()
+                  .extraInterfaces(SupportsCredentials.class, SupportsSecrets.class));
+      SupportsSecrets supportsSecrets = (SupportsSecrets) mockCatalog;
+      SupportsCredentials supportsCredentials = (SupportsCredentials) mockCatalog;
       Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
       Mockito.when(mockCatalog.properties())
           .thenReturn(
@@ -723,6 +733,9 @@ public class TestDynamicIcebergConfigProvider {
               });
       Mockito.when(mockCatalog.supportsSecrets()).thenReturn(supportsSecrets);
       Mockito.when(supportsSecrets.getSecrets()).thenReturn(secrets);
+      Mockito.when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+      Mockito.when(supportsCredentials.getCredentials())
+          .thenReturn(new Credential[] {new JdbcCredential("root", "mem-jdbc-pwd")});
 
       Map<String, String> properties = new HashMap<>();
       properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
@@ -737,6 +750,8 @@ public class TestDynamicIcebergConfigProvider {
       Assertions.assertEquals(
           "mem-jdbc-pwd",
           config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+      Assertions.assertEquals(
+          "mem-custom-tok", config.get().getIcebergCatalogProperties().get("custom-token"));
     }
   }
 

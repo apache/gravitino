@@ -48,6 +48,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -281,6 +282,49 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     String[] tagsLoadByNormalUser = tableSupportTagByNormalUser.listTags();
     Arrays.sort(tagsLoadByNormalUser);
     assertArrayEquals(new String[] {"tag2", "tag3"}, tagsLoadByNormalUser);
+
+    TagList<String> nameResult = tableSupportTagByNormalUser.listTagsWithVisibility();
+    Assertions.assertEquals(2, nameResult.tags().length);
+    Assertions.assertTrue(nameResult.hasInaccessibleTags());
+
+    var detailsResult = tableSupportTagByNormalUser.listTagsInfoWithVisibility();
+    Assertions.assertEquals(2, detailsResult.tags().length);
+    Assertions.assertTrue(detailsResult.hasInaccessibleTags());
+
+    String untaggedCatalog = "untagged_catalog";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    gravitinoMetalake.createCatalog(
+        untaggedCatalog, Catalog.Type.RELATIONAL, "hive", "untagged catalog", properties);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(untaggedCatalog), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
+
+    String tableWithOnlyInheritedHiddenTag = "table_with_only_inherited_hidden_tag";
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(CATALOG).asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag),
+        createColumns(),
+        "test visibility indicators",
+        new HashMap<>());
+    try {
+      SupportsTags untaggedCatalogTags =
+          normalUserClient.loadMetalake(METALAKE).loadCatalog(untaggedCatalog).supportsTags();
+      assertTagList(untaggedCatalogTags, new String[0], false);
+
+      SupportsTags inheritedHiddenTags =
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .loadCatalog(CATALOG)
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag))
+              .supportsTags();
+      assertTagList(inheritedHiddenTags, new String[0], true);
+    } finally {
+      tableCatalog.dropTable(NameIdentifier.of(SCHEMA, tableWithOnlyInheritedHiddenTag));
+      gravitinoMetalake.dropCatalog(untaggedCatalog, true);
+    }
   }
 
   @Test
@@ -466,5 +510,22 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private Column[] createColumns() {
     return new Column[] {Column.of("col1", Types.StringType.get())};
+  }
+
+  private void assertTagList(
+      SupportsTags supportsTags, String[] expectedTagNames, boolean hasInaccessibleTags) {
+    TagList<String> nameResult = supportsTags.listTagsWithVisibility();
+    String[] actualTagNames = nameResult.tags();
+    Arrays.sort(actualTagNames);
+    Arrays.sort(expectedTagNames);
+    Assertions.assertArrayEquals(expectedTagNames, actualTagNames);
+    Assertions.assertEquals(hasInaccessibleTags, nameResult.hasInaccessibleTags());
+
+    var detailsResult = supportsTags.listTagsInfoWithVisibility();
+    String[] actualDetailNames =
+        Arrays.stream(detailsResult.tags()).map(tag -> tag.name()).toArray(String[]::new);
+    Arrays.sort(actualDetailNames);
+    Assertions.assertArrayEquals(expectedTagNames, actualDetailNames);
+    Assertions.assertEquals(hasInaccessibleTags, detailsResult.hasInaccessibleTags());
   }
 }

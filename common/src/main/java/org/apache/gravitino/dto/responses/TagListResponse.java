@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.responses;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import lombok.ToString;
 import org.apache.gravitino.dto.tag.TagDTO;
 
 /** Represents a response for a list of tags. */
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)

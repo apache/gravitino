@@ -38,9 +38,11 @@ import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -195,6 +197,23 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
     return dispatcher.planTableScan(context, tableIdentifier, scanRequest);
+  }
+
+  /**
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior scan plan. Read-only, so no
+   * hooks are needed and the call is passed straight through.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param request The request carrying the {@code plan-task}.
+   * @return A FetchScanTasksResponse containing the scan tasks for that plan task.
+   */
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request) {
+    return dispatcher.fetchScanTasks(context, tableIdentifier, request);
   }
 
   @Override

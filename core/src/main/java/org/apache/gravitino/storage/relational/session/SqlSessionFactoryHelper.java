@@ -48,7 +48,6 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
  * should be initialized only once.
  */
 public class SqlSessionFactoryHelper {
-  private static final int JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 10;
   private static final int JDBC_BACKEND_MIN_IDLE_CONNECTIONS = 5;
   private static final Duration JDBC_BACKEND_MIN_EVICTABLE_IDLE_TIME = Duration.ofSeconds(30);
 
@@ -93,9 +92,14 @@ public class SqlSessionFactoryHelper {
       dataSource.setDefaultAutoCommit(false);
       dataSource.setMaxWaitMillis(
           config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
-      dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
-      dataSource.setMaxIdle(JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
-      dataSource.setMinIdle(JDBC_BACKEND_MIN_IDLE_CONNECTIONS);
+      int maxConnections = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
+      int configuredMaxIdle =
+          config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
+      int maxIdle =
+          maxConnections > 0 ? Math.min(maxConnections, configuredMaxIdle) : configuredMaxIdle;
+      dataSource.setMaxTotal(maxConnections);
+      dataSource.setMaxIdle(maxIdle);
+      dataSource.setMinIdle(Math.min(JDBC_BACKEND_MIN_IDLE_CONNECTIONS, maxIdle));
       dataSource.setLogAbandoned(true);
       dataSource.setRemoveAbandonedOnBorrow(true);
       dataSource.setRemoveAbandonedTimeout(60);

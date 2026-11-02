@@ -31,6 +31,11 @@ import java.util.Objects;
  * put in the place where Gravitino server can access them. Current Gravitino can support scripts in
  * the local file system, or on the web server (e.g., HTTP, HTTPS, FTP). Distributed file systems
  * like HDFS or S3 will be supported in the future.
+ *
+ * <p>Besides a file, the executable of a shell job template can be a command name with no path,
+ * such as {@code python} or {@code bash}. Such a command is not fetched, it is looked up in the
+ * environment the job runs in. The local job executor looks it up on the {@code PATH} of the
+ * Gravitino server process.
  */
 public class ShellJobTemplate extends JobTemplate {
 

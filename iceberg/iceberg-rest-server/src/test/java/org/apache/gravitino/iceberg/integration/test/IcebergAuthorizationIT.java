@@ -95,7 +95,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
+    containerSuite.startPostgreSQLContainer(getTestDatabaseName());
     startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
     initSparkEnv();
@@ -217,6 +217,11 @@ public class IcebergAuthorizationIT extends BaseIT {
    */
   protected String narrowedCatalogActiveRoles() {
     return null;
+  }
+
+  /** Returns the PostgreSQL database used by this authorization test suite. */
+  protected TestDatabaseName getTestDatabaseName() {
+    return TestDatabaseName.PG_ICEBERG_AUTHZ_IT;
   }
 
   void revokeUserRoles() {
@@ -341,7 +346,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   private String getPGUri() {
-    return containerSuite.getPostgreSQLContainer().getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
+    return containerSuite.getPostgreSQLContainer().getJdbcUrl(getTestDatabaseName());
   }
 
   private String getPGUser() {

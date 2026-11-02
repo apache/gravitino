@@ -63,4 +63,35 @@ class TestTableMetaBaseSQLProvider {
     Assertions.assertTrue(sql.contains("WHERE table_id = #{tableId} AND deleted_at = 0"));
     Assertions.assertTrue(sql.endsWith("FOR UPDATE"));
   }
+
+  @Test
+  void testAggregateReadRejectsDynamicRootSql() {
+    TableMetaBaseSQLProvider dynamic =
+        new TableMetaBaseSQLProvider() {
+          @Override
+          public String selectTableMetaBySchemaIdAndName(Long schemaId, String tableName) {
+            return " <script>SELECT 1</script>";
+          }
+
+          @Override
+          public String selectTableByFullQualifiedName(
+              String metalake, String catalog, String schema, String table) {
+            return "<script>SELECT 1</script>";
+          }
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dynamic.selectTableWithColumnsBySchemaIdAndName(1L, "table"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dynamic.selectTableWithColumnsByFullQualifiedName("ml", "cat", "schema", "table"));
+  }
+
+  @Test
+  void testAggregateReadAcceptsStaticRootWithTrailingSemicolon() {
+    String sql = PROVIDER.selectTableWithColumnsByFullQualifiedName("ml", "cat", "schema", "table");
+    Assertions.assertTrue(sql.startsWith("SELECT t.*"));
+    Assertions.assertFalse(sql.contains(";)"));
+    Assertions.assertFalse(sql.contains("<script>"));
+  }
 }

@@ -21,8 +21,12 @@ package org.apache.gravitino.hive.converter;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,6 +35,7 @@ import java.util.Map;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -229,5 +234,32 @@ public class TestHiveTableConverter {
     assertEquals("v_orders", hiveTable.name());
     assertEquals(0, hiveTable.columns().length);
     assertEquals("SELECT `1`", hiveTable.viewOriginalText());
+  }
+
+  @Test
+  public void testGetColumnsWithConstraints() {
+    Table table = new Table();
+    StorageDescriptor sd = new StorageDescriptor();
+    sd.setCols(
+        Arrays.asList(
+            new FieldSchema("id", "int", null),
+            new FieldSchema("name", "string", null),
+            new FieldSchema("age", "int", null)));
+    table.setSd(sd);
+    table.setPartitionKeys(Arrays.asList(new FieldSchema("dt", "string", null)));
+
+    Column[] columns =
+        HiveTableConverter.getColumns(
+            table, ImmutableSet.of("id", "dt"), ImmutableMap.of("name", "'n/a'", "age", "18"));
+
+    assertEquals(4, columns.length);
+    assertFalse(columns[0].nullable());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, columns[0].defaultValue());
+    assertTrue(columns[1].nullable());
+    assertEquals(Literals.stringLiteral("n/a"), columns[1].defaultValue());
+    assertTrue(columns[2].nullable());
+    assertEquals(Literals.integerLiteral(18), columns[2].defaultValue());
+    assertFalse(columns[3].nullable());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, columns[3].defaultValue());
   }
 }

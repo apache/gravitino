@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
@@ -45,6 +46,32 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   public static final LanceDataTypeConverter CONVERTER = new LanceDataTypeConverter();
   private static final ObjectMapper mapper = new ObjectMapper();
+
+  /**
+   * Returns the Lance file format version that a new dataset with these fields must use, so that
+   * its blob columns can be written: 2.2 for {@code lance.blob} and 2.1 for {@code
+   * lance.blob.legacy}.
+   *
+   * @param fields The top-level Arrow fields of the dataset.
+   * @return The required file format version, or empty if the fields have no blob column.
+   * @throws IllegalArgumentException If the fields mix {@code lance.blob} and {@code
+   *     lance.blob.legacy} columns.
+   */
+  public static Optional<String> requiredFileFormatVersion(List<Field> fields) {
+    return LanceBlobTypes.requiredFileFormatVersion(fields);
+  }
+
+  /**
+   * Checks that a field can be added to a dataset with the given Lance file format version.
+   *
+   * @param field The Arrow field to add.
+   * @param fileFormatVersion The dataset's Lance file format version, such as {@code 2.1}.
+   * @throws IllegalArgumentException If the field contains a blob column the version does not
+   *     support.
+   */
+  public static void checkFileFormatVersion(Field field, String fileFormatVersion) {
+    LanceBlobTypes.checkFileFormatVersion(field, fileFormatVersion);
+  }
 
   public Field toArrowField(String name, Type type, boolean nullable) {
     switch (type.name()) {
@@ -113,6 +140,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) type;
+        if (LanceBlobTypes.isBlobCatalogString(externalType.catalogString())) {
+          return LanceBlobTypes.toArrowField(name, nullable, externalType.catalogString());
+        }
         Field field;
         try {
           field = mapper.readValue(externalType.catalogString(), Field.class);
@@ -121,16 +151,14 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
               "Failed to parse external type catalog string: " + externalType.catalogString(), e);
         }
         Preconditions.checkArgument(
-            name.equals(field.getName()),
-            "expected field name %s but got %s",
-            name,
-            field.getName());
-        Preconditions.checkArgument(
             nullable == field.isNullable(),
             "expected field nullable %s but got %s",
             nullable,
             field.isNullable());
-        return field;
+        // The column name is authoritative: a renamed column keeps its stored JSON type.
+        return name.equals(field.getName())
+            ? field
+            : new Field(name, field.getFieldType(), field.getChildren());
 
       default:
         // non-complex type
@@ -203,7 +231,19 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   @Override
   public Type toGravitino(Field arrowField) {
+    Optional<String> blobType = LanceBlobTypes.toCatalogString(arrowField);
+    if (blobType.isPresent()) {
+      return Types.ExternalType.of(blobType.get());
+    }
+
+    // Only Lance blob metadata is recognized. A blob field outside the canonical layout keeps the
+    // whole field as Arrow JSON so the blob is not turned into a plain binary or struct column.
+    if (LanceBlobTypes.isBlob(arrowField)) {
+      return toExternalType(arrowField);
+    }
+
     FieldType fieldType = arrowField.getFieldType();
+
     switch (fieldType.getType().getTypeID()) {
       case Map:
         Field structField = arrowField.getChildren().get(0);
@@ -315,6 +355,10 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
         // fallthrough
     }
 
+    return toExternalType(arrowField);
+  }
+
+  private Type toExternalType(Field arrowField) {
     String typeString;
     try {
       typeString = mapper.writeValueAsString(arrowField);

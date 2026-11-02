@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.jdbc.converter;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -34,7 +36,9 @@ import org.apache.gravitino.rel.types.Types;
 
 public class JdbcColumnDefaultValueConverter {
 
-  protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+  /** The DDL rendering of the current timestamp default value function. */
+  public static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
       new DateTimeFormatterBuilder()
@@ -77,6 +81,8 @@ public class JdbcColumnDefaultValueConverter {
         // case value is an empty string, we should wrap it with single quotes to avoid SQL error.
         if (StringUtils.isBlank(value)) {
           value = "'%s'".formatted(value);
+        } else {
+          value = validateNumericLiteral(value);
         }
         return value;
       } else if (type instanceof Types.TimestampType) {
@@ -84,11 +90,11 @@ public class JdbcColumnDefaultValueConverter {
          * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
          */
         if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
-          return String.format("'%s'", literal.value().toString().replace("T", " "));
+          return quoteStringLiteral(literal.value().toString().replace("T", " "));
         }
-        return String.format("'%s'", literal.value());
+        return quoteStringLiteral(String.valueOf(literal.value()));
       } else {
-        return String.format("'%s'", literal.value());
+        return quoteStringLiteral(String.valueOf(literal.value()));
       }
     }
 
@@ -101,5 +107,28 @@ public class JdbcColumnDefaultValueConverter {
       boolean isExpression,
       boolean nullable) {
     return DEFAULT_VALUE_NOT_SET;
+  }
+
+  /**
+   * Renders a value as a quoted SQL string literal for a column default. The default escapes
+   * backslashes and doubles single quotes, as MySQL-compatible dialects require. Dialects with
+   * different string literal rules override this method.
+   *
+   * @param value the unquoted literal value
+   * @return the quoted and escaped SQL string literal
+   */
+  protected String quoteStringLiteral(String value) {
+    return "'" + escapeSqlLiteral(value, '\'') + "'";
+  }
+
+  private static String validateNumericLiteral(String value) {
+    String trimmed = value.trim();
+    try {
+      new BigDecimal(trimmed);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format("Invalid numeric column default value: %s", value), e);
+    }
+    return trimmed;
   }
 }

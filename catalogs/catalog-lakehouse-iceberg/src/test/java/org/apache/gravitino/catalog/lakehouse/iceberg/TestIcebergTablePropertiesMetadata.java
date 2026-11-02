@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.junit.jupiter.api.Assertions;
@@ -66,6 +67,20 @@ public class TestIcebergTablePropertiesMetadata {
   @MethodSource("invalidFormatVersions")
   void testFormatVersionRejectsInvalidValues(String value) {
     Assertions.assertThrows(IllegalArgumentException.class, () -> validateFormatVersion(value));
+  }
+
+  @Test
+  void testDefaultSpecIdCannotBeSetOrRemoved() {
+    Map<String, String> property = Map.of("default-spec-id", "1");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, property));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForAlter(metadata, property, Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PropertiesMetadataHelpers.validatePropertyForAlter(metadata, Map.of(), property));
   }
 
   private static Stream<String> invalidFormatVersions() {

@@ -25,6 +25,7 @@ from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.policy_operation import PolicyOperation
 from mcp_server.client.schema_operation import SchemaOperation
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.table_operation import TableOperation
 from mcp_server.client.tag_operation import TagOperation
@@ -154,6 +155,11 @@ class GravitinoOperation(ABC):
         Returns:
             ViewOperation: Interface for performing view-level operations
         """
+        pass
+
+    @abstractmethod
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        """Access the schema-scoped Semantic Model operation interface."""
         pass
 
     @abstractmethod

@@ -20,6 +20,7 @@ from __future__ import annotations
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_tag import GenericTag
 from gravitino.dto.requests.tag_associate_request import (
     TagsAssociateRequest,
@@ -68,6 +69,9 @@ class MetadataObjectTagOperations(SupportsTags):
         )
 
     def list_tags(self) -> list[str]:
+        return self.list_tags_with_visibility().tags()
+
+    def list_tags_with_visibility(self) -> TagList[str]:
         response = self.rest_client.get(
             self.tag_request_path,
             params={},
@@ -78,9 +82,14 @@ class MetadataObjectTagOperations(SupportsTags):
         )
         list_tags_resp.validate()
 
-        return list_tags_resp.tag_names()
+        return TagList(
+            list_tags_resp.tag_names(), list_tags_resp.has_inaccessible_tags()
+        )
 
     def list_tags_info(self) -> list[Tag]:
+        return self.list_tags_info_with_visibility().tags()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
         response = self.rest_client.get(
             self.tag_request_path,
             params={"details": "true"},
@@ -90,14 +99,17 @@ class MetadataObjectTagOperations(SupportsTags):
         list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
         list_info_resp.validate()
 
-        return [
-            GenericTag(
-                self.metalake_name,
-                tag_dto,
-                self.rest_client,
-            )
-            for tag_dto in list_info_resp.tags()
-        ]
+        return TagList(
+            [
+                GenericTag(
+                    self.metalake_name,
+                    tag_dto,
+                    self.rest_client,
+                )
+                for tag_dto in list_info_resp.tags()
+            ],
+            list_info_resp.has_inaccessible_tags(),
+        )
 
     def get_tag(self, name: str) -> Tag:
         Precondition.check_argument(

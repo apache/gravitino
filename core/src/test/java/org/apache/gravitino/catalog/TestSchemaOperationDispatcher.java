@@ -51,6 +51,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -382,6 +383,45 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportSchemaPropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_occ");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    // The schema is only in the catalog, so loading it imports it into the store.
+    doThrow(new NoSuchEntityException("mock error"))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(SchemaEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> dispatcher.loadSchema(schemaIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testDropSchemaPropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_drop_occ");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    // A conflict of the store, such as a lock wait timeout, reaches the caller as a conflict
+    // rather than an internal error.
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testDropMissingSchemaPreservesStoredEntity() throws IOException {
     reset(entityStore);
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_renamed_out_of_band");
@@ -398,6 +438,57 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
     Assertions.assertTrue(entityStore.exists(schemaIdent, SCHEMA));
+  }
+
+  @Test
+  void testDropSchemaRemovedFromSourceReportsMetadataCleanup() throws Exception {
+    reset(entityStore);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "externally_dropped_schema");
+    dispatcher.createSchema(ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    boolean droppedFromSource =
+        catalogManager.doWithCatalogWrapper(
+            NameIdentifier.of(metalake, catalog),
+            wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+    Assertions.assertTrue(droppedFromSource);
+    Assertions.assertTrue(entityStore.exists(ident, SCHEMA));
+
+    Assertions.assertTrue(dispatcher.dropSchema(ident, true));
+    Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+    Assertions.assertFalse(dispatcher.dropSchema(ident, true));
+  }
+
+  @Test
+  void testCascadingDropOfMissingSchemaDeletesStoredSecrets() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "missing_schema_secret");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "s3cr3t")),
+          Map.of());
+      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      boolean sourceDropped =
+          catalogManager.doWithCatalogWrapper(
+              NameIdentifier.of(metalake, catalog),
+              wrapper -> wrapper.doWithSchemaOps(ops -> ops.dropSchema(ident, true)));
+      Assertions.assertTrue(sourceDropped);
+      Assertions.assertFalse(d.dropSchema(ident, false));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      Assertions.assertTrue(d.dropSchema(ident, true));
+      Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
   }
 
   @Test

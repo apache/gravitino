@@ -16,6 +16,10 @@ Creating a table through Gravitino creates it in the source system, and listing 
 source at request time, so a table created directly in Hive appears the next time Gravitino is
 asked.
 
+When authorization is enabled, a table whose local name contains one or more dots is an exception:
+it can cause the entire table list request to fail. See
+[Local names containing one or more dots](./security/access-control.md#names-containing-dots).
+
 What Gravitino adds is a single shape across all of them. The same call describes a Hive table and
 an Iceberg table, columns carry the same type system, and tags, policies, ownership, and statistics
 attach the same way regardless of the system underneath.
@@ -100,6 +104,10 @@ written. Support is connector-specific.
 An external type represents a catalog type that is not part of the Gravitino type system. It keeps
 the external catalog's type string so clients can inspect it without losing information.
 
+When creating a table, adding a column, or changing a column's type, use a native Gravitino type
+or an explicit external type with a nonblank `catalogString`. This rule also applies to nested
+list, map, struct, and union types. The target catalog still determines whether it supports the type.
+
 ```json
 {
   "type": "external",
@@ -115,6 +123,11 @@ String typeString = ((ExternalType) type).catalogString();
 
 An unparsed type preserves forward compatibility when a client does not recognize a type returned
 by the server. The client retains the serialized value instead of failing deserialization.
+
+`UnparsedType` is not accepted for new or replaced column types, or for literal types in newly
+written expressions. Existing metadata containing it can still be read, imported, renamed, or
+annotated without replacing its type. Gravitino does not automatically convert an unparsed type
+into an external type.
 
 ```json
 {
@@ -180,8 +193,8 @@ Views can carry tags, and appear in listings alongside tables.
 Opening a schema lists its tables and views. Selecting a table shows its columns with their types,
 its properties, and its tags.
 
-Tags attach from the table row and from individual column rows, which is the fastest way to classify
-a specific field rather than a whole table. Policies attach at the table level.
+Assign tags from the table row and from individual column rows to classify a whole table or
+a specific field. Object policies are derived from those tag assignments.
 
 ## Permissions
 

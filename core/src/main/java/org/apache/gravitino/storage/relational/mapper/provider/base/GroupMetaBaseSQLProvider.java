@@ -141,13 +141,23 @@ public class GroupMetaBaseSQLProvider {
 
   /** Returns SQL that selects and locks an active group by ID. */
   public String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return selectGroupMetaById(groupId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return selectGroupMetaById(groupId) + " LOCK IN SHARE MODE";
+  }
+
+  /** Returns SQL that selects an active group by ID. */
+  protected String selectGroupMetaById(Long groupId) {
     return "SELECT group_id as groupId, group_name as groupName,"
         + " metalake_id as metalakeId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
         + GROUP_TABLE_NAME
-        + " WHERE group_id = #{groupId} AND deleted_at = 0 FOR UPDATE";
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
   public String listExtendedGroupPOsByMetalakeIdAndNames(
@@ -305,5 +315,26 @@ public class GroupMetaBaseSQLProvider {
         + " mm ON gm.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
         + " WHERE mm.metalake_name = #{metalakeName} AND gm.group_name = #{groupName}"
         + " AND gm.deleted_at = 0";
+  }
+  /**
+   * Returns a single-statement principal and membership snapshot.
+   *
+   * @param metalakeId the metalake ID
+   * @param groupName the principal name
+   * @return the aggregate select SQL
+   */
+  public String selectGroupWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("groupName") String groupName) {
+    return "SELECT p.*, r.role_id AS role_roleId, r.role_name AS role_roleName,"
+        + " r.metalake_id AS role_metalakeId, r.properties AS role_properties,"
+        + " r.audit_info AS role_auditInfo, r.current_version AS role_currentVersion,"
+        + " r.last_version AS role_lastVersion, r.deleted_at AS role_deletedAt FROM ("
+        + selectGroupMetaByMetalakeIdAndName(metalakeId, groupName)
+        + ") p LEFT JOIN "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " rel"
+        + " ON rel.group_id = p.groupId AND rel.deleted_at = 0 LEFT JOIN "
+        + ROLE_TABLE_NAME
+        + " r ON r.role_id = rel.role_id AND r.deleted_at = 0";
   }
 }

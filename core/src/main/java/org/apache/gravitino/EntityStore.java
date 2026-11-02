@@ -29,9 +29,39 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
+
+  /**
+   * Reads metric identifiers in a schema without loading complete Semantic Models.
+   *
+   * @param namespace The full schema namespace.
+   * @return Metric identifiers from one consistent statement or read snapshot.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    throw new UnsupportedOperationException("Metric listing is not supported");
+  }
+
+  /**
+   * Reads complete metrics in a schema without loading unrelated definition fields.
+   *
+   * @param namespace The full schema namespace.
+   * @return Decoded metrics from one consistent statement or read snapshot, without authorization
+   *     filtering.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    throw new UnsupportedOperationException("Metric info listing is not supported");
+  }
 
   /**
    * Initialize the entity store.
@@ -298,6 +328,26 @@ public interface EntityStore extends Closeable {
     } catch (NoSuchEntityException e) {
       return Optional.empty();
     }
+  }
+
+  /**
+   * Deletes a schema and optionally its functions, then runs an action before committing.
+   *
+   * <p>Any remaining children, including filesets, prevent deletion. Function cleanup and the
+   * schema deletion must roll back together if the action or the remaining-child check fails.
+   *
+   * @param ident the schema identifier
+   * @param cascadeFunctions whether to delete functions in the same metadata transaction
+   * @param postDeleteAction the action to run against the deleted snapshot before commit
+   * @return the deleted schema, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   * @throws UnsupportedOperationException if the store cannot honor this transaction boundary
+   */
+  default Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "This store cannot delete a schema with a pre-commit action");
   }
 
   /**

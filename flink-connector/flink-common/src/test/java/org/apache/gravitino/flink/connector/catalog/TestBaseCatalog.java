@@ -48,7 +48,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -62,7 +62,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestBaseCatalog {
+/**
+ * Base test for {@link BaseCatalog}. Concrete Flink version modules extend this and supply their
+ * own {@link CatalogCompat}, since some fixtures require a Flink-version-specific {@code
+ * CatalogTable} constructor.
+ */
+public abstract class TestBaseCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
 
   @Test
   void testDefaultFlinkTypeConversion() {
@@ -173,11 +180,16 @@ public class TestBaseCatalog {
   public void testTableChangesWithoutColumnChange() {
     Schema schema = Schema.newBuilder().column("test", "INT").build();
     CatalogBaseTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "test", ImmutableList.of(), ImmutableMap.of("key", "value", "key2", "value2"));
+        catalogCompat()
+            .createCatalogTable(
+                schema,
+                "test",
+                ImmutableList.of(),
+                ImmutableMap.of("key", "value", "key2", "value2"));
     CatalogBaseTable newTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
         BaseCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =
@@ -421,7 +433,7 @@ public class TestBaseCatalog {
   }
 
   /** Simulates a Paimon-like catalog that overrides dialect hooks. */
-  private static class PaimonLikeBaseCatalog extends BaseCatalog {
+  private class PaimonLikeBaseCatalog extends BaseCatalog {
 
     PaimonLikeBaseCatalog() {
       super(
@@ -430,6 +442,11 @@ public class TestBaseCatalog {
           "default",
           Mockito.mock(SchemaAndTablePropertiesConverter.class),
           Mockito.mock(PartitionConverter.class));
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override
@@ -468,8 +485,9 @@ public class TestBaseCatalog {
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogBaseTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
 
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
@@ -490,8 +508,9 @@ public class TestBaseCatalog {
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogBaseTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
 
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
@@ -510,11 +529,13 @@ public class TestBaseCatalog {
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogBaseTable existingTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "old comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "old comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
     CatalogBaseTable newTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
 
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(
@@ -525,7 +546,7 @@ public class TestBaseCatalog {
     Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
   }
 
-  private static class TestableBaseCatalog extends BaseCatalog {
+  private class TestableBaseCatalog extends BaseCatalog {
 
     private final AbstractCatalog delegate;
     private final Catalog gravitinoCatalog;
@@ -546,6 +567,11 @@ public class TestBaseCatalog {
       this.delegate = delegate;
       this.gravitinoCatalog = gravitinoCatalog;
       this.existingTable = existingTable;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return TestBaseCatalog.this.catalogCompat();
     }
 
     @Override

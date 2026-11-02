@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -27,6 +28,72 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionMetaBaseSQLProvider {
+
+  /**
+   * Returns a single-statement query for version URI rows and alias rows of the observed model.
+   *
+   * @param modelId the observed model ID
+   * @param schemaId the observed schema ID
+   * @param modelName the model name
+   * @param version the version number, or null for alias selection or listing
+   * @param alias the alias, or null for numeric selection or listing
+   * @return the snapshot SQL; version and alias must not both be set
+   */
+  public String selectModelVersionSnapshot(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Nullable @Param("version") Integer version,
+      @Nullable @Param("alias") String alias) {
+    String selectedVersion = null;
+    if (version != null) {
+      selectedVersion = "#{version}";
+    } else if (alias != null) {
+      selectedVersion =
+          "(SELECT target.model_version FROM "
+              + ModelVersionAliasRelMapper.TABLE_NAME
+              + " target WHERE target.model_id = #{modelId}"
+              + " AND target.model_version_alias = #{alias} AND target.deleted_at = 0)";
+    }
+    String versionFilter = selectedVersion == null ? "" : " AND v.version = " + selectedVersion;
+    String aliasFilter = selectedVersion == null ? "" : " AND a.model_version = " + selectedVersion;
+    // UNION ALL avoids a URI/alias cross product. The service assembles these flat rows;
+    // reading both arms in one statement keeps their aliases and URI values consistent.
+    return """
+        SELECT m.model_id AS modelId,
+               snapshot.metalakeId, snapshot.catalogId, snapshot.schemaId, snapshot.modelVersion,
+               snapshot.modelVersionComment, snapshot.modelVersionProperties,
+               snapshot.modelVersionUriName, snapshot.modelVersionUri,
+               snapshot.auditInfo, snapshot.deletedAt,
+               snapshot.aliasVersion, snapshot.aliasName, snapshot.aliasDeletedAt
+        FROM %s m
+        LEFT JOIN (
+          SELECT v.model_id AS snapshotModelId,
+                 v.metalake_id AS metalakeId, v.catalog_id AS catalogId, v.schema_id AS schemaId,
+                 v.version AS modelVersion, v.model_version_comment AS modelVersionComment,
+                 v.model_version_properties AS modelVersionProperties,
+                 v.model_version_uri_name AS modelVersionUriName,
+                 v.model_version_uri AS modelVersionUri, v.audit_info AS auditInfo,
+                 v.deleted_at AS deletedAt,
+                 NULL AS aliasVersion, NULL AS aliasName, NULL AS aliasDeletedAt
+          FROM %s v
+          WHERE v.model_id = #{modelId} AND v.deleted_at = 0 %s
+          UNION ALL
+          SELECT a.model_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                 a.model_version, a.model_version_alias, a.deleted_at
+          FROM %s a
+          WHERE a.model_id = #{modelId} AND a.deleted_at = 0 %s
+        ) snapshot ON snapshot.snapshotModelId = m.model_id
+        WHERE m.model_id = #{modelId} AND m.schema_id = #{schemaId}
+          AND m.model_name = #{modelName} AND m.deleted_at = 0
+        """
+        .formatted(
+            ModelMetaMapper.TABLE_NAME,
+            ModelVersionMetaMapper.TABLE_NAME,
+            versionFilter,
+            ModelVersionAliasRelMapper.TABLE_NAME,
+            aliasFilter);
+  }
 
   public String insertModelVersionMetas(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {

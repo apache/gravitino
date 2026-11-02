@@ -27,6 +27,12 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public final class CustomExtension {
 
+  /**
+   * The root-level extension vendor reserved for carrying Gravitino properties in Ossie documents.
+   * Native Semantic Model definitions must not use this vendor in their root custom extensions.
+   */
+  public static final String GRAVITINO_PROPERTIES_VENDOR = "GRAVITINO_PROPERTIES";
+
   private final String vendorName;
   private final String data;
 

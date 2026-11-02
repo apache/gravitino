@@ -120,6 +120,12 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
             HiveContainer.HIVE_METASTORE_PORT);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  protected HiveContainer hiveContainer() {
+    return containerSuite.getHiveContainerWithS3();
+  }
+
   @Override
   protected void initFileSystem() throws IOException {
     // Use S3a file system

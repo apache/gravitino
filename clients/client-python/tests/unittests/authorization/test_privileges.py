@@ -53,9 +53,12 @@ from gravitino.api.authorization.privileges import (
     UseJobTemplate,
     UseModel,
     UseSchema,
+    ViewPolicy,
+    ViewTag,
     WriteFileset,
 )
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -73,6 +76,17 @@ class TestPrivileges(unittest.TestCase):
                 self.assertEqual(name, deny_privilege.name())
                 self.assertEqual(Privilege.Condition.DENY, deny_privilege.condition())
                 self.assertIs(deny_privilege, Privileges.deny(name.name))
+
+    def test_privilege_dto_equality_and_hash(self) -> None:
+        for name in Privilege.Name:
+            for factory in (Privileges.allow, Privileges.deny):
+                with self.subTest(privilege=name.name, factory=factory):
+                    privilege = factory(name.name)
+                    dto = PrivilegeDTO(privilege.name(), privilege.condition())
+                    self.assertEqual(privilege, dto)
+                    self.assertEqual(dto, privilege)
+                    self.assertEqual(hash(privilege), hash(dto))
+                    self.assertEqual(1, len({privilege, dto}))
 
     def test_allow_raises_illegal_argument_exception_for_unknown_privilege(
         self,
@@ -110,6 +124,10 @@ class TestPrivileges(unittest.TestCase):
             Privilege.Name.LINK_MODEL_VERSION,
             Privileges.deny("CREATE_MODEL_VERSION").name(),
         )
+
+    def test_view_privilege_bit_values_match_java_api(self) -> None:
+        self.assertEqual(1 << 34, Privilege.Name.VIEW_TAG.low_bits)
+        self.assertEqual(1 << 35, Privilege.Name.VIEW_POLICY.low_bits)
 
     def test_create_catalog_binding(self) -> None:
         allow_privilege = CreateCatalog.allow()
@@ -311,6 +329,15 @@ class TestPrivileges(unittest.TestCase):
                     deny_privilege.can_bind_to(obj_type),
                 )
 
+    def test_view_tag_binding(self) -> None:
+        deny_privilege = ViewTag.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.TAG],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
     def test_create_policy_binding(self) -> None:
         deny_privilege = CreatePolicy.deny()
         for obj_type in MetadataObject.Type:
@@ -331,6 +358,16 @@ class TestPrivileges(unittest.TestCase):
 
     def test_apply_policy_binding(self) -> None:
         deny_privilege = ApplyPolicy.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type
+                    in [MetadataObject.Type.METALAKE, MetadataObject.Type.POLICY],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
+    def test_view_policy_binding(self) -> None:
+        deny_privilege = ViewPolicy.deny()
         for obj_type in MetadataObject.Type:
             with self.subTest(obj_type=obj_type.name):
                 self.assertEqual(

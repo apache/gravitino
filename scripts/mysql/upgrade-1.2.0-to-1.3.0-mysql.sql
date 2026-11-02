@@ -17,28 +17,65 @@
 -- under the License.
 --
 
-ALTER TABLE `user_meta`
-    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
-    COMMENT 'updated at';
+-- MySQL has no ADD COLUMN / CREATE INDEX IF NOT EXISTS. Guard completed DDL
+-- so a failed upgrade can be restarted from the beginning. Each operation
+-- runs in this session; no stored routines or extra privileges are required.
 
-ALTER TABLE `role_meta`
-    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
-    COMMENT 'updated at';
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND column_name = 'updated_at'),
+    'SELECT 1',
+    'ALTER TABLE `user_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''updated at''');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `owner_meta`
-    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
-    COMMENT 'updated at';
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'role_meta' AND column_name = 'updated_at'),
+    'SELECT 1',
+    'ALTER TABLE `role_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''updated at''');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE `group_meta`
-    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
-    COMMENT 'updated at';
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'owner_meta' AND column_name = 'updated_at'),
+    'SELECT 1',
+    'ALTER TABLE `owner_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''updated at''');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-CREATE INDEX idx_user_meta_name_del_upd
-    ON user_meta (metalake_id, user_name, deleted_at, updated_at);
-CREATE INDEX idx_owner_meta_del_upd_obj
-    ON owner_meta (deleted_at, updated_at, metadata_object_id);
-CREATE INDEX idx_group_meta_name_del_upd
-    ON group_meta (metalake_id, group_name, deleted_at, updated_at);
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'group_meta' AND column_name = 'updated_at'),
+    'SELECT 1',
+    'ALTER TABLE `group_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT ''updated at''');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'user_meta' AND index_name = 'idx_user_meta_name_del_upd'),
+    'SELECT 1',
+    'CREATE INDEX `idx_user_meta_name_del_upd` ON `user_meta` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'owner_meta' AND index_name = 'idx_owner_meta_del_upd_obj'),
+    'SELECT 1',
+    'CREATE INDEX `idx_owner_meta_del_upd_obj` ON `owner_meta` (`deleted_at`, `updated_at`, `metadata_object_id`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_meta' AND index_name = 'idx_group_meta_name_del_upd'),
+    'SELECT 1',
+    'CREATE INDEX `idx_group_meta_name_del_upd` ON `group_meta` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
@@ -52,13 +89,19 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Append-only log of entity structural changes for targeted metadataIdCache invalidation';
 
 -- add audit_info as nullable first for MySQL 5.7 compatibility
-ALTER TABLE `view_meta`
-    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'view audit info' AFTER `schema_id`;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'view_meta' AND column_name = 'audit_info'),
+    'SELECT 1',
+    'ALTER TABLE `view_meta` ADD COLUMN `audit_info` MEDIUMTEXT COMMENT ''view audit info'' AFTER `schema_id`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- backfill existing rows before enforcing NOT NULL
+-- backfill existing rows before enforcing NOT NULL. Cover both NULL and the
+-- truncated-by-SQL-mode empty string so a retry can finish a partial backfill.
 UPDATE `view_meta`
     SET `audit_info` = '{}'
-    WHERE `audit_info` IS NULL;
+    WHERE `audit_info` IS NULL OR `audit_info` = '';
 
 ALTER TABLE `view_meta`
     MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info' AFTER `schema_id`;

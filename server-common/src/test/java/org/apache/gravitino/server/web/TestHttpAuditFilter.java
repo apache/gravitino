@@ -25,8 +25,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.Principal;
+import java.util.Collections;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -366,7 +368,7 @@ public class TestHttpAuditFilter {
   // ─── Remote address resolution ───────────────────────────────────────────────
 
   @Test
-  public void testXForwardedForFirstEntryUsedAsRemoteAddress() throws Exception {
+  public void testXForwardedForIgnoredFromUntrustedPeer() throws Exception {
     EventBus eventBus = mock(EventBus.class);
     HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
     HttpServletRequest req =
@@ -374,6 +376,45 @@ public class TestHttpAuditFilter {
     HttpServletResponse resp = mock(HttpServletResponse.class);
     FilterChain chain = (request, response) -> ((HttpServletResponse) response).sendError(401);
 
+    filter.doFilter(req, resp, chain);
+
+    ArgumentCaptor<BaseEvent> captor = ArgumentCaptor.forClass(BaseEvent.class);
+    verify(eventBus).dispatchEvent(captor.capture());
+    HttpRequestFailureEvent event = (HttpRequestFailureEvent) captor.getValue();
+    Assertions.assertEquals("10.0.0.1", event.remoteAddress());
+  }
+
+  @Test
+  public void testXForwardedForHonoredFromTrustedProxy() throws Exception {
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter =
+        new HttpAuditFilter(
+            eventBus,
+            EventSource.GRAVITINO_SERVER,
+            new HealthCheckPathMatcher(),
+            new ClientAddressResolver(ImmutableList.of("10.0.0.0/8")));
+    HttpServletRequest req =
+        mockRequest("GET", "/api/metalakes", "198.51.100.7, 203.0.113.5, 10.1.1.1", "10.0.0.1");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain = (request, response) -> ((HttpServletResponse) response).sendError(401);
+
+    filter.doFilter(req, resp, chain);
+
+    ArgumentCaptor<BaseEvent> captor = ArgumentCaptor.forClass(BaseEvent.class);
+    verify(eventBus).dispatchEvent(captor.capture());
+    HttpRequestFailureEvent event = (HttpRequestFailureEvent) captor.getValue();
+    Assertions.assertEquals("203.0.113.5", event.remoteAddress());
+  }
+
+  @Test
+  public void testRequestContextAddressPreferredOverResolver() throws Exception {
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
+    HttpServletRequest req = mockRequest("GET", "/api/metalakes", null, "10.0.0.1");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain = (request, response) -> ((HttpServletResponse) response).sendError(401);
+
+    RequestContext.setRemoteAddress("203.0.113.5");
     filter.doFilter(req, resp, chain);
 
     ArgumentCaptor<BaseEvent> captor = ArgumentCaptor.forClass(BaseEvent.class);
@@ -565,6 +606,11 @@ public class TestHttpAuditFilter {
     when(req.getMethod()).thenReturn(method);
     when(req.getRequestURI()).thenReturn(uri);
     when(req.getHeader("X-Forwarded-For")).thenReturn(xForwardedFor);
+    when(req.getHeaders("X-Forwarded-For"))
+        .thenReturn(
+            xForwardedFor == null
+                ? Collections.emptyEnumeration()
+                : Collections.enumeration(Collections.singletonList(xForwardedFor)));
     when(req.getRemoteAddr()).thenReturn(remoteAddr);
     return req;
   }

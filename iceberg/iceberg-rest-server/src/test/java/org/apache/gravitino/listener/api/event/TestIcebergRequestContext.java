@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -143,9 +144,44 @@ class TestIcebergRequestContext {
     Assertions.assertEquals(context.httpHeaders(), event.customInfo());
   }
 
+  @Test
+  void testRemoteAddressComesFromRequestContext() {
+    // RequestContextFilter has already applied the trusted-proxy rules; a forged header that
+    // reaches the resource method must not override that result.
+    HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
+    RequestContext.setRemoteAddress("203.0.113.5");
+    try {
+      Assertions.assertEquals(
+          "203.0.113.5", new IcebergRequestContext(request, "cat").remoteHostName());
+    } finally {
+      RequestContext.clear();
+    }
+  }
+
+  @Test
+  void testFallbackPeerAddressIsCanonical() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn("[0:0:0:0:0:0:0:1]");
+    Assertions.assertEquals("::1", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
+  void testMissingPeerAddressIsRecordedAsUnknown() {
+    HttpServletRequest request = requestWithoutHeader();
+    when(request.getRemoteAddr()).thenReturn(null);
+    Assertions.assertEquals("unknown", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
+  @Test
+  void testRemoteAddressFallsBackToPeerAndIgnoresForwardedFor() {
+    HttpServletRequest request = requestWithHeader("X-Forwarded-For", "198.51.100.7");
+    Assertions.assertEquals(
+        "127.0.0.1", new IcebergRequestContext(request, "cat").remoteHostName());
+  }
+
   private static HttpServletRequest requestWithoutHeader() {
     HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getRemoteHost()).thenReturn("localhost");
+    when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return request;
   }
@@ -157,7 +193,7 @@ class TestIcebergRequestContext {
   private static HttpServletRequest requestWithHeader(String name, String value) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     Enumeration<String> headerNames = Collections.enumeration(Collections.singleton(name));
-    when(request.getRemoteHost()).thenReturn("localhost");
+    when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     when(request.getHeaderNames()).thenReturn(headerNames);
     when(request.getHeader(name)).thenReturn(value);
     return request;

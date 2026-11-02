@@ -179,6 +179,23 @@ public class TestDataSourceUrlValidation {
   }
 
   @Test
+  public void testRejectH2UrlWithMalformedPercent() {
+    // A malformed percent escape in an H2 URL must not derail the URL-decoding scan (it falls back
+    // instead of throwing), so the H2 guard still fires on the untouched "jdbc:h2" prefix.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:h2:mem:test?password=100%");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC URL is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
   public void testRejectH2Driver() {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.h2.Driver");
@@ -421,5 +438,30 @@ public class TestDataSourceUrlValidation {
     } finally {
       dataSource.close();
     }
+  }
+
+  @Test
+  public void testMissingDriverGivesClearError() {
+    // A driver that is not on the classpath must fail fast at catalog creation with an actionable
+    // message naming the driver, not a raw ClassNotFoundException surfaced later on first use.
+    // Use a driver class that is guaranteed absent so the assertion does not depend on which
+    // vendor jars happen to be present.
+    String missingDriver = "com.example.NonExistentJdbcDriver";
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), missingDriver);
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertTrue(
+        gre.getMessage().contains(missingDriver),
+        "message should name the missing driver: " + gre.getMessage());
+    Assertions.assertTrue(
+        gre.getMessage().contains("was not found"),
+        "message should state the driver was not found: " + gre.getMessage());
+    Assertions.assertInstanceOf(ClassNotFoundException.class, gre.getCause());
   }
 }

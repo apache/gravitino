@@ -29,8 +29,9 @@ import java.util.Map;
  * <p>Currently tracks four pieces of state:
  *
  * <ul>
- *   <li><b>remoteAddress</b> — the client IP resolved from {@code X-Forwarded-For} or {@link
- *       javax.servlet.http.HttpServletRequest#getRemoteAddr()}.
+ *   <li><b>remoteAddress</b> — the client IP: {@link
+ *       javax.servlet.http.HttpServletRequest#getRemoteAddr()}, or the right-most untrusted {@code
+ *       X-Forwarded-For} entry when the request came through a configured trusted proxy.
  *   <li><b>operationOutcome</b> — set by {@link org.apache.gravitino.listener.EventBus} when an
  *       operation-layer {@link org.apache.gravitino.listener.api.event.Event} or {@link
  *       org.apache.gravitino.listener.api.event.FailureEvent} is dispatched, so that {@code
@@ -76,7 +77,7 @@ public class RequestContext {
   /**
    * Sets the client remote address for the current request thread.
    *
-   * @param remoteAddress the client IP address (or the first entry of {@code X-Forwarded-For}).
+   * @param remoteAddress the client IP address, resolved with the server's trusted-proxy rules.
    */
   public static void setRemoteAddress(String remoteAddress) {
     REMOTE_ADDRESS.set(remoteAddress);

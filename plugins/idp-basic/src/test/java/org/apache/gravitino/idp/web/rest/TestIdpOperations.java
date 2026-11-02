@@ -51,8 +51,9 @@ import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.IdpGroupDTO;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
+import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
-import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -155,36 +156,64 @@ class TestIdpOperations extends JerseyTest {
 
   @Test
   void testChangePasswordAndRemoveUser() {
-    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD);
+    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD);
     when(MANAGER.changePassword("user1", VALID_PASSWORD)).thenReturn(true);
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);
 
     Assertions.assertEquals(
-        "user1", put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().name());
+        "user1",
+        put("/idp/users/user1/password", req).readEntity(IdpUserResponse.class).getUser().name());
     Assertions.assertTrue(delete("/idp/users/user1").readEntity(RemoveResponse.class).removed());
   }
 
   @Test
+  void testAdminSelfPasswordChangeRequiresOldPassword() {
+    ChangePasswordRequest missingOld = new ChangePasswordRequest(VALID_PASSWORD);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/password", missingOld),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    ChangePasswordRequest withOld = new ChangePasswordRequest(VALID_PASSWORD, "admin-old-pass12");
+    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-old-pass12")).thenReturn(true);
+    when(MANAGER.getUser("admin")).thenReturn(buildUser("admin"));
+    Assertions.assertEquals(
+        "admin",
+        put("/idp/users/admin/password", withOld)
+            .readEntity(IdpUserResponse.class)
+            .getUser()
+            .name());
+  }
+
+  @Test
+  void testAdminResetRejectsOldPassword() {
+    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD, "other-old-pass12");
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/user1/password", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+  }
+
+  @Test
   void testUpdateEnabled() {
-    UpdateUserRequest req = new UpdateUserRequest(null, false);
+    UpdateUserEnabledRequest req = new UpdateUserEnabledRequest(false);
     when(MANAGER.updateEnabled("user1", false)).thenReturn(true);
     when(MANAGER.getUser("user1")).thenReturn(new IdpUser("user1", Collections.emptyList(), false));
 
     Assertions.assertFalse(
-        put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().enabled());
+        put("/idp/users/user1/enabled", req).readEntity(IdpUserResponse.class).getUser().enabled());
   }
 
   @Test
-  void testCannotDisableServiceAdmin() {
-    UpdateUserRequest req = new UpdateUserRequest(null, false);
-    doThrow(new IllegalArgumentException("Cannot disable service admin admin"))
-        .when(MANAGER)
-        .updateEnabled("admin", false);
-
+  void testCannotUpdateEnabledOfServiceAdmin() {
     assertError(
         Response.Status.BAD_REQUEST,
-        put("/idp/users/admin", req),
+        put("/idp/users/admin/enabled", new UpdateUserEnabledRequest(false)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/enabled", new UpdateUserEnabledRequest(true)),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
   }
 

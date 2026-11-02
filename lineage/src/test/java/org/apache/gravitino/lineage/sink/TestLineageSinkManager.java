@@ -20,10 +20,13 @@
 package org.apache.gravitino.lineage.sink;
 
 import io.openlineage.server.OpenLineage.RunEvent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import lombok.SneakyThrows;
 import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.listener.AsyncQueueListener;
@@ -33,9 +36,94 @@ import org.apache.gravitino.listener.EventListenerPluginWrapper;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
 public class TestLineageSinkManager {
+
+  @ParameterizedTest
+  @CsvSource({
+    "queueCapacity,1,10,10",
+    "queueCapacity,2,20,10",
+    "queueCapacity,2,21,10",
+    "sinkQueueCapacity,1,10,10",
+    "sinkQueueCapacity,2,20,10",
+    "queueCapacity,3,2,1",
+    "default,2,10000,5000",
+    "both,2,20,10"
+  })
+  void testActualQueueHighWatermark(
+      String capacityKey, int sinkCount, int totalCapacity, int capacityPerSink) throws Exception {
+    Map<String, String> configs = new HashMap<>();
+    List<String> sinkNames = new ArrayList<>();
+    for (int i = 0; i < sinkCount; i++) {
+      String name = "sink" + i;
+      sinkNames.add(name);
+      configs.put(name + ".sinkClass", BlockingLineageSink.class.getName());
+    }
+    configs.put("sinks", String.join(",", sinkNames));
+    if ("both".equals(capacityKey)) {
+      configs.put("queueCapacity", String.valueOf(totalCapacity));
+      configs.put("sinkQueueCapacity", "200");
+    } else if (!"default".equals(capacityKey)) {
+      configs.put(capacityKey, String.valueOf(totalCapacity));
+    }
+    LineageConfig config = new LineageConfig(configs);
+    List<BlockingLineageSink> blockedSinks = new ArrayList<>();
+    try (LineageSinkManager manager = new LineageSinkManager()) {
+      manager.initialize(config.sinks(), config.getSinkConfigs());
+      List<AsyncQueueListener> queues = new ArrayList<>();
+      for (EventListenerPlugin listener : manager.eventBus().getEventListeners()) {
+        AsyncQueueListener queue = (AsyncQueueListener) listener;
+        queues.add(queue);
+        EventListenerPluginWrapper wrapper =
+            (EventListenerPluginWrapper) queue.getEventListeners().get(0);
+        blockedSinks.add(
+            (BlockingLineageSink)
+                ((LineageSinkEventListener) wrapper.getUserEventListener()).lineageSink());
+      }
+      Assertions.assertEquals(sinkCount, queues.size());
+      manager.sink(getEvent());
+      for (BlockingLineageSink sink : blockedSinks) {
+        Assertions.assertTrue(sink.entered.await(10, TimeUnit.SECONDS));
+      }
+
+      int threshold = (int) (capacityPerSink * 0.9f);
+      for (int i = 0; i < threshold; i++) {
+        manager.sink(getEvent());
+      }
+      queues.forEach(queue -> Assertions.assertFalse(queue.isHighWatermark()));
+      Assertions.assertFalse(manager.isHighWatermark());
+
+      manager.sink(getEvent());
+      queues.forEach(queue -> Assertions.assertTrue(queue.isHighWatermark()));
+      Assertions.assertTrue(manager.isHighWatermark());
+    } finally {
+      blockedSinks.forEach(sink -> sink.release.countDown());
+    }
+  }
+
+  /** A sink that holds the first event so queue watermarks can be checked deterministically. */
+  public static class BlockingLineageSink implements LineageSink {
+    private final CountDownLatch entered = new CountDownLatch(1);
+    private final CountDownLatch release = new CountDownLatch(1);
+
+    /**
+     * Blocks until the test releases the sink or the dispatcher is stopped.
+     *
+     * @param event the lineage event
+     */
+    @Override
+    public void sink(RunEvent event) {
+      entered.countDown();
+      try {
+        release.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 
   @SneakyThrows
   @Test
@@ -72,19 +160,14 @@ public class TestLineageSinkManager {
 
     Assertions.assertEquals(
         "sink1,sink2", configs.get(EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES));
+    Assertions.assertEquals("500", configs.get("queueCapacity"));
 
-    Assertions.assertEquals(
-        "500",
-        configs.get("sink1." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY));
     Assertions.assertEquals(
         LineageSinkEventListener.class.getName(),
         configs.get("sink1." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS));
     Assertions.assertEquals("sink1", configs.get("sink1.name"));
     Assertions.assertEquals("a", configs.get("sink1.a"));
 
-    Assertions.assertEquals(
-        "500",
-        configs.get("sink2." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY));
     Assertions.assertEquals(
         LineageSinkEventListener.class.getName(),
         configs.get("sink2." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS));
@@ -101,17 +184,9 @@ public class TestLineageSinkManager {
     Map<String, String> eventListenerConfigs =
         LineageSinkManager.transformToEventListenerConfigs(sinks, lineageConfigs);
 
-    sinks.forEach(
-        sink -> {
-          String capacityKey =
-              sink + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY;
-          String actualCapacity = eventListenerConfigs.get(capacityKey);
-
-          Assertions.assertEquals(
-              "1",
-              actualCapacity,
-              String.format("Queue capacity for %s should be at least 1", sink));
-        });
+    Assertions.assertEquals(
+        "1",
+        eventListenerConfigs.get(EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY));
   }
 
   @Test

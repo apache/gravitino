@@ -37,16 +37,22 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -60,10 +66,10 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -73,6 +79,7 @@ import org.testcontainers.containers.Container;
  * Gravitino and Iceberg REST requests, and Iceberg REST S3 credential vending.
  */
 @Tag("gravitino-docker-test")
+@EnabledIfSystemProperty(named = ITUtils.TEST_MODE, matches = ITUtils.DEPLOY_TEST_MODE)
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
@@ -81,9 +88,13 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   private static final String CLIENT_CREDENTIAL = "test-client:test-secret";
   private static final String STORE_PASSWORD = "changeit";
   // Deliberately not TrinoContainer.DEFAULT_IMAGE / GRAVITINO_CI_TRINO_DOCKER_IMAGE: that CI image
-  // identifies itself as Trino SPI version 435, which trino-connector-473-478 rejects outright.
-  // This test needs an actual Trino 473-478 build, so it pins the upstream image directly.
-  private static final String TRINO_IMAGE = "trinodb/trino:478";
+  // identifies itself as Trino SPI version 435, which every version-segment module rejects
+  // outright. This test needs an actual supported Trino build, so it uses the upstream image of
+  // the version given by the TRINO_VERSION environment variable (set by the Gradle test task, the
+  // same variable the docker-compose based Trino ITs use), and mounts the version-segment module
+  // whose range covers that version.
+  private static final Pattern CONNECTOR_MODULE_PATTERN =
+      Pattern.compile("trino-connector-(\\d+)(?:-(\\d+))?");
   private static final String CONTAINER_TRUSTSTORE = "/etc/trino/tls/truststore.p12";
 
   private final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
@@ -100,8 +111,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    Assumptions.assumeFalse(ITUtils.isEmbedded(), "This test requires the deploy distribution");
-
     containerSuite.startLocalStackContainer();
     localStack = containerSuite.getLocalStackContainer();
     createBucket();
@@ -112,7 +121,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     configureGravitino();
     copyIcebergAwsBundle();
 
-    OAuthMockDataProvider.getInstance().setTokenData(mintToken().getBytes(StandardCharsets.UTF_8));
+    OAuthMockDataProvider.getInstance()
+        .setTokenData(mintToken("admin").getBytes(StandardCharsets.UTF_8));
     super.startIntegrationTest();
 
     createCatalog();
@@ -163,6 +173,29 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     assertFalse(objects.getStdout().isBlank(), "No Iceberg objects were written to S3");
 
     trinoContainer.executeUpdateSQL("DROP TABLE " + table);
+    trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
+  }
+
+  @Test
+  public void testForwardedUserTokenIsUsedForGravitinoRequests() throws Exception {
+    assertTrue(trinoContainer.checkSyncCatalogFromGravitino(10, catalogName));
+
+    // The session carries a user token in extra-credentials, so with
+    // gravitino.client.session.forwardUser=true the connector must call Gravitino as that user
+    // instead of the configured service identity.
+    String forwardedUser = "alice";
+    String schema = "forwarded";
+    try (Connection connection =
+            trinoContainer.openJdbcConnection(
+                forwardedUser, ImmutableMap.of("token", mintToken(forwardedUser)));
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("CREATE SCHEMA " + catalogName + "." + schema);
+    }
+
+    Schema created =
+        client.loadMetalake(metalakeName).loadCatalog(catalogName).asSchemas().loadSchema(schema);
+    assertEquals(forwardedUser, created.auditInfo().creator());
+
     trinoContainer.executeUpdateSQL("DROP SCHEMA " + catalogName + "." + schema);
   }
 
@@ -336,6 +369,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
             + CLIENT_CREDENTIAL
             + "\n"
             + "gravitino.client.oauth2.scope=test\n"
+            + "gravitino.client.session.forwardUser=true\n"
             + "gravitino.iceberg.rest-uri="
             + containerIcebergRestUri()
             + "\n"
@@ -360,19 +394,22 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         catalogs.resolve("gravitino.properties.template"), connector, StandardCharsets.UTF_8);
   }
 
-  private void startTrino() {
+  private void startTrino() throws IOException {
     String root = System.getenv("GRAVITINO_ROOT_DIR");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(root), "GRAVITINO_ROOT_DIR environment variable is not set");
+    String trinoVersion = StringUtils.trim(System.getenv("TRINO_VERSION"));
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(trinoVersion), "TRINO_VERSION environment variable is not set");
     String connectorDirectory = System.getenv("TRINO_CONNECTOR_DIR");
     if (connectorDirectory == null || connectorDirectory.isBlank()) {
       connectorDirectory =
-          Path.of(root, "trino-connector", "trino-connector-473-478", "build", "libs").toString();
+          connectorLibsDirectory(Path.of(root), Integer.parseInt(trinoVersion)).toString();
     }
     Path truststore = trinoConfigDirectory.resolve("tls/truststore.p12");
     trinoContainer =
         TrinoContainer.builder()
-            .withImage(TRINO_IMAGE)
+            .withImage("trinodb/trino:" + trinoVersion)
             .withTrinoConfDir(trinoConfigDirectory.toString())
             .withFilesToMount(
                 ImmutableMap.of(
@@ -472,13 +509,39 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   }
 
   @SuppressWarnings("JavaUtilDate")
-  private String mintToken() {
+  private String mintToken(String subject) {
     return Jwts.builder()
-        .setSubject("admin")
+        .setSubject(subject)
         .setAudience(AUDIENCE)
         .setExpiration(new Date(System.currentTimeMillis() + 3_600_000))
         .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
         .compact();
+  }
+
+  /**
+   * Finds the version-segment module whose Trino version range covers the given version, e.g.
+   * {@code trino-connector-478-479} for 478 or {@code trino-connector-480} for 480.
+   */
+  private static Path connectorLibsDirectory(Path root, int trinoVersion) throws IOException {
+    try (Stream<Path> modules = Files.list(root.resolve("trino-connector"))) {
+      return modules
+          .filter(
+              module -> {
+                Matcher matcher = CONNECTOR_MODULE_PATTERN.matcher(module.getFileName().toString());
+                if (!matcher.matches()) {
+                  return false;
+                }
+                int min = Integer.parseInt(matcher.group(1));
+                int max = matcher.group(2) == null ? min : Integer.parseInt(matcher.group(2));
+                return trinoVersion >= min && trinoVersion <= max;
+              })
+          .findFirst()
+          .map(module -> module.resolve("build").resolve("libs"))
+          .orElseThrow(
+              () ->
+                  new IllegalStateException(
+                      "No trino-connector module supports Trino version " + trinoVersion));
+    }
   }
 
   private static String randomName(String prefix) {

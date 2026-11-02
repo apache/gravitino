@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -74,9 +75,10 @@ class TestGlueClientProvider {
         .when(provider)
         .resolveCredentials();
 
-    IllegalArgumentException ex =
+    ConnectionFailedException ex =
         assertThrows(
-            IllegalArgumentException.class, () -> GlueClientProvider.validateCredentials(provider));
+            ConnectionFailedException.class,
+            () -> GlueClientProvider.validateCredentials(provider));
     assertTrue(ex.getMessage().contains(AWS_ACCESS_KEY_ID));
     assertTrue(ex.getMessage().contains(AWS_SECRET_ACCESS_KEY));
   }
@@ -89,9 +91,10 @@ class TestGlueClientProvider {
     SdkClientException cause = SdkClientException.create("connection refused");
     doThrow(cause).when(provider).resolveCredentials();
 
-    IllegalArgumentException ex =
+    ConnectionFailedException ex =
         assertThrows(
-            IllegalArgumentException.class, () -> GlueClientProvider.validateCredentials(provider));
+            ConnectionFailedException.class,
+            () -> GlueClientProvider.validateCredentials(provider));
     assertEquals(cause, ex.getCause());
     assertTrue(ex.getMessage().contains("connection refused"));
     assertFalse(ex.getMessage().contains("No usable AWS credentials"));
@@ -155,6 +158,8 @@ class TestGlueClientProvider {
   void testBuildClientInvalidEndpointThrows() {
     Map<String, String> config = new HashMap<>();
     config.put(AWS_REGION, "us-east-1");
+    config.put(AWS_ACCESS_KEY_ID, "test");
+    config.put(AWS_SECRET_ACCESS_KEY, "test");
     config.put(AWS_GLUE_ENDPOINT, "not a valid uri ://");
 
     assertThrows(IllegalArgumentException.class, () -> GlueClientProvider.buildClient(config));

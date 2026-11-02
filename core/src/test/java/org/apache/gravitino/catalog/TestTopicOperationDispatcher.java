@@ -50,7 +50,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -261,6 +263,48 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testImportTopicPropagatesOptimisticLockConflict() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_import_topic_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_import_occ");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    entityStore.delete(topicIdent, Entity.EntityType.TOPIC);
+
+    doThrow(new NoSuchEntityException(""))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.TOPIC), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(TopicEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> topicOperationDispatcher.loadTopic(topicIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testDropTopicPropagatesOptimisticLockConflict() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_drop_topic_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_occ");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testCreateTopicNeedImportingSchema() throws IOException {
     Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
     NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic61");
@@ -303,5 +347,72 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
 
   public static TopicOperationDispatcher getTopicOperationDispatcher() {
     return topicOperationDispatcher;
+  }
+
+  @Test
+  public void testCreateTopicRunsConcurrentlyWithCreateTopicOfAnotherTopic() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_1");
+    createSchemaForLockTest(schemaIdent);
+
+    // Another in-flight create holds the WRITE lock on its own topic node.
+    try (TreeLockTestSupport.HeldLock inFlightCreate =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, catalog, "schema_topic_lock_1", "other_topic"),
+            LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          inFlightCreate,
+          () ->
+              createTopicForLockTest(
+                  NameIdentifier.of(metalake, catalog, "schema_topic_lock_1", "topic1")));
+    }
+  }
+
+  @Test
+  public void testCreateTopicWaitsForCreateTopicOfSameName() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_2");
+    createSchemaForLockTest(schemaIdent);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_topic_lock_2", "topic1");
+
+    TreeLockTestSupport.HeldLock sameNameCreate =
+        TreeLockTestSupport.HeldLock.acquire(ident, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(sameNameCreate, () -> createTopicForLockTest(ident));
+  }
+
+  @Test
+  public void testCreateTopicWaitsForSchemaWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_3");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock schemaWriter =
+        TreeLockTestSupport.HeldLock.acquire(schemaIdent, LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        schemaWriter,
+        () ->
+            createTopicForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_topic_lock_3", "topic1")));
+  }
+
+  @Test
+  public void testCreateTopicWaitsForCatalogWriteLock() throws Exception {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_topic_lock_4");
+    createSchemaForLockTest(schemaIdent);
+
+    TreeLockTestSupport.HeldLock catalogWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(metalake, catalog), LockType.WRITE);
+    TreeLockTestSupport.assertWaitsFor(
+        catalogWriter,
+        () ->
+            createTopicForLockTest(
+                NameIdentifier.of(metalake, catalog, "schema_topic_lock_4", "topic1")));
+  }
+
+  private static void createSchemaForLockTest(NameIdentifier schemaIdent) {
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private static Topic createTopicForLockTest(NameIdentifier ident) {
+    return topicOperationDispatcher.createTopic(
+        ident, "comment", null, ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
 }

@@ -74,6 +74,34 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
+    Map<String, String> all =
+        buildSparkCatalogProperties(
+            name,
+            options,
+            properties,
+            SparkSession.active().sparkContext().conf(),
+            () -> GravitinoCatalogManager.get().getIcebergRestUri());
+    TableCatalog icebergCatalog = new SparkCatalog();
+    icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
+    return icebergCatalog;
+  }
+
+  Map<String, String> buildSparkCatalogProperties(
+      String name,
+      CaseInsensitiveStringMap options,
+      Map<String, String> properties,
+      SparkConf sparkConf,
+      Supplier<Optional<String>> endpointDiscovery) {
+    Optional<String> icebergRestUri =
+        resolveIcebergRestUri(properties, key -> sparkConf.get(key, null), endpointDiscovery);
+    if (icebergRestUri.isPresent()) {
+      // The routed client only talks to the Iceberg REST server, so the backend JDBC driver is
+      // not needed on the Spark classpath.
+      return buildAutoRoutedIcebergRestProperties(
+          name, options, properties, icebergRestUri.get(), sparkConf);
+    }
+
     String jdbcDriver = properties.get(IcebergConstants.GRAVITINO_JDBC_DRIVER);
     if (StringUtils.isNotBlank(jdbcDriver)) {
       // If `spark.sql.hive.metastore.jars` is set, Spark will use an isolated client class loader
@@ -84,26 +112,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog
         throw new RuntimeException(e);
       }
     }
-    String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
-    SparkConf sparkConf = SparkSession.active().sparkContext().conf();
-    Optional<String> icebergRestUri =
-        resolveIcebergRestUri(
-            properties,
-            key -> sparkConf.get(key, null),
-            () -> GravitinoCatalogManager.get().getIcebergRestUri());
-    Map<String, String> all;
-    if (icebergRestUri.isPresent()) {
-      all =
-          buildAutoRoutedIcebergRestProperties(
-              name, options, properties, icebergRestUri.get(), sparkConf);
-    } else {
-      all = getPropertiesConverter().toSparkCatalogProperties(options, properties);
-      CredentialPropertyUtils.applyIcebergCredentials(
-          CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
-    }
-    TableCatalog icebergCatalog = new SparkCatalog();
-    icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
-    return icebergCatalog;
+    Map<String, String> all =
+        getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    CredentialPropertyUtils.applyIcebergCredentials(
+        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+    return all;
   }
 
   /**

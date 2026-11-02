@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.storage;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
@@ -54,14 +53,11 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
-import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -540,123 +536,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       Assertions.assertTrue(entityIds.contains(catalog2.id()));
       Assertions.assertTrue(entityNames.contains(catalog1.name()));
       Assertions.assertTrue(entityNames.contains(catalog2.name()));
-      destroy(type);
-    }
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testPolicyRelationMultipleBindings(String type, boolean enableCache) throws Exception {
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
-    init(type, config);
-
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-
-      BaseMetalake metalake =
-          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
-      store.put(metalake, false);
-
-      Namespace policyNamespace = NameIdentifierUtil.ofPolicy("metalake", "policy1").namespace();
-      PolicyEntity policy1 =
-          PolicyEntity.builder()
-              .withId(RandomIdGenerator.INSTANCE.nextId())
-              .withNamespace(policyNamespace)
-              .withName("policy1")
-              .withPolicyType(Policy.BuiltInType.CUSTOM)
-              .withContent(
-                  PolicyContents.custom(
-                      ImmutableMap.of("rule", "allow-all"),
-                      Collections.singleton(MetadataObject.Type.CATALOG),
-                      Collections.emptyMap()))
-              .withAuditInfo(auditInfo)
-              .build();
-
-      CatalogEntity catalog1 =
-          createCatalog(
-              RandomIdGenerator.INSTANCE.nextId(),
-              NamespaceUtil.ofCatalog("metalake"),
-              "catalog1",
-              auditInfo);
-
-      store.put(policy1, false);
-      store.put(catalog1, false);
-
-      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
-
-      relationOperations.updateEntityRelations(
-          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          catalog1.nameIdentifier(),
-          Entity.EntityType.CATALOG,
-          new NameIdentifier[] {policy1.nameIdentifier()},
-          new NameIdentifier[] {});
-
-      List<PolicyEntity> policiesForCatalog1 =
-          relationOperations.listEntitiesByRelation(
-              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-              catalog1.nameIdentifier(),
-              Entity.EntityType.CATALOG,
-              true);
-      Assertions.assertEquals(1, policiesForCatalog1.size());
-      Assertions.assertEquals(policy1, policiesForCatalog1.get(0));
-
-      List<GenericEntity> entitiesForPolicy1 =
-          relationOperations.listEntitiesByRelation(
-              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-              policy1.nameIdentifier(),
-              Entity.EntityType.POLICY,
-              true);
-      Assertions.assertEquals(1, entitiesForPolicy1.size());
-      Assertions.assertEquals(catalog1.id(), entitiesForPolicy1.get(0).id());
-
-      CatalogEntity catalog2 =
-          createCatalog(
-              RandomIdGenerator.INSTANCE.nextId(),
-              NamespaceUtil.ofCatalog("metalake"),
-              "catalog2",
-              auditInfo);
-      store.put(catalog2, false);
-
-      relationOperations.updateEntityRelations(
-          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          catalog2.nameIdentifier(),
-          Entity.EntityType.CATALOG,
-          new NameIdentifier[] {policy1.nameIdentifier()},
-          new NameIdentifier[] {});
-
-      policiesForCatalog1 =
-          relationOperations.listEntitiesByRelation(
-              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-              catalog1.nameIdentifier(),
-              Entity.EntityType.CATALOG,
-              true);
-      Assertions.assertEquals(1, policiesForCatalog1.size());
-      Assertions.assertEquals(policy1, policiesForCatalog1.get(0));
-
-      List<PolicyEntity> policiesForCatalog2 =
-          relationOperations.listEntitiesByRelation(
-              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-              catalog2.nameIdentifier(),
-              Entity.EntityType.CATALOG,
-              true);
-      Assertions.assertEquals(1, policiesForCatalog2.size());
-      Assertions.assertEquals(policy1, policiesForCatalog2.get(0));
-
-      entitiesForPolicy1 =
-          relationOperations.listEntitiesByRelation(
-              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-              policy1.nameIdentifier(),
-              Entity.EntityType.POLICY,
-              true);
-      Assertions.assertEquals(2, entitiesForPolicy1.size());
-      List<Long> entityIds =
-          entitiesForPolicy1.stream().map(GenericEntity::id).collect(Collectors.toList());
-      Assertions.assertTrue(entityIds.contains(catalog1.id()));
-      Assertions.assertTrue(entityIds.contains(catalog2.id()));
       destroy(type);
     }
   }

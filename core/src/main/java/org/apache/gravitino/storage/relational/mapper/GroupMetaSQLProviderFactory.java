@@ -64,6 +64,11 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByIdForUpdate(groupId);
   }
 
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public static String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForShare(groupId);
+  }
+
   public static String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
@@ -126,5 +131,16 @@ public class GroupMetaSQLProviderFactory {
   public static String getGroupUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
     return getProvider().getGroupUpdatedAt(metalakeName, groupName);
+  }
+  /**
+   * Returns SQL for a principal and membership snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param groupName the principal name
+   * @return the aggregate select SQL
+   */
+  public static String selectGroupWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("groupName") String groupName) {
+    return getProvider().selectGroupWithRolesByMetalakeIdAndName(metalakeId, groupName);
   }
 }

@@ -22,7 +22,10 @@ package org.apache.gravitino.audit;
 import static org.apache.gravitino.audit.AuditLog.Operation;
 import static org.apache.gravitino.audit.AuditLog.Status;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
@@ -31,6 +34,8 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -39,6 +44,18 @@ import org.junit.jupiter.api.TestInstance;
 public class TestAuditManager {
 
   private static final int EVENT_NUM = 2000;
+
+  private final List<EventListenerManager> eventListenerManagers = new ArrayList<>();
+
+  /**
+   * Stops the async audit log dispatchers, so they do not keep writing to the shared audit logger
+   * after the test ends.
+   */
+  @AfterEach
+  public void tearDown() {
+    eventListenerManagers.forEach(EventListenerManager::stop);
+    eventListenerManagers.clear();
+  }
 
   /** Test audit log with custom audit writer and formatter. */
   @Test
@@ -62,6 +79,8 @@ public class TestAuditManager {
         DummyAuditFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
 
     DummyAuditWriter dummyAuditWriter = (DummyAuditWriter) auditLogManager.getAuditLogWriter();
+    // The audit log listener is async, so wait for the dispatcher thread to write the log.
+    awaitAuditLogs(dummyAuditWriter, 1);
 
     DummyAuditFormatter formatter = (DummyAuditFormatter) dummyAuditWriter.getFormatter();
     DummyAuditLog formattedAuditLog = formatter.format(dummyEvent);
@@ -77,6 +96,7 @@ public class TestAuditManager {
     // dispatch fail event
     DummyFailEvent dummyFailEvent = mockDummyFailEvent();
     eventBus.dispatchEvent(dummyFailEvent);
+    awaitAuditLogs(dummyAuditWriter, 2);
     DummyAuditLog formattedFailAuditLog = formatter.format(dummyFailEvent);
     Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
     Assertions.assertEquals(Operation.UNKNOWN_OPERATION, formattedFailAuditLog.operation());
@@ -116,6 +136,13 @@ public class TestAuditManager {
     // No assertion needed — we just verify no exception is thrown for a large batch.
   }
 
+  private void awaitAuditLogs(DummyAuditWriter writer, int expectedSize) {
+    Awaitility.await()
+        .atMost(20, TimeUnit.SECONDS)
+        .pollInterval(10, TimeUnit.MILLISECONDS)
+        .until(() -> writer.getAuditLogs().size() >= expectedSize);
+  }
+
   private AuditLogManager mockAuditLogManager(
       Config config, EventListenerManager eventListenerManager) {
     AuditLogManager auditLogManager = new AuditLogManager();
@@ -127,6 +154,7 @@ public class TestAuditManager {
     EventListenerManager eventListenerManager = new EventListenerManager();
     eventListenerManager.init(new HashMap<>());
     eventListenerManager.start();
+    eventListenerManagers.add(eventListenerManager);
     return eventListenerManager;
   }
 

@@ -24,13 +24,14 @@ User can also use the system table `catalog` to describe all the catalogs.
 Create catalog:
 
 ```sql
-create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHAR), IGNORE_EXIST boolean);
+create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHAR), IGNORE_EXIST boolean, METALAKE varchar);
 ```
 
 - CATALOG: The catalog name to be created.
 - PROVIDER: The catalog provider. Supported values: `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`, `glue`.
 - PROPERTIES: The properties of the catalog.
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
+- METALAKE: The metalake to create the catalog in. It's optional, the default value is the configured `gravitino.metalake`; it is required when `gravitino.metalake` is unset.
 
 The type of catalog properties reference:
 - [Hive catalog](../apache-hive-catalog.md#catalog-properties)
@@ -43,30 +44,47 @@ The type of catalog properties reference:
 Drop catalog:
 
 ```sql
-drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
+drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean, METALAKE varchar);
 ```
 
 - CATALOG: The catalog name to be deleted.
 - IGNORE_NOT_EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
+- METALAKE: The metalake the catalog belongs to. It's optional, the default value is the configured `gravitino.metalake`; it is required when `gravitino.metalake` is unset.
 
 
 Alter catalog:
 
 ```sql
-alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROPERTIES ARRY[VARCHAR]);
+alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROPERTIES ARRY[VARCHAR], METALAKE varchar);
 ```
 
 - CATALOG: The catalog name to be altered.
 - SET_PROPERTIES: The properties to be set.
 - REMOVE_PROPERTIES: The properties to be removed.
+- METALAKE: The metalake the catalog belongs to. It's optional, the default value is the configured `gravitino.metalake`; it is required when `gravitino.metalake` is unset.
+
+A metalake other than the configured one can only be targeted when every metalake is loaded
+(`gravitino.metalake` unset or `gravitino.catalog-name-with-metalake=true`). With unqualified
+catalog names, the procedures look the catalog up by name and metalake, so a catalog of another
+metalake holding the same Trino catalog name is not affected.
 
 These stored procedures are under the `gravitino` connector and the `system` schema.
-So you need to use the following SQL to call them in the `trino-cli`:
+So you need to use the following SQL to call them in the `trino-cli`, passing the metalake by name
+when `gravitino.metalake` is unset:
 
+```sql
+call gravitino.system.create_catalog(
+    catalog => 'gt_hive',
+    provider => 'hive',
+    properties => map(array['metastore.uris'], array['thrift://trino-ci-hive:9083']),
+    metalake => 'test'
+);
+```
 
 Describe catalogs:
 
-The system table `gravitino.system.catalog` is used to describe all the catalogs.
+The system table `gravitino.system.catalog` is used to describe all the catalogs of the configured
+metalake, or of every metalake when `gravitino.metalake` is unset.
 
 ```sql
 select * from gravitino.system.catalog;
@@ -75,10 +93,13 @@ select * from gravitino.system.catalog;
 The result is like:
 
 ```test
-     name     | provider |                                                 properties
---------------+----------+-------------------------------------------------------------------------------------------------------------
- gt_hive      | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083}
+     name     | provider |                                                 properties                                                  | metalake
+--------------+----------+-------------------------------------------------------------------------------------------------------------+----------
+ gt_hive      | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083} | test
 ```
+
+The `metalake` column tells apart catalogs of different metalakes that share a name when
+`gravitino.metalake` is unset.
 
 Check catalog registration status:
 
@@ -254,6 +275,7 @@ Registration happens in the background, so a catalog that fails to register simp
 | A catalog is missing from `SHOW CATALOGS`                            | Query `gravitino.system.catalog_status` and read `status` and `last_error`, then follow the rows below              |
 | `status = FAILED`, `last_error` mentions `Access Denied`             | The `trino.jdbc.user` lacks a Trino system role permitted to run `CREATE CATALOG`                              |
 | `status = FAILED`, `last_error` mentions a configuration property    | A `trino.bypass.` property is not accepted by the underlying Trino connector                                        |
+| `status = FAILED`, `last_error` mentions `already registered by metalake` | Another metalake owns the same Trino catalog name. Rename the catalog or set `gravitino.catalog-name-with-metalake=true` |
 | `status = UNSUPPORTED`                                               | The catalog is not relational, or its provider is outside the supported list. `last_error` names the supported providers |
 | `status = SKIPPED`                                                   | The catalog matches `gravitino.trino.skip-catalog-patterns`                                                         |
 | The catalog has no row in `catalog_status` at all                    | The load loop never reached it. Check `gravitino.system.load_status`                                                |

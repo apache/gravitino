@@ -19,8 +19,6 @@
 package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 
 /**
  * Interface for policy operations on a metadata object.
@@ -36,36 +34,34 @@ public interface SupportsPolicies {
   String[] listPolicies();
 
   /**
+   * List the visible policy names and whether authorization filtering omitted other policies.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted policies. Implementations that support authorization filtering should override
+   * this method.
+   *
+   * @return The visible policy names and authorization-filtering status.
+   */
+  default PolicyList<String> listPoliciesWithVisibility() {
+    return new PolicyList<>(listPolicies(), false);
+  }
+
+  /**
    * @return The policies that apply to the metadata object.
    */
   Policy[] listPolicyInfos();
 
   /**
-   * Get an applicable policy by its name for the metadata object.
+   * List the visible policies with details and whether authorization filtering omitted other
+   * policies.
    *
-   * @param name The name of the policy.
-   * @return The policy.
-   * @throws NoSuchPolicyException If the policy does not apply to the object.
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted policies. Implementations that support authorization filtering should override
+   * this method.
+   *
+   * @return The visible policies and authorization-filtering status.
    */
-  Policy getPolicy(String name) throws NoSuchPolicyException;
-
-  /**
-   * Associate policies to the specific object. The policiesToAdd will be applied to the object and
-   * the policiesToRemove will be removed from the object. Note that:
-   *
-   * <ol>
-   *   <li>Adding or removing policies that are not existed will be ignored.
-   *   <li>If the same name policy is in both policiesToAdd and policiesToRemove, it will be
-   *       ignored.
-   *   <li>If the policy is already applied to the object, it will throw {@link
-   *       PolicyAlreadyAssociatedException}
-   * </ol>
-   *
-   * @param policiesToAdd The policies to be added to the object.
-   * @param policiesToRemove The policies to remove.
-   * @return The list of applied policies.
-   * @throws PolicyAlreadyAssociatedException If the policy is already applied to the object.
-   */
-  String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException;
+  default PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return new PolicyList<>(listPolicyInfos(), false);
+  }
 }

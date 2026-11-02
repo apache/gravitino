@@ -136,7 +136,13 @@ Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-p
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` and DLF credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC / DLF credential fields via either path:
+
+- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (no dedicated privilege beyond loading the catalog)
+- `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (DLF cloud access-key pairs also need `INCLUDE_CREDENTIAL_SECRETS`)
+
+Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` only.
+
 :::
 
 ## Schema

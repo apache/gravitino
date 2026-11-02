@@ -1,0 +1,5 @@
+# Populated at build time by flink-connectors-dependency.sh from the staged
+# runtime jars. Do not commit generated copies.
+/*/
+/LICENSE
+/NOTICE

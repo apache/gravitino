@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.expressions.literals;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Type;
@@ -288,13 +289,34 @@ public class Literals {
       if (value == null || literal.value == null) {
         return Objects.equals(value, literal.value);
       }
-      // Now, it's safe to compare using toString() since neither value is null
+      // Arrays need structural comparison: Objects.equals is reference equality for arrays and
+      // the toString() fallback below renders identity hashes, so equal-content binary and array
+      // literals would never compare equal.
+      if (value instanceof byte[] && literal.value instanceof byte[]) {
+        return Arrays.equals((byte[]) value, (byte[]) literal.value);
+      }
+      if (value instanceof Object[] && literal.value instanceof Object[]) {
+        return Arrays.deepEquals((Object[]) value, (Object[]) literal.value);
+      }
+      // Exactly one side is an array here (or the array kinds differ), so the values are not
+      // equal. Reaching the toString() fallback below only when neither value is an array keeps
+      // an array's identity-based toString from spuriously matching a non-array value.
+      if (value.getClass().isArray() || literal.value.getClass().isArray()) {
+        return false;
+      }
+      // Now, it's safe to compare using toString() since neither value is null nor an array
       return Objects.equals(value, literal.value)
           || value.toString().equals(literal.value.toString());
     }
 
     @Override
     public int hashCode() {
+      if (value instanceof byte[]) {
+        return Objects.hash(dataType, Arrays.hashCode((byte[]) value));
+      }
+      if (value instanceof Object[]) {
+        return Objects.hash(dataType, Arrays.deepHashCode((Object[]) value));
+      }
       return Objects.hash(dataType, value != null ? value.toString() : null);
     }
 

@@ -29,6 +29,10 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
+  // Only needed to compile HiveShimV2 against the shared HiveShim base class; compileOnly keeps
+  // hive-metastore-common's own classes out of the shaded runtime jar produced by copyDepends.
+  compileOnly(project(":catalogs:hive-metastore-common"))
+
   // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
   constraints {
     implementation(libs.thrift)

@@ -75,6 +75,31 @@ The Gravitino server configuration file is `conf/gravitino.conf`. Configure the 
 
 The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as the logging system. Refer to the [Log4j2 configuration guide](https://logging.apache.org/log4j/2.x/) to do the log configuration.
 
+##### Log rotation and retention
+
+A log rotates when its current file reaches the roll size or when the day ends. Every rotation compresses the file into its own archive, `<log name>_<yyyyMMdd>.<index>.log.gz`, so no archive replaces another.
+
+When a log rotates, an archive of that log is deleted if it is older than `logMaxAge`, or if the archives of the log exceed its total size cap. The oldest archives are deleted first. Deletion only looks at the archives of the log itself, directly in the log directory. The cap counts archives only, not the file being written.
+
+| Log file                            | Configuration file                              | Roll size | Kept for | Total size cap                  |
+|-------------------------------------|-------------------------------------------------|-----------|----------|---------------------------------|
+| `gravitino-server.log`              | `conf/log4j2.properties`                        | 100MB     | 30 days  | 2GB (`serverLogMaxTotalSize`)   |
+| `gravitino_audit.log`               | `conf/log4j2.properties`                        | 256MB     | 30 days  | 10GB (`auditLogMaxTotalSize`)   |
+| `gravitino_lineage.log`             | `conf/log4j2.properties`                        | 100MB     | 30 days  | 1GB (`lineageLogMaxTotalSize`)  |
+| `gravitino-iceberg-rest-server.log` | `conf/gravitino-iceberg-rest-log4j2.properties` | 100MB     | 30 days  | 2GB (`serverLogMaxTotalSize`)   |
+| `gravitino-lance-rest-server.log`   | `conf/gravitino-lance-rest-log4j2.properties`   | 100MB     | 30 days  | 1GB (`serverLogMaxTotalSize`)   |
+
+The retention properties are at the top of each configuration file. For example, to keep 90 days of logs with up to 5GB of server log archives:
+
+```properties
+property.logMaxAge = 90d
+property.serverLogMaxTotalSize = 5GB
+```
+
+`logMaxAge` applies to every log in the same file. The deletion rules are Log4j2 [Delete action](https://logging.apache.org/log4j/2.x/manual/appenders/rolling-file.html#DeleteAction) conditions, and each `if...` key is named after a condition type: `ifFileName` (`IfFileName`) selects the archives of the log by name, and `ifAny` (`IfAny`) deletes an archive when either `ifLastModified` (`IfLastModified`, older than an age) or `ifAccumulatedFileSize` (`IfAccumulatedFileSize`, beyond the size cap) matches. To change the age of one log only, set `appender.<name>.strategy.delete.ifFileName.ifAny.ifLastModified.age`. If you change the archive name in a `filePattern`, change `appender.<name>.strategy.delete.ifFileName.glob` to match, or the archives of that log are never deleted.
+
+`bin/gravitino.sh start` also writes the standard output and standard error of the process to `logs/gravitino-server.out`. Each `start` rotates this file first and keeps the previous files as `gravitino-server.out.1` (newest) to `gravitino-server.out.5`. Set `GRAVITINO_OUT_FILE_KEEP` in `conf/gravitino-env.sh` to keep a different number, or `0` to keep none.
+
 #### Configure the Server Environment
 
 The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes several environment variables. Modify them in this file.

@@ -189,12 +189,14 @@ public class MetalakeOperations {
     }
 
     LOG.info("Received set request for metalake: {}", metalakeName);
+    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            if (request.isInUse()) {
+            if (op == OperationType.ENABLE) {
               metalakeDispatcher.enableMetalake(identifier);
             } else {
               metalakeDispatcher.disableMetalake(identifier);
@@ -202,15 +204,17 @@ public class MetalakeOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} metalake: {}",
-                request.isInUse() ? "enable" : "disable",
+                op == OperationType.ENABLE ? "enable" : "disable",
                 metalakeName);
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to {} metalake: {}", request.isInUse() ? "enable" : "disable", metalakeName);
-      return ExceptionHandlers.handleMetalakeException(
-          request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE, metalakeName, e);
+      LOG.info(
+          "Failed to {} metalake: {}",
+          op == OperationType.ENABLE ? "enable" : "disable",
+          metalakeName);
+      return ExceptionHandlers.handleMetalakeException(op, metalakeName, e);
     }
   }
 

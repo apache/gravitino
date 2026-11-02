@@ -20,8 +20,8 @@ A schema is the middle level, and what it means depends on the system underneath
 catalog it is a database. In a fileset catalog it groups filesets under a location. In a model
 catalog it is a namespace for models with no physical counterpart at all.
 
-Catalogs and schemas both carry tags and policies, and both are the level to attach them at when
-something should apply broadly. A tag on a catalog reaches every object beneath it.
+Catalogs and schemas can carry tag assignments. Assign a tag at either level when its derived
+policies should apply broadly. A tag on a catalog reaches every object beneath it.
 
 ## Quick Start
 
@@ -74,9 +74,9 @@ where they are.
 
 ### What Gravitino Stores
 
-Gravitino stores the catalog registration, the schemas and objects created through it, and anything
-attached to those objects such as tags, policies, and ownership. It does not store a copy of the
-source system's contents.
+Gravitino stores the catalog registration, the schemas and objects created through it, and their tag
+assignments and ownership. Policies are derived from effective tags when they are read. Gravitino
+does not store a copy of the source system's contents.
 
 Listing tables in a schema reaches the source system at request time, so a table created directly in
 Hive appears the next time Gravitino is asked. The consequence worth knowing is that Gravitino
@@ -88,8 +88,8 @@ The catalog list holds every catalog in the current metalake. A catalog can be c
 enabled or disabled, and deleted from there, and each one expands into its schemas and their
 contents.
 
-Tags and policies attach from the catalog and schema rows, which is the fastest way to classify a
-whole subtree.
+Assign tags from the catalog and schema rows to classify a whole subtree. Policies associated
+with those tags appear in object policy lookups.
 
 ## Deleting Catalogs and Schemas
 

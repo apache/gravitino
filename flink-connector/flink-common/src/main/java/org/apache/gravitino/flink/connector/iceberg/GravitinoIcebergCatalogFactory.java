@@ -36,7 +36,7 @@ import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 import org.apache.iceberg.rest.auth.AuthProperties;
 
-public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
+public abstract class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
 
   @Override
   public Catalog createCatalog(Context context) {
@@ -51,21 +51,15 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         toIcebergCatalogOptions(context.getOptions()));
   }
 
-  protected Catalog newCatalog(
+  // GravitinoIcebergCatalog is abstract (its inner-catalog construction differs per Flink
+  // version); every concrete, version-specific factory overrides this hook.
+  protected abstract Catalog newCatalog(
       String catalogName,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       Map<String, String> catalogOptions,
-      Map<String, String> icebergCatalogProperties) {
-    return new GravitinoIcebergCatalog(
-        catalogName,
-        defaultDatabase,
-        schemaAndTablePropertiesConverter,
-        partitionConverter,
-        catalogOptions,
-        icebergCatalogProperties);
-  }
+      Map<String, String> icebergCatalogProperties);
 
   @Override
   public String factoryIdentifier() {

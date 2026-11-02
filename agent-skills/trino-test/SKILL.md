@@ -1,3 +1,11 @@
+---
+name: trino-test
+description: Run, debug, and manage Trino integration tests for the Gravitino project.
+argument-hint: "[command or intent] (e.g. run all | test mysql | trino 446 | add test)"
+allowed-tools: Bash
+disable-model-invocation: false
+---
+
 <!--
   Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
@@ -16,14 +24,6 @@
   specific language governing permissions and limitations
   under the License.
 -->
-
----
-name: trino-test
-description: Run, debug, and manage Trino integration tests for the Gravitino project.
-argument-hint: "[command or intent] (e.g. run all | test mysql | trino 446 | add test)"
-allowed-tools: Bash
-disable-model-invocation: false
----
 
 # /trino-test — Trino Integration Test Skill
 

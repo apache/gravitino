@@ -127,5 +127,5 @@ If you also extend Gravitino server job execution, see [Manage jobs in Gravitino
 
 - [Table Maintenance Service](./optimizer.md)
 - [Configuration](./optimizer-configuration.md)
-- [CLI Reference](./optimizer-configuration.md)
+- [CLI Reference](./optimizer-cli-reference.md)
 - [Troubleshooting](./optimizer-troubleshooting.md)

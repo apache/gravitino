@@ -33,47 +33,73 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  public String batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return "<script>"
-        + "INSERT INTO "
+  /**
+   * Returns whether the backend's {@code statistic_meta} key ignores trailing spaces, so that
+   * "name" and "name " are the same statistic.
+   *
+   * @return {@code true} if names that differ only in trailing spaces collide
+   */
+  public boolean namesIgnoreTrailingSpaces() {
+    return false;
+  }
+
+  /** Inserts new live statistics in one statement without upsert fallback. */
+  public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>INSERT INTO "
         + STATISTIC_META_TABLE_NAME
         + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
-        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES"
         + "<foreach collection='statisticPOs' item='item' separator=','>"
-        + "(#{item.statisticId}, "
-        + "#{item.statisticName}, "
-        + "#{item.statisticValue}, "
-        + "#{item.metalakeId}, "
-        + "#{item.metadataObjectId}, "
-        + "#{item.metadataObjectType}, "
-        + "#{item.auditInfo}, "
-        + "#{item.currentVersion}, "
-        + "#{item.lastVersion}, "
-        + "#{item.deletedAt})"
-        + "</foreach>"
-        + " ON DUPLICATE KEY UPDATE "
-        + "  statistic_value = VALUES(statistic_value),"
-        + "  audit_info = VALUES(audit_info),"
-        + "  current_version = VALUES(current_version),"
-        + "  last_version = VALUES(last_version),"
-        + "  deleted_at = VALUES(deleted_at)"
+        + " (#{item.statisticId}, #{item.statisticName}, #{item.statisticValue},"
+        + " #{item.metalakeId}, #{item.metadataObjectId}, #{item.metadataObjectType},"
+        + " #{item.auditInfo}, #{item.currentVersion}, #{item.lastVersion}, #{item.deletedAt})"
+        + "</foreach></script>";
+  }
+
+  /**
+   * Replaces the values of the observed statistics in one statement and advances their versions.
+   * Each PO identifies an observed row by ID, target, name and current version, and carries the new
+   * value and audit info.
+   */
+  public String batchUpdateStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
+        + STATISTIC_META_TABLE_NAME
+        + " SET statistic_value = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.statisticValue}"
+        + "</foreach> END,"
+        + " audit_info = CASE statistic_id"
+        + "<foreach collection='statisticPOs' item='item'>"
+        + " WHEN #{item.statisticId} THEN #{item.auditInfo}"
+        + "</foreach> END,"
+        + " last_version = current_version, current_version = current_version + 1"
+        + observedRowsPredicate()
         + "</script>";
   }
 
-  public String batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return "<script>"
-        + "UPDATE "
+  /**
+   * Soft-deletes the observed statistics in one statement and advances their versions. Each PO
+   * identifies an observed row by ID, target, name and current version.
+   */
+  public String batchDeleteStatisticPOsWithVersion(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return "<script>UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
-        + " WHERE "
-        + " statistic_name IN ("
-        + "<foreach collection='statisticNames' item='item' separator=','>"
-        + " #{item}"
-        + "</foreach>"
-        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId}"
+        + ", last_version = current_version, current_version = current_version + 1"
+        + observedRowsPredicate()
         + "</script>";
+  }
+
+  private static String observedRowsPredicate() {
+    return " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='statisticPOs' item='item' separator=' OR '>"
+        + "(statistic_id = #{item.statisticId}"
+        + " AND metadata_object_id = #{item.metadataObjectId}"
+        + " AND statistic_name = #{item.statisticName}"
+        + " AND current_version = #{item.currentVersion})"
+        + "</foreach>)";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
@@ -91,6 +117,20 @@ public class StatisticBaseSQLProvider {
         + " current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
         + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
+  }
+
+  /** Selects full rows of only the requested live statistics of one metadata object. */
+  public String listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") Long entityId,
+      @Param("names") List<String> names) {
+    return "<script>"
+        + listStatisticPOsByEntityId(metalakeId, entityId)
+        + " AND statistic_name IN "
+        + "<foreach collection='names' item='name' open='(' separator=',' close=')'>"
+        + "#{name}"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

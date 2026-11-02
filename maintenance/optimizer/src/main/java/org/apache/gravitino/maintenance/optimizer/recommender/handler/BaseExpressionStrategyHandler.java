@@ -127,7 +127,10 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean isPartitionTable() {
-    return tableMetadata.partitioning().length > 0;
+    // Table-level handlers must also work on partitioned tables without requesting partition
+    // statistics. Only handlers declaring PARTITION_STATISTICS use per-partition evaluation.
+    return dataRequirements().contains(DataRequirement.PARTITION_STATISTICS)
+        && tableMetadata.partitioning().length > 0;
   }
 
   private boolean shouldTriggerForPartitionTable() {

@@ -24,11 +24,13 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -42,7 +44,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the policy entity.");
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the policy entity.");
+      Field.required("name", "The name of the policy entity.", EntityFieldLimits.MAX_NAME_LENGTH);
   public static final Field POLICY_TYPE =
       Field.required("policyType", Policy.BuiltInType.class, "The type of the policy entity.");
   public static final Field COMMENT =
@@ -65,6 +67,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   private String comment;
   private boolean enabled;
   private PolicyContent content;
+  @Nullable private Boolean inherited;
   private AuditInfo auditInfo;
 
   private PolicyEntity() {}
@@ -125,13 +128,49 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   }
 
   public Optional<Boolean> inherited() {
-    return Optional.empty();
+    return Optional.ofNullable(inherited);
+  }
+
+  /**
+   * Returns a copy of this policy entity with the given inheritance context.
+   *
+   * <p>The inheritance context records whether the policy was selected only from ancestor metadata
+   * objects, either by an inherited tag assignment or a legacy direct policy association. It is not
+   * part of the policy definition fields.
+   *
+   * @param inherited Whether the policy was selected only from ancestor metadata objects.
+   * @return The copied policy entity with the inheritance context.
+   */
+  public PolicyEntity copyWithInherited(boolean inherited) {
+    PolicyEntity copy =
+        PolicyEntity.builder()
+            .withId(id)
+            .withName(name)
+            .withNamespace(namespace)
+            .withPolicyType(policyType)
+            .withComment(comment)
+            .withEnabled(enabled)
+            .withContent(content)
+            .withAuditInfo(auditInfo)
+            .build();
+    copy.inherited = inherited;
+    return copy;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     Entity.super.validate();
-    validatePolicy();
+    validatePolicy(true /* validateContent */);
+  }
+
+  /**
+   * Validates policy metadata and type/content class matching without calling {@link
+   * PolicyContent#validate()}. Used when renaming, commenting, or enabling a policy whose stored
+   * content may predate stricter content checks.
+   */
+  public void validateExceptContent() throws IllegalArgumentException {
+    Entity.super.validate();
+    validatePolicy(false /* validateContent */);
   }
 
   @Override
@@ -153,7 +192,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     return Objects.hash(id, name, namespace, policyType, comment, enabled, content, auditInfo);
   }
 
-  private void validatePolicy() {
+  private void validatePolicy(boolean validateContent) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name()), "Policy name cannot be blank");
 
     Preconditions.checkArgument(content() != null, "Policy content cannot be null");
@@ -169,7 +208,9 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         policyType.contentClass().getSimpleName(),
         policyType.name(),
         content().getClass().getName());
-    content().validate();
+    if (validateContent) {
+      content().validate();
+    }
   }
 
   public static class Builder {
@@ -223,6 +264,24 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     }
 
     public PolicyEntity build() {
+      PolicyEntity policyEntity = newEntity();
+      policyEntity.validate();
+      return policyEntity;
+    }
+
+    /**
+     * Builds a policy entity without invoking {@link PolicyContent#validate()}. Prefer {@link
+     * #build()} for create and content-update paths.
+     *
+     * @return policy entity with metadata validated only
+     */
+    public PolicyEntity buildSkippingContentValidation() {
+      PolicyEntity policyEntity = newEntity();
+      policyEntity.validateExceptContent();
+      return policyEntity;
+    }
+
+    private PolicyEntity newEntity() {
       PolicyEntity policyEntity = new PolicyEntity();
       policyEntity.id = id;
       policyEntity.name = name;
@@ -232,8 +291,6 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       policyEntity.enabled = enabled;
       policyEntity.content = content;
       policyEntity.auditInfo = auditInfo;
-      policyEntity.validate();
-
       return policyEntity;
     }
   }

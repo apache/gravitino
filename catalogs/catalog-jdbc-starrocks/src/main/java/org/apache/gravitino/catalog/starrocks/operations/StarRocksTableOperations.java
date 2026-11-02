@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.starrocks.operations;
 
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -33,10 +32,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -99,6 +100,12 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      throw new UnsupportedOperationException(
+          "StarRocks catalog does not support creating table indexes. "
+              + "Remove indexes from the create table request.");
+    }
+
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("CREATE TABLE `%s` ( \n", tableName));
     // Add columns
@@ -148,7 +155,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadTable));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.RemoveProperty) {
         throw new IllegalArgumentException("Remove property is not supported yet.");
       } else if (change instanceof TableChange.RenameColumn) {
@@ -170,7 +180,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
-        String newComment = updateComment.getNewComment();
+        String newComment = StringUtils.defaultString(updateComment.getNewComment());
         if (StringIdentifier.fromComment(newComment) == null) {
           lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
           StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
@@ -205,6 +215,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       }
     }
 
+    // An empty ALTER TABLE statement is treated as OPTIMIZE by StarRocks, so skip it.
+    if (alterSql.isEmpty()) {
+      return "";
+    }
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
@@ -248,12 +262,24 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
+      // SHOW INDEX lists only secondary indexes, one row per single-column index; table keys are
+      // not included.
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        String starRocksIndexType = resultSet.getString("Index_type");
+        Index.IndexType indexType = mapStarRocksIndexType(starRocksIndexType);
+        if (indexType == null) {
+          LOG.warn(
+              "Skip StarRocks index '{}' on table {}.{} with unsupported type '{}'",
+              indexName,
+              databaseName,
+              tableName,
+              starRocksIndexType);
+          continue;
+        }
+        indexes.add(Indexes.of(indexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
@@ -300,14 +326,8 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generatePurgeTableSql(String tableName) {
-    // never called, as implemented generatePurgeTableSql(String databaseName, String tableName)
     throw new UnsupportedOperationException(
         "StarRocks does not support purge table in Gravitino, please use drop table");
-  }
-
-  @Override
-  protected String generatePurgeTableSql(String databaseName, String tableName) {
-    return String.format("TRUNCATE TABLE `%s`.`%s`", databaseName, tableName);
   }
 
   @Override
@@ -474,29 +494,28 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
-    String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("StarRocks does not support nested column names.");
     }
     String col = addColumn.fieldName()[0];
+    // StarRocks only allows AUTO_INCREMENT columns to be defined at table creation time
+    Preconditions.checkArgument(
+        !addColumn.isAutoIncrement(),
+        "StarRocks does not support adding an auto-increment column: %s",
+        col);
 
-    StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition
-        .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
-        .append(SPACE)
-        .append(dataType)
-        .append(SPACE);
-
-    // Append comment if available
-    if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition
-          .append("COMMENT '")
-          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
-          .append("' ");
-    }
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName(col)
+            .withType(addColumn.getDataType())
+            .withComment(addColumn.getComment())
+            .withNullable(addColumn.isNullable())
+            .withDefaultValue(addColumn.getDefaultValue())
+            .withAutoIncrement(false)
+            .build();
+    StringBuilder columnDefinition =
+        new StringBuilder("ADD COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
+    appendColumnDefinition(column, columnDefinition);
 
     // Append position if available
     if (addColumn.getPosition() instanceof TableChange.First) {
@@ -548,7 +567,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try {
       getJdbcColumnFromTable(jdbcTable, renameColumn.getNewName());
     } catch (NoSuchColumnException ex) {
-      return String.format("RENAME COLUMN %s TO %s", oldColName, renameColumn.getNewName());
+      return "RENAME COLUMN "
+          + quoteIdentifier(oldColName)
+          + " TO "
+          + quoteIdentifier(renameColumn.getNewName());
     }
     throw new IllegalArgumentException("Column already exists: " + renameColumn.getNewName());
   }
@@ -564,7 +586,9 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   private String generateTableProperties(TableChange.SetProperty setProperty) {
     return String.format(
-        "set ( \"%s\" = \"%s\" )", setProperty.getProperty(), setProperty.getValue());
+        "set ( \"%s\" = \"%s\" )",
+        escapeSqlLiteral(setProperty.getProperty(), '"'),
+        escapeSqlLiteral(setProperty.getValue(), '"'));
   }
 
   private String updateColumnPositionFieldDefinition(
@@ -590,7 +614,13 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(
+              s ->
+                  columnDefinition
+                      .append("AFTER ")
+                      .append(BACK_QUOTE)
+                      .append(s)
+                      .append(BACK_QUOTE));
     }
     return columnDefinition.toString();
   }
@@ -608,10 +638,37 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
+  }
+
+  /**
+   * Maps the {@code Index_type} value of StarRocks {@code SHOW INDEX} to a Gravitino index type.
+   * The value may carry index properties, e.g. {@code GIN("parser" = "english")}; only the type
+   * name is used and the properties are not kept, since StarRocks indexes cannot be created or
+   * altered through Gravitino.
+   *
+   * @param indexType the {@code Index_type} value returned by StarRocks
+   * @return the Gravitino index type, or null if the type has no Gravitino equivalent
+   */
+  @Nullable
+  private static Index.IndexType mapStarRocksIndexType(@Nullable String indexType) {
+    if (indexType == null) {
+      return null;
+    }
+    String typeName = StringUtils.substringBefore(indexType, "(").trim();
+    switch (typeName.toUpperCase(Locale.ROOT)) {
+      case "BITMAP":
+        return Index.IndexType.BITMAP;
+      case "GIN":
+        return Index.IndexType.INVERTED;
+      case "VECTOR":
+        return Index.IndexType.VECTOR;
+      default:
+        return null;
+    }
   }
 }

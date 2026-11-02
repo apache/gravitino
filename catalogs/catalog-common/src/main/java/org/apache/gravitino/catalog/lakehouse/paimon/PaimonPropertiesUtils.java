@@ -60,6 +60,18 @@ public class PaimonPropertiesUtils {
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonConstants.OSS_ACCESS_KEY);
     gravitinoConfigToPaimon.put(
         OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonConstants.OSS_SECRET_KEY);
+    // DLF (Data Lake Formation)
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, PaimonConstants.PAIMON_DLF_ACCESS_KEY_ID);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
+        PaimonConstants.PAIMON_DLF_ACCESS_KEY_SECRET);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN, PaimonConstants.PAIMON_DLF_SECURITY_TOKEN);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_DLF_TOKEN_PATH, PaimonConstants.PAIMON_DLF_TOKEN_PATH);
+    gravitinoConfigToPaimon.put(
+        PaimonConstants.GRAVITINO_DLF_TOKEN_LOADER, PaimonConstants.PAIMON_DLF_TOKEN_LOADER);
     GRAVITINO_CONFIG_TO_PAIMON = Collections.unmodifiableMap(gravitinoConfigToPaimon);
     gravitinoConfigToPaimon.forEach(
         (key, value) -> {

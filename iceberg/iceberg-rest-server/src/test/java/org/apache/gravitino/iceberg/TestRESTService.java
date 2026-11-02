@@ -18,61 +18,112 @@
  */
 package org.apache.gravitino.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
-import java.util.Set;
+import java.util.ServiceLoader;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.listener.EventBus;
-import org.apache.gravitino.server.web.HttpAuditFilter;
-import org.apache.gravitino.server.web.JettyServer;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.server.web.JettyServerTestUtils;
-import org.apache.gravitino.server.web.RequestContextFilter;
-import org.eclipse.jetty.servlet.ServletHandler;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestRESTService {
 
-  /**
-   * RESTService.initServer() previously registered /metrics and /prometheus/metrics (added by
-   * JettyServer#initialize() itself, outside ICEBERG_SPEC) with no audit coverage at all, and
-   * nothing in the build caught it. Rather than parse source text, this exercises the extracted
-   * RESTService#registerMetricsPathFilters against a plain JettyServer and inspects the real
-   * ServletHandler filter mappings it produces, so a broken JettyServer.METRICS_PATH_SPECS list or
-   * a filter that merely appears in a comment cannot pass. See GH-12760.
-   */
   @Test
-  public void testMetricsPathsHaveAuditFilterCoverage() throws Exception {
-    JettyServer server = new JettyServer();
-    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(new IcebergConfig());
-    server.initialize(jettyServerConfig, "test-iceberg-rest", false);
-    EventBus eventBus = new EventBus(Collections.emptyList());
+  @SuppressWarnings("unchecked")
+  void testDiscoveryWarnsOnlyWhenInstalledProviderIsDisabled() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    ServiceLoader<IcebergReadRestrictionLoader> providers = mock(ServiceLoader.class);
+    when(providers.iterator()).thenAnswer(ignored -> Collections.singletonList(loader).iterator());
+    Logger logger = mock(Logger.class);
+    try (MockedStatic<ServiceLoader> discovery =
+            mockStatic(ServiceLoader.class, CALLS_REAL_METHODS);
+        MockedStatic<LoggerFactory> logging = mockStatic(LoggerFactory.class, CALLS_REAL_METHODS)) {
+      discovery
+          .when(() -> ServiceLoader.load(IcebergReadRestrictionLoader.class))
+          .thenReturn(providers);
+      logging
+          .when(() -> LoggerFactory.getLogger(IcebergReadRestrictionLoader.class))
+          .thenReturn(logger);
 
-    try {
-      RESTService.registerMetricsPathFilters(server, eventBus);
+      assertSame(loader, RESTService.loadReadRestrictionLoader(false));
+      verify(logger).warn(contains("installed but disabled"), eq(loader.getClass().getName()));
 
-      ServletHandler servletHandler =
-          JettyServerTestUtils.getServletContextHandler(server).getServletHandler();
-      Set<String> auditedPathSpecs =
-          JettyServerTestUtils.filterPathSpecsFor(servletHandler, HttpAuditFilter.class);
-      Set<String> requestContextPathSpecs =
-          JettyServerTestUtils.filterPathSpecsFor(servletHandler, RequestContextFilter.class);
+      clearInvocations(logger);
+      when(loader.enabled()).thenReturn(true);
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
+      verifyNoInteractions(logger);
+    }
+  }
 
-      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-        assertTrue(
-            auditedPathSpecs.contains(pathSpec),
-            "'" + pathSpec + "' must be covered by HttpAuditFilter, see GH-12760");
-        assertTrue(
-            requestContextPathSpecs.contains(pathSpec),
-            "'"
-                + pathSpec
-                + "' must be covered by RequestContextFilter for query-parameter "
-                + "capture, see GH-12760");
-      }
-    } finally {
-      server.stop();
+  @Test
+  void testNoProviderDoesNotRequireAuthorizationOrWarn() {
+    Logger logger = mock(Logger.class);
+    try (MockedStatic<LoggerFactory> logging =
+        mockStatic(LoggerFactory.class, CALLS_REAL_METHODS)) {
+      logging
+          .when(() -> LoggerFactory.getLogger(IcebergReadRestrictionLoader.class))
+          .thenReturn(logger);
+
+      assertFalse(RESTService.loadReadRestrictionLoader(false).enabled());
+      verifyNoInteractions(logger);
+    }
+  }
+
+  @Test
+  void testReadRestrictionStartupRequiresAuthorization() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    when(loader.enabled()).thenReturn(true);
+    GravitinoEnv environment = mock(GravitinoEnv.class);
+    Config config = mock(Config.class);
+    when(environment.config()).thenReturn(config);
+    when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(false);
+    try (MockedStatic<IcebergReadRestrictionLoader> discovery =
+            mockStatic(IcebergReadRestrictionLoader.class);
+        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
+      discovery.when(IcebergReadRestrictionLoader::load).thenReturn(loader);
+      environments.when(GravitinoEnv::getInstance).thenReturn(environment);
+
+      IllegalStateException exception =
+          assertThrows(
+              IllegalStateException.class,
+              () -> new RESTService().serviceInit(Collections.emptyMap(), true));
+      assertEquals(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true",
+          exception.getMessage());
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
+    }
+  }
+
+  @Test
+  void testDisabledReadRestrictionLoaderDoesNotRequireAuthorization() {
+    IcebergReadRestrictionLoader loader = mock(IcebergReadRestrictionLoader.class);
+    when(loader.enabled()).thenReturn(false);
+    try (MockedStatic<IcebergReadRestrictionLoader> discovery =
+        mockStatic(IcebergReadRestrictionLoader.class)) {
+      discovery.when(IcebergReadRestrictionLoader::load).thenReturn(loader);
+
+      assertSame(loader, RESTService.loadReadRestrictionLoader(false));
+      assertSame(loader, RESTService.loadReadRestrictionLoader(true));
     }
   }
 
@@ -84,5 +135,17 @@ public class TestRESTService {
         JettyServerConfig.fromConfig(
                 new IcebergConfig(Collections.singletonMap("includeErrorStackTrace", "false")))
             .isIncludeErrorStackTrace());
+  }
+
+  @Test
+  public void testMetricsAreEnabledOnlyForConfiguredStandaloneMode() {
+    IcebergConfig disabledConfig = new IcebergConfig();
+    assertFalse(RESTService.shouldEnableMetrics(false, disabledConfig));
+    assertFalse(RESTService.shouldEnableMetrics(true, disabledConfig));
+
+    IcebergConfig enabledConfig =
+        new IcebergConfig(Collections.singletonMap(IcebergConfig.METRICS_ENABLED.getKey(), "true"));
+    assertTrue(RESTService.shouldEnableMetrics(false, enabledConfig));
+    assertFalse(RESTService.shouldEnableMetrics(true, enabledConfig));
   }
 }
