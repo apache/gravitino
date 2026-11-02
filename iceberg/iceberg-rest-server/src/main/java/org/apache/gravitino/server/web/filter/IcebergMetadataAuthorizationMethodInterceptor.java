@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
@@ -93,7 +94,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         String value = String.valueOf(args[i]);
         switch (type) {
           case CATALOG:
-            catalog = IcebergRESTUtils.getCatalogName(value);
+            // A path prefix ends with '/'; the config endpoint's warehouse is a plain catalog name.
+            catalog =
+                StringUtils.isBlank(value) || value.endsWith("/")
+                    ? IcebergRESTUtils.getCatalogName(value)
+                    : value;
             nameIdentifierMap.put(
                 Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
             break;
@@ -206,7 +211,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     IcebergCatalogWrapper catalogWrapper;
     try {
       catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
-    } catch (NoSuchCatalogException e) {
+    } catch (NoSuchCatalogException | IllegalArgumentException e) {
+      // A missing catalog, or a catalog that is not an Iceberg catalog, is not a REST backend:
+      // authorize the request normally. A caller without access gets 403 whatever the name
+      // refers to, and an authorized caller gets the operation's own error.
       return false;
     }
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
