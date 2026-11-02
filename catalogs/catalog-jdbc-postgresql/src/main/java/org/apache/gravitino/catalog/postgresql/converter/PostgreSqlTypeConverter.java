@@ -40,6 +40,9 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String BPCHAR = "bpchar";
   static final String BYTEA = "bytea";
   static final String UUID = "uuid";
+  static final String SERIAL = "serial";
+  static final String SMALLSERIAL = "smallserial";
+  static final String BIGSERIAL = "bigserial";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
@@ -52,10 +55,13 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     switch (typeName) {
       case BOOL:
         return Types.BooleanType.get();
+      case SMALLSERIAL:
       case INT_2:
         return Types.ShortType.get();
+      case SERIAL:
       case INT_4:
         return Types.IntegerType.get();
+      case BIGSERIAL:
       case INT_8:
         return Types.LongType.get();
       case FLOAT_4:

@@ -34,6 +34,9 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SMALLSERIAL;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BIGSERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -60,6 +63,9 @@ public class TestPostgreSqlTypeConverter {
 
   @Test
   public void testToGravitinoType() {
+    checkJdbcTypeToGravitinoType(Types.ShortType.get(), SMALLSERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.IntegerType.get(), SERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.LongType.get(), BIGSERIAL, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT_4, null, null, 0);
