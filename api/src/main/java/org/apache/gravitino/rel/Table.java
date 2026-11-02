@@ -87,6 +87,14 @@ public interface Table extends Auditable {
   String PROPERTY_LOCATION = "location";
 
   /**
+   * Internal property that maps Gravitino column entity ids to stable field ids from the underlying
+   * table format (for example Iceberg field ids). Used so column tags and other governance stay
+   * attached across renames that happen outside the Gravitino table API. Not a user-facing table
+   * property.
+   */
+  String PROPERTY_COLUMN_FIELD_IDS = "gravitino.column.field-ids";
+
+  /**
    * @return Name of the table.
    */
   String name();

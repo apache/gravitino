@@ -76,6 +76,7 @@ public class ConvertUtil {
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
         .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
+        .withFieldId(nestedField.fieldId())
         .build();
   }
 

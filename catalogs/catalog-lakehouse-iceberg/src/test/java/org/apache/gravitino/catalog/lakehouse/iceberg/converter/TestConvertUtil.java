@@ -619,6 +619,7 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertEquals(icebergColumn.name(), colName);
     Assertions.assertTrue(icebergColumn.nullable());
     Assertions.assertEquals(icebergColumn.comment(), doc);
+    Assertions.assertEquals(1, icebergColumn.fieldId());
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.IntegerType);
 

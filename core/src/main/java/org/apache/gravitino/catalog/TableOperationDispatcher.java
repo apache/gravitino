@@ -64,6 +64,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -381,27 +382,33 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             Namespace newNamespace = getNewNamespace(ident, changes);
 
                             // Update the columns
-                            Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+                            ColumnsUpdateResult columnsUpdateResult =
                                 updateColumnsIfNecessary(
                                     alteredTable,
                                     tableEntity,
                                     alignNameChangesWithStoredColumns(
                                         catalogResult.columnNameChanges, tableEntity.columns()));
 
-                            return TableEntity.builder()
-                                .withId(tableEntity.id())
-                                .withName(alteredTable.name())
-                                .withNamespace(newNamespace)
-                                .withColumns(columnsUpdateResult.getRight())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(tableEntity.auditInfo().creator())
-                                        .withCreateTime(tableEntity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build();
+                            TableEntity.Builder entityBuilder =
+                                TableEntity.builder()
+                                    .withId(tableEntity.id())
+                                    .withName(alteredTable.name())
+                                    .withNamespace(newNamespace)
+                                    .withColumns(columnsUpdateResult.columns)
+                                    .withAuditInfo(
+                                        AuditInfo.builder()
+                                            .withCreator(tableEntity.auditInfo().creator())
+                                            .withCreateTime(tableEntity.auditInfo().createTime())
+                                            .withLastModifier(
+                                                PrincipalUtils.getCurrentPrincipal().getName())
+                                            .withLastModifiedTime(Instant.now())
+                                            .build());
+                            if (columnsUpdateResult.properties != null) {
+                              entityBuilder.withProperties(columnsUpdateResult.properties);
+                            } else if (tableEntity.properties() != null) {
+                              entityBuilder.withProperties(tableEntity.properties());
+                            }
+                            return entityBuilder.build();
                           }),
                   "UPDATE",
                   tableId);
@@ -1027,13 +1034,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return null;
   }
 
-  private Pair<Boolean, List<ColumnEntity>> updateColumnsIfNecessary(
+  private ColumnsUpdateResult updateColumnsIfNecessary(
       Table tableFromCatalog, TableEntity tableFromGravitino, Map<String, String> nameChanges) {
     if (tableFromCatalog == null || tableFromGravitino == null) {
       LOG.warn(
           "Cannot update columns for table when altering because table or table entity is "
               + "null");
-      return Pair.of(false, Collections.emptyList());
+      return ColumnsUpdateResult.unchanged(Collections.emptyList());
     }
 
     // A catalog that reports no column list says nothing about the columns, so keep the stored
@@ -1043,11 +1050,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       LOG.warn(
           "Table {} from the underlying source has no column list, keeping the stored columns",
           tableFromCatalog.name());
-      return Pair.of(
-          false,
+      return ColumnsUpdateResult.unchanged(
           tableFromGravitino.columns() == null
               ? Collections.emptyList()
               : tableFromGravitino.columns());
+    }
+
+    Map<String, String> effectiveNameChanges = new HashMap<>(nameChanges);
+    if (effectiveNameChanges.isEmpty()) {
+      effectiveNameChanges.putAll(
+          resolveNameChangesByFieldId(tableFromCatalog, tableFromGravitino));
     }
 
     Map<String, Pair<Integer, Column>> columnsFromCatalogTable =
@@ -1062,6 +1074,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Check if columns need to be updated in Gravitino store
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();
+    // entity id -> Iceberg (or other format) field id for columns that expose one
+    Map<Long, Integer> fieldIdsByEntityId = new HashMap<>();
     Set<String> matchedCatalogColumns = new HashSet<>();
     boolean columnsNeedsUpdate = false;
     // Renamed and dropped columns claim their catalog names first. Otherwise a stale stored column
@@ -1069,12 +1083,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // first and take that name, and the renamed column would lose its id.
     List<Map.Entry<String, ColumnEntity>> storedColumns =
         new ArrayList<>(columnsFromTableEntity.entrySet());
-    storedColumns.sort(Comparator.comparing(e -> !nameChanges.containsKey(e.getKey())));
+    storedColumns.sort(Comparator.comparing(e -> !effectiveNameChanges.containsKey(e.getKey())));
     for (Map.Entry<String, ColumnEntity> entry : storedColumns) {
       // Follow renames so the stored column keeps its id under its new name.
       String catalogColumnName =
-          nameChanges.containsKey(entry.getKey())
-              ? nameChanges.get(entry.getKey())
+          effectiveNameChanges.containsKey(entry.getKey())
+              ? effectiveNameChanges.get(entry.getKey())
               : entry.getKey();
       Pair<Integer, Column> columnPair =
           catalogColumnName == null || matchedCatalogColumns.contains(catalogColumnName)
@@ -1121,10 +1135,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
         columnsNeedsUpdate = true;
         columnsToInsert.add(updatedColumnEntity);
+        rememberFieldId(fieldIdsByEntityId, updatedColumnEntity.id(), column);
 
       } else {
         // If the column is the same, we keep the original ColumnEntity
         columnsToInsert.add(entry.getValue());
+        rememberFieldId(fieldIdsByEntityId, entry.getValue().id(), columnPair.getRight());
       }
     }
 
@@ -1148,22 +1164,152 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
         columnsNeedsUpdate = true;
         columnsToInsert.add(newColumnEntity);
+        rememberFieldId(fieldIdsByEntityId, newColumnEntity.id(), entry.getValue().getRight());
       }
     }
 
-    return Pair.of(columnsNeedsUpdate, columnsToInsert);
+    Map<String, String> properties =
+        mergeColumnFieldIdProperty(tableFromGravitino.properties(), fieldIdsByEntityId);
+    boolean propertiesNeedsUpdate =
+        !Objects.equal(
+            fieldIdsPropertyValue(tableFromGravitino.properties()),
+            fieldIdsPropertyValue(properties));
+    return new ColumnsUpdateResult(
+        columnsNeedsUpdate || propertiesNeedsUpdate, columnsToInsert, properties);
+  }
+
+  /**
+   * When the catalog exposes stable field ids (Iceberg), rebuild rename/drop name changes from the
+   * stored {@link Table#PROPERTY_COLUMN_FIELD_IDS} map so a rename made outside the Gravitino table
+   * API keeps the column entity id (and its tags).
+   */
+  @VisibleForTesting
+  static Map<String, String> resolveNameChangesByFieldId(
+      Table tableFromCatalog, TableEntity tableFromGravitino) {
+    Map<String, String> changes = new HashMap<>();
+    if (tableFromCatalog.columns() == null
+        || tableFromGravitino.columns() == null
+        || tableFromGravitino.columns().isEmpty()) {
+      return Collections.unmodifiableMap(changes);
+    }
+
+    Map<Long, Integer> entityIdToFieldId = parseColumnFieldIds(tableFromGravitino.properties());
+    if (entityIdToFieldId.isEmpty()) {
+      return Collections.unmodifiableMap(changes);
+    }
+
+    Map<Integer, String> fieldIdToCatalogName = new HashMap<>();
+    for (Column column : tableFromCatalog.columns()) {
+      if (column.fieldId() != null) {
+        fieldIdToCatalogName.put(column.fieldId(), column.name());
+      }
+    }
+    if (fieldIdToCatalogName.isEmpty()) {
+      return Collections.unmodifiableMap(changes);
+    }
+
+    for (ColumnEntity stored : tableFromGravitino.columns()) {
+      Integer fieldId = entityIdToFieldId.get(stored.id());
+      if (fieldId == null) {
+        continue;
+      }
+      String catalogName = fieldIdToCatalogName.get(fieldId);
+      if (catalogName == null) {
+        changes.put(stored.name(), null);
+      } else if (!catalogName.equals(stored.name())) {
+        changes.put(stored.name(), catalogName);
+      }
+    }
+    return Collections.unmodifiableMap(changes);
+  }
+
+  private static void rememberFieldId(
+      Map<Long, Integer> fieldIdsByEntityId, long entityId, Column column) {
+    if (column.fieldId() != null) {
+      fieldIdsByEntityId.put(entityId, column.fieldId());
+    }
+  }
+
+  @VisibleForTesting
+  static Map<Long, Integer> parseColumnFieldIds(@Nullable Map<String, String> properties) {
+    Map<Long, Integer> result = new HashMap<>();
+    String raw = fieldIdsPropertyValue(properties);
+    if (raw == null || raw.isEmpty()) {
+      return Collections.unmodifiableMap(result);
+    }
+    try {
+      Map<String, Integer> parsed =
+          JsonUtils.anyFieldMapper()
+              .readValue(
+                  raw,
+                  JsonUtils.anyFieldMapper()
+                      .getTypeFactory()
+                      .constructMapType(Map.class, String.class, Integer.class));
+      for (Map.Entry<String, Integer> entry : parsed.entrySet()) {
+        result.put(Long.parseLong(entry.getKey()), entry.getValue());
+      }
+      return Collections.unmodifiableMap(result);
+    } catch (Exception e) {
+      LOG.warn("Failed to parse {}: {}", Table.PROPERTY_COLUMN_FIELD_IDS, e.getMessage());
+      return Collections.unmodifiableMap(new HashMap<>());
+    }
+  }
+
+  @Nullable
+  private static String fieldIdsPropertyValue(@Nullable Map<String, String> properties) {
+    return properties == null ? null : properties.get(Table.PROPERTY_COLUMN_FIELD_IDS);
+  }
+
+  private static Map<String, String> mergeColumnFieldIdProperty(
+      @Nullable Map<String, String> existing, Map<Long, Integer> fieldIdsByEntityId) {
+    Map<String, String> properties = existing == null ? new HashMap<>() : new HashMap<>(existing);
+    if (fieldIdsByEntityId.isEmpty()) {
+      properties.remove(Table.PROPERTY_COLUMN_FIELD_IDS);
+      return properties;
+    }
+    Map<String, Integer> serialized = new HashMap<>();
+    for (Map.Entry<Long, Integer> entry : fieldIdsByEntityId.entrySet()) {
+      serialized.put(Long.toString(entry.getKey()), entry.getValue());
+    }
+    try {
+      properties.put(
+          Table.PROPERTY_COLUMN_FIELD_IDS,
+          JsonUtils.anyFieldMapper().writeValueAsString(serialized));
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to serialize %s", Table.PROPERTY_COLUMN_FIELD_IDS);
+    }
+    return properties;
+  }
+
+  /** Result of syncing catalog columns to stored column entities. */
+  private static final class ColumnsUpdateResult {
+    private final boolean needsUpdate;
+    private final List<ColumnEntity> columns;
+    private final Map<String, String> properties;
+
+    private ColumnsUpdateResult(
+        boolean needsUpdate, List<ColumnEntity> columns, Map<String, String> properties) {
+      this.needsUpdate = needsUpdate;
+      this.columns = columns;
+      this.properties = properties;
+    }
+
+    private static ColumnsUpdateResult unchanged(List<ColumnEntity> columns) {
+      return new ColumnsUpdateResult(false, columns, null);
+    }
   }
 
   private TableEntity updateColumnsIfNecessaryWhenLoad(
       NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
-    Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+    ColumnsUpdateResult columnsUpdateResult =
         updateColumnsIfNecessary(
             combinedTable.tableFromCatalog(),
             combinedTable.tableFromGravitino(),
             Collections.emptyMap());
 
     // No need to update the columns
-    if (!columnsUpdateResult.getLeft()) {
+    if (!columnsUpdateResult.needsUpdate) {
       return combinedTable.tableFromGravitino();
     }
 
@@ -1193,30 +1339,36 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         id,
                         TableEntity.class,
                         TABLE,
-                        entity ->
-                            TableEntity.builder()
-                                .withId(entity.id())
-                                .withName(entity.name())
-                                .withNamespace(entity.namespace())
-                                .withComment(entity.comment())
-                                .withProperties(entity.properties())
-                                .withColumns(
-                                    updateColumnsIfNecessary(
-                                            tableFromCatalog, entity, Collections.emptyMap())
-                                        .getRight())
-                                .withPartitioning(entity.partitioning())
-                                .withDistribution(entity.distribution())
-                                .withSortOrders(entity.sortOrders())
-                                .withIndexes(entity.indexes())
-                                .withAuditInfo(
-                                    AuditInfo.builder()
-                                        .withCreator(entity.auditInfo().creator())
-                                        .withCreateTime(entity.auditInfo().createTime())
-                                        .withLastModifier(
-                                            PrincipalUtils.getCurrentPrincipal().getName())
-                                        .withLastModifiedTime(Instant.now())
-                                        .build())
-                                .build()),
+                        entity -> {
+                          ColumnsUpdateResult synced =
+                              updateColumnsIfNecessary(
+                                  tableFromCatalog, entity, Collections.emptyMap());
+                          TableEntity.Builder entityBuilder =
+                              TableEntity.builder()
+                                  .withId(entity.id())
+                                  .withName(entity.name())
+                                  .withNamespace(entity.namespace())
+                                  .withComment(entity.comment())
+                                  .withColumns(synced.columns)
+                                  .withPartitioning(entity.partitioning())
+                                  .withDistribution(entity.distribution())
+                                  .withSortOrders(entity.sortOrders())
+                                  .withIndexes(entity.indexes())
+                                  .withAuditInfo(
+                                      AuditInfo.builder()
+                                          .withCreator(entity.auditInfo().creator())
+                                          .withCreateTime(entity.auditInfo().createTime())
+                                          .withLastModifier(
+                                              PrincipalUtils.getCurrentPrincipal().getName())
+                                          .withLastModifiedTime(Instant.now())
+                                          .build());
+                          if (synced.properties != null) {
+                            entityBuilder.withProperties(synced.properties);
+                          } else if (entity.properties() != null) {
+                            entityBuilder.withProperties(entity.properties());
+                          }
+                          return entityBuilder.build();
+                        }),
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
   }

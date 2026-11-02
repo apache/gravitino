@@ -1800,6 +1800,79 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testResolveNameChangesByFieldId() {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    ColumnEntity storedA =
+        ColumnEntity.builder()
+            .withId(101L)
+            .withName("a")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(audit)
+            .build();
+    ColumnEntity storedB =
+        ColumnEntity.builder()
+            .withId(102L)
+            .withName("b")
+            .withPosition(1)
+            .withDataType(Types.LongType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(audit)
+            .build();
+
+    Column catalogANew = mock(Column.class);
+    doReturn("a_new").when(catalogANew).name();
+    doReturn(Types.IntegerType.get()).when(catalogANew).dataType();
+    doReturn(2).when(catalogANew).fieldId();
+    Column catalogB = mock(Column.class);
+    doReturn("b").when(catalogB).name();
+    doReturn(Types.LongType.get()).when(catalogB).dataType();
+    doReturn(3).when(catalogB).fieldId();
+
+    Table catalogTable = mock(Table.class);
+    doReturn(new Column[] {catalogANew, catalogB}).when(catalogTable).columns();
+
+    Map<String, String> properties =
+        ImmutableMap.of(Table.PROPERTY_COLUMN_FIELD_IDS, "{\"101\":2,\"102\":3}");
+    TableEntity entity =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("m", "c", "s"))
+            .withColumns(Arrays.asList(storedA, storedB))
+            .withProperties(properties)
+            .withAuditInfo(audit)
+            .build();
+
+    Assertions.assertEquals(
+        ImmutableMap.of("a", "a_new"),
+        TableOperationDispatcher.resolveNameChangesByFieldId(catalogTable, entity));
+
+    // Dropped field id: stored column is marked dropped (null target name).
+    doReturn(new Column[] {catalogB}).when(catalogTable).columns();
+    Map<String, String> dropped =
+        TableOperationDispatcher.resolveNameChangesByFieldId(catalogTable, entity);
+    Assertions.assertEquals(1, dropped.size());
+    Assertions.assertNull(dropped.get("a"));
+
+    // No stored field-id map: no inferred renames.
+    TableEntity withoutMap =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("m", "c", "s"))
+            .withColumns(Arrays.asList(storedA, storedB))
+            .withAuditInfo(audit)
+            .build();
+    Assertions.assertEquals(
+        ImmutableMap.of(),
+        TableOperationDispatcher.resolveNameChangesByFieldId(catalogTable, withoutMap));
+  }
+
+  @Test
   public void testIsSameDefaultValue() {
     Expression literal = Literals.stringLiteral("1");
     Assertions.assertTrue(

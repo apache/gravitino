@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.connector.BaseColumn;
 
@@ -25,12 +26,39 @@ import org.apache.gravitino.connector.BaseColumn;
 @EqualsAndHashCode(callSuper = true)
 public class IcebergColumn extends BaseColumn {
 
+  @Nullable private Integer fieldId;
+
   private IcebergColumn() {}
+
+  /**
+   * Returns the Iceberg field id for this column.
+   *
+   * @return the Iceberg field id, or {@code null} if it was not set
+   */
+  @Nullable
+  @Override
+  public Integer fieldId() {
+    return fieldId;
+  }
 
   /** A builder class for constructing IcebergColumn instances. */
   public static class Builder extends BaseColumnBuilder<Builder, IcebergColumn> {
+    @Nullable private Integer fieldId;
+
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
+
+    /**
+     * Sets the Iceberg field id for the column.
+     *
+     * @param fieldId the Iceberg field id
+     * @return this builder
+     */
+    public Builder withFieldId(int fieldId) {
+      this.fieldId = fieldId;
+      return this;
+    }
+
     /**
      * Internal method to build a IcebergColumn instance using the provided values.
      *
@@ -44,6 +72,7 @@ public class IcebergColumn extends BaseColumn {
       icebergColumn.dataType = dataType;
       icebergColumn.nullable = nullable;
       icebergColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      icebergColumn.fieldId = fieldId;
       return icebergColumn;
     }
   }

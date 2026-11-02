@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -81,6 +82,20 @@ public interface Column {
    * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
    */
   Expression defaultValue();
+
+  /**
+   * Returns a stable field id from the underlying table format, if the catalog exposes one.
+   *
+   * <p>Iceberg identifies columns by field id across renames. Catalogs that can report this id
+   * should override this method so Gravitino can keep column tags and other governance attached to
+   * the same physical column when the name changes outside the Gravitino table API.
+   *
+   * @return the field id, or {@code null} if the catalog does not expose one
+   */
+  @Nullable
+  default Integer fieldId() {
+    return null;
+  }
 
   /**
    * @return the {@link SupportsTags} if the column supports tag operations.
