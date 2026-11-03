@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.MetadataUpdateParser;
 import org.apache.iceberg.PartitionSpec;
@@ -378,6 +379,43 @@ public class TestIcebergCommitValidation {
                     + "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1001}")));
     Assertions.assertEquals(2, catalog.loadTable(ident).specs().size());
     Assertions.assertNotNull(partitioned);
+  }
+
+  @Test
+  public void testAddSpecWithoutFieldIdsGetsTheTablesIds() {
+    createPartitionedTable("noid");
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "noid");
+    // Spec 0 has 1000: s identity(2). Neither field below carries a field-id.
+    UpdateTableRequest request =
+        IcebergCommitValidation.assignPartitionFieldIds(
+            request(
+                addSpec(
+                    "{\"name\":\"s\",\"transform\":\"identity\",\"source-id\":2},"
+                        + "{\"name\":\"id_b\",\"transform\":\"bucket[4]\",\"source-id\":1}"),
+                new MetadataUpdate.SetDefaultPartitionSpec(-1)),
+            () -> ((HasTableOperations) catalog.loadTable(ident)).operations().current());
+
+    CatalogHandlers.updateTable(catalog, ident, IcebergCommitValidation.withValidation(request));
+
+    PartitionSpec spec = catalog.loadTable(ident).spec();
+    // The field already partitioned on keeps its id; the new field gets the next one.
+    Assertions.assertEquals(1000, spec.fields().get(0).fieldId());
+    Assertions.assertEquals(1001, spec.fields().get(1).fieldId());
+  }
+
+  @Test
+  public void testAddSpecWithFieldIdsIsUnchanged() {
+    UpdateTableRequest request =
+        request(
+            addSpec(
+                "{\"name\":\"id\",\"transform\":\"identity\",\"source-id\":1,\"field-id\":1000}"));
+    Assertions.assertSame(
+        request,
+        IcebergCommitValidation.assignPartitionFieldIds(
+            request,
+            () -> {
+              throw new AssertionError("metadata must not be loaded");
+            }));
   }
 
   @Test
