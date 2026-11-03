@@ -29,6 +29,7 @@ import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInt
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
@@ -53,6 +54,10 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     CreateNamespaceRequest request = extractRequest();
+    if (request == null || request.namespace() == null || request.namespace().isEmpty()) {
+      throw new BadRequestException(
+          "Invalid namespace creation request: a non-empty namespace is required");
+    }
 
     NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
     if (catalogIdent == null) {

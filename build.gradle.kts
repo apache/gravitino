@@ -405,7 +405,11 @@ allprojects {
         // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
         // integration-test is intentionally excluded from this carve-out: it runs outside
         // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
-        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+        // The :trino-connector project itself formats the shared common-* source trees.
+        val isTrinoPluginSource =
+          project.path == ":trino-connector" ||
+            project.path.startsWith(":trino-connector:trino-connector")
+        if (!isTrinoPluginSource) {
           replaceRegex(
             "Use SLF4J Logger instead of other logging frameworks",
             "import\\s+.*\\.(Logger|LoggerFactory);",
@@ -514,9 +518,14 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
+      // configuration action, which may run after this configureEach action registers.
+      val includeDockerTaggedTests =
+        param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
+          ?: dockerTest
       val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
-        if (!dockerTest) {
+        if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
         }
         if (!dorisMultiVersion) {
@@ -620,6 +629,7 @@ subprojects {
     ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
+    ":maintenance:maintenance-common",
     ":maintenance:optimizer-api",
     ":maintenance:updaters",
     ":clients",
@@ -805,7 +815,7 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
-    ":catalogs:catalog-common" to listOf("doris"),
+    ":bundles:aws" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
@@ -1019,7 +1029,17 @@ subprojects {
       val extraArgs = project.property("extraJvmArgs") as List<String>
       jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+      val isCoreSuiteTask =
+        project.path == ":core" &&
+          name in setOf(
+          "coreUnitTest",
+          "coreH2Test",
+          "coreMySQLTest",
+          "corePostgreSQLTest"
+        )
+      if (!isCoreSuiteTask) {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
@@ -1168,9 +1188,12 @@ tasks {
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
         ":maintenance:optimizer:copyLibAndConfigs",
-        ":plugins:idp-basic:copyLibAndConfigs"
+        ":plugins:idp-basic:copyLibAndConfigs",
+        ":plugins:maintenance:copyLibAndConfigs",
+        ":plugins:k8s-job-executor:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")
@@ -1342,18 +1365,19 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
+    dependsOn("trino-connector:trino-connector-482-483:copyLibs")
     group = "gravitino distribution"
   }
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
       compileDistribution,
-      ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
-      ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
-      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
-      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-477:assembleTrinoConnector",
+      ":trino-connector:trino-connector-478-479:assembleTrinoConnector",
+      ":trino-connector:trino-connector-480:assembleTrinoConnector",
+      ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

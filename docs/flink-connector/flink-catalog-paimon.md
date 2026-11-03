@@ -39,9 +39,10 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 ## Prerequisites
 
-* Paimon 1.2.0 is fully tested.
+* Flink 1.19 and 1.20 use Paimon 1.2.0.
+* Flink 2.1 and 2.2 use Paimon 1.4.1.
 
-Other Paimon versions may also work but have not been tested fully.
+The supported Paimon versions are pinned in the table below. Other Paimon versions may also work but have not been tested fully.
 
 ## Getting Started
 
@@ -52,11 +53,12 @@ Place the following JAR files in the lib directory of your Flink installation:
 - The Paimon Flink connector JAR that matches your Flink minor version
 - The Gravitino Flink connector runtime JAR that matches your Flink minor version
 
-| Flink version | Paimon connector artifact                 | Gravitino runtime artifact                                             |
-|---------------|-------------------------------------------|------------------------------------------------------------------------|
-| 1.19          | `paimon-flink-1.19-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
-| 1.20          | `paimon-flink-1.20-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
-| 2.1           | `paimon-flink-2.1-${paimon-version}.jar`  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| Flink version | Paimon version | Paimon connector artifact           | Gravitino runtime artifact                                             |
+|---------------|----------------|-------------------------------------|------------------------------------------------------------------------|
+| 1.19          | 1.2.0          | `paimon-flink-1.19-1.2.0.jar`       | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | 1.2.0          | `paimon-flink-1.20-1.2.0.jar`       | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+| 2.1           | 1.4.1          | `paimon-flink-2.1-1.4.1.jar`        | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | 1.4.1          | `paimon-flink-2.2-1.4.1.jar`        | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
 
 ### SQL Example
 

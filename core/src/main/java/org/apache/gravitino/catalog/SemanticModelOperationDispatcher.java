@@ -35,9 +35,13 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieDocumentConverter;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
 import org.apache.gravitino.storage.IdGenerator;
 
@@ -86,6 +90,20 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetrics(namespace);
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetricInfos(namespace);
+  }
+
+  @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
     checkRelationalCatalog(ident.namespace());
     if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
@@ -113,6 +131,21 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     schemaDispatcher.loadSchema(schemaIdent);
     return managedOperations.createSemanticModel(ident, comment, definition, effectiveProperties);
+  }
+
+  @Override
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    return createSemanticModel(ident, comment, definition, properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return OssieDocumentConverter.exportDocument(loadSemanticModel(ident), format);
   }
 
   @Override

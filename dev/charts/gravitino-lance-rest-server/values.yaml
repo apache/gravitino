@@ -40,6 +40,8 @@ lanceRest:
   shutdownTimeout: 3000
   host: 0.0.0.0
   httpPort: 9101
+  # Enable unauthenticated metrics endpoints only on a trusted network.
+  metricsEnabled: false
   minThreads: 24
   maxThreads: 200
   stopTimeout: 30000

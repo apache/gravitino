@@ -20,6 +20,8 @@ from typing import Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SemanticModel(Auditable):
@@ -45,3 +47,16 @@ class SemanticModel(Auditable):
     def properties(self) -> dict[str, str]:
         """Returns the Gravitino-specific Semantic Model properties."""
         return {}
+
+    def supports_tags(self) -> SupportsTags:
+        """Return tag operations if the Semantic Model supports tags.
+
+        Raises:
+            UnsupportedOperationException: If tag operations are not supported.
+
+        Returns:
+            SupportsTags: The tag operations supported by the Semantic Model.
+        """
+        raise UnsupportedOperationException(
+            "Semantic Model does not support tag operations."
+        )

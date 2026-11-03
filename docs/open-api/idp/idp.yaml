@@ -109,31 +109,49 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
+    delete:
+      tags:
+        - IDP
+      summary: Remove local user store user
+      description: Removes the specified local user store user.
+      operationId: removeIdpUser
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}/password:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
     put:
       tags:
         - IDP
-      summary: Update local user store user
+      summary: Change local user store user password
       description: >
-        Updates the password and/or enabled flag of the specified local user store user and returns
-        the user object. At least one of `password` or `enabled` is required. Disabled users cannot
-        authenticate. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
-        Service admins may update any user. Authenticated non-admin users may update only their own
-        password and cannot change `enabled` or another user's account.
-      operationId: updateIdpUser
+        Changes the password of the specified local user store user and returns the user object.
+        Service admins may reset any user's password. Authenticated non-admin users may change only
+        their own password. Changing your own password requires `oldPassword` and verifies it
+        against the stored hash. A service admin resetting another user's password must omit
+        `oldPassword`.
+      operationId: changeIdpUserPassword
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateUserRequest"
+              $ref: "#/components/schemas/ChangePasswordRequest"
             examples:
-              UpdateUserPasswordRequest:
-                $ref: "#/components/examples/UpdateUserPasswordRequest"
-              UpdateUserEnabledRequest:
-                $ref: "#/components/examples/UpdateUserEnabledRequest"
+              ChangeUserPasswordRequest:
+                $ref: "#/components/examples/ChangeUserPasswordRequest"
+              ChangeOwnUserPasswordRequest:
+                $ref: "#/components/examples/ChangeOwnUserPasswordRequest"
       responses:
         "200":
-          description: Returns the local user store user after the update
+          description: Returns the local user store user after the password change
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -149,7 +167,7 @@ paths:
                 $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 IllegalArgumentException:
-                  $ref: "#/components/examples/IdpUpdateUserIllegalArgumentException"
+                  $ref: "#/components/examples/IdpChangePasswordIllegalArgumentException"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -164,17 +182,58 @@ paths:
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
-    delete:
+  /idp/users/{user}/enabled:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
+    put:
       tags:
         - IDP
-      summary: Remove local user store user
-      description: Removes the specified local user store user.
-      operationId: removeIdpUser
+      summary: Update local user store user enabled flag
+      description: >
+        Updates the enabled flag of the specified local user store user and returns the user object.
+        Disabled users cannot authenticate. Users listed in `gravitino.authorization.serviceAdmins`
+        cannot have their enabled flag changed. Only service admins may call this API.
+      operationId: updateIdpUserEnabled
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserEnabledRequest"
+            examples:
+              UpdateUserEnabledRequest:
+                $ref: "#/components/examples/UpdateUserEnabledRequest"
       responses:
         "200":
-          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+          description: Returns the local user store user after the enabled-flag update
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserUpdateResponse:
+                  $ref: "#/components/examples/IdpUserUpdateResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpUpdateEnabledIllegalArgumentException"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "404":
+          description: Not Found - The specified local user store user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpUserUpdateNotFoundException"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -410,21 +469,31 @@ components:
           default: true
           description: Whether the user is enabled. Disabled users cannot authenticate.
 
-    UpdateUserRequest:
+    ChangePasswordRequest:
       type: object
-      anyOf:
-        - required:
-            - password
-        - required:
-            - enabled
+      required:
+        - newPassword
       properties:
-        password:
+        newPassword:
           type: string
           format: password
           minLength: 12
           maxLength: 64
           description: The new password of the local user store user.
           writeOnly: true
+        oldPassword:
+          type: string
+          format: password
+          description: >
+            The caller's current password. Required when changing your own password; must be
+            omitted when a service admin resets another user's password.
+          writeOnly: true
+
+    UpdateUserEnabledRequest:
+      type: object
+      required:
+        - enabled
+      properties:
         enabled:
           type: boolean
           description: Whether the local user store user should be enabled.
@@ -497,9 +566,9 @@ components:
     IdpForbiddenErrorResponse:
       description:
         Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
-        user store users and groups. Authenticated non-admin users may only `GET` or `PUT`
-        `/idp/users/{user}` for their own username (password-only on update). Unauthenticated
-        requests and other non-admin IdP management calls receive this response.
+        user store users and groups. Authenticated non-admin users may only `GET`
+        `/idp/users/{user}` or `PUT` `/idp/users/{user}/password` for their own username.
+        Unauthenticated requests and other non-admin IdP management calls receive this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -515,9 +584,15 @@ components:
         "password": "Passw0rd-1234"
       }
 
-    UpdateUserPasswordRequest:
+    ChangeUserPasswordRequest:
       value: {
-        "password": "Passw0rd-5678"
+        "newPassword": "Passw0rd-5678"
+      }
+
+    ChangeOwnUserPasswordRequest:
+      value: {
+        "newPassword": "Passw0rd-5678",
+        "oldPassword": "Passw0rd-1234"
       }
 
     UpdateUserEnabledRequest:
@@ -630,11 +705,18 @@ components:
         "message": "Failed to operate local user store user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
       }
 
-    IdpUpdateUserIllegalArgumentException:
+    IdpChangePasswordIllegalArgumentException:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" or \"enabled\" field is required]"
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"newPassword\" field is required]"
+      }
+
+    IdpUpdateEnabledIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"enabled\" field is required]"
       }
 
     IdpAddGroupIllegalArgumentException:

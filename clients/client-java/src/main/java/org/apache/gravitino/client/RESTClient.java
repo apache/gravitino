@@ -204,6 +204,24 @@ public interface RESTClient extends Closeable {
       Consumer<ErrorResponse> errorHandler);
 
   /**
+   * Perform a GET request and return the response body without JSON deserialization.
+   *
+   * @param path The path to be requested.
+   * @param queryParams The query parameters to be included in the request.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @return The raw response body.
+   * @throws UnsupportedOperationException If raw responses are not supported by the client.
+   */
+  default String getRaw(
+      String path,
+      Map<String, String> queryParams,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    throw new UnsupportedOperationException("Raw GET responses are not supported");
+  }
+
+  /**
    * Perform a POST request on the specified path with given information.
    *
    * @param path The path to be requested.
@@ -289,6 +307,29 @@ public interface RESTClient extends Closeable {
       Class<T> responseType,
       Map<String, String> headers,
       Consumer<ErrorResponse> errorHandler);
+
+  /**
+   * Perform a POST request whose body is already serialized.
+   *
+   * @param path The path to be requested.
+   * @param body The raw request body.
+   * @param contentType The media type of the raw request body.
+   * @param responseType The class representing the type of the JSON response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @param <T> The type of the response.
+   * @return The deserialized response of the POST request.
+   * @throws UnsupportedOperationException If raw request bodies are not supported by the client.
+   */
+  default <T extends RESTResponse> T postRaw(
+      String path,
+      String body,
+      String contentType,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    throw new UnsupportedOperationException("Raw POST request bodies are not supported");
+  }
 
   /**
    * Perform a PUT request on the specified path with given information.

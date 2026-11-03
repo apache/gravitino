@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -80,6 +81,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
 public class TestPolicyOperations extends BaseOperationsTest {
@@ -408,6 +411,44 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "spec_id,1.5",
+    "manifest_count_critical,500.5",
+    "manifest_count_warning,100.5",
+    "avg_manifest_size_threshold_bytes,4096.5",
+    "use_caching,0",
+    "use_caching,1"
+  })
+  public void testCreateManifestPolicyRejectsInvalidFieldTypes(String field, String value) {
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("rewrite")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergRewriteManifests())
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
+        .thenReturn(policy);
+    String json =
+        "{\"name\":\"rewrite\",\"policyType\":\"system_iceberg_rewrite_manifests\","
+            + "\"enabled\":true,\"content\":{\""
+            + field
+            + "\":"
+            + value
+            + "}}";
+    try (Response response =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(policyManager);
+  }
+
   @Test
   public void testCreatePolicyWithIcebergCompactionType() {
     PolicyContent content =
@@ -583,6 +624,27 @@ public class TestPolicyOperations extends BaseOperationsTest {
             .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyAlreadyExistsException exception =
+        new PolicyAlreadyExistsException("Policy existing already exists");
+    doThrow(exception).when(policyManager).alterPolicy(any(), any(), any(PolicyChange.class));
+    PolicyUpdatesRequest request =
+        new PolicyUpdatesRequest(
+            Collections.singletonList(new PolicyUpdateRequest.RenamePolicyRequest("existing")));
+    try (Response response =
+        target(policyPath(metalake) + "/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(PolicyAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
   }
 
   @Test

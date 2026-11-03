@@ -63,7 +63,7 @@ import org.junit.jupiter.api.TestTemplate;
 /**
  * Exercises {@link IcebergCleanupManager} against the same relational backend matrix as the cleanup
  * store: {@link TestJDBCBackend} initializes H2 by default, adds MySQL and PostgreSQL when {@code
- * dockerTest=true}, and truncates all backend tables before each invocation.
+ * dockerTest=true}, and empties the tables written to before each invocation.
  */
 class TestIcebergCleanupManager extends TestJDBCBackend {
 

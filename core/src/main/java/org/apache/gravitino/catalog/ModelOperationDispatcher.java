@@ -37,8 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
@@ -60,28 +58,20 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   @Override
   public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(namespace.levels()),
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-                c -> c.doWithModelOps(m -> m.listModels(namespace)),
-                NoSuchSchemaException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
+        c -> c.doWithModelOps(m -> m.listModels(namespace)),
+        NoSuchSchemaException.class);
   }
 
   @Override
   public Model getModel(NameIdentifier ident) throws NoSuchModelException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     Model model =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.READ,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithModelOps(m -> m.getModel(ident)),
-                    NoSuchModelException.class));
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithModelOps(m -> m.getModel(ident)),
+            NoSuchModelException.class);
 
     return EntityCombinedModel.of(model)
         .withHiddenProperties(
@@ -97,18 +87,12 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         checkAndUpdateProperties(
             catalogIdent, properties, HasPropertyMetadata::modelPropertiesMetadata);
 
-    // Lock the model node, not the schema, so models in the same schema can be registered
-    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     Model registeredModel =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithModelOps(m -> m.registerModel(ident, comment, updatedProperties)),
-                    NoSuchSchemaException.class,
-                    ModelAlreadyExistsException.class));
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithModelOps(m -> m.registerModel(ident, comment, updatedProperties)),
+            NoSuchSchemaException.class,
+            ModelAlreadyExistsException.class);
 
     return EntityCombinedModel.of(registeredModel)
         .withHiddenProperties(
@@ -120,26 +104,18 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   @Override
   public boolean deleteModel(NameIdentifier ident) {
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.deleteModel(ident)),
-                RuntimeException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.deleteModel(ident)),
+        RuntimeException.class);
   }
 
   @Override
   public int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.listModelVersions(ident)),
-                NoSuchModelException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.listModelVersions(ident)),
+        NoSuchModelException.class);
   }
 
   @Override
@@ -147,14 +123,10 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     return internalListModelVersion(
         ident,
         () ->
-            TreeLockUtils.doWithTreeLock(
-                ident,
-                LockType.READ,
-                () ->
-                    doWithCatalog(
-                        getCatalogIdentifier(ident),
-                        c -> c.doWithModelOps(m -> m.listModelVersionInfos(ident)),
-                        NoSuchModelException.class)));
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithModelOps(m -> m.listModelVersionInfos(ident)),
+                NoSuchModelException.class));
   }
 
   @Override
@@ -163,14 +135,10 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     return internalGetModelVersion(
         ident,
         () ->
-            TreeLockUtils.doWithTreeLock(
-                ident,
-                LockType.READ,
-                () ->
-                    doWithCatalog(
-                        getCatalogIdentifier(ident),
-                        c -> c.doWithModelOps(m -> m.getModelVersion(ident, version)),
-                        NoSuchModelVersionException.class)));
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithModelOps(m -> m.getModelVersion(ident, version)),
+                NoSuchModelVersionException.class));
   }
 
   @Override
@@ -179,14 +147,10 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     return internalGetModelVersion(
         ident,
         () ->
-            TreeLockUtils.doWithTreeLock(
-                ident,
-                LockType.READ,
-                () ->
-                    doWithCatalog(
-                        getCatalogIdentifier(ident),
-                        c -> c.doWithModelOps(m -> m.getModelVersion(ident, alias)),
-                        NoSuchModelVersionException.class)));
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithModelOps(m -> m.getModelVersion(ident, alias)),
+                NoSuchModelVersionException.class));
   }
 
   @Override
@@ -202,72 +166,52 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         checkAndUpdateProperties(
             catalogIdent, properties, HasPropertyMetadata::modelVersionPropertiesMetadata);
 
-    TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.WRITE,
-        () ->
-            doWithCatalog(
-                catalogIdent,
-                c ->
-                    c.doWithModelOps(
-                        m -> {
-                          m.linkModelVersion(ident, uris, aliases, comment, updatedProperties);
-                          return null;
-                        }),
-                NoSuchModelException.class,
-                ModelVersionAliasesAlreadyExistException.class));
+    doWithCatalog(
+        catalogIdent,
+        c ->
+            c.doWithModelOps(
+                m -> {
+                  m.linkModelVersion(ident, uris, aliases, comment, updatedProperties);
+                  return null;
+                }),
+        NoSuchModelException.class,
+        ModelVersionAliasesAlreadyExistException.class);
   }
 
   @Override
   public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
       throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, version, uriName)),
-                NoSuchModelVersionException.class,
-                NoSuchModelVersionURINameException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, version, uriName)),
+        NoSuchModelVersionException.class,
+        NoSuchModelVersionURINameException.class);
   }
 
   @Override
   public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
       throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, alias, uriName)),
-                NoSuchModelVersionException.class,
-                NoSuchModelVersionURINameException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, alias, uriName)),
+        NoSuchModelVersionException.class,
+        NoSuchModelVersionURINameException.class);
   }
 
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, int version) {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.WRITE,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, version)),
-                RuntimeException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, version)),
+        RuntimeException.class);
   }
 
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, String alias) {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.WRITE,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, alias)),
-                RuntimeException.class));
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, alias)),
+        RuntimeException.class);
   }
 
   /** {@inheritDoc} */
@@ -278,15 +222,11 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     Model alteredModel =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithModelOps(f -> f.alterModel(ident, changes)),
-                    NoSuchModelException.class,
-                    IllegalArgumentException.class));
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithModelOps(f -> f.alterModel(ident, changes)),
+            NoSuchModelException.class,
+            IllegalArgumentException.class);
 
     return EntityCombinedModel.of(alteredModel)
         .withHiddenProperties(
@@ -319,15 +259,11 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     ModelVersion alteredModelVersion =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithModelOps(fn),
-                    NoSuchModelVersionException.class,
-                    IllegalArgumentException.class));
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithModelOps(fn),
+            NoSuchModelVersionException.class,
+            IllegalArgumentException.class);
 
     return EntityCombinedModelVersion.of(alteredModelVersion)
         .withHiddenProperties(
@@ -370,20 +306,15 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
       NameIdentifier catalogIdent,
       Map<String, String> properties,
       Function<HasPropertyMetadata, PropertiesMetadata> propertiesMetadataProvider) {
-    TreeLockUtils.doWithTreeLock(
+    doWithCatalog(
         catalogIdent,
-        LockType.READ,
-        () ->
-            doWithCatalog(
-                catalogIdent,
-                c ->
-                    c.doWithPropertiesMeta(
-                        p -> {
-                          validatePropertyForCreate(
-                              propertiesMetadataProvider.apply(p), properties);
-                          return null;
-                        }),
-                IllegalArgumentException.class));
+        c ->
+            c.doWithPropertiesMeta(
+                p -> {
+                  validatePropertyForCreate(propertiesMetadataProvider.apply(p), properties);
+                  return null;
+                }),
+        IllegalArgumentException.class);
 
     long uid = idGenerator.nextId();
     StringIdentifier stringId = StringIdentifier.fromId(uid);

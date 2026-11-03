@@ -572,6 +572,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameCatalogToExistingName() {
+    CatalogAlreadyExistsException exception =
+        new CatalogAlreadyExistsException("Catalog existing already exists");
+    doThrow(exception).when(manager).alterCatalog(any(), any());
+    CatalogUpdatesRequest request =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(new CatalogUpdateRequest.RenameCatalogRequest("existing")));
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(CatalogAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
@@ -684,6 +705,34 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  void testDropCatalogWithSchemaConnectionFailure() {
+    String message =
+        "Failed to check schemas in the underlying catalog metalake1.catalog1: "
+            + "Failed to connect to Hive Metastore: TTransportException: Connection refused. "
+            + "Use force=true to skip this check.";
+    doThrow(new ConnectionFailedException("%s", message))
+        .when(manager)
+        .dropCatalog(NameIdentifier.of("metalake1", "catalog1"), false);
+
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.BAD_GATEWAY.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, error.getCode());
+      Assertions.assertEquals(ConnectionFailedException.class.getSimpleName(), error.getType());
+      Assertions.assertEquals(
+          "Failed to operate catalog(s) [catalog1] operation [DROP] under metalake [metalake1], "
+              + "reason ["
+              + message
+              + "]",
+          error.getMessage());
+    }
   }
 
   @Test

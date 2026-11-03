@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -512,9 +513,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * Drops a schema.
    *
    * @param ident The identifier of the schema to be dropped.
-   * @param cascade If true, drops all tables within the schema as well.
+   * @param cascade Whether to request cascading deletion. A catalog may reject a non-empty schema
+   *     even when this is true if it cannot safely contain the deletion.
    * @return True if the schema was successfully dropped, false if the schema doesn't exist.
-   * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   * @throws NonEmptySchemaException If the schema is non-empty and cascade is false, or if the
+   *     catalog cannot safely support the requested cascading deletion.
    * @throws RuntimeException If an error occurs while dropping the schema.
    */
   @Override
@@ -580,6 +583,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -639,14 +644,44 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       // If the entity in the store doesn't match the one in the external system, we use the data
       // of external system to correct it.
       LOG.warn(
-          "The Schema uid {} existed but still needs to be imported, this could be happened "
-              + "when Schema is renamed by external systems not controlled by Gravitino. In this case, "
-              + "we need to overwrite the stored entity to keep consistency.",
+          "Verifying ownership of schema identifier {} before import; the source may have been "
+              + "renamed externally or may carry a copied identifier.",
           stringId);
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
+    }
+
+    SchemaEntity previousEntity = null;
+    if (stringId != null) {
+      try {
+        for (SchemaEntity existing :
+            store.list(identifier.namespace(), SchemaEntity.class, SCHEMA)) {
+          if (existing.id() == uid) {
+            if (existing.nameIdentifier().equals(identifier)) {
+              previousEntity = existing;
+              break;
+            }
+            try {
+              doWithCatalog(
+                  getCatalogIdentifier(existing.nameIdentifier()),
+                  c -> c.doWithSchemaOps(ops -> ops.loadSchema(existing.nameIdentifier())),
+                  NoSuchSchemaException.class);
+            } catch (NoSuchSchemaException e) {
+              // Preserve a genuine external rename only after confirming the old object is gone.
+              previousEntity = existing;
+              break;
+            }
+            throw new SchemaAlreadyExistsException(
+                "Schema %s carries the identifier of existing schema %s; refusing to move its metadata",
+                identifier, existing.nameIdentifier());
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(
+            "Failed to verify schema identifier ownership for " + identifier, e);
+      }
     }
 
     SchemaEntity schemaEntity =
@@ -665,8 +700,25 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build())
             .build();
     try {
-      store.put(schemaEntity, true);
+      if (previousEntity == null) {
+        // An untrusted source marker must never overwrite an entity in another namespace.
+        store.put(schemaEntity, false);
+      } else {
+        store.update(
+            previousEntity.nameIdentifier(),
+            SchemaEntity.class,
+            SCHEMA,
+            existing -> {
+              if (!existing.id().equals(schemaEntity.id())) {
+                throw new OptimisticLockException("Schema identifier changed during import");
+              }
+              return schemaEntity;
+            });
+      }
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);

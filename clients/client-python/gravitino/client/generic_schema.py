@@ -27,6 +27,7 @@ from gravitino.api.schema import Schema
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
@@ -99,8 +100,14 @@ class GenericSchema(
     def list_tags(self) -> list[str]:
         return self._metadata_object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._metadata_object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._metadata_object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._metadata_object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._metadata_object_tag_operations.get_tag(name)

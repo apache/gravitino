@@ -53,9 +53,11 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
@@ -345,8 +347,8 @@ public class IcebergRESTUtils {
 
   /**
    * Builds an OK response with the ETag header derived from the table metadata location. Uses the
-   * default snapshots value to ensure ETags from create/update/register are consistent with the
-   * default loadTable endpoint.
+   * default snapshots value, matching an unrestricted default load-table response. A load-table
+   * response with read restrictions has a distinct ETag based on those restrictions.
    *
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
@@ -396,6 +398,20 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return generateETag(metadataLocation, snapshots, Optional.empty());
+  }
+
+  /**
+   * Generates an ETag for a load-table representation, including state that may change without an
+   * Iceberg metadata commit.
+   *
+   * @param metadataLocation the metadata file location
+   * @param snapshots the snapshots query parameter value
+   * @param representationSeed optional canonical seed for response state outside table metadata
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
     if (StringUtils.isBlank(metadataLocation)) {
       return Optional.empty();
     }
@@ -403,6 +419,10 @@ public class IcebergRESTUtils {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
       digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
+      if (representationSeed.isPresent()) {
+        digest.update((byte) 0);
+        digest.update(representationSeed.get().getBytes(StandardCharsets.UTF_8));
+      }
       byte[] hash = digest.digest();
       StringBuilder hexString = new StringBuilder();
       for (byte b : hash) {
@@ -441,12 +461,44 @@ public class IcebergRESTUtils {
     includeErrorStackTrace = include;
   }
 
+  /**
+   * Checks that a request body was sent and passes the request's own validation, so a missing or
+   * incomplete body is answered with 400 instead of failing later with an internal error.
+   *
+   * @param request the deserialized request body, which is null when no body was sent
+   * @param requestType the request type named in the error message
+   * @throws BadRequestException if the body is missing or fails validation
+   */
+  public static void validateRequest(Object request, String requestType) {
+    if (request == null) {
+      throw new BadRequestException("Invalid request: a %s body is required", requestType);
+    }
+    if (request instanceof RESTRequest) {
+      try {
+        ((RESTRequest) request).validate();
+      } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+        throw new BadRequestException(
+            "Invalid %s: %s",
+            requestType, e.getMessage() == null ? "a required field is missing" : e.getMessage());
+      }
+    }
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
+    String message = ex.getMessage();
+    if (message == null) {
+      message =
+          httpStatus >= Status.INTERNAL_SERVER_ERROR.getStatusCode()
+              ? "Internal server error"
+              : Status.fromStatusCode(httpStatus) == null
+                  ? "Request failed"
+                  : Status.fromStatusCode(httpStatus).getReasonPhrase();
+    }
     ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage());
+            .withMessage(message);
     if (includeErrorStackTrace) {
       builder.withStackTrace(ex);
     }
@@ -500,12 +552,33 @@ public class IcebergRESTUtils {
     return catalogName;
   }
 
+  /**
+   * Copies an Iceberg REST request or response through its JSON form, so event listeners get an
+   * object detached from the one the server works on.
+   *
+   * <p>Events are built after the operation has been applied, so a copy that fails must not turn a
+   * completed operation into an error. Some valid requests cannot be serialized again by Iceberg,
+   * for example a partition field sent without its optional {@code field-id}; for those the
+   * original object, which Iceberg does not modify, is returned instead.
+   *
+   * @param message the object to copy
+   * @param className the class of the copy
+   * @param <T> the type of the copy
+   * @return the copy, or the original object if it cannot be copied
+   */
   public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
     ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
     try {
       byte[] values = icebergObjectMapper.writeValueAsBytes(message);
       return icebergObjectMapper.readValue(values, className);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
+      if (className.isInstance(message)) {
+        LOG.warn(
+            "Cannot copy {} for an event, the event carries the original object: {}",
+            className.getSimpleName(),
+            e.getMessage());
+        return className.cast(message);
+      }
       throw new RuntimeException(e);
     }
   }

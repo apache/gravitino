@@ -178,4 +178,16 @@ public class TestDorisColumnDefaultValueConverter {
         CONVERTER.fromGravitinoForModifyColumn(
             Literals.of(defaultValue, Types.VarCharType.of(255)), true, true));
   }
+
+  @Test
+  public void testCreateTableStringDefaultLiteralForms() {
+    DorisColumnDefaultValueConverter converter = new DorisColumnDefaultValueConverter();
+    Literal<?> value = Literals.varcharLiteral(64, "O'Brien C:\\tmp \"x\"");
+    Assertions.assertEquals(
+        "\"O'Brien C:\\\\tmp \\\"x\\\"\"", converter.fromGravitinoForCreateTable(value, true));
+    Assertions.assertEquals(
+        "'O''Brien C:\\\\tmp \"x\"'", converter.fromGravitinoForCreateTable(value, false));
+    Assertions.assertEquals(
+        "12", converter.fromGravitinoForCreateTable(Literals.integerLiteral(12), true));
+  }
 }

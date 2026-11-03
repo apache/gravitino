@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -40,7 +41,8 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
   // for example:
   // '2021-10-01 00:00:00'::timestamp without time zone
   // ''something'::character varying'
-  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'(.+?)'::\\s*(.+)");
+  // Possessive repetition avoids recursive backtracking for long default literals.
+  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'((?:[^']|'')*+)'::\\s*(.+)");
 
   // for example:
   // NULL::character varying
@@ -72,10 +74,31 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
     }
   }
 
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public String fromGravitino(Expression defaultValue) {
+    String sql = super.fromGravitino(defaultValue);
+    if (sql != null && sql.indexOf('\0') >= 0) {
+      throw new IllegalArgumentException("PostgreSQL column default must not contain U+0000 (NUL)");
+    }
+    return sql;
+  }
+
+  /**
+   * Doubles single quotes only. With {@code standard_conforming_strings} on, the default since
+   * PostgreSQL 9.1, a backslash in a string literal is an ordinary character.
+   */
+  @Override
+  protected String quoteStringLiteral(String value) {
+    return "'" + value.replace("'", "''") + "'";
+  }
+
   private Expression parseLiteral(JdbcTypeConverter.JdbcTypeBean type, String columnDefaultValue) {
     Matcher matcher = VALUE_WITH_TYPE.matcher(columnDefaultValue);
     if (matcher.find()) {
-      columnDefaultValue = matcher.group(1);
+      // String literals in the catalog are shown with embedded single quotes doubled.
+      columnDefaultValue = matcher.group(1).replace("''", "'");
     }
 
     if (columnDefaultValue.startsWith(NULL_PREFIX)) {

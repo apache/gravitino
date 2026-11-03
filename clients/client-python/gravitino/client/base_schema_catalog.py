@@ -34,6 +34,7 @@ from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.function_catalog_operations import FunctionCatalogOperations
 from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
@@ -235,6 +236,8 @@ class BaseSchemaCatalog(
 
         Raises:
             NoSuchSchemaException if the schema with specified identifier does not exist.
+            SchemaAlreadyExistsException if the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             The Schema with specified identifier.
@@ -293,12 +296,17 @@ class BaseSchemaCatalog(
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
 
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
+
         Args:
             schema_name: The name of the schema.
-            cascade: Whether to drop all the tables under the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Raises:
-            NonEmptySchemaException if the schema is not empty and cascade is false.
+            NonEmptySchemaException if the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
 
         Returns:
              true if the schema is dropped successfully, false otherwise.
@@ -402,8 +410,14 @@ class BaseSchemaCatalog(
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> List[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)

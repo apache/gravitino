@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No                             |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No                             |
 | `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No                             |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                        | `30000`       | No                             |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No                             |
 
 :::caution
 Download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
@@ -77,7 +77,7 @@ Sensitive catalog properties such as `jdbc-password` are hidden from the default
 - Gravitino schema corresponds to the PostgreSQL schema.
 - Supports creating schema with comments.
 - Supports dropping schema.
-- Supports cascade dropping schema.
+- Non-empty schema drops, including requests with `cascade=true`, are refused with a schema-not-empty conflict (HTTP 409). PostgreSQL native `CASCADE` can delete objects in other schemas, and a client-side dependency check cannot prevent concurrent DDL from adding such dependencies. Remove the schema objects explicitly, then drop the empty schema.
 
 ### Schema Properties
 
