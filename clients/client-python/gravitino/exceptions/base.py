@@ -299,3 +299,19 @@ class NoSuchGroupException(NotFoundException):
 
 class GroupAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a group already exists."""
+
+
+class NoSuchDomainException(NotFoundException):
+    """The domain does not exist or is not visible to the caller."""
+
+
+class DomainAlreadyExistsException(AlreadyExistsException):
+    """A domain with the requested name already exists."""
+
+
+class BackingTagAlreadyBoundException(AlreadyExistsException):
+    """The backing tag conflicts with another domain's binding."""
+
+
+class NonEmptyDomainException(GravitinoRuntimeException):
+    """A domain with subdomains cannot be deleted."""

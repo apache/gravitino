@@ -37,6 +37,7 @@ class MetadataObjects:
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
             MetadataObject.Type.TAG,
+            MetadataObject.Type.DOMAIN,
             MetadataObject.Type.POLICY,
             MetadataObject.Type.JOB,
             MetadataObject.Type.JOB_TEMPLATE,
@@ -130,6 +131,7 @@ class MetadataObjects:
             MetadataObject.Type.METALAKE,
             MetadataObject.Type.CATALOG,
             MetadataObject.Type.ROLE,
+            MetadataObject.Type.DOMAIN,
         }:
             return None
 
@@ -193,8 +195,8 @@ class MetadataObjects:
         )
 
         parts = full_name.split(MetadataObjects.DOT_SPLITTER)
-        if type_ is MetadataObject.Type.ROLE:
-            return MetadataObjects.of([full_name], MetadataObject.Type.ROLE)
+        if type_ in {MetadataObject.Type.ROLE, MetadataObject.Type.DOMAIN}:
+            return MetadataObjects.of([full_name], type_)
 
         return MetadataObjects.of(parts, type_)
 

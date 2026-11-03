@@ -34,6 +34,10 @@ from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.secret import SecretBinding, SecretReference
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.tag.tag_value import TagValue
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -45,7 +49,9 @@ _EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
 _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
-class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
+class GravitinoClient(
+    GravitinoClientBase, SupportsJobs, TagOperations, DomainOperations
+):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.
 
@@ -717,3 +723,36 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         return self.get_metalake().revoke_privileges_from_role(
             role_name, securable_object, privileges
         )
+
+    def list_domains(self) -> list[str]:
+        """List visible domains in the current metalake."""
+        return self.get_metalake().list_domains()
+
+    def list_domains_info(self) -> list[Domain]:
+        """List visible domain snapshots in the current metalake."""
+        return self.get_metalake().list_domains_info()
+
+    def get_domain(self, name: str) -> Domain:
+        """Load a domain; absent or hidden drafts raise NoSuchDomainException."""
+        return self.get_metalake().get_domain(name)
+
+    def create_domain(
+        self,
+        name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        backing_tag: TagValue,
+        create_backing_tag: bool,
+    ) -> Domain:
+        """Create a draft top-level domain with an explicit new or existing tag."""
+        return self.get_metalake().create_domain(
+            name, comment, properties, backing_tag, create_backing_tag
+        )
+
+    def alter_domain(self, name: str, *changes: DomainChange) -> Domain:
+        """Alter the named domain and return a new snapshot."""
+        return self.get_metalake().alter_domain(name, *changes)
+
+    def delete_domain(self, name: str) -> bool:
+        """Delete the named domain while preserving tags."""
+        return self.get_metalake().delete_domain(name)
