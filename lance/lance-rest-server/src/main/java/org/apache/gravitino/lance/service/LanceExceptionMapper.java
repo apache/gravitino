@@ -20,7 +20,11 @@ package org.apache.gravitino.lance.service;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -54,6 +58,10 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   // outside the main server's classpath, so each service loads its own copy.
   private static volatile boolean includeErrorStackTrace =
       JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
+
+  @Context private Request request;
+
+  @Context private UriInfo uriInfo;
 
   /**
    * Sets whether error details built by {@link #errorDetail(Throwable)} include the exception's
@@ -92,6 +100,14 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   @Override
   public Response toResponse(Throwable ex) {
+    if (ex instanceof javax.ws.rs.NotFoundException) {
+      String path = uriInfo.getRequestUri().getPath();
+      String message = "Unsupported operation: " + request.getMethod() + " " + path;
+
+      return toRESTResponse(
+          path, new org.lance.namespace.errors.UnsupportedOperationException(message, "", path));
+    }
+
     return toRESTResponse("", ex);
   }
 
@@ -166,6 +182,9 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
     errResp.setError(ex.getMessage());
     errResp.setDetail(ex.getDetail());
     errResp.setInstance(ex.getInstance());
-    return Response.status(toHttpStatus(ex)).entity(errResp).build();
+    return Response.status(toHttpStatus(ex))
+        .type(MediaType.APPLICATION_JSON_TYPE)
+        .entity(errResp)
+        .build();
   }
 }

@@ -21,10 +21,13 @@ package org.apache.gravitino.lance.service;
 import java.io.IOException;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -53,6 +56,20 @@ public class TestLanceExceptionMapper extends JerseyTest {
       AssertionError error = new AssertionError("assertion failure");
       error.initCause(new IllegalStateException("root cause"));
       throw error;
+    }
+
+    /** Simulates an operation failing because its table does not exist. */
+    @GET
+    @Path("missing-table")
+    public String missingTable() {
+      throw new NoSuchTableException("Missing test table");
+    }
+
+    /** Simulates an operation failing because its namespace does not exist. */
+    @GET
+    @Path("missing-namespace")
+    public String missingNamespace() {
+      throw new NoSuchSchemaException("Missing test namespace");
     }
   }
 
@@ -161,6 +178,53 @@ public class TestLanceExceptionMapper extends JerseyTest {
           "native detail", ((ErrorResponse) nativeResponse.getEntity()).getDetail());
     } finally {
       LanceExceptionMapper.setIncludeErrorStackTrace(true);
+    }
+  }
+
+  /** Verifies that an unregistered route returns an Unsupported error. */
+  @Test
+  public void testUnregisteredRouteReturnsUnsupported() {
+    String path = "v1/table/test_table/query";
+
+    try (Response response =
+        target(path).request(MediaType.APPLICATION_JSON_TYPE).post(Entity.json("{}"))) {
+      Assertions.assertEquals(Response.Status.NOT_ACCEPTABLE.getStatusCode(), response.getStatus());
+
+      Assertions.assertNotNull(response.getMediaType());
+      Assertions.assertTrue(MediaType.APPLICATION_JSON_TYPE.isCompatible(response.getMediaType()));
+
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(0, error.getCode());
+      Assertions.assertNotNull(error.getError());
+      Assertions.assertTrue(error.getError().contains("POST"));
+      Assertions.assertNotNull(error.getInstance());
+      Assertions.assertTrue(error.getInstance().contains(path));
+    }
+  }
+
+  /** Verifies that a missing table remains a not-found error. */
+  @Test
+  public void testMissingTableRemainsNotFound() {
+    try (Response response =
+        target("error/missing-table").request(MediaType.APPLICATION_JSON_TYPE).get()) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("Missing test table", error.getError());
+      Assertions.assertNotEquals(0, error.getCode());
+    }
+  }
+
+  /** Verifies that a missing namespace remains a not-found error. */
+  @Test
+  public void testMissingNamespaceRemainsNotFound() {
+    try (Response response =
+        target("error/missing-namespace").request(MediaType.APPLICATION_JSON_TYPE).get()) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("Missing test namespace", error.getError());
+      Assertions.assertNotEquals(0, error.getCode());
     }
   }
 }
