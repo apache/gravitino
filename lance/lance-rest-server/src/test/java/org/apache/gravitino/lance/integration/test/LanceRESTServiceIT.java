@@ -684,16 +684,31 @@ public class LanceRESTServiceIT extends BaseIT {
     AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();
     dropNonExistingColumnsRequest.setId(ids);
     dropNonExistingColumnsRequest.setColumns(List.of("non_existing_column"));
-    Exception dropColumnException =
+    long versionBeforeRejectedDrop;
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      versionBeforeRejectedDrop = dataset.version();
+    }
+    ApiException dropColumnException =
         Assertions.assertThrows(
-            Exception.class,
+            ApiException.class,
             () ->
                 tableApi.alterTableDropColumns(
                     String.join(delimiter, ids), dropNonExistingColumnsRequest, delimiter));
-    Assertions.assertTrue(
-        dropColumnException
-            .getMessage()
-            .contains("Column non_existing_column does not exist in the dataset"));
+    Assertions.assertEquals(400, dropColumnException.getCode());
+    ErrorResponse error =
+        JsonUtils.anyFieldMapper()
+            .readValue(dropColumnException.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+    Assertions.assertTrue(error.getError().contains("non_existing_column"));
+    Assertions.assertEquals("", error.getDetail());
+    Assertions.assertEquals(
+        List.of("id"),
+        ns.describeTable(describeTableRequest).getSchema().getFields().stream()
+            .map(JsonArrowField::getName)
+            .toList());
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      Assertions.assertEquals(versionBeforeRejectedDrop, dataset.version());
+    }
   }
 
   @Test
