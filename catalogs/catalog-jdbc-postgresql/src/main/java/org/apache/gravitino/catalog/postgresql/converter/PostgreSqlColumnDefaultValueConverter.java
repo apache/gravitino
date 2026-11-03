@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -71,6 +72,17 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
       }
       return UnparsedExpression.of(columnDefaultValue);
     }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public String fromGravitino(Expression defaultValue) {
+    String sql = super.fromGravitino(defaultValue);
+    if (sql != null && sql.indexOf('\0') >= 0) {
+      throw new IllegalArgumentException("PostgreSQL column default must not contain U+0000 (NUL)");
+    }
+    return sql;
   }
 
   /**

@@ -28,6 +28,20 @@ public class TestPostgreSqlColumnDefaultValueConverter {
   private final PostgreSqlColumnDefaultValueConverter converter =
       new PostgreSqlColumnDefaultValueConverter();
 
+  @Test
+  void testNulStringDefaultIsRejectedBeforeDdl() {
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Literals.stringLiteral("before\0after")));
+    Assertions.assertTrue(error.getMessage().contains("default"));
+    Assertions.assertTrue(error.getMessage().contains("U+0000"));
+    Assertions.assertEquals(
+        "'before\\u0000after'",
+        converter.fromGravitino(Literals.stringLiteral("before\\u0000after")));
+    Assertions.assertEquals("NULL", converter.fromGravitino(Literals.NULL));
+  }
+
   /** Verifies long quoted text defaults can be loaded without recursive regex stack growth. */
   @Test
   public void testLongQuotedTextLiteralIsUnescaped() {
