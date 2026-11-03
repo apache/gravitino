@@ -81,6 +81,10 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
@@ -108,6 +112,10 @@ public class IdpUserOperations {
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
