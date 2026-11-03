@@ -336,4 +336,18 @@ class TestGlueIcebergTableHelper {
                 () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
             .getMessage());
   }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesAppliesHttpTimeouts() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "2500");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+
+    assertEquals("apache", icebergProps.get("http-client.type"));
+    assertEquals("2500", icebergProps.get("http-client.apache.connection-timeout-ms"));
+    assertEquals("2500", icebergProps.get("http-client.apache.socket-timeout-ms"));
+  }
 }

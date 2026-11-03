@@ -32,9 +32,9 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
-import org.apache.gravitino.utils.ExceptionMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreatePartitionRequest;
@@ -43,7 +43,6 @@ import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GetPartitionRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
-import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.PartitionInput;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 
@@ -60,6 +59,8 @@ import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 class GlueTableOperations implements TableOperations, SupportsPartitions {
 
   private static final Logger LOG = LoggerFactory.getLogger(GlueTableOperations.class);
+
+  private static final int MAX_PARTITION_VALUE_LENGTH = 1024;
 
   private final GlueClient glueClient;
   /** Nullable — when null, Glue uses the caller's AWS account ID. */
@@ -99,8 +100,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
         }
         nextToken = resp.nextToken();
       } while (nextToken != null);
-    } catch (GlueException e) {
-      throw ExceptionMessages.wrap("Failed to list partitions for table " + tableName, e);
+    } catch (SdkException e) {
+      throw GlueExceptionConverter.toGenericException(
+          e, "listing partitions of table " + tableName, glueClient);
     }
     return names.toArray(new String[0]);
   }
@@ -121,8 +123,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
         }
         nextToken = resp.nextToken();
       } while (nextToken != null);
-    } catch (GlueException e) {
-      throw ExceptionMessages.wrap("Failed to list partitions for table " + tableName, e);
+    } catch (SdkException e) {
+      throw GlueExceptionConverter.toGenericException(
+          e, "listing partitions of table " + tableName, glueClient);
     }
     return partitions.toArray(new Partition[0]);
   }
@@ -141,8 +144,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     } catch (EntityNotFoundException e) {
       throw new NoSuchPartitionException(
           e, "Partition %s does not exist in table %s", partitionName, tableName);
-    } catch (GlueException e) {
-      throw ExceptionMessages.wrap("Failed to get partition " + partitionName, e);
+    } catch (SdkException e) {
+      throw GlueExceptionConverter.toGenericException(
+          e, "partition " + partitionName + " of table " + tableName, glueClient);
     }
   }
 
@@ -158,8 +162,20 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
         partitionColNames.length);
 
     List<String> values = new ArrayList<>(ip.values().length);
-    for (Literal<?> v : ip.values()) {
-      values.add(v.value() != null ? v.value().toString() : null);
+    for (int i = 0; i < ip.values().length; i++) {
+      Object value = ip.values()[i].value();
+      // Glue limits partition values to 1024 characters. Null and empty values are rejected because
+      // a Hive-style partition name cannot represent them.
+      Preconditions.checkArgument(
+          value != null && !value.toString().isEmpty(),
+          "Value of partition column %s must not be null or empty",
+          partitionColNames[i]);
+      Preconditions.checkArgument(
+          value.toString().length() <= MAX_PARTITION_VALUE_LENGTH,
+          "Value of partition column %s exceeds the Glue limit of %s characters",
+          partitionColNames[i],
+          MAX_PARTITION_VALUE_LENGTH);
+      values.add(value.toString());
     }
 
     PartitionInput input =
@@ -181,8 +197,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     } catch (AlreadyExistsException e) {
       throw new PartitionAlreadyExistsException(
           e, "Partition %s already exists in table %s", partition.name(), tableName);
-    } catch (GlueException e) {
-      throw ExceptionMessages.wrap("Failed to add partition " + partition.name(), e);
+    } catch (SdkException e) {
+      throw GlueExceptionConverter.toGenericException(
+          e, "adding partition " + partition.name() + " to table " + tableName, glueClient);
     }
 
     LOG.info("Added partition {} to {}.{}", partition.name(), dbName, tableName);
@@ -210,8 +227,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       return true;
     } catch (EntityNotFoundException e) {
       return false;
-    } catch (GlueException e) {
-      throw ExceptionMessages.wrap("Failed to drop partition " + partitionName, e);
+    } catch (SdkException e) {
+      throw GlueExceptionConverter.toGenericException(
+          e, "dropping partition " + partitionName + " of table " + tableName, glueClient);
     }
   }
 

@@ -22,6 +22,7 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -148,6 +149,21 @@ public class TestExceptionHandlers {
     Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
     Assertions.assertEquals(
         ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  void testPartitionForbiddenReturnsForbidden() {
+    Response response =
+        ExceptionHandlers.handlePartitionException(
+            OperationType.LIST,
+            "",
+            "table",
+            new ForbiddenException("not authorized to perform: glue:GetTable"));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
