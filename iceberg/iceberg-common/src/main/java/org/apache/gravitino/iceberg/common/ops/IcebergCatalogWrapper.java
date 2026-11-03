@@ -531,6 +531,20 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return getCatalog() instanceof RESTCatalog;
   }
 
+  /**
+   * Returns whether authorization for this catalog may be left to the remote catalog. That holds
+   * only for a REST catalog backend that forwards the calling user's token, so the remote catalog
+   * sees and authorizes the real user. A REST backend connected as a service account presents one
+   * identity for every user, so Gravitino must authorize each request itself.
+   *
+   * @return {@code true} if the remote catalog authorizes each user's requests
+   */
+  public boolean remoteCatalogAuthorizesUsers() {
+    return IcebergCatalogBackend.REST.equals(catalogBackend)
+        && !icebergConfig.isRestBackendServiceAccount()
+        && isRESTCatalog();
+  }
+
   @Getter
   @Setter
   public static final class IcebergTableChange {

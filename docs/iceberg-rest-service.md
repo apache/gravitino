@@ -260,6 +260,28 @@ IRC1 must also configure S3 configurations if the client side requests credentia
 If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-rest-authz=true` can leave operations unprotected. Set it to `false` to enforce authorization in IRC1.
 :::
 
+##### Service account connection
+
+By default IRC1 forwards each user's access token to IRC2, so IRC2 must trust the same identity provider and authorize every user itself. To federate a catalog that cannot do that, such as a managed catalog that accepts only its own API token, connect IRC1 to IRC2 as a service account. IRC1 then presents one configured credential on every request to IRC2 and authorizes each user against Gravitino's own grants before anything is proxied. A catalog connected as a service account always enforces authorization in IRC1, whatever `disable-rest-authz` is set to.
+
+| Configuration item                                    | Description                                                                                                                                         | Default value | Required                                    |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------------------------|
+| `gravitino.iceberg-rest.rest-backend-auth-type`       | How IRC1 authenticates to IRC2. `user-token` forwards the calling user's access token. `service-account` connects with the credential below.        | `user-token`  | No                                          |
+| `gravitino.iceberg-rest.rest-backend-token`           | Static bearer token the service account presents to IRC2.                                                                                          | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-credential`      | OAuth2 client credential (`client_id:client_secret`) the service account exchanges for a token.                                                    | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-oauth2-server-uri` | OAuth2 token endpoint for the client credential. Defaults to IRC2's own token endpoint.                                                          | (none)        | No                                          |
+| `gravitino.iceberg-rest.rest-backend-scope`           | OAuth2 scope requested with the client credential.                                                                                                 | (none)        | No                                          |
+
+IRC1 configuration example federating a catalog that accepts only a static API token:
+
+```text
+gravitino.iceberg-rest.catalog-backend = rest
+gravitino.iceberg-rest.uri = https://catalog.example.com/v1
+gravitino.iceberg-rest.warehouse = example_warehouse
+gravitino.iceberg-rest.rest-backend-auth-type = service-account
+gravitino.iceberg-rest.rest-backend-token = xx
+```
+
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).

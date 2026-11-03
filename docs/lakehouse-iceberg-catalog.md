@@ -87,6 +87,11 @@ The following properties tune REST backend behavior:
 | `data-access`                       | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       |
 | `rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       |
 | `rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       |
+| `rest-backend-auth-type`           | How the REST backend authenticates to the remote catalog: `user-token` forwards the calling user's token, `service-account` connects with `rest-backend-token` or `rest-backend-credential` and authorizes every request in Gravitino. | user-token    | No       |
+| `rest-backend-token`               | Static bearer token for a `service-account` connection. Hidden from catalog responses.                     | (none)        | No       |
+| `rest-backend-credential`          | OAuth2 client credential (`client_id:client_secret`) for a `service-account` connection. Hidden from catalog responses. | (none)        | No       |
+| `rest-backend-oauth2-server-uri`   | OAuth2 token endpoint for `rest-backend-credential`.                                                       | (none)        | No       |
+| `rest-backend-scope`               | OAuth2 scope requested with `rest-backend-credential`.                                                     | (none)        | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.

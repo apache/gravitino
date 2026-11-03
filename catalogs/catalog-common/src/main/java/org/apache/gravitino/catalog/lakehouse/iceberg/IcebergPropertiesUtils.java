@@ -111,6 +111,16 @@ public class IcebergPropertiesUtils {
     map.put(
         IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
         IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS);
+    // The service account settings keep their Gravitino names here and are translated to Iceberg
+    // REST client properties only when the REST backend is built, so no other component (such as
+    // an engine connector converting catalog properties) receives the remote catalog's credential.
+    map.put(IcebergConstants.REST_BACKEND_AUTH_TYPE, IcebergConstants.REST_BACKEND_AUTH_TYPE);
+    map.put(IcebergConstants.REST_BACKEND_TOKEN, IcebergConstants.REST_BACKEND_TOKEN);
+    map.put(IcebergConstants.REST_BACKEND_CREDENTIAL, IcebergConstants.REST_BACKEND_CREDENTIAL);
+    map.put(
+        IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI,
+        IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI);
+    map.put(IcebergConstants.REST_BACKEND_SCOPE, IcebergConstants.REST_BACKEND_SCOPE);
 
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 

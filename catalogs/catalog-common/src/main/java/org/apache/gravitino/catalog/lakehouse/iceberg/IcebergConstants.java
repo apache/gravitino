@@ -137,6 +137,45 @@ public class IcebergConstants {
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
   public static final String ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME = "default-catalog-name";
   public static final String ICEBERG_REST_DISABLE_REST_AUTHZ = "disable-rest-authz";
+
+  /**
+   * Gravitino config key selecting how a REST catalog backend authenticates to the remote catalog:
+   * {@link #REST_BACKEND_AUTH_TYPE_USER_TOKEN} or {@link #REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT}.
+   */
+  public static final String REST_BACKEND_AUTH_TYPE = "rest-backend-auth-type";
+
+  /** Forward the calling user's access token to the remote catalog, which authorizes the user. */
+  public static final String REST_BACKEND_AUTH_TYPE_USER_TOKEN = "user-token";
+
+  /**
+   * Connect to the remote catalog as a service account with a configured credential. Gravitino
+   * authorizes every request locally before proxying it.
+   */
+  public static final String REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT = "service-account";
+
+  /** Gravitino config key for the service account's static bearer token. */
+  public static final String REST_BACKEND_TOKEN = "rest-backend-token";
+
+  /** Gravitino config key for the service account's OAuth2 client credential. */
+  public static final String REST_BACKEND_CREDENTIAL = "rest-backend-credential";
+
+  /** Gravitino config key for the OAuth2 token endpoint used with the client credential. */
+  public static final String REST_BACKEND_OAUTH2_SERVER_URI = "rest-backend-oauth2-server-uri";
+
+  /** Gravitino config key for the OAuth2 scope requested with the client credential. */
+  public static final String REST_BACKEND_SCOPE = "rest-backend-scope";
+
+  /** Iceberg REST client property for a static bearer token. */
+  public static final String ICEBERG_REST_TOKEN = "token";
+
+  /** Iceberg REST client property for an OAuth2 client credential. */
+  public static final String ICEBERG_REST_CREDENTIAL = "credential";
+
+  /** Iceberg REST client property for the OAuth2 token endpoint. */
+  public static final String ICEBERG_REST_OAUTH2_SERVER_URI = "oauth2-server-uri";
+
+  /** Iceberg REST client property for the OAuth2 scope. */
+  public static final String ICEBERG_REST_SCOPE = "scope";
   /** Gravitino config key for REST catalog backend HTTP connection timeout. */
   public static final String REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
       "rest-client-connection-timeout-ms";
