@@ -32,13 +32,15 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Interface defining the operations for a Relation Backend. */
-public interface RelationalBackend extends Closeable, SupportsRelationOperations {
+public interface RelationalBackend
+    extends Closeable, SupportsRelationOperations, SupportsDomainOperations {
 
   /**
    * Reads metric identifiers in a schema without loading complete Semantic Models.

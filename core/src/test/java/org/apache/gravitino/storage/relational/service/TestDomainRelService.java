@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.mockito.ArgumentMatchers.any;
+
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -26,9 +29,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,19 +43,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
+import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.DomainRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -67,6 +78,7 @@ import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestDomainRelService extends TestJDBCBackend {
 
@@ -270,31 +282,6 @@ public class TestDomainRelService extends TestJDBCBackend {
                 trading.nameIdentifier(),
                 NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"),
                 AUDIT_INFO));
-  }
-
-  @TestTemplate
-  public void testDeleteDomainRel() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
-    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
-
-    Assertions.assertFalse(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    domainRelService.insertDomainRel(
-        trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO);
-    Assertions.assertTrue(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    Assertions.assertFalse(domainRelService.deleteDomainRel(trading.nameIdentifier()));
-    Assertions.assertFalse(domainRelService.getParentDomainName(trading.id()).isPresent());
-    Assertions.assertTrue(domainRelService.listSubDomains(finance.nameIdentifier()).isEmpty());
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            domainRelService.deleteDomainRel(
-                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing")));
-
-    // A detached domain can be attached again.
-    domainRelService.insertDomainRel(
-        trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO);
-    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
   }
 
   @TestTemplate
@@ -515,7 +502,11 @@ public class TestDomainRelService extends TestJDBCBackend {
           try {
             for (int i = 0; i < 3; i++) {
               insertDomainRel(child, parent);
-              Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+              Assertions.assertFalse(
+                  domainRelService
+                      .removeDomainParentAndGet(child.nameIdentifier(), state -> {})
+                      .parent()
+                      .isPresent());
             }
             insertDomainRel(child, parent);
             Assertions.assertTrue(domainMetaService.deleteDomain(child.nameIdentifier()));
@@ -747,7 +738,11 @@ public class TestDomainRelService extends TestJDBCBackend {
         () -> {
           insertDomainRel(child, parent);
           try {
-            Assertions.assertTrue(domainRelService.deleteDomainRel(child.nameIdentifier()));
+            Assertions.assertFalse(
+                domainRelService
+                    .removeDomainParentAndGet(child.nameIdentifier(), state -> {})
+                    .parent()
+                    .isPresent());
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -811,6 +806,629 @@ public class TestDomainRelService extends TestJDBCBackend {
     }
   }
 
+  @TestTemplate
+  public void testInsertDomainWithCheck() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    domainMetaService.insertDomain(finance, states::add);
+    Assertions.assertEquals(
+        finance, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    Assertions.assertEquals(1, states.size());
+    Assertions.assertEquals(finance, states.get(0).domain());
+    Assertions.assertFalse(states.get(0).parent().isPresent());
+    Assertions.assertTrue(states.get(0).subDomains().isEmpty());
+
+    // A domain with a parent is inserted together with its edge, and the check sees the parent.
+    DomainEntity trading = newDomain(METALAKE_NAME, "Trading", "Finance");
+    states.clear();
+    domainMetaService.insertDomain(trading, states::add);
+    Assertions.assertEquals(
+        trading, domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
+    Assertions.assertEquals(finance.id(), selectDomainRel(trading.id()).parentId());
+    LockedDomainState state = states.get(0);
+    Assertions.assertEquals(finance.id(), state.parent().get().id());
+    Assertions.assertFalse(state.parent().get().parent().isPresent());
+
+    // The check sees that the parent is itself a sub-domain.
+    DomainEntity desk = newDomain(METALAKE_NAME, "Desk", "Trading");
+    states.clear();
+    domainMetaService.insertDomain(desk, states::add);
+    Assertions.assertEquals("Finance", states.get(0).parent().get().parent().get());
+
+    // A failing check inserts neither the domain nor its edge.
+    DomainEntity rejected = newDomain(METALAKE_NAME, "Rejected", "Finance");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainMetaService.insertDomain(
+                rejected,
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(rejected.nameIdentifier()));
+    Assertions.assertEquals(0, countDomainRelRows(rejected.id()));
+
+    DomainEntity orphan = newDomain(METALAKE_NAME, "Orphan", "missing");
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> domainMetaService.insertDomain(orphan, s -> {}));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.getDomainByIdentifier(orphan.nameIdentifier()));
+
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> domainMetaService.insertDomain(newDomain(METALAKE_NAME, "Finance", null), s -> {}));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> domainMetaService.insertDomain(newDomain("missing_metalake", "X", null), s -> {}));
+  }
+
+  @TestTemplate
+  public void testInsertDomainWithCheckRejectsOuterTransaction() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    for (String parent : new String[] {null, finance.name()}) {
+      DomainEntity rejected = newDomain(METALAKE_NAME, "Rejected", parent);
+      DomainEntity accepted = newDomain(METALAKE_NAME, "Accepted" + rejected.id(), null);
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            Assertions.assertThrows(
+                IllegalStateException.class,
+                () ->
+                    domainMetaService.insertDomain(
+                        rejected,
+                        state -> {
+                          throw new IllegalArgumentException("rejected");
+                        }));
+            // Catching the rejection must not leave a domain for the outer commit to persist.
+            // A separate write confirms that the outer transaction still commits normally.
+            try {
+              domainMetaService.insertDomain(accepted, false);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          });
+      Assertions.assertEquals(
+          accepted, domainMetaService.getDomainByIdentifier(accepted.nameIdentifier()));
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () -> domainMetaService.getDomainByIdentifier(rejected.nameIdentifier()));
+      Assertions.assertEquals(0, countDomainRelRows(rejected.id()));
+    }
+  }
+
+  @TestTemplate
+  public void testSetDomainParent() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    String anotherMetalakeName = METALAKE_NAME + "_another";
+    createAndInsertMakeLake(anotherMetalakeName);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity markets = insertDomain(METALAKE_NAME, "Markets");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    DomainEntity desk = insertDomain(METALAKE_NAME, "Desk");
+    DomainEntity elsewhere = insertDomain(anotherMetalakeName, "Elsewhere");
+    insertDomainRel(desk, trading);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    // Attaching a top-level domain inserts its edge; the check sees the locked domains.
+    DomainEntity attached =
+        domainRelService.setDomainParentAndGet(
+            trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, states::add);
+    Assertions.assertEquals(trading.toBuilder().withParent("Finance").build(), attached);
+    LockedDomainState state = states.get(0);
+    Assertions.assertEquals(trading.id(), state.domain().id());
+    Assertions.assertFalse(state.domain().parent().isPresent());
+    Assertions.assertEquals(finance.id(), state.parent().get().id());
+    Assertions.assertFalse(state.parent().get().parent().isPresent());
+    Assertions.assertEquals(
+        Lists.newArrayList(desk.id()),
+        state.subDomains().stream().map(DomainEntity::id).collect(Collectors.toList()));
+    Assertions.assertEquals(1L, selectDomainRel(trading.id()).currentVersion());
+
+    // Moving it re-points the edge; the check sees the current parent.
+    states.clear();
+    Instant modifiedTime = Instant.now();
+    AuditInfo modifiedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("mover")
+            .withCreateTime(modifiedTime)
+            .withLastModifier("mover")
+            .withLastModifiedTime(modifiedTime)
+            .build();
+    DomainEntity moved =
+        domainRelService.setDomainParentAndGet(
+            trading.nameIdentifier(), markets.nameIdentifier(), modifiedAuditInfo, states::add);
+    Assertions.assertEquals("Markets", moved.parent().get());
+    Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
+    Assertions.assertEquals(markets.id(), states.get(0).parent().get().id());
+    DomainRelPO domainRelPO = selectDomainRel(trading.id());
+    Assertions.assertEquals(2L, domainRelPO.currentVersion());
+    AuditInfo storedAuditInfo =
+        JsonUtils.anyFieldMapper().readValue(domainRelPO.auditInfo(), AuditInfo.class);
+    Assertions.assertEquals(AUDIT_INFO.creator(), storedAuditInfo.creator());
+    Assertions.assertEquals("mover", storedAuditInfo.lastModifier());
+
+    // The check also sees that the new parent is itself a sub-domain.
+    states.clear();
+    domainRelService.setDomainParentAndGet(
+        finance.nameIdentifier(), desk.nameIdentifier(), AUDIT_INFO, states::add);
+    Assertions.assertEquals("Trading", states.get(0).parent().get().parent().get());
+    domainRelService.removeDomainParentAndGet(finance.nameIdentifier(), s -> {});
+
+    // Setting the current parent changes nothing.
+    domainRelService.setDomainParentAndGet(
+        trading.nameIdentifier(), markets.nameIdentifier(), modifiedAuditInfo, s -> {});
+    Assertions.assertEquals(2L, selectDomainRel(trading.id()).currentVersion());
+
+    // A failing check changes nothing.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.setDomainParentAndGet(
+                trading.nameIdentifier(),
+                finance.nameIdentifier(),
+                AUDIT_INFO,
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertEquals("Markets", domainRelService.getParentDomainName(trading.id()).get());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.setDomainParentAndGet(
+                trading.nameIdentifier(), trading.nameIdentifier(), AUDIT_INFO, s -> {}));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.setDomainParentAndGet(
+                elsewhere.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, s -> {}));
+    // On MySQL, whose collation ignores trailing spaces, both names resolve to the same row, which
+    // is refused as its own parent; elsewhere the second name does not exist. No edge is written.
+    RuntimeException selfParent =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                domainRelService.setDomainParentAndGet(
+                    finance.nameIdentifier(),
+                    NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance "),
+                    AUDIT_INFO,
+                    s -> {}));
+    Assertions.assertTrue(
+        selfParent instanceof IllegalArgumentException
+            || selfParent instanceof NoSuchEntityException,
+        String.valueOf(selfParent));
+    Assertions.assertFalse(domainRelService.getParentDomainName(finance.id()).isPresent());
+
+    NameIdentifier missing = NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing");
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            domainRelService.setDomainParentAndGet(
+                missing, finance.nameIdentifier(), AUDIT_INFO, s -> {}));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            domainRelService.setDomainParentAndGet(
+                trading.nameIdentifier(), missing, AUDIT_INFO, s -> {}));
+  }
+
+  @TestTemplate
+  public void testRemoveDomainParent() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    insertDomainRel(trading, finance);
+    List<LockedDomainState> states = new ArrayList<>();
+
+    // A failing check keeps the edge.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.removeDomainParentAndGet(
+                trading.nameIdentifier(),
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
+
+    // The check sees the parent the edge is removed from.
+    Assertions.assertEquals(
+        trading, domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), states::add));
+    Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
+    Assertions.assertFalse(states.get(0).parent().isPresent());
+    Assertions.assertTrue(states.get(0).subDomains().isEmpty());
+    Assertions.assertFalse(domainRelService.getParentDomainName(trading.id()).isPresent());
+    Assertions.assertTrue(domainRelService.listSubDomains(finance.nameIdentifier()).isEmpty());
+
+    // Removing the parent of a top-level domain changes nothing.
+    states.clear();
+    Assertions.assertEquals(
+        trading, domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), states::add));
+    Assertions.assertFalse(states.get(0).domain().parent().isPresent());
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            domainRelService.removeDomainParentAndGet(
+                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"), s -> {}));
+
+    // A detached domain can be attached again.
+    insertDomainRel(trading, finance);
+    Assertions.assertEquals("Finance", domainRelService.getParentDomainName(trading.id()).get());
+  }
+
+  @TestTemplate
+  public void testUpdateDomainStatus() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    insertDomainRel(trading, finance);
+    List<LockedDomainState> states = new ArrayList<>();
+    Instant modifiedTime = Instant.now();
+    AuditInfo modifiedAuditInfo =
+        AuditInfo.builder()
+            .withLastModifier("publisher")
+            .withLastModifiedTime(modifiedTime)
+            .build();
+
+    // A top-level domain has no parent; the check sees its sub-domains.
+    DomainEntity published =
+        domainRelService.updateDomainStatusAndGet(
+            finance.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, states::add);
+    Assertions.assertEquals(Domain.Status.PUBLISHED, published.status());
+    Assertions.assertEquals(AUDIT_INFO.creator(), published.auditInfo().creator());
+    Assertions.assertEquals("publisher", published.auditInfo().lastModifier());
+    Assertions.assertEquals(modifiedTime, published.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(
+        published, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+    Assertions.assertEquals(Domain.Status.DRAFT, states.get(0).domain().status());
+    Assertions.assertFalse(states.get(0).parent().isPresent());
+    Assertions.assertEquals(trading.id(), states.get(0).subDomains().get(0).id());
+    Assertions.assertEquals(Domain.Status.DRAFT, states.get(0).subDomains().get(0).status());
+
+    // A sub-domain's check sees its parent.
+    states.clear();
+    DomainEntity publishedTrading =
+        domainRelService.updateDomainStatusAndGet(
+            trading.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, states::add);
+    Assertions.assertEquals("Finance", publishedTrading.parent().get());
+    Assertions.assertEquals("Finance", states.get(0).domain().parent().get());
+    Assertions.assertEquals(Domain.Status.PUBLISHED, states.get(0).parent().get().status());
+
+    // Setting the current status writes nothing.
+    long version = selectDomainVersion(trading.id());
+    domainRelService.updateDomainStatusAndGet(
+        trading.nameIdentifier(), Domain.Status.PUBLISHED, modifiedAuditInfo, s -> {});
+    Assertions.assertEquals(version, selectDomainVersion(trading.id()));
+
+    // A failing check changes nothing.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainRelService.updateDomainStatusAndGet(
+                finance.nameIdentifier(),
+                Domain.Status.DRAFT,
+                modifiedAuditInfo,
+                s -> {
+                  throw new IllegalArgumentException("rejected");
+                }));
+    Assertions.assertEquals(
+        Domain.Status.PUBLISHED,
+        domainMetaService.getDomainByIdentifier(finance.nameIdentifier()).status());
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            domainRelService.updateDomainStatusAndGet(
+                NameIdentifierUtil.ofDomain(METALAKE_NAME, "missing"),
+                Domain.Status.PUBLISHED,
+                modifiedAuditInfo,
+                s -> {}));
+  }
+
+  @TestTemplate
+  public void testUpdateDomainStatusRetriesWhenParentChanges() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity markets = insertDomain(METALAKE_NAME, "Markets");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    insertDomainRel(trading, finance);
+    NameIdentifier tradingIdent = trading.nameIdentifier();
+    DomainPO observedPO = selectDomainPO(trading.id());
+    DomainRelPO observedRelPO = selectDomainRel(trading.id());
+
+    // The domain is moved after its parent was read: the attempt writes nothing.
+    moveDomainRel(trading, markets);
+    Assertions.assertFalse(
+        domainRelService
+            .tryUpdateDomainStatusOnce(
+                tradingIdent,
+                Domain.Status.PUBLISHED,
+                AUDIT_INFO,
+                s -> Assertions.fail("the check must not run"),
+                observedPO,
+                observedRelPO)
+            .isPresent());
+    Assertions.assertEquals(
+        Domain.Status.DRAFT, domainMetaService.getDomainByIdentifier(tradingIdent).status());
+
+    // The domain is detached after its parent was read.
+    domainRelService.removeDomainParentAndGet(tradingIdent, s -> {});
+    Assertions.assertFalse(
+        domainRelService
+            .tryUpdateDomainStatusOnce(
+                tradingIdent,
+                Domain.Status.PUBLISHED,
+                AUDIT_INFO,
+                s -> {},
+                observedPO,
+                observedRelPO)
+            .isPresent());
+
+    // The domain is attached after it was read as top-level.
+    insertDomainRel(trading, markets);
+    Assertions.assertFalse(
+        domainRelService
+            .tryUpdateDomainStatusOnce(
+                tradingIdent, Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}, observedPO, null)
+            .isPresent());
+
+    // A fresh read locks the current parent, which the check sees.
+    List<LockedDomainState> states = new ArrayList<>();
+    DomainEntity published =
+        domainRelService.updateDomainStatusAndGet(
+            tradingIdent, Domain.Status.PUBLISHED, AUDIT_INFO, states::add);
+    Assertions.assertEquals(Domain.Status.PUBLISHED, published.status());
+    Assertions.assertEquals(markets.id(), states.get(0).parent().get().id());
+  }
+
+  @TestTemplate
+  public void testUpdateDomainStatusWhenObservedParentIsGone() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    insertDomainRel(trading, finance);
+    DomainPO observedPO = selectDomainPO(trading.id());
+    DomainRelPO observedRelPO = selectDomainRel(trading.id());
+
+    // The domain is detached and its old parent deleted after the parent was read.
+    domainRelService.removeDomainParentAndGet(trading.nameIdentifier(), s -> {});
+    Assertions.assertTrue(domainMetaService.deleteDomain(finance.nameIdentifier()));
+    Assertions.assertFalse(
+        domainRelService
+            .tryUpdateDomainStatusOnce(
+                trading.nameIdentifier(),
+                Domain.Status.PUBLISHED,
+                AUDIT_INFO,
+                s -> Assertions.fail("the check must not run"),
+                observedPO,
+                observedRelPO)
+            .isPresent());
+    Assertions.assertEquals(
+        Domain.Status.DRAFT,
+        domainMetaService.getDomainByIdentifier(trading.nameIdentifier()).status());
+  }
+
+  @TestTemplate
+  public void testUpdateDomainStatusGivesUpAfterRetries() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainRelService service = Mockito.spy(domainRelService);
+    // Every attempt finds that the parent changed.
+    Mockito.doReturn(Optional.empty())
+        .when(service)
+        .tryUpdateDomainStatusOnce(any(), any(), any(), any(), any(), any());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateDomainStatusAndGet(
+                finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
+    Mockito.verify(service, Mockito.times(3))
+        .tryUpdateDomainStatusOnce(any(), any(), any(), any(), any(), any());
+  }
+
+  @TestTemplate
+  public void testUpdateDomainStatusRejectsOuterTransaction() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () -> {
+                  try {
+                    domainRelService.updateDomainStatusAndGet(
+                        finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {});
+                  } catch (IOException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
+    Assertions.assertEquals(
+        Domain.Status.DRAFT,
+        domainMetaService.getDomainByIdentifier(finance.nameIdentifier()).status());
+  }
+
+  @TestTemplate
+  public void testLockedOperationsWaitForDomainRows() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity markets = insertDomain(METALAKE_NAME, "Markets");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    DomainEntity desk = insertDomain(METALAKE_NAME, "Desk");
+    insertDomainRel(trading, finance);
+
+    // Only the domain row is held, not the metalake row, so each wait is on that domain row.
+    assertWaitsForDomainRow(
+        finance.id(),
+        () ->
+            domainRelService.updateDomainStatusAndGet(
+                trading.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
+    assertWaitsForDomainRow(
+        finance.id(),
+        () -> {
+          domainMetaService.insertDomain(newDomain(METALAKE_NAME, "Tax", "Finance"), s -> {});
+          return null;
+        });
+    assertWaitsForDomainRow(
+        markets.id(),
+        () ->
+            domainRelService.setDomainParentAndGet(
+                desk.nameIdentifier(), markets.nameIdentifier(), AUDIT_INFO, s -> {}));
+    assertWaitsForDomainRow(
+        desk.id(),
+        () ->
+            domainRelService.setDomainParentAndGet(
+                desk.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, s -> {}));
+
+    assertWaitsForDomainRow(
+        desk.id(), () -> domainRelService.removeDomainParentAndGet(desk.nameIdentifier(), s -> {}));
+    assertWaitsForDomainRow(
+        markets.id(),
+        () ->
+            domainRelService.updateDomainStatusAndGet(
+                markets.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {}));
+
+    Assertions.assertEquals(
+        Domain.Status.PUBLISHED,
+        domainMetaService.getDomainByIdentifier(trading.nameIdentifier()).status());
+    Assertions.assertEquals(
+        Domain.Status.PUBLISHED,
+        domainMetaService.getDomainByIdentifier(markets.nameIdentifier()).status());
+    Assertions.assertFalse(domainRelService.getParentDomainName(desk.id()).isPresent());
+  }
+
+  @TestTemplate
+  public void testLockedReadsBypassTheSessionCache() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity markets = insertDomain(METALAKE_NAME, "Markets");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            // An outer transaction reads the edge before another transaction attaches the domain;
+            // the empty result is now in this session's cache.
+            Assertions.assertNull(selectDomainRel(trading.id()));
+            try {
+              executor.submit(() -> insertDomainRel(trading, finance)).get(30, TimeUnit.SECONDS);
+              // Under its locks, the change reads the committed edge and re-points it, instead of
+              // inserting a second edge from the cached empty read.
+              DomainEntity moved =
+                  domainRelService.setDomainParentAndGet(
+                      trading.nameIdentifier(), markets.nameIdentifier(), AUDIT_INFO, s -> {});
+              Assertions.assertEquals("Markets", moved.parent().get());
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          });
+    } finally {
+      executor.shutdownNow();
+    }
+    Assertions.assertEquals("Markets", domainRelService.getParentDomainName(trading.id()).get());
+    Assertions.assertEquals(1, countDomainRelRows(trading.id()));
+  }
+
+  // On H2 the metalake row is locked exclusively, so there the publish waits on the metalake row;
+  // testLockedOperationsWaitForDomainRows checks the parent row lock on every database.
+  @TestTemplate
+  public void testPublishWaitsForConcurrentParentUnpublish() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainEntity finance = insertDomain(METALAKE_NAME, "Finance");
+    DomainEntity trading = insertDomain(METALAKE_NAME, "Trading");
+    insertDomainRel(trading, finance);
+    domainRelService.updateDomainStatusAndGet(
+        finance.nameIdentifier(), Domain.Status.PUBLISHED, AUDIT_INFO, s -> {});
+
+    CountDownLatch unpublishChecked = new CountDownLatch(1);
+    CountDownLatch allowUnpublishCommit = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> unpublishResult =
+        executor.submit(
+            () -> {
+              try {
+                domainRelService.updateDomainStatusAndGet(
+                    finance.nameIdentifier(),
+                    Domain.Status.DRAFT,
+                    AUDIT_INFO,
+                    s -> {
+                      unpublishChecked.countDown();
+                      await(allowUnpublishCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      Assertions.assertTrue(unpublishChecked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> publishResult =
+          executor.submit(
+              () -> {
+                try {
+                  domainRelService.updateDomainStatusAndGet(
+                      trading.nameIdentifier(),
+                      Domain.Status.PUBLISHED,
+                      AUDIT_INFO,
+                      s ->
+                          Preconditions.checkArgument(
+                              s.parent().get().status() == Domain.Status.PUBLISHED,
+                              "The parent is not published"));
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      // The unpublish holds the parent row, so the publish waits and then sees the draft parent.
+      Assertions.assertThrows(
+          TimeoutException.class, () -> publishResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowUnpublishCommit.countDown();
+      Assertions.assertNull(unpublishResult.get(30, TimeUnit.SECONDS));
+      Throwable publishFailure = publishResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          publishFailure instanceof IllegalArgumentException, String.valueOf(publishFailure));
+    } finally {
+      allowUnpublishCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(
+        Domain.Status.DRAFT,
+        domainMetaService.getDomainByIdentifier(trading.nameIdentifier()).status());
+  }
+
+  // Holds the row of a domain in another transaction, checks that the operation waits for it,
+  // and lets the operation finish once the row is released.
+  private void assertWaitsForDomainRow(long domainId, Callable<?> operation) throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (SqlSession holder =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false)) {
+      try (Statement statement = holder.getConnection().createStatement();
+          ResultSet rs =
+              statement.executeQuery(
+                  String.format(
+                      "SELECT domain_id FROM domain_meta WHERE domain_id = %d FOR UPDATE",
+                      domainId))) {
+        Assertions.assertTrue(rs.next());
+      }
+      Future<?> result = executor.submit(operation);
+      Assertions.assertThrows(TimeoutException.class, () -> result.get(500, TimeUnit.MILLISECONDS));
+      holder.rollback(true);
+      result.get(30, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
   private void installReadProbe() {
     var configuration =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
@@ -859,6 +1477,32 @@ public class TestDomainRelService extends TestJDBCBackend {
       AFTER_READ.remove();
       AFTER_WRITE.remove();
     }
+  }
+
+  private DomainEntity newDomain(String metalake, String name, String parent) {
+    return DomainEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofDomain(metalake))
+        .withProperties(ImmutableMap.of("k1", "v1"))
+        .withStatus(Domain.Status.DRAFT)
+        .withParent(parent)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private void moveDomainRel(DomainEntity child, DomainEntity newParent) throws IOException {
+    domainRelService.updateDomainRel(
+        child.nameIdentifier(), newParent.nameIdentifier(), AUDIT_INFO);
+  }
+
+  private DomainPO selectDomainPO(long domainId) {
+    return SessionUtils.getWithoutCommit(
+        DomainMetaMapper.class, mapper -> mapper.selectDomainMetaById(domainId));
+  }
+
+  private long selectDomainVersion(long domainId) {
+    return selectDomainPO(domainId).currentVersion();
   }
 
   private DomainEntity insertDomain(String metalake, String name) throws IOException {
