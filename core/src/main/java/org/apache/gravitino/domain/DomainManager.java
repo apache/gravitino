@@ -383,7 +383,8 @@ public class DomainManager implements DomainDispatcher {
       if (parent == null) {
         throw new NoSuchMetalakeException(e, "Metalake %s does not exist", metalake);
       }
-      // The metalake was checked, so the missing entity is most likely the parent.
+      // A missing metalake is reported by the pre-check. If it is deleted concurrently after
+      // that check, the requested parent domain is also gone; report it as not found.
       throw new NoSuchDomainException(
           e,
           "Parent domain %s under metalake %s does not exist: %s",

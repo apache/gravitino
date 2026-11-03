@@ -110,6 +110,9 @@ public interface DomainDispatcher {
   /**
    * Creates a sub-domain in draft status under a top-level domain.
    *
+   * <p>If the metalake is deleted after the initial existence check, creation reports the parent
+   * domain as not found.
+   *
    * @param metalake The name of the metalake.
    * @param parent The name of the parent domain.
    * @param name The name of the sub-domain.
