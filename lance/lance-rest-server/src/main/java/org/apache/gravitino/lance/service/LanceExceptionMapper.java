@@ -131,7 +131,17 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
     }
     // Keep protocol headers such as Allow, WWW-Authenticate and Retry-After, while replacing any
     // framework entity with the Lance error envelope. Never expose a framework stack or 5xx detail.
-    return Response.fromResponse(exception.getResponse())
+    Response.ResponseBuilder response = Response.fromResponse(exception.getResponse());
+    // The old entity's framing, representation metadata and validators do not describe our JSON.
+    for (String header :
+        new String[] {
+          "Content-Length", "Content-Encoding", "Content-Language", "Content-Location",
+          "Content-Range", "Content-Disposition", "Transfer-Encoding", "ETag",
+          "Last-Modified", "Content-MD5", "Digest"
+        }) {
+      response.header(header, null);
+    }
+    return response
         .status(status)
         .entity(errorResponse(error))
         .type(MediaType.APPLICATION_JSON_TYPE)

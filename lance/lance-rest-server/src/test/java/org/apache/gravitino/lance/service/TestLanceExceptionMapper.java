@@ -58,6 +58,26 @@ public class TestLanceExceptionMapper extends JerseyTest {
       error.initCause(new IllegalStateException("root cause"));
       throw error;
     }
+
+    /**
+     * Converts a framework response whose headers describe its original entity.
+     *
+     * @return the mapped Lance error response
+     */
+    @GET
+    @Path("framework")
+    public Response frameworkFailure() {
+      try (Response original =
+          Response.status(415)
+              .header("content-encoding", "gzip")
+              .header("content-length", "3")
+              .header("Retry-After", "3")
+              .entity("old")
+              .build()) {
+        return LanceExceptionMapper.toRESTResponse(
+            "table", new WebApplicationException("request rejected", original));
+      }
+    }
   }
 
   /**
@@ -154,6 +174,40 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(
           "Basic realm=\"lance\"", response.getHeaderString("WWW-Authenticate"));
       Assertions.assertEquals("3", response.getHeaderString("Retry-After"));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "Content-Length", "Content-Encoding", "Content-Language", "Content-Location",
+        "Content-Range", "Content-Disposition", "Transfer-Encoding", "ETag",
+        "Last-Modified", "Content-MD5", "Digest"
+      })
+  void testFrameworkEntityHeadersAreRemoved(String header) {
+    try (Response original =
+            Response.status(415).header(header, "original-entity-metadata").entity("old").build();
+        Response response =
+            LanceExceptionMapper.toRESTResponse(
+                "table", new WebApplicationException("request rejected", original))) {
+      Assertions.assertNull(response.getHeaderString(header));
+      Assertions.assertEquals(415, response.getStatus());
+      Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+      Assertions.assertEquals(
+          "request rejected", ((ErrorResponse) response.getEntity()).getError());
+    }
+  }
+
+  @Test
+  void testMappedFrameworkEntityCanBeReadOverHttp() {
+    try (Response response = target("error/framework").request().get()) {
+      Assertions.assertEquals(415, response.getStatus());
+      Assertions.assertNull(response.getHeaderString("Content-Encoding"));
+      Assertions.assertEquals("3", response.getHeaderString("Retry-After"));
+      Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("request rejected", error.getError());
+      Assertions.assertEquals("table", error.getInstance());
     }
   }
 
