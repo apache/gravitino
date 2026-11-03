@@ -120,6 +120,8 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       org.apache.spark.sql.connector.catalog.Table sparkTable) {
     return new SparkHiveView(
         gravitinoView,
+        name(),
+        getDatabase(ident),
         (HiveTable) sparkTable,
         (HiveTableCatalog) sparkCatalog,
         getSparkTypeConverter());

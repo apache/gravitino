@@ -257,6 +257,20 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testIdentifierCollisionCannotOverwriteExistingSchema() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity original = createAndInsertSchema(metalakeName, catalogName, "identity_original");
+    SchemaEntity copy =
+        createSchemaEntity(original.id(), original.namespace(), "identity_copy", AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(copy, false));
+    assertTrue(backend.exists(original.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertFalse(backend.exists(copy.nameIdentifier(), Entity.EntityType.SCHEMA));
+    SchemaEntity preserved = backend.get(original.nameIdentifier(), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(original.id(), preserved.id());
+  }
+
+  @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

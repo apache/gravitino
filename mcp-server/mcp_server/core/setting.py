@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import math
 from dataclasses import dataclass, field
 from typing import Set
 
@@ -63,12 +64,20 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     # HTTP only: reject requests with no Authorization when service OAuth or
     # --token is configured instead of falling back to the service identity.
     no_service_identity_fallback: bool = False
+    gravitino_read_timeout: float = 60.0
 
     def __post_init__(self) -> None:
         # A whitespace-only --metalake (e.g. a shell-quoting mistake) must be
         # treated as "no default configured", the same as an empty string,
         # rather than silently used as a nonsensical metalake name.
         self.metalake = self.metalake.strip()
+        if (
+            not math.isfinite(self.gravitino_read_timeout)
+            or self.gravitino_read_timeout <= 0
+        ):
+            raise ValueError(
+                "Gravitino read timeout must be a finite positive number of seconds"
+            )
 
     def has_oauth_client(self) -> bool:
         """Return True when client-credentials is fully configured."""
@@ -122,6 +131,7 @@ class Setting:  # pylint: disable=too-many-instance-attributes
         return (
             f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
             f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "
+            f"gravitino_read_timeout={self.gravitino_read_timeout}, "
             f"token={token_display}, tls_cert={self.tls_cert}, "
             f"tls_key={self.tls_key}, "
             f"oauth_token_endpoint={self.oauth_token_endpoint}, "
