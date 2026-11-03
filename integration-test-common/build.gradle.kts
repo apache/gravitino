@@ -51,7 +51,6 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
     exclude("org.apache.lucene")
     exclude("org.apache.solr")
@@ -59,7 +58,13 @@ dependencies {
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
-    exclude("org.apache.hadoop", "hadoop-common")
+    // Keep the Hadoop, Jackson and commons-lang3 versions used by the rest of the build instead of
+    // the newer ones Ranger 2.8 asks for.
+    exclude("org.apache.hadoop")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.jaxrs")
+    exclude("com.fasterxml.jackson.module")
+    exclude("org.apache.commons", "commons-lang3")
   }
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)

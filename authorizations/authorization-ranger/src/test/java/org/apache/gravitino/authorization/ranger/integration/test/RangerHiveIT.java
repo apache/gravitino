@@ -2097,4 +2097,87 @@ public class RangerHiveIT {
         includeRoles,
         null);
   }
+<<<<<<< HEAD
+=======
+
+  private RangerAuthorizationHadoopSQLPlugin createRangerPlugin(String catalogId) {
+    return new RangerAuthorizationHadoopSQLPlugin(
+        "metalake-" + currentFunName(),
+        ImmutableMap.of(
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+            RangerITEnv.RANGER_HIVE_REPO_NAME,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true",
+            BaseAuthorization.METALAKE_ID,
+            RangerITEnv.METALAKE_ID,
+            BaseAuthorization.CATALOG_ID,
+            catalogId));
+  }
+
+  private void replacePolicyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      MetadataObject catalog,
+      String currentOwnerRole,
+      String legacyOwnerRole)
+      throws RangerServiceException {
+    for (AuthorizationSecurableObject securableObject : plugin.translateOwner(catalog)) {
+      RangerPolicy policy = plugin.findManagedPolicy(securableObject);
+      Assertions.assertNotNull(policy);
+      boolean replaced = false;
+      for (RangerPolicy.RangerPolicyItem policyItem : policy.getPolicyItems()) {
+        if (policyItem.getRoles().remove(currentOwnerRole)) {
+          if (!policyItem.getRoles().contains(legacyOwnerRole)) {
+            policyItem.addRole(legacyOwnerRole);
+          }
+          replaced = true;
+        }
+      }
+      Assertions.assertTrue(replaced);
+      rangerClient.updatePolicy(policy.getId(), policy);
+    }
+  }
+
+  private void verifyPolicyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      MetadataObject catalog,
+      String expectedOwnerRole,
+      String legacyOwnerRole) {
+    for (AuthorizationSecurableObject securableObject : plugin.translateOwner(catalog)) {
+      RangerPolicy policy = plugin.findManagedPolicy(securableObject);
+      Assertions.assertNotNull(policy);
+      boolean expectedRoleFound = false;
+      for (RangerPolicy.RangerPolicyItem policyItem : policy.getPolicyItems()) {
+        if (policyItem.getRoles().contains(expectedOwnerRole)) {
+          Assertions.assertFalse(policyItem.getRoles().contains(legacyOwnerRole));
+          expectedRoleFound = true;
+        }
+      }
+      Assertions.assertTrue(expectedRoleFound);
+    }
+  }
+
+  private void verifyOwnerRole(
+      RangerAuthorizationHadoopSQLPlugin plugin,
+      String roleName,
+      String expectedOwner,
+      String unexpectedOwner)
+      throws RangerServiceException {
+    RangerRole role =
+        rangerClient.getRole(roleName, plugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+    List<String> users =
+        role.getUsers().stream().map(user -> user.getName()).collect(Collectors.toList());
+    Assertions.assertTrue(users.contains(expectedOwner));
+    Assertions.assertFalse(users.contains(unexpectedOwner));
+  }
+>>>>>>> a5c13c934 ([#14435] fix(build): Upgrade Ranger to 2.8.0 and ZooKeeper to 3.8.8, and strip the outdated Avro shaded in hadoop-client-runtime (#14532))
 }
