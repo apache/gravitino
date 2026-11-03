@@ -125,6 +125,15 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
+  void testNullRequestBodyReturnsBadRequest() {
+    assertNullBody(postNull("/idp/users"));
+    assertNullBody(putNull("/idp/users/user1/password"));
+    assertNullBody(putNull("/idp/users/user1/enabled"));
+    assertNullBody(postNull("/idp/groups"));
+    assertNullBody(putNull("/idp/groups/group1/users"));
+  }
+
+  @Test
   void testAddUser() throws Exception {
     AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
     doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD, true);
@@ -295,8 +304,16 @@ class TestIdpOperations extends JerseyTest {
     return request(path).post(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response postNull(String path) {
+    return request(path).post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response put(String path, Object body) {
     return request(path).put(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response putNull(String path) {
+    return request(path).put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response delete(String path) {
@@ -310,6 +327,13 @@ class TestIdpOperations extends JerseyTest {
   private void assertError(Response.Status expected, Response response, int code) {
     assertStatus(expected, response);
     Assertions.assertEquals(code, response.readEntity(ErrorResponse.class).getCode());
+  }
+
+  private void assertNullBody(Response response) {
+    assertStatus(Response.Status.BAD_REQUEST, response);
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+    Assertions.assertTrue(error.getMessage().contains("Request body cannot be null"));
   }
 
   private IdpUser buildUser(String user) {
