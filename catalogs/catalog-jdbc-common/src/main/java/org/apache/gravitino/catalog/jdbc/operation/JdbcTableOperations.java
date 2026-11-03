@@ -266,6 +266,20 @@ public abstract class JdbcTableOperations implements TableOperation {
     return false;
   }
 
+  /**
+   * Returns the user-facing reason that this connector rejects table sort orders.
+   *
+   * <p>Called by the catalog before database access when {@link #supportsTableSortOrder()} is false
+   * and a create request contains sort orders. Connectors may override this method to name the
+   * catalog type and suggest a supported alternative. The message must not contain internal
+   * implementation class names.
+   *
+   * @return the rejection message, without the table identifier
+   */
+  public String unsupportedTableSortOrderMessage() {
+    return "The catalog does not support sort orders";
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL

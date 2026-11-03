@@ -36,6 +36,34 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Tests database resolution before catalog operations are initialized. */
 class TestPostgreSqlCatalogConfiguration {
 
+  @Test
+  void testProposedConfigurationRejectsDatabaseMismatchBeforeInitialization() {
+    Map<String, String> configuration =
+        new HashMap<>(
+            Map.of(
+                "jdbc-url",
+                "jdbc:postgresql://localhost/demo",
+                "jdbc-database",
+                "other",
+                "jdbc-driver",
+                "org.postgresql.Driver",
+                "jdbc-user",
+                "unused",
+                "jdbc-password",
+                "unused",
+                "verify-on-create",
+                "false"));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new PostgreSqlCatalog().validateConfiguration(configuration));
+    Assertions.assertTrue(error.getMessage().contains("jdbc-database must match"));
+    Assertions.assertEquals("other", configuration.get("jdbc-database"));
+    configuration.put("jdbc-database", "demo");
+    Assertions.assertDoesNotThrow(
+        () -> new PostgreSqlCatalog().validateConfiguration(configuration));
+  }
+
   @ParameterizedTest
   @CsvSource(
       value = {
