@@ -74,9 +74,6 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
-import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
-import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -126,9 +123,6 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(PolicyOperations.class);
-    resourceConfig.register(JsonProcessingExceptionMapper.class);
-    resourceConfig.register(JsonParseExceptionMapper.class);
-    resourceConfig.register(JsonMappingExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override

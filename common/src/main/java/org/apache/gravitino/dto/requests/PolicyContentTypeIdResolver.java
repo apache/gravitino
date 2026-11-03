@@ -19,20 +19,20 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.policy.Policy;
 
 /**
  * Selects the policy content DTO from the sibling {@code policyType}, matching known types
- * case-insensitively via {@link Policy.BuiltInType#fromPolicyType(String)}.
+ * case-insensitively.
+ *
+ * <p>An unknown type resolves to no content class, so the content is bound as {@code null} and
+ * request validation reports the type by name.
  */
 public class PolicyContentTypeIdResolver extends TypeIdResolverBase {
 
@@ -80,18 +80,14 @@ public class PolicyContentTypeIdResolver extends TypeIdResolverBase {
   }
 
   @Override
-  public JavaType typeFromId(DatabindContext context, String id) throws IOException {
-    try {
-      Policy.BuiltInType type = Policy.BuiltInType.fromPolicyType(id);
-      Class<? extends PolicyContentDTO> contentClass = CONTENT_CLASSES.get(type);
-      if (contentClass == null) {
-        throw new IllegalArgumentException("Unsupported policy type: " + id);
+  public JavaType typeFromId(DatabindContext context, String id) {
+    for (Map.Entry<Policy.BuiltInType, Class<? extends PolicyContentDTO>> entry :
+        CONTENT_CLASSES.entrySet()) {
+      if (entry.getKey().policyType().equalsIgnoreCase(id)) {
+        return context.constructSpecializedType(baseType, entry.getValue());
       }
-      return context.constructSpecializedType(baseType, contentClass);
-    } catch (IllegalArgumentException e) {
-      // JsonMappingExceptionMapper turns this into HTTP 400 carrying the type-named message.
-      throw JsonMappingException.from((JsonParser) null, e.getMessage(), e);
     }
+    return null;
   }
 
   @Override

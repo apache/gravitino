@@ -59,7 +59,8 @@ public class PolicyCreateRequest implements RESTRequest {
   @JsonTypeInfo(
       use = JsonTypeInfo.Id.NAME,
       include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-      property = "policyType")
+      property = "policyType",
+      defaultImpl = Void.class)
   @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
   private final PolicyContentDTO policyContent;
 
@@ -97,11 +98,10 @@ public class PolicyCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
+    // An unknown policyType binds content as null, so resolve the type before the content checks.
+    Policy.BuiltInType.fromPolicyType(policyType);
     Preconditions.checkArgument(
         policyContent != null, "\"content\" is required and cannot be null");
-    // Resolve the type before content rules so an unknown type is never reported as a content
-    // validation failure.
-    Policy.BuiltInType.fromPolicyType(policyType);
     policyContent.validate();
   }
 }

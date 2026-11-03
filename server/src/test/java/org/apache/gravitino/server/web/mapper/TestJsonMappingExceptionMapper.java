@@ -45,20 +45,4 @@ public class TestJsonMappingExceptionMapper {
     Assertions.assertNull(entity.getStack());
     Assertions.assertFalse(entity.getMessage().contains("MY-SECRET-VALUE-123"));
   }
-
-  @Test
-  public void testJsonMappingExceptionMapperSurfacesPlainIllegalArgumentCause() {
-    JsonParser mockParser = Mockito.mock(JsonParser.class);
-    JsonMappingException mapping =
-        JsonMappingException.from(
-            mockParser,
-            "wrapper",
-            new IllegalArgumentException("Unknown built-in policy type: system_iceberg_bogus"));
-    Response response = jsonMappingExceptionMapper.toResponse(mapping);
-    ErrorResponse entity = (ErrorResponse) response.getEntity();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
-    Assertions.assertEquals(
-        "Unknown built-in policy type: system_iceberg_bogus", entity.getMessage());
-    Assertions.assertNull(entity.getStack());
-  }
 }

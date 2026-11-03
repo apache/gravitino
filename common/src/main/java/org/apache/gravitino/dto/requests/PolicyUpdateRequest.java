@@ -144,7 +144,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-        property = "policyType")
+        property = "policyType",
+        defaultImpl = Void.class)
     @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
     private final PolicyContentDTO newContent;
 
@@ -174,8 +175,9 @@ public interface PolicyUpdateRequest extends RESTRequest {
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
-      Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
+      // An unknown policyType binds newContent as null, so resolve the type first.
       Policy.BuiltInType.fromPolicyType(policyType);
+      Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
       newContent.validate();
     }
   }

@@ -105,7 +105,8 @@ public class TestPolicyUpdatesRequest {
   }
 
   @Test
-  public void testUpdatePolicyContentDeserializeRejectsUnknownPolicyType() {
+  public void testUpdatePolicyContentDeserializeRejectsUnknownPolicyType()
+      throws JsonProcessingException {
     assertPolicyTypeNamedOnDeserialize(
         "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
             + "\"newContent\":{}}",
@@ -116,19 +117,15 @@ public class TestPolicyUpdatesRequest {
         "Unknown built-in policy type: system_iceberg_bogus");
   }
 
-  private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage) {
-    Exception thrown =
-        Assertions.assertThrows(
-            Exception.class,
-            () ->
-                JsonUtils.objectMapper()
-                    .readValue(json, PolicyUpdateRequest.UpdatePolicyContentRequest.class));
-    Throwable cause = thrown;
-    while (cause.getCause() != null) {
-      cause = cause.getCause();
-    }
-    Assertions.assertInstanceOf(IllegalArgumentException.class, cause);
-    Assertions.assertEquals(expectedMessage, cause.getMessage());
+  private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage)
+      throws JsonProcessingException {
+    PolicyUpdateRequest.UpdatePolicyContentRequest request =
+        JsonUtils.objectMapper()
+            .readValue(json, PolicyUpdateRequest.UpdatePolicyContentRequest.class);
+    Assertions.assertNull(request.getNewContent());
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals(expectedMessage, thrown.getMessage());
   }
 
   @Test
