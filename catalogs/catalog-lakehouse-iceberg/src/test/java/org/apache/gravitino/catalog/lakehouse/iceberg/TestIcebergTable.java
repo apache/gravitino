@@ -455,27 +455,22 @@ public class TestIcebergTable {
           (sortOrders[i]).expression(), alteredTable.sortOrder()[i].expression());
     }
 
-    // Iceberg assigns field ids in creation order: col_1=1, col_2=2, then added col_3=3.
-    // loadTable now surfaces those ids, so equals must include them.
     Column[] expected =
         new Column[] {
           IcebergColumn.builder()
               .withName("col_2_new")
               .withType(Types.DateType.get())
               .withComment(ICEBERG_COMMENT)
-              .withFieldId(2)
               .build(),
           IcebergColumn.builder()
               .withName("col_1")
               .withType(Types.IntegerType.get())
               .withComment(ICEBERG_COMMENT + "_new")
-              .withFieldId(1)
               .build(),
           IcebergColumn.builder()
               .withName("col_3")
               .withType(Types.StringType.get())
               .withComment(null)
-              .withFieldId(3)
               .build()
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());

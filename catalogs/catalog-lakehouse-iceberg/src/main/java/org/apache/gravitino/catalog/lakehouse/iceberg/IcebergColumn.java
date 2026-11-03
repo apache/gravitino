@@ -26,7 +26,8 @@ import org.apache.gravitino.connector.BaseColumn;
 @EqualsAndHashCode(callSuper = true)
 public class IcebergColumn extends BaseColumn {
 
-  @Nullable private Integer fieldId;
+  /** Iceberg field id for governance sync; not part of column value equality. */
+  @EqualsAndHashCode.Exclude @Nullable private Integer fieldId;
 
   private IcebergColumn() {}
 
