@@ -300,7 +300,7 @@ public class CatalogOperations {
     try {
       request.validate();
     } catch (IllegalArgumentException e) {
-      return ExceptionHandlers.handleCatalogException(OperationType.SET, metalake, catalogName, e);
+      return ExceptionHandlers.handleCatalogException(OperationType.SET, catalogName, metalake, e);
     }
 
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;

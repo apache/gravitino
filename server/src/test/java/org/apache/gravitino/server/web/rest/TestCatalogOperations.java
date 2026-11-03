@@ -745,6 +745,11 @@ public class TestCatalogOperations extends BaseOperationsTest {
               .accept("application/vnd.gravitino.v1+json")
               .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
         Assertions.assertEquals(400, response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(
+            "Failed to operate catalog(s) [catalog1] operation [SET] under metalake [metalake1], "
+                + "reason [inUse field is required and must not be null]",
+            error.getMessage());
       }
     }
     Mockito.verify(manager, Mockito.never()).enableCatalog(any());

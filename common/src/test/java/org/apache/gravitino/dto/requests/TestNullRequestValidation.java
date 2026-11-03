@@ -80,7 +80,9 @@ class TestNullRequestValidation {
   @ValueSource(strings = {"{\"name\":\"t\"}", "{\"name\":\"t\",\"columns\":null}"})
   void testMissingColumns(String json) throws Exception {
     TableCreateRequest request = JsonUtils.objectMapper().readValue(json, TableCreateRequest.class);
-    assertThrows(IllegalArgumentException.class, request::validate);
+    IllegalArgumentException error =
+        assertThrows(IllegalArgumentException.class, request::validate);
+    assertEquals("\"columns\" field is required and cannot be null", error.getMessage());
   }
 
   @Test

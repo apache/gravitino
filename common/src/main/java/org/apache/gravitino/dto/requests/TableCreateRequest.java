@@ -125,7 +125,6 @@ public class TableCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
 
-    Preconditions.checkArgument(columns != null, "columns field is required and must not be null");
     RequestValidation.elements(partitioning, "partitioning");
     RequestValidation.elements(indexes, "indexes");
 
