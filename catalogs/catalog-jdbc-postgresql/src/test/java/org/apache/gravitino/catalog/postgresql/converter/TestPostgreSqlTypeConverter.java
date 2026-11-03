@@ -58,6 +58,7 @@ public class TestPostgreSqlTypeConverter {
   void testUnboundedVarcharDriverSentinelMapsToString() {
     checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, Integer.MAX_VALUE, null, 0);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, 0, null, 0);
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(255), VARCHAR, 255, null, 0);
   }
 
@@ -138,12 +139,17 @@ public class TestPostgreSqlTypeConverter {
   @Test
   void testCharArrayWithoutLengthMetadataStillLoads() {
     checkJdbcTypeToGravitinoType(
-        Types.ListType.nullable(Types.StringType.get()), "_bpchar", null, null, null);
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")), "_bpchar", null, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.ListType.nullable(Types.StringType.get()), "_bpchar", 0, null, null);
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")), "_bpchar", 0, null, null);
     checkJdbcTypeToGravitinoType(
-        Types.ListType.nullable(Types.StringType.get()), "_bpchar", Integer.MAX_VALUE, null, null);
-    checkJdbcTypeToGravitinoType(Types.StringType.get(), BPCHAR, Integer.MAX_VALUE, null, null);
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")),
+        "_bpchar",
+        Integer.MAX_VALUE,
+        null,
+        null);
+    checkJdbcTypeToGravitinoType(
+        Types.ExternalType.of("bpchar"), BPCHAR, Integer.MAX_VALUE, null, null);
     checkJdbcTypeToGravitinoType(
         Types.ListType.nullable(Types.StringType.get()), "_varchar", Integer.MAX_VALUE, null, null);
   }

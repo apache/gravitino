@@ -109,13 +109,18 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         }
         return Types.DecimalType.of(columnSize, numericScale);
       case VARCHAR:
-        return typeBean.getColumnSize() == null || typeBean.getColumnSize() == Integer.MAX_VALUE
+        // Table metadata normalizes unbounded declarations to zero. Also accept pgjdbc's default
+        // sentinel for callers supplying driver metadata directly.
+        return typeBean.getColumnSize() == null
+                || typeBean.getColumnSize() <= 0
+                || typeBean.getColumnSize() == Integer.MAX_VALUE
             ? Types.StringType.get()
             : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
+        // An unbounded bpchar ignores trailing spaces and is not equivalent to String.
         Integer length = typeBean.getColumnSize();
         return length == null || length <= 0 || length == Integer.MAX_VALUE
-            ? Types.StringType.get()
+            ? Types.ExternalType.of(BPCHAR)
             : Types.FixedCharType.of(length);
       case TEXT:
         return Types.StringType.get();

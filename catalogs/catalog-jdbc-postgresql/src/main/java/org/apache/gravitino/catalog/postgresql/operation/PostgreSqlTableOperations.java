@@ -25,16 +25,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetProvider;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -763,8 +768,73 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @Override
   protected ResultSet getColumns(Connection connection, String schema, String tableName)
       throws SQLException {
-    DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getColumns(connection.getCatalog(), schema, tableName, null);
+    CachedRowSet columns = RowSetProvider.newFactory().createCachedRowSet();
+    try (ResultSet metadata =
+        connection.getMetaData().getColumns(connection.getCatalog(), schema, tableName, null)) {
+      columns.populate(metadata);
+    }
+
+    boolean hasCharacterColumn = false;
+    while (columns.next()) {
+      String type = columns.getString("TYPE_NAME");
+      if ("varchar".equals(type)
+          || "bpchar".equals(type)
+          || "_varchar".equals(type)
+          || "_bpchar".equals(type)) {
+        hasCharacterColumn = true;
+        break;
+      }
+    }
+    columns.beforeFirst();
+    if (!hasCharacterColumn) {
+      return columns;
+    }
+
+    // COLUMN_SIZE substitutes the configurable pgjdbc unknownLength for unbounded character
+    // types. It can equal a real bounded length, so consult the declaration instead of guessing
+    // from the reported size. One metadata query covers both scalar and array columns.
+    Set<String> unboundedColumns = new HashSet<>();
+    String sql =
+        "SELECT a.attname FROM pg_catalog.pg_attribute a "
+            + "JOIN pg_catalog.pg_class c ON a.attrelid = c.oid "
+            + "JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid "
+            + "WHERE n.nspname = ? AND c.relname = ? AND a.attnum > 0 "
+            + "AND NOT a.attisdropped AND a.atttypmod = -1 "
+            + "AND a.atttypid IN ('pg_catalog.varchar'::pg_catalog.regtype, "
+            + "'pg_catalog.bpchar'::pg_catalog.regtype, "
+            + "'pg_catalog.varchar[]'::pg_catalog.regtype, "
+            + "'pg_catalog.bpchar[]'::pg_catalog.regtype)";
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, schema);
+      statement.setString(2, tableName);
+      try (ResultSet declarations = statement.executeQuery()) {
+        while (declarations.next()) {
+          unboundedColumns.add(declarations.getString(1));
+        }
+      }
+    }
+    while (columns.next()) {
+      if (unboundedColumns.contains(columns.getString("COLUMN_NAME"))) {
+        // Zero is the converter's canonical unknown length, independent of driver configuration.
+        columns.updateInt("COLUMN_SIZE", 0);
+        columns.updateRow();
+      }
+    }
+    columns.beforeFirst();
+    return columns;
+  }
+
+  /**
+   * Reads the JDBC YES/NO marker without relying on pgjdbc's boolean coercion, which a cached
+   * metadata row set does not provide.
+   *
+   * @param resultSet the column metadata positioned on the current column
+   * @return whether the column is auto-incrementing
+   * @throws SQLException if the metadata cannot be read
+   */
+  @Override
+  protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {
+    return "YES".equals(resultSet.getString("IS_AUTOINCREMENT"));
   }
 
   @Override

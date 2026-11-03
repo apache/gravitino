@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -133,11 +135,12 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
-  void testNativeUnboundedBpcharLoadsAsString() throws SQLException {
+  void testNativeUnboundedBpcharPreservesSemanticsOnRoundTrip() throws SQLException {
     String name = RandomNameUtils.genRandomName("unbounded_bpchar");
-    try (Connection connection = DATA_SOURCE.getConnection()) {
-      JdbcConnectorUtils.executeUpdate(
-          connection,
+    String copy = RandomNameUtils.genRandomName("bpchar_copy");
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
           "CREATE TABLE "
               + TEST_DB_NAME
               + "."
@@ -145,13 +148,131 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
               + " (label bpchar, labels bpchar[], bounded char(3))");
       try {
         JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
-        Assertions.assertEquals(Types.StringType.get(), table.columns()[0].dataType());
+        Assertions.assertEquals(Types.ExternalType.of("bpchar"), table.columns()[0].dataType());
         Assertions.assertEquals(
-            Types.ListType.nullable(Types.StringType.get()), table.columns()[1].dataType());
+            Types.ListType.nullable(Types.ExternalType.of("bpchar")),
+            table.columns()[1].dataType());
         Assertions.assertEquals(Types.FixedCharType.of(3), table.columns()[2].dataType());
+        TABLE_OPERATIONS.create(
+            TEST_DB_NAME,
+            copy,
+            Arrays.stream(table.columns()).map(JdbcColumn.class::cast).toArray(JdbcColumn[]::new),
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + copy
+                + " (label, labels) VALUES ('a', '{a}'), ('a ', '{\"a \"}')");
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT count(DISTINCT label), count(DISTINCT labels) FROM "
+                    + TEST_DB_NAME
+                    + "."
+                    + copy)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(1, result.getInt(1));
+          Assertions.assertEquals(1, result.getInt(2));
+        }
       } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, copy);
         TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 12, 255, Integer.MAX_VALUE})
+  void testCharacterDeclarationsDoNotDependOnDriverUnknownLength(int unknownLength)
+      throws SQLException {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
+    String jdbcUrl = CONTAINER.getJdbcUrl();
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        jdbcUrl + (jdbcUrl.contains("?") ? "&" : "?") + "unknownLength=" + unknownLength);
+    properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
+    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
+    DataSource dataSource = DataSourceUtils.createDataSource(properties);
+    PostgreSqlTableOperations operations = new PostgreSqlTableOperations();
+    operations.initialize(
+        dataSource,
+        JDBC_EXCEPTION_CONVERTER,
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        Map.of(JdbcConfig.JDBC_DATABASE.getKey(), CONTAINER.getDatabaseName()));
+    operations.setDatabaseOperation(DATABASE_OPERATIONS);
+    String name = RandomNameUtils.genRandomName("character_lengths");
+    String copy = RandomNameUtils.genRandomName("character_copy");
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (label varchar DEFAULT 'value', labels varchar[], "
+              + "bounded varchar(12) DEFAULT 'bound', bounded_array varchar(12)[], "
+              + "fixed char(12), fixed_array char(12)[], "
+              + "bounded_255 varchar(255), bounded_255_array varchar(255)[])");
+      try {
+        JdbcTable table = operations.load(TEST_DB_NAME, name);
+        Type[] types = {
+          Types.StringType.get(), Types.ListType.nullable(Types.StringType.get()),
+          Types.VarCharType.of(12), Types.ListType.nullable(Types.VarCharType.of(12)),
+          Types.FixedCharType.of(12), Types.ListType.nullable(Types.FixedCharType.of(12)),
+          Types.VarCharType.of(255), Types.ListType.nullable(Types.VarCharType.of(255))
+        };
+        for (int i = 0; i < types.length; i++) {
+          Assertions.assertEquals(types[i], table.columns()[i].dataType());
+        }
+        Assertions.assertEquals(Literals.stringLiteral("value"), table.columns()[0].defaultValue());
+        Assertions.assertEquals(
+            Literals.varcharLiteral(12, "bound"), table.columns()[2].defaultValue());
+        operations.create(
+            TEST_DB_NAME,
+            copy,
+            Arrays.stream(table.columns()).map(JdbcColumn.class::cast).toArray(JdbcColumn[]::new),
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + name
+                + " (label, labels) VALUES (repeat('x', 300), ARRAY[repeat('x', 300)])");
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + copy
+                + " SELECT * FROM "
+                + TEST_DB_NAME
+                + "."
+                + name);
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT char_length(label), char_length(labels[1]) FROM "
+                    + TEST_DB_NAME
+                    + "."
+                    + copy)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(300, result.getInt(1));
+          Assertions.assertEquals(300, result.getInt(2));
+        }
+      } finally {
+        operations.drop(TEST_DB_NAME, copy);
+        operations.drop(TEST_DB_NAME, name);
+      }
+    } finally {
+      DataSourceUtils.closeDataSource(dataSource);
     }
   }
 

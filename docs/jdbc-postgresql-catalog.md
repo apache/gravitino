@@ -143,8 +143,13 @@ PostgreSQL array elements always accept NULL and cannot be declared otherwise, s
 mapped to a `List` whose elements are nullable. A `List` created with non-nullable elements is accepted and
 produces an ordinary array whose elements accept NULL.
 Array element types retain their character length, numeric precision and scale, and supported temporal
-precision, following the same conversion rules as scalar columns. Unbounded `varchar` and `bpchar`
-map to `String`, including when used as array elements; bounded character types retain their lengths.
+precision, following the same conversion rules as scalar columns. Unbounded `varchar` maps to
+`String`, including array elements. Unbounded `bpchar` maps to `ExternalType("bpchar")` because its
+trailing-space-insensitive comparison semantics cannot be represented by `String` or a bounded
+`FixedChar`. Consumers that read external types as strings must not assume native `bpchar`
+comparison semantics. Bounded character types retain their declared lengths, independently of pgjdbc's
+`unknownLength` setting. Loading a table with character columns performs one additional read of
+PostgreSQL's column declarations to distinguish unbounded types from driver display lengths.
 
 Native `smallserial`, `serial`, and `bigserial` columns map to `Short`, `Integer`, and `Long`, respectively,
 and retain their auto-increment metadata.
