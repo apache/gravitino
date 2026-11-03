@@ -28,12 +28,31 @@ import org.apache.gravitino.server.web.Utils;
  * JsonMappingExceptionMapper is used for returning consistent format of response when an illegal
  * Json request is sent. This class overrides the built-in JsonMappingExceptionMapper defined in
  * Jersey.
+ *
+ * <p>When a request deserializer throws a plain {@link IllegalArgumentException} (for example
+ * naming an invalid {@code policyType} before content is read), that cause is surfaced instead of
+ * the generic malformed-JSON message.
  */
 @Priority(1)
 public class JsonMappingExceptionMapper implements ExceptionMapper<JsonMappingException> {
   @Override
   public Response toResponse(JsonMappingException e) {
-    String errorMsg = "Malformed json request";
+    IllegalArgumentException validation = findPlainIllegalArgument(e);
+    String errorMsg =
+        validation != null && validation.getMessage() != null
+            ? validation.getMessage()
+            : "Malformed json request";
     return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
+  }
+
+  private static IllegalArgumentException findPlainIllegalArgument(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current.getClass() == IllegalArgumentException.class) {
+        return (IllegalArgumentException) current;
+      }
+      current = current.getCause();
+    }
+    return null;
   }
 }

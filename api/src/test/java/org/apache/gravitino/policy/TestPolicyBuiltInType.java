@@ -51,17 +51,6 @@ public class TestPolicyBuiltInType {
   }
 
   @Test
-  void testFromPolicyTypeRejectsMisCasedWireName() {
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> Policy.BuiltInType.fromPolicyType("SYSTEM_ICEBERG_COMPACTION"));
-    Assertions.assertEquals(
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
-        exception.getMessage());
-  }
-
-  @Test
   void testSingleReadRestrictionTypeIsUnsupported() {
     Assertions.assertThrows(
         IllegalArgumentException.class,

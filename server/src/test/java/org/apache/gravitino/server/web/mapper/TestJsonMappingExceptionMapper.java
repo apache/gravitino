@@ -42,4 +42,21 @@ public class TestJsonMappingExceptionMapper {
     Assertions.assertEquals(errorResponse.getMessage(), entity.getMessage());
     Assertions.assertEquals(errorResponse.getType(), entity.getType());
   }
+
+  @Test
+  public void testJsonMappingExceptionMapperSurfacesPlainIllegalArgumentCause() {
+    JsonParser mockParser = Mockito.mock(JsonParser.class);
+    JsonMappingException mapping =
+        JsonMappingException.from(
+            mockParser,
+            "wrapper",
+            new IllegalArgumentException(
+                "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION"));
+    Response response = jsonMappingExceptionMapper.toResponse(mapping);
+    ErrorResponse entity = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
+        entity.getMessage());
+  }
 }

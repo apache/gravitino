@@ -71,27 +71,42 @@ public class TestPolicyUpdatesRequest {
   }
 
   @Test
-  public void testUpdatePolicyContentValidateNamesUnknownOrMisCasedType()
-      throws JsonProcessingException {
-    PolicyUpdateRequest.UpdatePolicyContentRequest unknown =
-        JsonUtils.objectMapper()
-            .readValue(
-                "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
-                    + "\"newContent\":{}}",
-                PolicyUpdateRequest.UpdatePolicyContentRequest.class);
-    Exception e = Assertions.assertThrows(IllegalArgumentException.class, unknown::validate);
-    Assertions.assertEquals("Unknown built-in policy type: system_iceberg_bogus", e.getMessage());
+  public void testUpdatePolicyContentDeserializeRejectsUnknownOrMisCasedType() {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"newContent\":{}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+            + "\"newContent\":{}}",
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
+  }
 
-    PolicyUpdateRequest.UpdatePolicyContentRequest misCased =
-        JsonUtils.objectMapper()
-            .readValue(
-                "{\"@type\":\"updateContent\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
-                    + "\"newContent\":{}}",
-                PolicyUpdateRequest.UpdatePolicyContentRequest.class);
-    e = Assertions.assertThrows(IllegalArgumentException.class, misCased::validate);
-    Assertions.assertEquals(
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
-        e.getMessage());
+  @Test
+  public void testUpdatePolicyContentDeserializeRejectsMisCasedTypeWithBuiltInContent() {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+            + "\"newContent\":{\"maxPartitionNum\":5}}",
+        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"newContent\":{\"maxPartitionNum\":5}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+  }
+
+  private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage) {
+    Exception thrown =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                JsonUtils.objectMapper()
+                    .readValue(json, PolicyUpdateRequest.UpdatePolicyContentRequest.class));
+    Throwable cause = thrown;
+    while (cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    Assertions.assertInstanceOf(IllegalArgumentException.class, cause);
+    Assertions.assertEquals(expectedMessage, cause.getMessage());
   }
 
   @Test

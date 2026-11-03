@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -35,6 +36,7 @@ import org.apache.gravitino.rest.RESTRequest;
 @Getter
 @EqualsAndHashCode
 @ToString
+@JsonDeserialize(using = PolicyCreateRequestDeserializer.class)
 public class PolicyCreateRequest implements RESTRequest {
 
   @JsonProperty("name")

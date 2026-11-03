@@ -79,24 +79,15 @@ public interface Policy extends Auditable {
     /**
      * Get the built-in policy type from the policy type string.
      *
-     * <p>Wire names are matched case-sensitively. A known type with the wrong case is rejected with
-     * the canonical value named in the error.
-     *
      * @param policyType the policy type string
      * @return the matched built-in policy type
-     * @throws IllegalArgumentException if the policy type is unknown, blank, or mis-cased
+     * @throws IllegalArgumentException if the policy type is unknown or blank
      */
     public static BuiltInType fromPolicyType(String policyType) {
       Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");
       for (BuiltInType type : BuiltInType.values()) {
-        if (type.policyType.equals(policyType)) {
-          return type;
-        }
-      }
-      for (BuiltInType type : BuiltInType.values()) {
         if (type.policyType.equalsIgnoreCase(policyType)) {
-          throw new IllegalArgumentException(
-              String.format("Policy type must be '%s', but got: %s", type.policyType, policyType));
+          return type;
         }
       }
 

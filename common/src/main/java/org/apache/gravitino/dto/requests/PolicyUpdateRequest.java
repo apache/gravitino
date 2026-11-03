@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -131,6 +132,7 @@ public interface PolicyUpdateRequest extends RESTRequest {
   @EqualsAndHashCode
   @Getter
   @ToString
+  @JsonDeserialize(using = PolicyUpdateContentRequestDeserializer.class)
   class UpdatePolicyContentRequest implements PolicyUpdateRequest {
 
     @JsonProperty("policyType")
