@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.maintenance.policy;
 
+import java.util.Set;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -130,5 +135,33 @@ public class TestMaintenanceMinIntervalConfigs {
     Assertions.assertEquals(
         MaintenanceMinIntervalConfigs.COMPACTION_MIN_INTERVAL_MS_KEY,
         compaction.minIntervalMsKey());
+  }
+
+  @Test
+  void testContentHelpers() {
+    Assertions.assertFalse(MaintenancePolicyDefinitions.isMaintenance((PolicyContent) null));
+    Assertions.assertNull(MaintenancePolicyDefinitions.timeTrigger(null));
+    Assertions.assertFalse(
+        MaintenancePolicyDefinitions.isMaintenance(
+            PolicyContents.custom(java.util.Map.of(), Set.of(MetadataObject.Type.TABLE), null)));
+
+    IcebergDataCompactionContent content =
+        (IcebergDataCompactionContent)
+            PolicyContents.icebergDataCompaction(
+                IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+                IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+                IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+                IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+                IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+                IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+                IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS,
+                "0 0 2 * * ?",
+                null,
+                null,
+                null,
+                null);
+    Assertions.assertTrue(MaintenancePolicyDefinitions.isMaintenance(content));
+    Assertions.assertEquals("0 0 2 * * ?", MaintenancePolicyDefinitions.timeTrigger(content));
   }
 }
