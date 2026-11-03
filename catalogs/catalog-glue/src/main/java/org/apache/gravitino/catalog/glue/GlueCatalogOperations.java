@@ -467,6 +467,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         GlueConstants.TABLE_FORMAT_FILTER,
         tableFormatFilter);
 
+    // Glue readers take table_type=ICEBERG as an Iceberg table, so a Hive-format table cannot carry
+    // it.
+    Preconditions.checkArgument(
+        isIceberg
+            || !GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+                props.get(GlueConstants.TABLE_TYPE_PARAM)),
+        "Set '%s'=ICEBERG to create an Iceberg table; '%s'=ICEBERG is not allowed on a Hive-format"
+            + " table",
+        GlueConstants.TABLE_FORMAT,
+        GlueConstants.TABLE_TYPE_PARAM);
+
     validateColumns(columns);
     // Iceberg tables delegate partitioning and ordering to GlueIcebergTableHelper.
     if (!isIceberg) {
@@ -528,8 +539,32 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     LOG.info("Created {} table {}.{}", isIceberg ? "Iceberg" : "Glue", dbName, ident.name());
 
     // Read back what Glue stored, so the response carries the derived location and storage
-    // classes, as a later load does.
-    return loadTable(ident);
+    // classes, as a later load does. The table exists at this point, so a failed read falls back
+    // to the definition that was sent rather than reporting the create as failed.
+    try {
+      return loadTable(ident);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Created table {}.{}, but failed to read it back; returning the submitted definition",
+          dbName,
+          ident.name(),
+          e);
+      GlueTable table = GlueTable.fromGlueTable(toTable(dbName, input), typeConverter);
+      table.initOpsContext(glueClient, catalogId, dbName);
+      return table;
+    }
+  }
+
+  private static Table toTable(String dbName, TableInput input) {
+    return Table.builder()
+        .databaseName(dbName)
+        .name(input.name())
+        .description(input.description())
+        .tableType(input.tableType())
+        .parameters(input.parameters())
+        .storageDescriptor(input.storageDescriptor())
+        .partitionKeys(input.partitionKeys())
+        .build();
   }
 
   @Override
@@ -575,8 +610,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             rawSd != null && rawSd.hasBucketColumns()
                 ? rawSd.bucketColumns()
                 : Collections.emptyList(),
-            rawSd != null && rawSd.hasSortColumns()
-                ? rawSd.sortColumns()
+            rawSd != null && rawSd.hasSortColumns() ? rawSd.sortColumns() : Collections.emptyList(),
+            rawSd != null && rawSd.skewedInfo() != null && rawSd.skewedInfo().hasSkewedColumnNames()
+                ? rawSd.skewedInfo().skewedColumnNames()
                 : Collections.emptyList());
     String description = raw.description();
     Map<String, String> params =
@@ -618,6 +654,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         changed = true;
       } else if (change instanceof TableChange.RemoveProperty) {
         String property = ((TableChange.RemoveProperty) change).getProperty();
+        // A table parameter of the same name is shown when the storage descriptor has no value, so
+        // it is removed as well.
+        if (isStorageProperty(property)) {
+          changed |= params.remove(property) != null;
+        }
         if (GlueConstants.LOCATION.equals(property)) {
           storageChanged |= location != null;
           location = null;
@@ -650,6 +691,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       StorageDescriptor.Builder sdBuilder =
           rawSd != null ? rawSd.toBuilder() : StorageDescriptor.builder();
       sdBuilder.columns(cols.dataCols).bucketColumns(cols.bucketCols).sortColumns(cols.sortCols);
+      if (rawSd != null && rawSd.skewedInfo() != null) {
+        sdBuilder.skewedInfo(
+            rawSd.skewedInfo().toBuilder().skewedColumnNames(cols.skewCols).build());
+      }
       if (storageChanged) {
         SerDeInfo.Builder serdeBuilder =
             rawSerde != null ? rawSerde.toBuilder() : SerDeInfo.builder();
@@ -687,10 +732,21 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return loadTable(ident);
   }
 
-  /** The storage format and classes are set at create only. */
+  private static boolean isStorageProperty(String property) {
+    return GlueConstants.LOCATION.equals(property)
+        || GlueConstants.SERDE_NAME.equals(property)
+        || property.startsWith(GlueConstants.SERDE_PARAMETER_PREFIX);
+  }
+
+  /**
+   * The storage format and classes are set at create only, and so is the table format: changing it
+   * would make a Hive-format table read as another format, or hide it behind the format filter.
+   */
   private static void checkTableParameterKey(String property) {
     Preconditions.checkArgument(
-        !SD_TABLE_PROPERTY_KEYS.contains(property),
+        !SD_TABLE_PROPERTY_KEYS.contains(property)
+            && !GlueConstants.TABLE_FORMAT.equals(property)
+            && !GlueConstants.TABLE_TYPE_PARAM.equals(property),
         "Property %s of a Glue table cannot be changed",
         property);
   }
@@ -704,16 +760,19 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     private final List<software.amazon.awssdk.services.glue.model.Column> partCols;
     private final List<String> bucketCols;
     private final List<Order> sortCols;
+    private final List<String> skewCols;
 
     private HiveColumns(
         List<software.amazon.awssdk.services.glue.model.Column> dataCols,
         List<software.amazon.awssdk.services.glue.model.Column> partCols,
         List<String> bucketCols,
-        List<Order> sortCols) {
+        List<Order> sortCols,
+        List<String> skewCols) {
       this.dataCols = new ArrayList<>(dataCols);
       this.partCols = new ArrayList<>(partCols);
       this.bucketCols = new ArrayList<>(bucketCols);
       this.sortCols = new ArrayList<>(sortCols);
+      this.skewCols = new ArrayList<>(skewCols);
     }
 
     /**
@@ -775,8 +834,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         }
         Preconditions.checkArgument(
             bucketCols.stream().noneMatch(name::equalsIgnoreCase)
-                && sortCols.stream().noneMatch(o -> name.equalsIgnoreCase(o.column())),
-            "Cannot delete column %s: it is a bucket or sort column of the table",
+                && sortCols.stream().noneMatch(o -> name.equalsIgnoreCase(o.column()))
+                && skewCols.stream().noneMatch(name::equalsIgnoreCase),
+            "Cannot delete column %s: it is a bucket, sort or skewed column of the table",
             name);
         dataCols.remove(index);
         return true;
@@ -793,6 +853,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             newName);
         dataCols.set(index, old.toBuilder().name(newName).build());
         bucketCols.replaceAll(c -> c.equalsIgnoreCase(name) ? newName : c);
+        skewCols.replaceAll(c -> c.equalsIgnoreCase(name) ? newName : c);
         sortCols.replaceAll(
             o -> name.equalsIgnoreCase(o.column()) ? o.toBuilder().column(newName).build() : o);
       } else if (change instanceof TableChange.UpdateColumnType) {
@@ -1175,13 +1236,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
-    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
-    String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
-    String serdeLib = properties.get(GlueConstants.SERDE_LIB);
+    // Blank classes cannot name a storage format, so they are treated as not set.
+    String inputFormat = StringUtils.trimToNull(properties.get(GlueConstants.INPUT_FORMAT_CLASS));
+    String outputFormat = StringUtils.trimToNull(properties.get(GlueConstants.OUTPUT_FORMAT));
+    String serdeLib = StringUtils.trimToNull(properties.get(GlueConstants.SERDE_LIB));
     if (!isIceberg) {
       StorageFormat sf =
           resolveStorageFormat(
-              properties.get(GlueConstants.FORMAT), inputFormat, outputFormat, serdeLib);
+              StringUtils.trimToNull(properties.get(GlueConstants.FORMAT)),
+              inputFormat,
+              outputFormat,
+              serdeLib);
       if (sf != null) {
         inputFormat = sf.getInputFormat();
         outputFormat = sf.getOutputFormat();
@@ -1274,6 +1339,21 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private static StorageFormat resolveStorageFormat(
       String format, String inputFormat, String outputFormat, String serdeLib) {
     if (format == null) {
+      // Built-in input and output classes must come from the same storage format; a custom SerDe
+      // over a built-in format, such as a JSON SerDe over text files, is allowed.
+      Preconditions.checkArgument(
+          !isBuiltInInputFormat(inputFormat)
+              || !isBuiltInOutputFormat(outputFormat)
+              || Arrays.stream(StorageFormat.values())
+                  .anyMatch(
+                      f ->
+                          f.getInputFormat().equals(inputFormat)
+                              && f.getOutputFormat().equals(outputFormat)),
+          "'%s' %s and '%s' %s belong to different storage formats",
+          GlueConstants.INPUT_FORMAT_CLASS,
+          inputFormat,
+          GlueConstants.OUTPUT_FORMAT,
+          outputFormat);
       boolean anyClass = inputFormat != null || outputFormat != null || serdeLib != null;
       if (!anyClass) {
         return StorageFormat.TEXTFILE;
@@ -1299,6 +1379,16 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     checkFormatClass(format, GlueConstants.OUTPUT_FORMAT, outputFormat, sf.getOutputFormat());
     checkFormatClass(format, GlueConstants.SERDE_LIB, serdeLib, sf.getSerde());
     return sf;
+  }
+
+  private static boolean isBuiltInInputFormat(String inputFormat) {
+    return Arrays.stream(StorageFormat.values())
+        .anyMatch(f -> f.getInputFormat().equals(inputFormat));
+  }
+
+  private static boolean isBuiltInOutputFormat(String outputFormat) {
+    return Arrays.stream(StorageFormat.values())
+        .anyMatch(f -> f.getOutputFormat().equals(outputFormat));
   }
 
   private static void checkFormatClass(
