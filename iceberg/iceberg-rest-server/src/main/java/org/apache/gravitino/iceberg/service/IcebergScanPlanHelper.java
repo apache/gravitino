@@ -49,9 +49,9 @@ import org.apache.iceberg.types.Types;
  * Helpers for Iceberg REST server-side scan planning: honour {@code use-snapshot-schema} and avoid
  * failing when historical partition specs reference dropped columns.
  */
-final class ScanPlanSupport {
+final class IcebergScanPlanHelper {
 
-  private ScanPlanSupport() {}
+  private IcebergScanPlanHelper() {}
 
   /**
    * Returns a branch that points at the snapshot, preferring {@code main}.

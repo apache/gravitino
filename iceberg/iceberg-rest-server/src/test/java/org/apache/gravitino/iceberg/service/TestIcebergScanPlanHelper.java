@@ -36,7 +36,7 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestScanPlanSupport {
+public class TestIcebergScanPlanHelper {
 
   // Field 2 was "l" at the snapshot and is "l2" now; field 3, added later, reuses the name "l".
   private static final Schema SNAPSHOT_SCHEMA =
@@ -51,7 +51,7 @@ public class TestScanPlanSupport {
 
   @Test
   void testSnapshotNamesResolveOnTheCurrentSchema() {
-    ScanPlanSupport.SnapshotNames names = names(true);
+    IcebergScanPlanHelper.SnapshotNames names = names(true);
     Assertions.assertEquals("id", names.toSnapshotName("id"));
     Assertions.assertEquals("l", names.toSnapshotName("l2"));
     // "l" is the column added after the snapshot, not the snapshot's "l".
@@ -64,46 +64,48 @@ public class TestScanPlanSupport {
 
   @Test
   void testRewriteFilterNames() {
-    ScanPlanSupport.SnapshotNames names = names(true);
+    IcebergScanPlanHelper.SnapshotNames names = names(true);
     Assertions.assertEquals(
         Expressions.equal("l", 10L).toString(),
-        ScanPlanSupport.rewriteFilterNames(Expressions.equal("l2", 10L), names).toString());
+        IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("l2", 10L), names).toString());
     Assertions.assertEquals(
         Expressions.equal("id", 1L).toString(),
-        ScanPlanSupport.rewriteFilterNames(Expressions.equal("id", 1L), names).toString());
+        IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("id", 1L), names).toString());
     Assertions.assertEquals(
         Expressions.and(Expressions.in("l", 1L, 2L), Expressions.not(Expressions.isNull("l")))
             .toString(),
-        ScanPlanSupport.rewriteFilterNames(
+        IcebergScanPlanHelper.rewriteFilterNames(
                 Expressions.and(
                     Expressions.in("l2", 1L, 2L), Expressions.not(Expressions.isNull("l2"))),
                 names)
             .toString());
     Assertions.assertEquals(
         Expressions.equal(Expressions.bucket("l", 4), 1).toString(),
-        ScanPlanSupport.rewriteFilterNames(Expressions.equal(Expressions.bucket("l2", 4), 1), names)
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal(Expressions.bucket("l2", 4), 1), names)
             .toString());
 
     IllegalArgumentException addedLater =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> ScanPlanSupport.rewriteFilterNames(Expressions.equal("l", 10L), names));
+            () -> IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("l", 10L), names));
     Assertions.assertTrue(
         addedLater.getMessage().contains("does not exist in snapshot 7"), addedLater.getMessage());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> ScanPlanSupport.rewriteFilterNames(Expressions.equal("nope", 1L), names));
+        () -> IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("nope", 1L), names));
   }
 
   @Test
   void testRewriteColumnNamesDropsColumnsAddedLater() {
     Assertions.assertEquals(
         ImmutableList.of("id", "l"),
-        ScanPlanSupport.rewriteColumnNames(ImmutableList.of("id", "l2", "l"), names(true)));
+        IcebergScanPlanHelper.rewriteColumnNames(ImmutableList.of("id", "l2", "l"), names(true)));
   }
 
-  private static ScanPlanSupport.SnapshotNames names(boolean caseSensitive) {
-    return new ScanPlanSupport.SnapshotNames(CURRENT_SCHEMA, SNAPSHOT_SCHEMA, caseSensitive, 7L);
+  private static IcebergScanPlanHelper.SnapshotNames names(boolean caseSensitive) {
+    return new IcebergScanPlanHelper.SnapshotNames(
+        CURRENT_SCHEMA, SNAPSHOT_SCHEMA, caseSensitive, 7L);
   }
 
   @Test
@@ -140,7 +142,7 @@ public class TestScanPlanSupport {
     doReturn(dataFile).when(task).file();
 
     Map<Integer, PartitionSpec> sanitized =
-        ScanPlanSupport.sanitizeSpecsForSerialization(
+        IcebergScanPlanHelper.sanitizeSpecsForSerialization(
             ImmutableMap.of(0, staleSpec), Collections.singletonList(task));
 
     Assertions.assertFalse(

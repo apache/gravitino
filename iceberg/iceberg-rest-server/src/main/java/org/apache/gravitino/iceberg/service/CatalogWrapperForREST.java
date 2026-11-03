@@ -652,7 +652,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return PlanTableScanResponse.builder()
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
-        .withSpecsById(ScanPlanSupport.sanitizeSpecsForSerialization(table.specs(), fileScanTasks))
+        .withSpecsById(
+            IcebergScanPlanHelper.sanitizeSpecsForSerialization(table.specs(), fileScanTasks))
         .build();
   }
 
@@ -699,14 +700,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
-      ScanPlanSupport.SnapshotNames snapshotNames = null;
+      IcebergScanPlanHelper.SnapshotNames snapshotNames = null;
       // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
         long snapshotId = scanRequest.snapshotId();
         Optional<String> branch =
             scanRequest.useSnapshotSchema()
                 ? Optional.empty()
-                : ScanPlanSupport.branchAt(table, snapshotId);
+                : IcebergScanPlanHelper.branchAt(table, snapshotId);
         if (branch.isPresent()) {
           tableScan = tableScan.useRef(branch.get());
           LOG.debug("Applied branch {} for snapshot-id={}", branch.get(), snapshotId);
@@ -714,7 +715,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           tableScan = tableScan.useSnapshot(snapshotId);
           if (!scanRequest.useSnapshotSchema()) {
             snapshotNames =
-                new ScanPlanSupport.SnapshotNames(
+                new IcebergScanPlanHelper.SnapshotNames(
                     table.schema(),
                     SnapshotUtil.schemaFor(table, snapshotId),
                     scanRequest.caseSensitive(),
@@ -732,7 +733,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanRequest(
       T scan,
       PlanTableScanRequest scanRequest,
-      @Nullable ScanPlanSupport.SnapshotNames snapshotNames) {
+      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
     scan = (T) scan.caseSensitive(scanRequest.caseSensitive());
     LOG.debug("Applied case-sensitive: {}", scanRequest.caseSensitive());
     scan = applyScanFilter(scan, scanRequest, snapshotNames);
@@ -746,13 +747,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanFilter(
       T scan,
       PlanTableScanRequest scanRequest,
-      @Nullable ScanPlanSupport.SnapshotNames snapshotNames) {
+      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
     if (scanRequest.filter() != null) {
       try {
         Expression filter =
             snapshotNames == null
                 ? scanRequest.filter()
-                : ScanPlanSupport.rewriteFilterNames(scanRequest.filter(), snapshotNames);
+                : IcebergScanPlanHelper.rewriteFilterNames(scanRequest.filter(), snapshotNames);
         scan = (T) scan.filter(filter);
         LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
@@ -767,13 +768,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanSelect(
       T scan,
       PlanTableScanRequest scanRequest,
-      @Nullable ScanPlanSupport.SnapshotNames snapshotNames) {
+      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
     if (scanRequest.select() != null && !scanRequest.select().isEmpty()) {
       try {
         List<String> select =
             snapshotNames == null
                 ? scanRequest.select()
-                : ScanPlanSupport.rewriteColumnNames(scanRequest.select(), snapshotNames);
+                : IcebergScanPlanHelper.rewriteColumnNames(scanRequest.select(), snapshotNames);
         if (!select.isEmpty()) {
           scan = (T) scan.select(select);
           LOG.debug("Applied column projection: {}", select);
@@ -790,12 +791,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanStatsFields(
       T scan,
       PlanTableScanRequest scanRequest,
-      @Nullable ScanPlanSupport.SnapshotNames snapshotNames) {
+      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
     if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
       List<String> statsFields =
           snapshotNames == null
               ? scanRequest.statsFields()
-              : ScanPlanSupport.rewriteColumnNames(scanRequest.statsFields(), snapshotNames);
+              : IcebergScanPlanHelper.rewriteColumnNames(scanRequest.statsFields(), snapshotNames);
       for (String field : statsFields) {
         boolean known =
             scanRequest.caseSensitive()
