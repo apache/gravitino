@@ -626,16 +626,17 @@ components:
 
     IdpNotAcceptableErrorResponse:
       description: >
-        Not Acceptable - The `Accept` header must allow
-        `application/vnd.gravitino.v1+json` (for example `*/*`). Requests that accept only
-        incompatible media types such as `application/json` receive this response.
+        Not Acceptable - Returned when `Accept` (or a versioned `Content-Type`) declares an
+        unsupported Gravitino API version, for example `application/vnd.gravitino.v99+json`.
+        Missing Accept, `*/*`, or `application/json` alone are rewritten to the default
+        `application/vnd.gravitino.v1+json` and do not produce this response.
       content:
         application/vnd.gravitino.v1+json:
           schema:
             $ref: "../openapi.yaml#/components/schemas/ErrorModel"
           examples:
-            NotAcceptableException:
-              $ref: "#/components/examples/IdpNotAcceptableException"
+            UnsupportedApiVersion:
+              $ref: "#/components/examples/IdpUnsupportedApiVersionException"
 
   examples:
     AddUserRequest:
@@ -860,12 +861,12 @@ components:
       value: {
         "code": 1008,
         "type": "ForbiddenException",
-        "message": "Only service admins can manage local user store users and groups."
+        "message": "Only service admins can manage built-in IdP users and groups."
       }
 
-    IdpNotAcceptableException:
+    IdpUnsupportedApiVersionException:
       value: {
-        "code": 1000,
-        "type": "RESTException",
-        "message": "HTTP 406 Not Acceptable"
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Unsupported version v99 in request header"
       }
