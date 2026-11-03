@@ -162,6 +162,8 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofPolicy(metalake, request.getName()), Entity.EntityType.POLICY);
             validateCreatePolicyType(request.getPolicyType());
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
@@ -231,6 +233,14 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
+            for (PolicyUpdateRequest update : request.getUpdates()) {
+              if (update instanceof PolicyUpdateRequest.RenamePolicyRequest) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofPolicy(
+                        metalake, ((PolicyUpdateRequest.RenamePolicyRequest) update).getNewName()),
+                    Entity.EntityType.POLICY);
+              }
+            }
 
             PolicyChange[] changes =
                 request.getUpdates().stream()

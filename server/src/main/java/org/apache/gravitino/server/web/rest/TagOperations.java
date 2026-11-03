@@ -175,6 +175,8 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofTag(metalake, request.getName()), Entity.EntityType.TAG);
             Tag tag =
                 tagDispatcher.createTag(
                     metalake,
@@ -243,6 +245,14 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
+            for (TagUpdateRequest update : request.getUpdates()) {
+              if (update instanceof TagUpdateRequest.RenameTagRequest) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofTag(
+                        metalake, ((TagUpdateRequest.RenameTagRequest) update).getNewName()),
+                    Entity.EntityType.TAG);
+              }
+            }
 
             TagChange[] changes =
                 request.getUpdates().stream()
