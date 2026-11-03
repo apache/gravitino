@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Parses the {@link AuthConstants#X_GRAVITINO_ACTIVE_ROLES_HEADER} header value into an {@link
@@ -166,10 +167,11 @@ public final class ActiveRolesParser {
     return decodeUtf8(bytes.toByteArray(), value);
   }
 
-  // Decoding can produce names the raw header could not carry: reject blank names (e.g. "%20") here
-  // so they get a 400, and control characters so a name cannot forge lines in logs.
+  // Decoding can produce names the raw header could not carry: reject blank names (e.g. "%20" or
+  // Unicode spaces, matching role creation) here so they get a 400, and control characters so a
+  // name cannot forge lines in logs.
   private static String checkRoleName(String name, String value) {
-    if (name.trim().isEmpty()) {
+    if (StringUtils.isBlank(name)) {
       throw invalid("empty role entry in value '" + value + "'");
     }
     if (name.chars().anyMatch(Character::isISOControl)) {

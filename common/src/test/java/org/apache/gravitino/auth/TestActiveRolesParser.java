@@ -218,6 +218,7 @@ public class TestActiveRolesParser {
         "vrf_r\u00f4le", // raw Latin-1 byte 0xF4 is not valid UTF-8
         "%20", // blank after decoding
         "a,%09", // blank after decoding
+        "%E2%80%83", // Unicode whitespace (U+2003) only after decoding
         "%00", // control character
         "x%0Aforged", // control character
         "x%7F" // control character
