@@ -70,6 +70,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for PostgreSQL. */
@@ -322,12 +323,16 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         .collect(Collectors.joining(", "));
   }
 
+  private static boolean allowsAutoIncrement(Type type) {
+    return type instanceof Types.ShortType || Types.allowAutoIncrement(type);
+  }
+
   private void appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add data type
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
     if (column.autoIncrement()) {
-      if (!Types.allowAutoIncrement(column.dataType())) {
+      if (!allowsAutoIncrement(column.dataType())) {
         throw new IllegalArgumentException(
             "Unsupported auto-increment , column: "
                 + column.name()
@@ -666,7 +671,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         .append(SPACE);
 
     if (addColumn.isAutoIncrement()) {
-      if (!Types.allowAutoIncrement(addColumn.getDataType())) {
+      if (!allowsAutoIncrement(addColumn.getDataType())) {
         throw new IllegalArgumentException(
             "Unsupported auto-increment , column: "
                 + Arrays.toString(addColumn.getFieldName())
@@ -807,49 +812,80 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       columns.populate(metadata);
     }
 
-    boolean hasCharacterColumn = false;
+    boolean needsDeclarations = false;
     while (columns.next()) {
       String type = columns.getString("TYPE_NAME");
       if ("varchar".equals(type)
           || "bpchar".equals(type)
           || "_varchar".equals(type)
-          || "_bpchar".equals(type)) {
-        hasCharacterColumn = true;
+          || "_bpchar".equals(type)
+          || (getAutoIncrementInfo(columns) && columns.getString("COLUMN_DEF") != null)) {
+        needsDeclarations = true;
         break;
       }
     }
     columns.beforeFirst();
-    if (!hasCharacterColumn) {
+    if (!needsDeclarations) {
       return columns;
     }
 
     // COLUMN_SIZE substitutes the configurable pgjdbc unknownLength for unbounded character
-    // types. It can equal a real bounded length, so consult the declaration instead of guessing
-    // from the reported size. One metadata query covers both scalar and array columns.
+    // types. Serial defaults also need their declaration: JDBC marks shared sequence defaults as
+    // auto-incrementing too. One catalog query resolves both without querying per column.
     Set<String> unboundedColumns = new HashSet<>();
+    Set<String> serialColumns = new HashSet<>();
+    // Match only a bare nextval call and verify its dependency on the owned sequence. Ownership
+    // alone would also match custom defaults such as nextval(owned_sequence) + 1.
     String sql =
-        "SELECT a.attname FROM pg_catalog.pg_attribute a "
+        "SELECT a.attname, a.atttypmod = -1 AND a.atttypid IN "
+            + "('pg_catalog.varchar'::pg_catalog.regtype, 'pg_catalog.bpchar'::pg_catalog.regtype, "
+            + "'pg_catalog.varchar[]'::pg_catalog.regtype, "
+            + "'pg_catalog.bpchar[]'::pg_catalog.regtype) AS unbounded_character, "
+            + "a.attnotnull AND a.atttypid IN ('pg_catalog.int2'::pg_catalog.regtype, "
+            + "'pg_catalog.int4'::pg_catalog.regtype, 'pg_catalog.int8'::pg_catalog.regtype) "
+            + "AND pg_catalog.pg_get_expr(d.adbin, d.adrelid) ~ "
+            + "'^nextval[(]''([^'']|'''')*''::regclass[)]$' "
+            + "AND EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep "
+            + "WHERE dep.classid = 'pg_catalog.pg_attrdef'::pg_catalog.regclass "
+            + "AND dep.objid = d.oid AND dep.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass "
+            + "AND dep.refobjid = pg_catalog.pg_get_serial_sequence("
+            + "pg_catalog.format('%I.%I', n.nspname, c.relname), a.attname)::pg_catalog.regclass "
+            + "AND dep.deptype = 'n') AS owned_serial "
+            + "FROM pg_catalog.pg_attribute a "
             + "JOIN pg_catalog.pg_class c ON a.attrelid = c.oid "
             + "JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid "
-            + "WHERE n.nspname = ? AND c.relname = ? AND a.attnum > 0 "
-            + "AND NOT a.attisdropped AND a.atttypmod = -1 "
-            + "AND a.atttypid IN ('pg_catalog.varchar'::pg_catalog.regtype, "
-            + "'pg_catalog.bpchar'::pg_catalog.regtype, "
-            + "'pg_catalog.varchar[]'::pg_catalog.regtype, "
-            + "'pg_catalog.bpchar[]'::pg_catalog.regtype)";
+            + "LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum "
+            + "WHERE n.nspname = ? AND c.relname = ? AND a.attnum > 0 AND NOT a.attisdropped";
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
       statement.setString(1, schema);
       statement.setString(2, tableName);
       try (ResultSet declarations = statement.executeQuery()) {
         while (declarations.next()) {
-          unboundedColumns.add(declarations.getString(1));
+          if (declarations.getBoolean("unbounded_character")) {
+            unboundedColumns.add(declarations.getString("attname"));
+          }
+          if (declarations.getBoolean("owned_serial")) {
+            serialColumns.add(declarations.getString("attname"));
+          }
         }
       }
     }
     while (columns.next()) {
-      if (unboundedColumns.contains(columns.getString("COLUMN_NAME"))) {
+      boolean updated = false;
+      String name = columns.getString("COLUMN_NAME");
+      if (unboundedColumns.contains(name)) {
         // Zero is the converter's canonical unknown length, independent of driver configuration.
         columns.updateInt("COLUMN_SIZE", 0);
+        updated = true;
+      }
+      if (getAutoIncrementInfo(columns) && serialColumns.contains(name)) {
+        // Preserve basic auto-increment semantics using a new IDENTITY on recreation, rather
+        // than copying a default that still depends on the source table's owned sequence.
+        // Shared sequences and custom expressions deliberately retain their original defaults.
+        columns.updateNull("COLUMN_DEF");
+        updated = true;
+      }
+      if (updated) {
         columns.updateRow();
       }
     }
