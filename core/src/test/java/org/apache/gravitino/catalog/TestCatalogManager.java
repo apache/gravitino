@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -2499,6 +2500,82 @@ public class TestCatalogManager {
                   Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
                   Map.of()));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  void testCreateRejectsMaskedPlaceholderSecretBinding() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_mask_create");
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(
+                          PROPERTY_KEY4,
+                          new SecretBinding("memory", HiddenPropertyMaskUtils.MASKED_VALUE)),
+                      Map.of()));
+      Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
+      Assertions.assertFalse(manager.catalogExists(ident));
+    }
+  }
+
+  @Test
+  void testCatalogManageableWhenSecretMissing() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier broken = NameIdentifier.of("metalake", "secret_missing");
+      NameIdentifier healthy = NameIdentifier.of("metalake", "secret_healthy");
+      manager.createCatalog(
+          broken,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "gone-soon")),
+          Map.of());
+      manager.createCatalog(healthy, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
+
+      String urn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, urn));
+      manager.getCatalogCache().invalidate(broken);
+
+      Catalog[] listed = manager.listCatalogsInfo(broken.namespace());
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(broken.name())));
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(healthy.name())));
+
+      // Re-bind while still in use (alter requires catalog in use).
+      Assertions.assertDoesNotThrow(
+          () ->
+              manager.alterCatalog(
+                  broken,
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "rebound"))));
+      String reboundUrn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertEquals("rebound", secrets.readSecret(SecretUrn.parse(reboundUrn)));
+
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, reboundUrn));
+      manager.getCatalogCache().invalidate(broken);
+      Assertions.assertDoesNotThrow(() -> manager.disableCatalog(broken));
+      Assertions.assertTrue(manager.dropCatalog(broken, true));
+      Assertions.assertTrue(manager.dropCatalog(healthy, true));
     }
   }
 
