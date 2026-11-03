@@ -38,6 +38,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -144,7 +145,10 @@ public class DomainOperations {
           DomainCreateRequest.BackingTag tag = request.getBackingTag();
           DomainAuthzHelper.requireManage(metalake, null);
           if (request.getParent() != null) {
-            DomainAuthzHelper.requireManage(domainDispatcher, metalake, request.getParent());
+            DomainAuthzHelper.requireManage(
+                GravitinoEnv.getInstance().internalDomainDispatcher(),
+                metalake,
+                request.getParent());
           }
           if (tag.isCreate()) {
             DomainAuthzHelper.requireBackingTag(metalake, tag.getName(), true);
@@ -335,8 +339,10 @@ public class DomainOperations {
         domain,
         () -> {
           validateRequest(request);
-          DomainAuthzHelper.requireManage(domainDispatcher, metalake, domain);
-          DomainAuthzHelper.requireManage(domainDispatcher, metalake, request.getParent());
+          DomainAuthzHelper.requireManage(
+              GravitinoEnv.getInstance().internalDomainDispatcher(), metalake, domain);
+          DomainAuthzHelper.requireManage(
+              GravitinoEnv.getInstance().internalDomainDispatcher(), metalake, request.getParent());
           return domainResponse(
               DomainAuthzHelper.checked(
                       domainDispatcher,
@@ -401,7 +407,8 @@ public class DomainOperations {
         domain,
         () -> {
           validateRequest(request);
-          DomainAuthzHelper.requireManage(domainDispatcher, metalake, domain);
+          DomainAuthzHelper.requireManage(
+              GravitinoEnv.getInstance().internalDomainDispatcher(), metalake, domain);
           return domainResponse(
               DomainAuthzHelper.checked(
                       domainDispatcher,
@@ -442,7 +449,8 @@ public class DomainOperations {
         metalake,
         domain,
         () -> {
-          DomainAuthzHelper.requireVisible(domainDispatcher, metalake, domain);
+          DomainAuthzHelper.requireVisible(
+              GravitinoEnv.getInstance().internalDomainDispatcher(), metalake, domain);
           return details
               ? listResponse(
                   DomainAuthzHelper.filterDomains(
