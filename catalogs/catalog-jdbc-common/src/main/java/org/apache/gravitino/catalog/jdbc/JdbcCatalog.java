@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -86,6 +87,32 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     return false;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public JdbcCatalog withCatalogConf(Map<String, String> configuration) {
+    return super.withCatalogConf(prepareConfiguration(configuration));
+  }
+
+  /**
+   * Normalizes and validates provider-specific settings for initialization and proposed changes.
+   *
+   * @param configuration the complete proposed configuration, which must not be mutated
+   * @return the normalized settings; the default returns the original map
+   * @throws IllegalArgumentException if provider-specific settings are inconsistent
+   */
+  protected Map<String, String> prepareConfiguration(Map<String, String> configuration) {
+    return configuration;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    JdbcCatalogPropertiesMetadata metadata =
+        (JdbcCatalogPropertiesMetadata) catalogPropertiesMetadata();
+    DataSourceUtils.validateConfiguration(
+        new JdbcConfig(metadata.jdbcProperties(prepareConfiguration(configuration))));
+  }
+
   /**
    * Returns the effective {@link JdbcConfig#VERIFY_ON_CREATE verify-on-create} setting for this
    * catalog. A relational JDBC catalog verifies its backend at create time by default; an
@@ -100,7 +127,10 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     if (properties == null) {
       return true;
     }
-    return new JdbcConfig(properties).getVerifyOnCreate();
+    JdbcCatalogPropertiesMetadata metadata =
+        (JdbcCatalogPropertiesMetadata) catalogPropertiesMetadata();
+    return new JdbcConfig(metadata.jdbcProperties(prepareConfiguration(properties)))
+        .getVerifyOnCreate();
   }
 
   /**

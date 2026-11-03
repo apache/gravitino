@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.postgresql;
 
 import java.sql.Driver;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -46,6 +45,6 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
 
   @Override
   protected Driver getDriver() throws SQLException {
-    return DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
+    return super.getDriver();
   }
 }
