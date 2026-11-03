@@ -33,6 +33,8 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -47,6 +49,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
@@ -55,6 +58,7 @@ import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
+import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
@@ -242,6 +246,92 @@ class TestGlueCatalogOperationsForIceberg {
     verify(mockClient).getPartitions(captor.capture());
     assertEquals(DB, captor.getValue().databaseName());
     assertEquals(TABLE, captor.getValue().tableName());
+  }
+
+  @Test
+  void testAlterIcebergTableRenameOntoExistingTableIsAlreadyExists() {
+    software.amazon.awssdk.services.glue.model.Table rawTable =
+        software.amazon.awssdk.services.glue.model.Table.builder()
+            .name(TABLE)
+            .parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(rawTable).build());
+    Mockito.doThrow(
+            new org.apache.iceberg.exceptions.AlreadyExistsException(
+                "Table already exists: %s.%s.taken",
+                GlueIcebergTableHelper.ICEBERG_CATALOG_NAME, DB))
+        .when(mockIcebergCatalog)
+        .renameTable(any(TableIdentifier.class), any(TableIdentifier.class));
+
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
+    TableAlreadyExistsException e =
+        assertThrows(
+            TableAlreadyExistsException.class,
+            () -> ops.alterTable(ident, TableChange.rename("taken")));
+    assertFalse(
+        e.getMessage().contains(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME), e.getMessage());
+  }
+
+  @Test
+  void testCreateIcebergTableWithRejectedCredentialsIsForbidden() {
+    Catalog.TableBuilder mockBuilder = mock(Catalog.TableBuilder.class, Mockito.RETURNS_SELF);
+    when(mockIcebergCatalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(mockBuilder);
+    when(mockBuilder.create())
+        .thenThrow(
+            new RuntimeException(
+                GlueException.builder()
+                    .message("The security token included in the request is invalid")
+                    .awsErrorDetails(
+                        AwsErrorDetails.builder()
+                            .errorCode("UnrecognizedClientException")
+                            .errorMessage("The security token included in the request is invalid")
+                            .build())
+                    .build()));
+
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            ops.createTable(
+                NameIdentifier.of("cat", "ns", DB, TABLE),
+                icebergColumns(),
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testCreateIcebergTableRequiresS3Location() {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTable(
+                    NameIdentifier.of("cat", "ns", DB, TABLE),
+                    icebergColumns(),
+                    null,
+                    Map.of(
+                        GlueConstants.TABLE_FORMAT,
+                        "iceberg",
+                        GlueConstants.LOCATION,
+                        "hdfs://nn:8020/warehouse/ice1"),
+                    new Transform[0],
+                    Distributions.NONE,
+                    null,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(e.getMessage().contains("hdfs://nn:8020/warehouse/ice1"), e.getMessage());
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
+  private static GlueColumn[] icebergColumns() {
+    return new GlueColumn[] {
+      GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(false).build()
+    };
   }
 
   @Test
