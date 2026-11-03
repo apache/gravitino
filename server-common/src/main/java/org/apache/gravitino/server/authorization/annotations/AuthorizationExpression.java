@@ -55,8 +55,7 @@ public @interface AuthorizationExpression {
   /**
    * The secondary expression to evaluate for authorization when {@link
    * #secondaryExpressionCondition()} matches. Typical uses are stricter load checks (for example
-   * MODIFY_TABLE privileges) and create-versus-overwrite switches (for example {@link
-   * ExpressionCondition#OVERWRITE}).
+   * MODIFY_TABLE privileges) and catalog connection-test paths that carry proposed changes.
    *
    * @return the secondary expression to evaluate for authorization.
    */
