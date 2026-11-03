@@ -260,6 +260,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 

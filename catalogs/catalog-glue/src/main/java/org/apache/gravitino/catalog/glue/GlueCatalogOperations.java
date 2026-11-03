@@ -69,7 +69,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
@@ -165,7 +164,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       applyCatalogId(catalogId, req::catalogId);
       glueClient.getDatabases(req.build());
     } catch (SdkException e) {
-      throw GlueExceptionConverter.toConnectionException(e);
+      throw GlueExceptionConverter.toConnectionException(e, glueClient);
     }
   }
 
@@ -325,6 +324,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           throw new NonEmptySchemaException(
               "Schema %s is not empty. Use cascade=true to drop it with its tables.", ident.name());
         }
+      } catch (EntityNotFoundException e) {
+        return false;
       } catch (GlueException e) {
         throw GlueExceptionConverter.toSchemaException(
             e, "checking tables in schema " + ident.name());
@@ -380,6 +381,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       software.amazon.awssdk.services.glue.model.Table rawGlueTable =
           callGlue(() -> glueClient.getTable(req.build()), "table " + ident.name()).table();
       rejectIfView(rawGlueTable, ident, dbName);
+      rejectIfFormatHidden(rawGlueTable, ident, dbName);
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
 
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
@@ -420,6 +422,20 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     String tableFormat = props.getOrDefault(GlueConstants.TABLE_FORMAT, defaultTableFormat);
     boolean isIceberg = GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableFormat);
+    String normalizedFormat =
+        isIceberg
+            ? GlueConstants.ICEBERG_TABLE_TYPE_VALUE.toLowerCase(Locale.ROOT)
+            : props
+                .getOrDefault(GlueConstants.TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE)
+                .toLowerCase(Locale.ROOT);
+    // A table of an excluded format would be created but stay invisible through this catalog.
+    Preconditions.checkArgument(
+        isFormatVisible(normalizedFormat),
+        "Cannot create table %s with format '%s': the catalog property '%s' only exposes %s",
+        ident.name(),
+        normalizedFormat,
+        GlueConstants.TABLE_FORMAT_FILTER,
+        tableFormatFilter);
 
     // Non-Iceberg (Hive) tables only support identity partitioning.
     // Iceberg tables delegate to GlueIcebergCatalogHelper which supports all transforms.
@@ -451,15 +467,19 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
       if (!registerMode) {
         // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
-        GlueIcebergTableHelper.createTable(
-            icebergGlueCatalog,
-            dbName,
-            ident.name(),
-            columns,
-            comment,
-            finalProps,
-            partitions,
-            sortOrders);
+        try {
+          GlueIcebergTableHelper.createTable(
+              icebergGlueCatalog,
+              dbName,
+              ident.name(),
+              columns,
+              comment,
+              finalProps,
+              partitions,
+              sortOrders);
+        } catch (RuntimeException e) {
+          throw GlueExceptionConverter.toIcebergException(e, "table " + ident.name());
+        }
         LOG.info("Created Iceberg table {}.{} via Iceberg SDK", dbName, ident.name());
         return loadTable(ident);
       }
@@ -524,6 +544,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     rejectIfView(rawGlueTable, ident, dbName);
+    rejectIfFormatHidden(rawGlueTable, ident, dbName);
 
     if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
       return alterIcebergTable(ident, dbName, rawGlueTable, changes);
@@ -609,8 +630,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
-    TableIdentifier finalId =
-        GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
+    TableIdentifier finalId;
+    try {
+      finalId =
+          GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
+    } catch (RuntimeException e) {
+      throw GlueExceptionConverter.toIcebergException(e, "altering table " + ident.name());
+    }
     String newDbName = finalId.namespace().level(0);
     NameIdentifier finalIdent;
     if (newDbName.equals(dbName) && finalId.name().equals(ident.name())) {
@@ -664,10 +690,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         GetTableRequest.builder().databaseName(dbName).name(ident.name());
     applyCatalogId(catalogId, getReq::catalogId);
     try {
-      rejectIfView(
-          callGlue(() -> glueClient.getTable(getReq.build()), "table " + ident.name()).table(),
-          ident,
-          dbName);
+      Table existing =
+          callGlue(() -> glueClient.getTable(getReq.build()), "table " + ident.name()).table();
+      rejectIfView(existing, ident, dbName);
+      if (!matchesFormatFilter(existing)) {
+        return false;
+      }
     } catch (EntityNotFoundException e) {
       return false;
     } catch (GlueException e) {
@@ -725,7 +753,25 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     String normalized =
         fmt != null ? fmt.toLowerCase(Locale.ROOT) : GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
-    return tableFormatFilter.contains(normalized);
+    return isFormatVisible(normalized);
+  }
+
+  private boolean isFormatVisible(String normalizedFormat) {
+    return tableFormatFilter == null
+        || tableFormatFilter.contains(GlueConstants.DEFAULT_TABLE_FORMAT_FILTER)
+        || tableFormatFilter.contains(normalizedFormat);
+  }
+
+  /**
+   * Throws {@link NoSuchTableException} for a table whose format is excluded by {@code
+   * table-format-filter}, so that load and alter treat it as absent.
+   */
+  private void rejectIfFormatHidden(Table table, NameIdentifier ident, String dbName) {
+    if (!matchesFormatFilter(table)) {
+      throw new NoSuchTableException(
+          "Table %s.%s does not exist: its format is excluded by catalog property '%s'",
+          dbName, ident.name(), GlueConstants.TABLE_FORMAT_FILTER);
+    }
   }
 
   private void executeCreateTable(
@@ -975,28 +1021,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
-   * Translates a raw AWS SDK credential-chain failure into a message naming this connector's own
-   * {@code aws-access-key-id} / {@code aws-secret-access-key} properties, so operators are not left
-   * to guess from the SDK's generic provider-chain error. Non-credential {@link
-   * SdkClientException}s (e.g. network failures) are rethrown unchanged.
+   * Invokes a Glue SDK call and converts the failures that do not depend on the object (credential,
+   * region, throttling, invalid input, access denied, timeout and transport failures) through
+   * {@link GlueExceptionConverter#toClientException}. Any other {@link SdkException} is rethrown
+   * unchanged so each call site's own catch block still applies its not-found/already-exists
+   * semantics.
    */
-  private static RuntimeException translateCredentialFailure(SdkClientException e, String context) {
-    return GlueExceptionConverter.isCredentialFailure(e)
-        ? GlueExceptionConverter.toCredentialException(e, context)
-        : e;
-  }
-
-  /**
-   * Invokes a Glue SDK call, translating a credential-chain {@link SdkClientException} into an
-   * actionable error naming this connector's own credential properties. {@link GlueException} is
-   * left untouched so each call site's own catch block still applies its usual (e.g.
-   * not-found/already-exists) semantics.
-   */
-  private static <T> T callGlue(Supplier<T> call, String context) {
+  private <T> T callGlue(Supplier<T> call, String context) {
     try {
       return call.get();
-    } catch (SdkClientException e) {
-      throw translateCredentialFailure(e, context);
+    } catch (SdkException e) {
+      RuntimeException converted = GlueExceptionConverter.toClientException(e, context, glueClient);
+      throw converted != null ? converted : e;
     }
   }
 

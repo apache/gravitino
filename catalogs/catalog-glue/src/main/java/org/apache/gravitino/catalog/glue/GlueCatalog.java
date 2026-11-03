@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -44,6 +45,9 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
   static final GlueTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
       new GlueTablePropertiesMetadata();
 
+  /** Plaintext catalog configuration, kept for the create-time checks. */
+  private Map<String, String> catalogConf = Collections.emptyMap();
+
   /**
    * Returns the short name of the Glue catalog.
    *
@@ -57,6 +61,30 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
   @Override
   public boolean supportsPathBasedCredentials() {
     return false;
+  }
+
+  @Override
+  public GlueCatalog withCatalogConf(Map<String, String> conf) {
+    this.catalogConf = conf == null ? Collections.emptyMap() : conf;
+    return super.withCatalogConf(conf);
+  }
+
+  /**
+   * Validates at create the configuration that is otherwise only checked when the Glue client is
+   * first built, so a misconfigured catalog is refused instead of stored.
+   */
+  @Override
+  public boolean shouldValidateOnCreate() {
+    return true;
+  }
+
+  /**
+   * Runs only local configuration checks. Creating a Glue catalog does not contact AWS, because
+   * credentials that only AWS can reject must not block the create.
+   */
+  @Override
+  public void validateOnCreate() {
+    GlueClientProvider.validateConfig(catalogConf);
   }
 
   /**
