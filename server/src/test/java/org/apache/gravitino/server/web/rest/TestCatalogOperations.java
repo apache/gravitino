@@ -736,6 +736,22 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testSetCatalogRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/catalogs/catalog1")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).enableCatalog(any());
+    Mockito.verify(manager, Mockito.never()).disableCatalog(any());
+  }
+
+  @Test
   public void testSetCatalog() {
     // Test enable catalog
     CatalogSetRequest req = new CatalogSetRequest(true);
