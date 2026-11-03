@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -82,6 +83,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -89,6 +91,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -194,6 +197,65 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         revived.id(),
         backend.<SchemaEntity>get(revived.nameIdentifier(), Entity.EntityType.SCHEMA).id());
     assertFalse(backend.exists(child.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  void testConcurrentRevivalOfRetiredSchemaIdKeepsOneOwner() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertCatalog(metalakeName, "first_revival_catalog");
+    createAndInsertCatalog(metalakeName, "second_revival_catalog");
+    SchemaEntity retired = createAndInsertSchema(metalakeName, catalogName, "retired_identity");
+    backend.delete(retired.nameIdentifier(), Entity.EntityType.SCHEMA, true);
+    SchemaEntity first =
+        createSchemaEntity(
+            retired.id(),
+            Namespace.of(metalakeName, "first_revival_catalog"),
+            "revived",
+            AUDIT_INFO);
+    SchemaEntity second =
+        createSchemaEntity(
+            retired.id(),
+            Namespace.of(metalakeName, "second_revival_catalog"),
+            "revived",
+            AUDIT_INFO);
+    CountDownLatch lockingReadsStarted = new CountDownLatch(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> firstResult;
+      Future<Throwable> secondResult;
+      try (SqlSession session =
+          SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false)) {
+        SchemaPO locked =
+            session
+                .getMapper(SchemaMetaMapper.class)
+                .selectSchemaMetaByIdIncludingDeletedForUpdate(retired.id());
+        Assertions.assertNotNull(locked);
+        assertTrue(locked.getDeletedAt() > 0);
+        firstResult =
+            executor.submit(() -> reviveSchemaAfterIdentityCheck(first, lockingReadsStarted));
+        secondResult =
+            executor.submit(() -> reviveSchemaAfterIdentityCheck(second, lockingReadsStarted));
+        // Both non-locking checks have observed no active owner. Hold the retired row until both
+        // writers reach the locking read, forcing the loser to revalidate the winner's active ID.
+        assertTrue(lockingReadsStarted.await(30, TimeUnit.SECONDS));
+        session.commit();
+      }
+      Throwable firstFailure = firstResult.get(30, TimeUnit.SECONDS);
+      Throwable secondFailure = secondResult.get(30, TimeUnit.SECONDS);
+      assertTrue((firstFailure == null) != (secondFailure == null), "Exactly one revival must win");
+      Assertions.assertInstanceOf(
+          EntityAlreadyExistsException.class, firstFailure == null ? secondFailure : firstFailure);
+      SchemaEntity winner = firstFailure == null ? first : second;
+      SchemaEntity loser = firstFailure == null ? second : first;
+      Assertions.assertEquals(
+          retired.id(),
+          backend.<SchemaEntity>get(winner.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+      assertFalse(backend.exists(loser.nameIdentifier(), Entity.EntityType.SCHEMA));
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
   }
 
   @TestTemplate
@@ -2608,5 +2670,38 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   @FunctionalInterface
   private interface SchemaChildMove {
     void run(NameIdentifier childIdentifier, String targetSchemaName) throws Exception;
+  }
+
+  @Nullable
+  private Throwable reviveSchemaAfterIdentityCheck(
+      SchemaEntity schema, CountDownLatch lockingReadsStarted) {
+    // Static mocks are thread-local: install this observer in each database writer, and delegate
+    // every mapper call to the real session so the row locks and transaction remain real.
+    try (MockedStatic<SqlSessions> sessions =
+        Mockito.mockStatic(
+            SqlSessions.class,
+            invocation -> {
+              Object result = invocation.callRealMethod();
+              if (!"getMapper".equals(invocation.getMethod().getName())
+                  || invocation.getArgument(0) != SchemaMetaMapper.class) {
+                return result;
+              }
+              SchemaMetaMapper actual = (SchemaMetaMapper) result;
+              SchemaMetaMapper observed =
+                  Mockito.mock(SchemaMetaMapper.class, AdditionalAnswers.delegatesTo(actual));
+              Mockito.doAnswer(
+                      call -> {
+                        lockingReadsStarted.countDown();
+                        return actual.selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
+                      })
+                  .when(observed)
+                  .selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
+              return observed;
+            })) {
+      backend.insert(schema, true);
+      return null;
+    } catch (Throwable failure) {
+      return failure;
+    }
   }
 }
