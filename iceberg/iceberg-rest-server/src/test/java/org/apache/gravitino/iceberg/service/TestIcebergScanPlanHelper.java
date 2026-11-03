@@ -30,7 +30,9 @@ import java.util.Map;
 import org.apache.iceberg.ContentFileParser;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
@@ -141,7 +143,7 @@ public class TestIcebergScanPlanHelper {
                 true)
             .toString());
 
-    // Column added after the snapshot: do not prune; keep as a residual via postSnapshotResidual.
+    // Column added after the snapshot: do not prune; callers AND the full original filter.
     Assertions.assertEquals(
         Expressions.alwaysTrue().toString(),
         IcebergScanPlanHelper.rewriteFilterNames(
@@ -152,10 +154,28 @@ public class TestIcebergScanPlanHelper {
         IcebergScanPlanHelper.rewriteFilterNames(
                 Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
             .toString());
+
+    // Mixed OR: post-snapshot leaf becomes always-true so planning over-includes; residual keeps
+    // the complete original filter.
     Assertions.assertEquals(
-        Expressions.equal("l", 10L).toString(),
-        IcebergScanPlanHelper.postSnapshotResidual(
-                Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
+        Expressions.or(Expressions.equal("id", 1L), Expressions.alwaysTrue()).toString(),
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.or(Expressions.equal("id", 1L), Expressions.equal("l", 2L)),
+                CURRENT_SCHEMA,
+                SNAPSHOT_SCHEMA,
+                true)
+            .toString());
+
+    // NOT of a post-snapshot predicate must not become always-false (would prune every file).
+    Assertions.assertEquals(
+        Expressions.alwaysTrue().toString(),
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.not(Expressions.equal("l", 1L)), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
+            .toString());
+    Assertions.assertEquals(
+        Expressions.not(Expressions.equal("id", 1L)).toString(),
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.not(Expressions.equal("id", 1L)), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
             .toString());
 
     Assertions.assertThrows(
@@ -359,6 +379,187 @@ public class TestIcebergScanPlanHelper {
     JsonNode node = JsonUtil.parse(json, n -> n);
     DataFile parsed = (DataFile) ContentFileParser.fromJson(node, clientSpecs);
     Assertions.assertEquals("file:///tmp/f.parquet", parsed.location());
+  }
+
+  @Test
+  void testPrepareTasksRewritesToCurrentSpecWhenNeverUnpartitioned() {
+    // Evolution (s, id) → (id) never creates an unpartitioned spec; old files keep spec 0.
+    Schema originalSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    PartitionSpec originalSpec =
+        PartitionSpec.builderFor(originalSchema).withSpecId(0).identity("s").identity("id").build();
+    Schema evolved =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    PartitionSpec currentSpec =
+        PartitionSpec.builderFor(evolved).withSpecId(1).identity("id").build();
+    Schema droppedS = new Schema(Types.NestedField.optional(1, "id", Types.LongType.get()));
+    PartitionSpec stale = originalSpec.toUnbound().bind(droppedS, true);
+    PartitionSpec currentOnDropped = currentSpec.toUnbound().bind(droppedS, true);
+
+    PartitionData partitionData =
+        new PartitionData(
+            Types.StructType.of(
+                Types.NestedField.optional(1000, "s", Types.StringType.get()),
+                Types.NestedField.optional(1001, "id", Types.LongType.get())));
+    partitionData.set(0, "a");
+    partitionData.set(1, 7L);
+    DataFile dataFile =
+        DataFiles.builder(originalSpec)
+            .withPath("file:///tmp/sid.parquet")
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(10)
+            .withRecordCount(1)
+            .withPartition(partitionData)
+            .build();
+
+    org.apache.iceberg.BaseFileScanTask task =
+        new org.apache.iceberg.BaseFileScanTask(
+            DataFiles.builder(stale).copy(dataFile).withPartition(partitionData).build(),
+            null,
+            SchemaParser.toJson(droppedS),
+            PartitionSpecParser.toJson(stale),
+            ResidualEvaluator.of(stale, Expressions.alwaysTrue(), true));
+
+    Map<Integer, PartitionSpec> clientSpecs = ImmutableMap.of(0, stale, 1, currentOnDropped);
+    List<FileScanTask> prepared =
+        IcebergScanPlanHelper.prepareTasksForResponse(
+            Collections.singletonList(task), clientSpecs, droppedS, null, null, true);
+
+    Assertions.assertEquals(1, prepared.get(0).file().specId());
+    Assertions.assertFalse(clientSpecs.get(1).isUnpartitioned());
+
+    String json =
+        JsonUtil.generate(
+            gen -> ContentFileParser.toJson(prepared.get(0).file(), clientSpecs.get(1), gen),
+            false);
+    DataFile parsed =
+        (DataFile) ContentFileParser.fromJson(JsonUtil.parse(json, n -> n), clientSpecs);
+    Assertions.assertEquals("file:///tmp/sid.parquet", parsed.location());
+    Assertions.assertEquals(1, parsed.specId());
+  }
+
+  @Test
+  void testPrepareTasksRewritesDeleteFilesWithCompatibleSpec() {
+    Schema originalSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    PartitionSpec originalSpec =
+        PartitionSpec.builderFor(originalSchema).withSpecId(0).identity("s").build();
+    Schema evolved = new Schema(Types.NestedField.optional(1, "id", Types.LongType.get()));
+    PartitionSpec unpartitioned = PartitionSpec.builderFor(evolved).withSpecId(1).build();
+    PartitionSpec stale = originalSpec.toUnbound().bind(evolved, true);
+
+    PartitionData partitionData =
+        new PartitionData(
+            Types.StructType.of(Types.NestedField.optional(1000, "s", Types.StringType.get())));
+    partitionData.set(0, "a");
+    DataFile dataFile =
+        DataFiles.builder(originalSpec)
+            .withPath("file:///tmp/data.parquet")
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(10)
+            .withRecordCount(1)
+            .withPartition(partitionData)
+            .build();
+    DeleteFile deleteFile =
+        FileMetadata.deleteFileBuilder(originalSpec)
+            .ofPositionDeletes()
+            .withPath("file:///tmp/data.parquet.pos-deletes")
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(4)
+            .withRecordCount(1)
+            .withPartition(partitionData)
+            .build();
+
+    org.apache.iceberg.BaseFileScanTask task =
+        new org.apache.iceberg.BaseFileScanTask(
+            DataFiles.builder(stale).copy(dataFile).withPartition(partitionData).build(),
+            new DeleteFile[] {
+              FileMetadata.deleteFileBuilder(stale)
+                  .copy(deleteFile)
+                  .withPartition(partitionData)
+                  .build()
+            },
+            SchemaParser.toJson(evolved),
+            PartitionSpecParser.toJson(stale),
+            ResidualEvaluator.of(stale, Expressions.alwaysTrue(), true));
+
+    Map<Integer, PartitionSpec> clientSpecs = ImmutableMap.of(0, stale, 1, unpartitioned);
+    List<FileScanTask> prepared =
+        IcebergScanPlanHelper.prepareTasksForResponse(
+            Collections.singletonList(task), clientSpecs, evolved, null, null, true);
+
+    Assertions.assertEquals(1, prepared.get(0).file().specId());
+    Assertions.assertEquals(1, prepared.get(0).deletes().size());
+    Assertions.assertEquals(1, prepared.get(0).deletes().get(0).specId());
+
+    String deleteJson =
+        JsonUtil.generate(
+            gen -> ContentFileParser.toJson(prepared.get(0).deletes().get(0), unpartitioned, gen),
+            false);
+    DeleteFile parsedDelete =
+        (DeleteFile) ContentFileParser.fromJson(JsonUtil.parse(deleteJson, n -> n), clientSpecs);
+    Assertions.assertEquals("file:///tmp/data.parquet.pos-deletes", parsedDelete.location());
+    Assertions.assertEquals(1, parsedDelete.specId());
+  }
+
+  @Test
+  void testPrepareTasksResidualEvaluatorUsesRequestSchema() {
+    // Partitioned by id; snapshot schema names field 2 "l", request schema renamed it to "l2".
+    Schema snapshotSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "l", Types.LongType.get()));
+    Schema requestSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "l2", Types.LongType.get()));
+    PartitionSpec snapshotSpec =
+        PartitionSpec.builderFor(snapshotSchema).withSpecId(0).identity("id").build();
+    PartitionSpec requestSpec = snapshotSpec.toUnbound().bind(requestSchema, true);
+
+    PartitionData partitionData =
+        new PartitionData(
+            Types.StructType.of(Types.NestedField.optional(1000, "id", Types.LongType.get())));
+    partitionData.set(0, 1L);
+    DataFile dataFile =
+        DataFiles.builder(snapshotSpec)
+            .withPath("file:///tmp/part.parquet")
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(10)
+            .withRecordCount(1)
+            .withPartition(partitionData)
+            .build();
+
+    Expression snapshotResidual = Expressions.equal("l", 10L);
+    org.apache.iceberg.BaseFileScanTask task =
+        new org.apache.iceberg.BaseFileScanTask(
+            dataFile,
+            null,
+            SchemaParser.toJson(snapshotSchema),
+            PartitionSpecParser.toJson(snapshotSpec),
+            ResidualEvaluator.of(snapshotSpec, snapshotResidual, true));
+
+    List<FileScanTask> prepared =
+        IcebergScanPlanHelper.prepareTasksForResponse(
+            Collections.singletonList(task),
+            ImmutableMap.of(0, requestSpec),
+            requestSchema,
+            snapshotSchema,
+            null,
+            true);
+
+    Assertions.assertEquals(
+        Expressions.equal("l2", 10L).toString(), prepared.get(0).residual().toString());
+    // ResidualEvaluator must bind remapped names against the request schema, not the snapshot.
+    Types.StructType rowType = requestSchema.asStruct();
+    Assertions.assertTrue(
+        new Evaluator(rowType, prepared.get(0).residual()).eval(new ArrayStruct(1L, 10L)));
   }
 
   @Test

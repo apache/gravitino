@@ -539,13 +539,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             if (!branch.isPresent()) {
               residualFrom = SnapshotUtil.schemaFor(table, snapshotId);
               residualTo = table.schema();
+              // Keep the complete client filter as a residual. Extracting only
+              // post-snapshot predicates by replacing others with always-true
+              // collapses OR/NOT (e.g. id=1 OR new_col=2 → true).
               if (scanRequest.filter() != null) {
-                extraResidual =
-                    IcebergScanPlanHelper.postSnapshotResidual(
-                        scanRequest.filter(),
-                        residualTo,
-                        residualFrom,
-                        scanRequest.caseSensitive());
+                extraResidual = scanRequest.filter();
               }
             }
           }

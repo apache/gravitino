@@ -34,6 +34,7 @@ import org.apache.iceberg.BaseFileScanTask;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionField;
@@ -90,8 +91,9 @@ final class IcebergScanPlanHelper {
    * by field id, so a {@code useSnapshot} scan can serve a request written against the current
    * schema. Names are resolved on the current schema first, so a name that only the snapshot schema
    * has, or that a later column reuses, never binds to the snapshot's field. Columns added after
-   * the snapshot are dropped from select/stats; filters on them become always-true for planning and
-   * are reattached as residuals via {@link #postSnapshotResidual}.
+   * the snapshot are dropped from select/stats; filters on them are rewritten conservatively for
+   * planning (never under-prune under OR/NOT) and the full original filter is reattached as a
+   * residual by the caller.
    */
   static PlanTableScanRequest rewriteForSnapshot(
       PlanTableScanRequest request, Schema current, Schema snapshot) {
@@ -255,8 +257,10 @@ final class IcebergScanPlanHelper {
 
   /**
    * Prepares planned tasks for the REST response: remap residuals onto the request schema and
-   * rewrite tasks whose partition spec still has {@code unknown} so Iceberg clients can parse them
-   * with their local {@code table.specs()} map.
+   * rewrite tasks whose partition spec still has {@code unknown} onto a client-parseable spec from
+   * {@code tableSpecs} (prefer unpartitioned, else any spec without {@code unknown}) so Iceberg
+   * clients can parse them with their local {@code table.specs()} map. Associated delete files are
+   * rewritten to the same target spec.
    */
   static List<FileScanTask> prepareTasksForResponse(
       List<FileScanTask> fileScanTasks,
@@ -268,7 +272,7 @@ final class IcebergScanPlanHelper {
     if (fileScanTasks.isEmpty()) {
       return fileScanTasks;
     }
-    PartitionSpec unpartitioned = findUnpartitionedSpec(tableSpecs);
+    PartitionSpec compatibleSpec = findClientCompatibleSpec(tableSpecs);
     List<FileScanTask> prepared = Lists.newArrayListWithCapacity(fileScanTasks.size());
     for (FileScanTask task : fileScanTasks) {
       Expression residual = task.residual();
@@ -285,10 +289,14 @@ final class IcebergScanPlanHelper {
         residual = residual == null ? extraResidual : Expressions.and(residual, extraResidual);
       }
       PartitionSpec spec = tableSpecs.get(task.file().specId());
-      if (spec != null && partitionTypeHasUnknown(spec.partitionType()) && unpartitioned != null) {
-        prepared.add(asUnpartitionedTask(task, unpartitioned, residual, caseSensitive));
+      boolean needsSpecRewrite =
+          spec != null && partitionTypeHasUnknown(spec.partitionType()) && compatibleSpec != null;
+      if (needsSpecRewrite) {
+        prepared.add(
+            withCompatibleSpec(
+                task, compatibleSpec, residual, residualTargetSchema, caseSensitive));
       } else if (residual != null && residual != task.residual()) {
-        prepared.add(withResidual(task, residual, caseSensitive));
+        prepared.add(withResidual(task, residual, residualTargetSchema, caseSensitive));
       } else {
         prepared.add(task);
       }
@@ -360,6 +368,15 @@ final class IcebergScanPlanHelper {
 
           @Override
           public Expression not(Expression result) {
+            // Post-snapshot predicates become always-true for planning. Negating that would yield
+            // always-false and incorrectly prune every file (NOT(new_col = 1) on historical rows
+            // is typically true). Keep planning conservative: do not under-include.
+            if (result.op() == Expression.Operation.TRUE) {
+              return Expressions.alwaysTrue();
+            }
+            if (result.op() == Expression.Operation.FALSE) {
+              return Expressions.alwaysFalse();
+            }
             return Expressions.not(result);
           }
 
@@ -378,71 +395,14 @@ final class IcebergScanPlanHelper {
             String name = pred.ref().name();
             String snapshotName = toSnapshotName(name, current, snapshot, caseSensitive);
             if (snapshotName == null) {
-              // Column was added after the snapshot. Do not prune files here; Iceberg's useRef
-              // path keeps such predicates as residuals. Callers AND
-              // {@link #postSnapshotResidual} onto the response residual.
+              // Column was added after the snapshot. Do not prune files here; the caller ANDs the
+              // full original filter onto the response residual.
               return Expressions.alwaysTrue();
             }
             if (snapshotName.equals(name)) {
               return pred;
             }
             return unboundWithName(pred, snapshotName);
-          }
-        });
-  }
-
-  /**
-   * Predicates from {@code filter} that name columns present in {@code current} but absent from
-   * {@code snapshot}. Kept with current-schema names for response residuals when a snapshot is
-   * scanned with {@code use-snapshot-schema=false}.
-   */
-  @VisibleForTesting
-  static Expression postSnapshotResidual(
-      Expression filter, Schema current, Schema snapshot, boolean caseSensitive) {
-    if (filter == null) {
-      return Expressions.alwaysTrue();
-    }
-    return ExpressionVisitors.visit(
-        filter,
-        new ExpressionVisitors.ExpressionVisitor<Expression>() {
-          @Override
-          public Expression alwaysTrue() {
-            return Expressions.alwaysTrue();
-          }
-
-          @Override
-          public Expression alwaysFalse() {
-            return Expressions.alwaysFalse();
-          }
-
-          @Override
-          public Expression not(Expression result) {
-            return Expressions.not(result);
-          }
-
-          @Override
-          public Expression and(Expression left, Expression right) {
-            return Expressions.and(left, right);
-          }
-
-          @Override
-          public Expression or(Expression left, Expression right) {
-            return Expressions.or(left, right);
-          }
-
-          @Override
-          public <T> Expression predicate(UnboundPredicate<T> pred) {
-            String name = pred.ref().name();
-            Types.NestedField field =
-                caseSensitive ? current.findField(name) : current.caseInsensitiveFindField(name);
-            if (field == null) {
-              throw new IllegalArgumentException(
-                  String.format("Cannot find field '%s' in the current table schema", name));
-            }
-            if (snapshot.findColumnName(field.fieldId()) == null) {
-              return pred;
-            }
-            return Expressions.alwaysTrue();
           }
         });
   }
@@ -588,43 +548,185 @@ final class IcebergScanPlanHelper {
     return (UnboundTerm<T>) Expressions.ref(name);
   }
 
+  /**
+   * Prefers an unpartitioned parseable spec; otherwise any parseable spec (typically the current
+   * default after partition evolution). Iceberg REST clients resolve file {@code spec-id} against
+   * their local {@code table.specs()}, so the target id must already exist there without {@code
+   * unknown}.
+   */
   @Nullable
-  private static PartitionSpec findUnpartitionedSpec(Map<Integer, PartitionSpec> specsById) {
+  private static PartitionSpec findClientCompatibleSpec(Map<Integer, PartitionSpec> specsById) {
+    PartitionSpec unpartitioned = null;
+    PartitionSpec anyCompatible = null;
+    int bestId = Integer.MIN_VALUE;
     for (PartitionSpec spec : specsById.values()) {
-      if (spec.isUnpartitioned() && !partitionTypeHasUnknown(spec.partitionType())) {
-        return spec;
+      if (partitionTypeHasUnknown(spec.partitionType())) {
+        continue;
+      }
+      if (spec.isUnpartitioned()) {
+        unpartitioned = spec;
+      }
+      if (spec.specId() >= bestId) {
+        bestId = spec.specId();
+        anyCompatible = spec;
       }
     }
-    return null;
+    return unpartitioned != null ? unpartitioned : anyCompatible;
   }
 
   private static FileScanTask withResidual(
-      FileScanTask task, Expression residual, boolean caseSensitive) {
-    PartitionSpec spec = task.spec();
+      FileScanTask task,
+      Expression residual,
+      @Nullable Schema residualSchema,
+      boolean caseSensitive) {
+    PartitionSpec fileSpec = task.spec();
+    PartitionSpec evalSpec =
+        residualSchema == null ? fileSpec : fileSpec.toUnbound().bind(residualSchema, true);
     ResidualEvaluator residuals =
         ResidualEvaluator.of(
-            spec, residual == null ? Expressions.alwaysTrue() : residual, caseSensitive);
+            evalSpec, residual == null ? Expressions.alwaysTrue() : residual, caseSensitive);
+    Schema schemaJson = residualSchema != null ? residualSchema : task.schema();
     return new BaseFileScanTask(
         task.file(),
         task.deletes().toArray(new DeleteFile[0]),
-        SchemaParser.toJson(task.schema()),
-        PartitionSpecParser.toJson(spec),
+        SchemaParser.toJson(schemaJson),
+        PartitionSpecParser.toJson(fileSpec),
         residuals);
   }
 
-  private static FileScanTask asUnpartitionedTask(
-      FileScanTask task, PartitionSpec unpartitioned, Expression residual, boolean caseSensitive) {
-    // Rebuild under an unpartitioned spec so Iceberg clients can parse the task with their local
-    // table.specs() map, which still has UnknownType for dropped partition sources.
-    DataFile rewritten = DataFiles.builder(unpartitioned).copy(task.file()).build();
+  private static FileScanTask withCompatibleSpec(
+      FileScanTask task,
+      PartitionSpec targetSpec,
+      Expression residual,
+      @Nullable Schema residualSchema,
+      boolean caseSensitive) {
+    // Rebuild under a client-parseable spec id so Iceberg clients can parse the task (and its
+    // deletes) with their local table.specs() map, which still has UnknownType for dropped
+    // partition sources on the historical spec id.
+    DataFile rewritten = rewriteDataFile(task.file(), task.spec(), targetSpec);
+    DeleteFile[] deletes = rewriteDeletes(task.deletes(), task.spec(), targetSpec);
+    Schema evalSchema = residualSchema != null ? residualSchema : targetSpec.schema();
+    PartitionSpec evalSpec = targetSpec.toUnbound().bind(evalSchema, true);
     ResidualEvaluator residuals =
         ResidualEvaluator.of(
-            unpartitioned, residual == null ? Expressions.alwaysTrue() : residual, caseSensitive);
+            evalSpec, residual == null ? Expressions.alwaysTrue() : residual, caseSensitive);
     return new BaseFileScanTask(
         rewritten,
-        task.deletes().toArray(new DeleteFile[0]),
-        SchemaParser.toJson(unpartitioned.schema()),
-        PartitionSpecParser.toJson(unpartitioned),
+        deletes,
+        SchemaParser.toJson(evalSchema),
+        PartitionSpecParser.toJson(targetSpec),
         residuals);
+  }
+
+  private static DataFile rewriteDataFile(
+      DataFile file, PartitionSpec fromSpec, PartitionSpec targetSpec) {
+    if (targetSpec.isUnpartitioned()) {
+      return DataFiles.builder(targetSpec).copy(file).build();
+    }
+    if (fromSpec.specId() == targetSpec.specId()) {
+      return DataFiles.builder(targetSpec).copy(file).build();
+    }
+    DataFiles.Builder builder =
+        DataFiles.builder(targetSpec)
+            .withPath(file.location())
+            .withFormat(file.format())
+            .withFileSizeInBytes(file.fileSizeInBytes())
+            .withRecordCount(file.recordCount());
+    if (file.splitOffsets() != null) {
+      builder.withSplitOffsets(file.splitOffsets());
+    }
+    if (file.sortOrderId() != null) {
+      builder.withSortOrderId(file.sortOrderId());
+    }
+    if (file.keyMetadata() != null) {
+      builder.withEncryptionKeyMetadata(file.keyMetadata());
+    }
+    StructLike projected = projectPartition(file.partition(), fromSpec, targetSpec);
+    if (projected != null) {
+      builder.withPartition(projected);
+    }
+    return builder.build();
+  }
+
+  private static DeleteFile[] rewriteDeletes(
+      List<DeleteFile> deletes, PartitionSpec fromSpec, PartitionSpec targetSpec) {
+    if (deletes == null || deletes.isEmpty()) {
+      return new DeleteFile[0];
+    }
+    DeleteFile[] rewritten = new DeleteFile[deletes.size()];
+    for (int i = 0; i < deletes.size(); i++) {
+      rewritten[i] = rewriteDeleteFile(deletes.get(i), fromSpec, targetSpec);
+    }
+    return rewritten;
+  }
+
+  private static DeleteFile rewriteDeleteFile(
+      DeleteFile delete, PartitionSpec fromSpec, PartitionSpec targetSpec) {
+    if (targetSpec.isUnpartitioned() || fromSpec.specId() == targetSpec.specId()) {
+      FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(targetSpec).copy(delete);
+      return builder.build();
+    }
+    FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(targetSpec);
+    switch (delete.content()) {
+      case POSITION_DELETES:
+        builder.ofPositionDeletes();
+        break;
+      case EQUALITY_DELETES:
+        List<Integer> equalityFieldIds = delete.equalityFieldIds();
+        int[] eqIds =
+            equalityFieldIds == null
+                ? new int[0]
+                : equalityFieldIds.stream().mapToInt(Integer::intValue).toArray();
+        builder.ofEqualityDeletes(eqIds);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported delete content: " + delete.content());
+    }
+    builder
+        .withPath(delete.location())
+        .withFormat(delete.format())
+        .withFileSizeInBytes(delete.fileSizeInBytes())
+        .withRecordCount(delete.recordCount());
+    if (delete.referencedDataFile() != null) {
+      builder.withReferencedDataFile(delete.referencedDataFile());
+    }
+    if (delete.contentOffset() != null) {
+      builder.withContentOffset(delete.contentOffset());
+    }
+    if (delete.contentSizeInBytes() != null) {
+      builder.withContentSizeInBytes(delete.contentSizeInBytes());
+    }
+    StructLike projected = projectPartition(delete.partition(), fromSpec, targetSpec);
+    if (projected != null) {
+      builder.withPartition(projected);
+    }
+    return builder.build();
+  }
+
+  @Nullable
+  private static StructLike projectPartition(
+      StructLike partition, PartitionSpec fromSpec, PartitionSpec toSpec) {
+    if (toSpec.isUnpartitioned() || partition == null) {
+      return null;
+    }
+    PartitionData out = new PartitionData(toSpec.partitionType());
+    List<PartitionField> fromFields = fromSpec.fields();
+    List<PartitionField> toFields = toSpec.fields();
+    for (int toPos = 0; toPos < toFields.size(); toPos++) {
+      PartitionField toField = toFields.get(toPos);
+      int fromPos = -1;
+      for (int i = 0; i < fromFields.size(); i++) {
+        PartitionField fromField = fromFields.get(i);
+        if (fromField.sourceId() == toField.sourceId()
+            && fromField.transform().toString().equals(toField.transform().toString())) {
+          fromPos = i;
+          break;
+        }
+      }
+      if (fromPos >= 0) {
+        out.set(toPos, partition.get(fromPos, Object.class));
+      }
+    }
+    return out;
   }
 }

@@ -187,14 +187,15 @@ public class TestIcebergScanPlanning {
     assertInvalidScan(() -> planBranch(evolved, Expressions.equal("a", 5L)), "'a'");
 
     // Residual must keep current-schema names (l2), not the snapshot name (l) that now means a
-    // different field id after rename+reuse.
+    // different field id after rename+reuse. The complete client filter is ANDed on as an
+    // extra residual (may duplicate the remapped scan residual; that is intentional).
     PlanTableScanResponse residualResponse =
         wrapper.planTableScan(
             evolved.ident, branchRequest(evolved).withFilter(Expressions.equal("l2", 10L)).build());
     Assertions.assertEquals(1, residualResponse.fileScanTasks().size());
-    Assertions.assertEquals(
-        Expressions.equal("l2", 10L).toString(),
-        residualResponse.fileScanTasks().get(0).residual().toString());
+    String residual = residualResponse.fileScanTasks().get(0).residual().toString();
+    Assertions.assertTrue(residual.contains("l2"), residual);
+    Assertions.assertFalse(residual.contains("name=\"l\""), residual);
 
     Assertions.assertEquals(
         F1,
