@@ -21,8 +21,11 @@ package org.apache.gravitino.lance.service;
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -59,6 +62,9 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   private static volatile boolean includeErrorStackTrace =
       JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
 
+  @Context private UriInfo uriInfo;
+  @Context private Request request;
+
   /**
    * Sets whether error details built by {@link #errorDetail(Throwable)} include the exception's
    * stack trace. Called once when the service starts.
@@ -89,17 +95,32 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
             ? (LanceNamespaceException) ex
             : toLanceNamespaceException(instance, ex);
 
-    LOG.error(
-        "Operate Lance instance with id '{}' got exception: {}",
-        instance,
-        lanceException.getMessage());
+    if (toHttpStatus(lanceException) >= 500) {
+      LOG.error("Operate Lance instance with id '{}' failed", instance, ex);
+    } else {
+      LOG.info(
+          "Operate Lance instance with id '{}' got exception: {}",
+          instance,
+          lanceException.getMessage());
+    }
 
     return handleLanceNamespaceException(lanceException);
   }
 
+  /** {@inheritDoc} */
   @Override
   public Response toResponse(Throwable ex) {
-    return toRESTResponse("", ex);
+    String instance = "";
+    if (isRouteMiss(ex) && request != null && uriInfo != null) {
+      instance = request.getMethod() + " " + uriInfo.getPath(false);
+    }
+    return toRESTResponse(instance, ex);
+  }
+
+  private static boolean isRouteMiss(Throwable ex) {
+    return ex instanceof WebApplicationException webException
+        && !(ex instanceof ParamException)
+        && webException.getResponse().getStatus() == Response.Status.NOT_FOUND.getStatusCode();
   }
 
   private static Response handleWebApplicationException(
@@ -110,16 +131,18 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
       // Jersey can use 404 for parameter conversion failures, but these are invalid input.
       status = Response.Status.BAD_REQUEST.getStatusCode();
       message = "Invalid value for parameter '" + parameterException.getParameterName() + "'";
+    } else if (isRouteMiss(exception)) {
+      // Unmatched routes include unimplemented Namespace operations. Code 0 / HTTP 406 lets
+      // Lance clients recognize Unsupported and fall back; domain not-found errors stay 404.
+      status = Response.Status.NOT_ACCEPTABLE.getStatusCode();
+      message = "Unsupported Lance REST operation" + (instance.isEmpty() ? "" : ": " + instance);
     }
     LanceNamespaceException error;
-    // Framework 404s describe route misses, not an identified missing table or namespace.
-    // Keep their HTTP status, while using INVALID_INPUT instead of an entity-not-found body code.
     if (status >= 400 && status < 500) {
       error =
           switch (status) {
             case 401 -> new UnauthenticatedException(message, "", instance);
             case 403 -> new PermissionDeniedException(message, "", instance);
-            case 404 -> new InvalidInputException(message, "", instance);
             case 405, 406, 415 -> new org.lance.namespace.errors.UnsupportedOperationException(
                 message, "", instance);
             case 409 -> new ConcurrentModificationException(message, "", instance);
@@ -127,7 +150,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
             default -> new InvalidInputException(message, "", instance);
           };
     } else {
-      LOG.warn("Lance REST framework failure:", exception);
+      LOG.error("Lance REST framework failure:", exception);
       error = new InternalException("Internal server error", "", instance);
     }
     // Keep protocol headers such as Allow, WWW-Authenticate and Retry-After, while replacing any
@@ -163,7 +186,8 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
       return new NamespaceNotFoundException(ex.getMessage(), errorDetail(ex), instance);
 
     } else if (ex instanceof IllegalArgumentException) {
-      return new InvalidInputException(ex.getMessage(), errorDetail(ex), instance);
+      // Validation failures never expose generated stacks, independent of the diagnostic setting.
+      return new InvalidInputException(ex.getMessage(), "", instance);
 
     } else if (ex instanceof org.apache.gravitino.exceptions.TableAlreadyExistsException) {
       return new TableAlreadyExistsException(ex.getMessage(), errorDetail(ex), instance);
@@ -173,7 +197,6 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getMessage(), errorDetail(ex), instance);
 
     } else {
-      LOG.warn("Lance REST server unexpected exception:", ex);
       return new InternalException("Internal server error", "", instance);
     }
   }

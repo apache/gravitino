@@ -69,6 +69,7 @@ import org.lance.namespace.client.apache.ApiException;
 import org.lance.namespace.client.apache.api.TableApi;
 import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.errors.UnsupportedOperationException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -94,6 +95,8 @@ import org.lance.namespace.model.ListNamespacesRequest;
 import org.lance.namespace.model.ListNamespacesResponse;
 import org.lance.namespace.model.ListTablesRequest;
 import org.lance.namespace.model.NamespaceExistsRequest;
+import org.lance.namespace.model.QueryTableRequest;
+import org.lance.namespace.model.QueryTableRequestVector;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
@@ -734,6 +737,37 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
+  void testUnimplementedOperationUsesUnsupportedError() throws Exception {
+    QueryTableRequest request = new QueryTableRequest();
+    request.setId(List.of("missing", "schema", "table"));
+    request.setK(1);
+    request.setVector(new QueryTableRequestVector().singleVector(List.of(1.0f, 2.0f)));
+    request.setVectorColumn("vector");
+    UnsupportedOperationException error =
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> ns.queryTable(request));
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+    // The native client classifies by code but does not retain instance; inspect diagnostics
+    // on the wire independently rather than requiring it to preserve every response field.
+    HttpRequest httpRequest =
+        HttpRequest.newBuilder(
+                URI.create(getLanceRestServiceUrl() + "/v1/table/missing.schema.table/query"))
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    JsonUtils.anyFieldMapper().writeValueAsString(request)))
+            .build();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    Assertions.assertEquals(406, response.statusCode());
+    ErrorResponse body = JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), body.getCode());
+    Assertions.assertTrue(body.getInstance().startsWith("POST "));
+    Assertions.assertTrue(body.getInstance().endsWith("/query"));
+    Assertions.assertTrue(body.getError().contains(body.getInstance()));
+    Assertions.assertEquals("", body.getDetail());
+  }
+
+  @Test
   void testInvalidJsonRequestUsesLanceEnvelope() throws Exception {
     HttpClient http = HttpClient.newHttpClient();
     for (String body : List.of("{", "[]")) {
@@ -791,6 +825,7 @@ public class LanceRESTServiceIT extends BaseIT {
         JsonUtils.anyFieldMapper().readValue(conflictError.getResponseBody(), ErrorResponse.class);
     Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), conflictBody.getCode());
     Assertions.assertTrue(conflictBody.getError().contains("value"));
+    Assertions.assertEquals("", conflictBody.getDetail());
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

@@ -57,6 +57,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -297,11 +298,14 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   public void testDescribeNamespaceOnRootUnsupported() {
     Mockito.clearInvocations(namespaceOps);
 
-    Response resp =
-        target("/v1/namespace/describe").request(MediaType.APPLICATION_JSON_TYPE).post(null);
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
-    Mockito.verifyNoInteractions(namespaceOps);
+    try (Response resp =
+        target("/v1/namespace/describe").request(MediaType.APPLICATION_JSON_TYPE).post(null)) {
+      Assertions.assertEquals(Response.Status.NOT_ACCEPTABLE.getStatusCode(), resp.getStatus());
+      ErrorResponse error = resp.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+      Assertions.assertEquals("POST v1/namespace/describe", error.getInstance());
+      Mockito.verifyNoInteractions(namespaceOps);
+    }
   }
 
   @Test
