@@ -118,6 +118,103 @@ public interface PolicyContentDTO extends PolicyContent {
     }
   }
 
+  /**
+   * Reads a long without silently coercing fractional values or strings.
+   *
+   * <p>Shared by Iceberg maintenance policy numeric fields so compaction, orphan removal, snapshot
+   * expiration, rewrite-manifests thresholds, and peer {@code minIntervalMs} reject the same wrong
+   * JSON tokens.
+   */
+  class StrictLongDeserializer extends JsonDeserializer<Long> {
+    @Override
+    public Long deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+        return context.reportInputMismatch(Long.class, "Value must be a 64-bit integer");
+      }
+      return parser.getLongValue();
+    }
+  }
+
+  /**
+   * Reads a boolean without silently coercing numbers or strings.
+   *
+   * <p>Shared by Iceberg maintenance policy boolean fields ({@code dryRun}, {@code streamResults},
+   * {@code use_caching}, {@code commitTrigger}).
+   */
+  class StrictBooleanDeserializer extends JsonDeserializer<Boolean> {
+    @Override
+    public Boolean deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+        return context.reportInputMismatch(Boolean.class, "Value must be a boolean");
+      }
+      return parser.getBooleanValue();
+    }
+  }
+
+  /**
+   * Reads an int without silently coercing fractional values or strings.
+   *
+   * <p>Shared by Iceberg maintenance policy 32-bit integer fields (for example rewrite-manifests
+   * {@code spec_id}).
+   */
+  class StrictIntegerDeserializer extends JsonDeserializer<Integer> {
+    @Override
+    public Integer deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+        return context.reportInputMismatch(Integer.class, "Value must be a 32-bit integer");
+      }
+      return parser.getIntValue();
+    }
+  }
+
+  /**
+   * Reads a string without silently coercing numbers or booleans.
+   *
+   * <p>Shared by Iceberg maintenance policy string fields ({@code rewriteStrategy}, {@code
+   * sortOrder}, orphan {@code location}, peer {@code timeTrigger}).
+   */
+  class StrictStringDeserializer extends JsonDeserializer<String> {
+    @Override
+    public String deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.VALUE_STRING)) {
+        return context.reportInputMismatch(String.class, "Value must be a string");
+      }
+      return parser.getText();
+    }
+  }
+
+  /**
+   * Reads a string-to-string map without silently coercing numeric or boolean entry values.
+   *
+   * <p>Shared by Iceberg maintenance {@code rewriteOptions}, {@code jobOptions}, and {@code
+   * updaterOptions}.
+   */
+  class StrictStringMapDeserializer extends JsonDeserializer<Map<String, String>> {
+    @Override
+    public Map<String, String> deserialize(JsonParser parser, DeserializationContext context)
+        throws IOException {
+      if (!parser.hasToken(JsonToken.START_OBJECT)) {
+        return context.reportInputMismatch(Map.class, "Value must be a JSON object");
+      }
+      Map<String, String> result = new LinkedHashMap<>();
+      while (parser.nextToken() != JsonToken.END_OBJECT) {
+        String key = parser.currentName();
+        JsonToken valueToken = parser.nextToken();
+        if (valueToken == JsonToken.VALUE_NULL) {
+          result.put(key, null);
+        } else if (valueToken != JsonToken.VALUE_STRING) {
+          return context.reportInputMismatch(Map.class, "Map entry '%s' must be a string", key);
+        } else {
+          result.put(key, parser.getText());
+        }
+      }
+      return result;
+    }
+  }
+
   /** Represents a custom policy content DTO. */
   @EqualsAndHashCode
   @ToString
@@ -170,54 +267,67 @@ public interface PolicyContentDTO extends PolicyContent {
   class IcebergCompactionContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
 
     @JsonProperty("minDataFileMse")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long minDataFileMse;
 
     @JsonProperty("minDeleteFileNumber")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long minDeleteFileNumber;
 
     @JsonProperty("dataFileMseWeight")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long dataFileMseWeight;
 
     @JsonProperty("deleteFileNumberWeight")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long deleteFileNumberWeight;
 
     @JsonProperty("maxPartitionNum")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long maxPartitionNum;
 
     @JsonProperty("rewriteStrategy")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String rewriteStrategy;
 
     @JsonProperty("sortOrder")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String sortOrder;
 
     @JsonProperty("rewriteOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     private Map<String, String> rewriteOptions;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("commitTrigger")
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean commitTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("minIntervalMs")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long minIntervalMs;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -420,39 +530,47 @@ public interface PolicyContentDTO extends PolicyContent {
   @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
   class IcebergOrphanFileRemovalContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("olderThanDays")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long olderThanDays;
 
     @JsonProperty("location")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     private String location;
 
     @JsonProperty("dryRun")
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     private Boolean dryRun;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("commitTrigger")
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean commitTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("minIntervalMs")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long minIntervalMs;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -590,50 +708,55 @@ public interface PolicyContentDTO extends PolicyContent {
   @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergRewriteManifestsContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("manifest_count_critical")
-    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long manifestCountCritical;
 
     @JsonProperty("manifest_count_warning")
-    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long manifestCountWarning;
 
     @JsonProperty("avg_manifest_size_threshold_bytes")
-    @JsonDeserialize(using = ManifestThresholdDeserializer.class)
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long avgManifestSizeThresholdBytes;
 
     @JsonProperty("spec_id")
-    @JsonDeserialize(using = ManifestSpecIdDeserializer.class)
+    @JsonDeserialize(using = StrictIntegerDeserializer.class)
     private Integer specId;
 
     @JsonProperty("use_caching")
-    @JsonDeserialize(using = ManifestUseCachingDeserializer.class)
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     private Boolean useCaching;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("commitTrigger")
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean commitTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("minIntervalMs")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long minIntervalMs;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -756,43 +879,6 @@ public interface PolicyContentDTO extends PolicyContent {
       toDomainContent().validate();
     }
 
-    /** Reads a manifest threshold without silently coercing fractional values or strings. */
-    public static class ManifestThresholdDeserializer extends JsonDeserializer<Long> {
-      @Override
-      public Long deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
-          return context.reportInputMismatch(
-              Long.class, "Manifest thresholds must be 64-bit integers");
-        }
-        return parser.getLongValue();
-      }
-    }
-
-    /** Reads a partition spec ID without silently coercing fractional values or strings. */
-    public static class ManifestSpecIdDeserializer extends JsonDeserializer<Integer> {
-      @Override
-      public Integer deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
-          return context.reportInputMismatch(Integer.class, "spec_id must be a 32-bit integer");
-        }
-        return parser.getIntValue();
-      }
-    }
-
-    /** Reads the caching option without silently coercing numbers or strings to booleans. */
-    public static class ManifestUseCachingDeserializer extends JsonDeserializer<Boolean> {
-      @Override
-      public Boolean deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
-          return context.reportInputMismatch(Boolean.class, "use_caching must be a boolean");
-        }
-        return parser.getBooleanValue();
-      }
-    }
-
     /**
      * @return domain policy content including thresholds and execution peers
      */
@@ -850,42 +936,47 @@ public interface PolicyContentDTO extends PolicyContent {
   @AllArgsConstructor(access = AccessLevel.PRIVATE)
   class IcebergSnapshotExpirationContentDTO implements PolicyContentDTO, ExecutionPeersDTO {
     @JsonProperty("olderThanDays")
-    @JsonDeserialize(using = SnapshotLongDeserializer.class)
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long olderThanDays;
 
     @JsonProperty("retainLast")
-    @JsonDeserialize(using = SnapshotLongDeserializer.class)
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     private Long retainLast;
 
     @JsonProperty("streamResults")
-    @JsonDeserialize(using = SnapshotBooleanDeserializer.class)
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     private Boolean streamResults;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("timeTrigger")
+    @JsonDeserialize(using = StrictStringDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String timeTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("commitTrigger")
+    @JsonDeserialize(using = StrictBooleanDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean commitTrigger;
 
     @EqualsAndHashCode.Exclude
     @Nullable
     @JsonProperty("minIntervalMs")
+    @JsonDeserialize(using = StrictLongDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long minIntervalMs;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("jobOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> jobOptions;
 
     @EqualsAndHashCode.Exclude
     @JsonProperty("updaterOptions")
+    @JsonDeserialize(using = StrictStringMapDeserializer.class)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, String> updaterOptions;
 
@@ -1010,31 +1101,6 @@ public interface PolicyContentDTO extends PolicyContent {
                 ? null
                 : new LinkedHashMap<>(executionSpec.updaterOptions());
         return this;
-      }
-    }
-
-    /** Reads a long option without silently coercing fractional values or strings. */
-    public static class SnapshotLongDeserializer extends JsonDeserializer<Long> {
-      @Override
-      public Long deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
-          return context.reportInputMismatch(
-              Long.class, "olderThanDays and retainLast must be 64-bit integers");
-        }
-        return parser.getLongValue();
-      }
-    }
-
-    /** Reads streamResults without silently coercing numbers or strings to booleans. */
-    public static class SnapshotBooleanDeserializer extends JsonDeserializer<Boolean> {
-      @Override
-      public Boolean deserialize(JsonParser parser, DeserializationContext context)
-          throws IOException {
-        if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
-          return context.reportInputMismatch(Boolean.class, "streamResults must be a boolean");
-        }
-        return parser.getBooleanValue();
       }
     }
   }
