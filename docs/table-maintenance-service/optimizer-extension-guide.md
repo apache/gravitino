@@ -20,21 +20,21 @@ The service supports three loading patterns:
 
 ## Extension Points and Config Keys
 
-| Area | Interface / type | Config key | Loading mode |
-| --- | --- | --- | --- |
-| Recommender statistics | `StatisticsProvider` | `gravitino.optimizer.recommender.statisticsProvider` | `Provider` SPI by `name()` |
-| Recommender strategy source | `StrategyProvider` | `gravitino.optimizer.recommender.strategyProvider` | `Provider` SPI by `name()` |
-| Recommender table metadata | `TableMetadataProvider` | `gravitino.optimizer.recommender.tableMetaProvider` | `Provider` SPI by `name()` |
-| Recommender job submission | `JobSubmitter` | `gravitino.optimizer.recommender.jobSubmitter` | `Provider` SPI by `name()` |
-| Strategy evaluation logic | `StrategyHandler` | `gravitino.optimizer.strategyHandler.<strategyType>.className` | Reflection by class name |
-| Job template adaptation | `GravitinoJobAdapter` | `gravitino.optimizer.jobAdapter.<jobTemplate>.className` | Reflection by class name |
-| Update statistics sink | `StatisticsUpdater` | `gravitino.optimizer.updater.statisticsUpdater` | `Provider` SPI by `name()` |
-| Update metrics sink | `MetricsUpdater` | `gravitino.optimizer.updater.metricsUpdater` | `Provider` SPI by `name()` |
-| Monitor metrics source | `MetricsProvider` | `gravitino.optimizer.monitor.metricsProvider` | `Provider` SPI by `name()` |
-| Monitor table-job relation | `TableJobRelationProvider` | `gravitino.optimizer.monitor.tableJobRelationProvider` | `Provider` SPI by `name()` |
-| Monitor evaluator | `MetricsEvaluator` | `gravitino.optimizer.monitor.metricsEvaluator` | Typed SPI (`ServiceLoader<MetricsEvaluator>`) |
-| Monitor callbacks | `MonitorCallback` | `gravitino.optimizer.monitor.callbacks` | `Provider` SPI by `name()` (comma-separated) |
-| CLI calculator | `StatisticsCalculator` | CLI `--calculator-name` | Typed SPI (`ServiceLoader<StatisticsCalculator>`) |
+| Area                        | Interface / type           | Config key                                                     | Loading mode                                      |
+|-----------------------------|----------------------------|----------------------------------------------------------------|---------------------------------------------------|
+| Recommender statistics      | `StatisticsProvider`       | `gravitino.optimizer.recommender.statisticsProvider`           | `Provider` SPI by `name()`                        |
+| Recommender strategy source | `StrategyProvider`         | `gravitino.optimizer.recommender.strategyProvider`             | `Provider` SPI by `name()`                        |
+| Recommender table metadata  | `TableMetadataProvider`    | `gravitino.optimizer.recommender.tableMetaProvider`            | `Provider` SPI by `name()`                        |
+| Recommender job submission  | `JobSubmitter`             | `gravitino.optimizer.recommender.jobSubmitter`                 | `Provider` SPI by `name()`                        |
+| Strategy evaluation logic   | `StrategyHandler`          | `gravitino.optimizer.strategyHandler.<strategyType>.className` | Reflection by class name                          |
+| Job template adaptation     | `GravitinoJobAdapter`      | `gravitino.optimizer.jobAdapter.<jobTemplate>.className`       | Reflection by class name                          |
+| Update statistics sink      | `StatisticsUpdater`        | `gravitino.optimizer.updater.statisticsUpdater`                | `Provider` SPI by `name()`                        |
+| Update metrics sink         | `MetricsUpdater`           | `gravitino.optimizer.updater.metricsUpdater`                   | `Provider` SPI by `name()`                        |
+| Monitor metrics source      | `MetricsProvider`          | `gravitino.optimizer.monitor.metricsProvider`                  | `Provider` SPI by `name()`                        |
+| Monitor table-job relation  | `TableJobRelationProvider` | `gravitino.optimizer.monitor.tableJobRelationProvider`         | `Provider` SPI by `name()`                        |
+| Monitor evaluator           | `MetricsEvaluator`         | `gravitino.optimizer.monitor.metricsEvaluator`                 | Typed SPI (`ServiceLoader<MetricsEvaluator>`)     |
+| Monitor callbacks           | `MonitorCallback`          | `gravitino.optimizer.monitor.callbacks`                        | `Provider` SPI by `name()` (comma-separated)      |
+| CLI calculator              | `StatisticsCalculator`     | CLI `--calculator-name`                                        | Typed SPI (`ServiceLoader<StatisticsCalculator>`) |
 
 ## Implement a Custom Provider
 

@@ -23,8 +23,7 @@ Confirm your environment matches this list before starting an evaluation against
 
 - Compaction and orphan file cleanup have built-in strategies. Snapshot expiration is available as a directly submitted built-in job. Scheduling and minimum run intervals remain separate from strategy evaluation. Sort and cluster maintenance also require custom strategies.
 - Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
-- The service is driven through the CLI workflow rather than running on a schedule of its own.
-
+- The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
 ## How It Works
 
@@ -344,6 +343,7 @@ Policy-driven manifest maintenance through Policy -> Strategy -> Adapter is a fo
 
 ## Related
 
+- [Service](./service.md) for the in-process service, `timeTrigger`, and the cron path
 - [Configuration](./optimizer-configuration.md) for the three configuration layers
 - [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
 - [Troubleshooting](./optimizer-troubleshooting.md) when something above does not behave

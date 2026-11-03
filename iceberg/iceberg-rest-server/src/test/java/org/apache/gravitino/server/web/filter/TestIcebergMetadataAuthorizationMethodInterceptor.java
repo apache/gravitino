@@ -47,10 +47,12 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.rest.IcebergConfigOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Catalog;
@@ -60,6 +62,8 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.glassfish.hk2.api.ActiveDescriptor;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -305,6 +309,58 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  public void testNonIcebergCatalogDoesNotSkipAuthorization() {
+    // A prefix naming a catalog of another kind is authorized normally instead of failing with
+    // an internal error inside the authorization step.
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    Mockito.when(wrapperManager.getCatalogWrapper("glue_catalog"))
+        .thenThrow(new IllegalArgumentException("Catalog glue_catalog is not an Iceberg catalog"));
+    resetContext(wrapperManager, true);
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+    assertFalse(
+        interceptor.shouldSkipAuthorization(
+            Map.of(Entity.EntityType.CATALOG, NameIdentifier.of(TEST_METALAKE, "glue_catalog"))));
+  }
+
+  @Test
+  public void testConfigEndpointIsAuthorizedOnTheWarehouseCatalog() throws Exception {
+    Assertions.assertTrue(
+        new IcebergRESTAuthInterceptionService()
+            .getDescriptorFilter()
+            .matches(descriptorFor(IcebergConfigOperations.class)));
+
+    Method getConfig = IcebergConfigOperations.class.getMethod("getConfig", String.class);
+    AuthorizationExpression expression = getConfig.getAnnotation(AuthorizationExpression.class);
+    assertNotNull(expression);
+    assertEquals(
+        AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+        expression.expression());
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+    // The warehouse names the catalog; an empty warehouse means the default catalog.
+    assertEquals(
+        NameIdentifierUtil.ofCatalog(TEST_METALAKE, "other_catalog"),
+        interceptor
+            .extractNameIdentifierFromParameters(
+                getConfig.getParameters(), new Object[] {"other_catalog"})
+            .get(Entity.EntityType.CATALOG));
+    assertEquals(
+        NameIdentifierUtil.ofCatalog(TEST_METALAKE, TEST_CATALOG),
+        interceptor
+            .extractNameIdentifierFromParameters(getConfig.getParameters(), new Object[] {""})
+            .get(Entity.EntityType.CATALOG));
+  }
+
+  private static ActiveDescriptor<?> descriptorFor(Class<?> clazz) {
+    ActiveDescriptor<?> descriptor = Mockito.mock(ActiveDescriptor.class);
+    Mockito.when(descriptor.getImplementation()).thenReturn(clazz.getName());
+    return descriptor;
+  }
+
+  @Test
   public void testMetricsReportDoesNotSkipAuthorizationForRestCatalog() throws Exception {
     IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
     CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
@@ -479,8 +535,10 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   public void testInvokeShouldSkipAuthorizationWrapperLookupFailureReturnsAuthInternalError()
       throws Throwable {
     IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    // An unexpected lookup failure is a server error. (An IllegalArgumentException, such as a
+    // prefix naming a catalog that is not an Iceberg catalog, is authorized normally instead.)
     Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG))
-        .thenThrow(new IllegalArgumentException("wrapper lookup failed"));
+        .thenThrow(new IllegalStateException("wrapper lookup failed"));
     resetContext(wrapperManager, true);
 
     Method method =

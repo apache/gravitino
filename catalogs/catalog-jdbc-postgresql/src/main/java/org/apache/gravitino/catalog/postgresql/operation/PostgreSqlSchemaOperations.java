@@ -131,7 +131,15 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
    */
   private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getSchemas(connection.getCatalog(), schemaName);
+    String escape = metaData.getSearchStringEscape();
+    String pattern =
+        schemaName == null
+            ? null
+            : schemaName
+                .replace(escape, escape + escape)
+                .replace("%", escape + "%")
+                .replace("_", escape + "_");
+    return metaData.getSchemas(connection.getCatalog(), pattern);
   }
 
   @Override
@@ -154,7 +162,8 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   protected String generateDatabaseExistSql(String databaseName) {
     return String.format(
-        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'", databaseName);
+        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'",
+        databaseName.replace("'", "''"));
   }
 
   @Override
@@ -178,17 +187,16 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return false;
   }
 
-  private String getShowSchemaCommentSql(String schema) {
-    return String.format(
-        "SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
-            + "FROM pg_catalog.pg_namespace n\n"
-            + "WHERE n.nspname = '%s';\n",
-        schema);
+  private String getShowSchemaCommentSql() {
+    return ("SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
+        + "FROM pg_catalog.pg_namespace n\n"
+        + "WHERE n.nspname = ?;\n");
   }
 
   private String getSchemaComment(String schema, Connection connection) throws SQLException {
     try (PreparedStatement preparedStatement =
-        connection.prepareStatement(getShowSchemaCommentSql(schema))) {
+        connection.prepareStatement(getShowSchemaCommentSql())) {
+      preparedStatement.setString(1, schema);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (resultSet.next()) {
           return resultSet.getString("comment");

@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -50,6 +51,7 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
@@ -61,7 +63,9 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -385,7 +389,27 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     validateCredentialLocation(loadTableResponse.tableMetadata().location());
-    return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
+    return canVendCredentials(loadTableResponse.tableMetadata().location());
+  }
+
+  /**
+   * Whether this catalog can vend credentials for a location. The access-delegation header only
+   * tells the server what the client supports, and the server may supply none of the mechanisms, so
+   * a location no configured provider covers is served without credentials instead of failing the
+   * request.
+   */
+  private boolean canVendCredentials(String location) {
+    if (isLocalOrHdfsLocation(location)) {
+      return false;
+    }
+    if (!catalogCredentialManager.supportsPath(location)) {
+      LOG.debug(
+          "No credential provider of catalog {} covers {}, serving without vended credentials",
+          catalogCredentialManager.catalogName(),
+          location);
+      return false;
+    }
+    return true;
   }
 
   private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {
@@ -503,6 +527,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               tableIdentifier);
         }
 
+        checkDeleteFilesCanBeReferenced(tableIdentifier, fileScanTasks);
         try {
           response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
         } catch (Exception e) {
@@ -517,14 +542,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
       }
 
-      if (requestCredentialVending && !isLocalOrHdfsLocation(table.location())) {
+      if (requestCredentialVending && canVendCredentials(table.location())) {
         response = injectScanCredentials(tableIdentifier, table, response, privilege);
       }
       return response;
 
-    } catch (IllegalArgumentException e) {
-      LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
-      throw new IllegalArgumentException("Invalid scan parameters: " + e.getMessage(), e);
+    } catch (IllegalArgumentException | ValidationException e) {
+      // A filter is bound to the schema only while files are planned, so an unknown column or a
+      // value of the wrong type surfaces here as a ValidationException.
+      LOG.info("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
+      throw new IllegalArgumentException(
+          "Invalid scan parameters: " + withoutSchemaStruct(e.getMessage()), e);
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       LOG.error("Table not found during scan planning: {}", tableIdentifier);
       throw e;
@@ -629,6 +657,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Long startSnapshotId = scanRequest.startSnapshotId();
     Long endSnapshotId = scanRequest.endSnapshotId();
     // Use IncrementalAppendScan if both start and end snapshot IDs are provided
+    if (startSnapshotId != null && startSnapshotId.equals(endSnapshotId)) {
+      // The start is exclusive, so the range from a snapshot to itself is empty.
+      return CloseableIterable.empty();
+    }
     if (startSnapshotId != null && endSnapshotId != null) {
       LOG.debug(
           "Using IncrementalAppendScan for table: {}, from snapshot: {} to snapshot: {}",
@@ -638,7 +670,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       IncrementalAppendScan incrementalScan =
           table
               .newIncrementalAppendScan()
-              .fromSnapshotInclusive(startSnapshotId)
+              // The REST spec defines start-snapshot-id as exclusive, and Iceberg's REST client
+              // sends it from appendsBetween/appendsAfter, which are exclusive as well.
+              .fromSnapshotExclusive(startSnapshotId)
               .toSnapshot(endSnapshotId);
       incrementalScan = applyScanRequest(incrementalScan, scanRequest);
       return incrementalScan.planFiles();
@@ -696,6 +730,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @SuppressWarnings("unchecked")
   private <T extends Scan> T applyScanStatsFields(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
+      for (String field : scanRequest.statsFields()) {
+        boolean known =
+            scanRequest.caseSensitive()
+                ? scan.schema().findField(field) != null
+                : scan.schema().caseInsensitiveFindField(field) != null;
+        if (!known) {
+          throw new IllegalArgumentException("Invalid statistics fields: unknown field " + field);
+        }
+      }
       try {
         scan = (T) scan.includeColumnStats(scanRequest.statsFields());
         LOG.debug("Applied statistics fields: {}", scanRequest.statsFields());
@@ -776,5 +819,36 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               + " metadata location %s has table UUID %s",
           identifier, currentUuid, request.metadataLocation(), newUuid);
     }
+  }
+
+  /**
+   * Iceberg's plan response serializer refers to delete files by their location. Deletion vectors
+   * that share one Puffin file have the same location, so every task would refer to whichever of
+   * them was indexed last, and a client would apply the wrong deletion vector. Such a plan is
+   * refused rather than answered wrongly.
+   */
+  @VisibleForTesting
+  static void checkDeleteFilesCanBeReferenced(
+      TableIdentifier tableIdentifier, List<FileScanTask> fileScanTasks) {
+    Map<String, DeleteFile> byLocation = new HashMap<>();
+    for (FileScanTask task : fileScanTasks) {
+      for (DeleteFile deleteFile : task.deletes()) {
+        DeleteFile other = byLocation.putIfAbsent(deleteFile.location(), deleteFile);
+        if (other != null
+            && !(Objects.equals(other.contentOffset(), deleteFile.contentOffset())
+                && Objects.equals(other.referencedDataFile(), deleteFile.referencedDataFile()))) {
+          throw new ServiceFailureException(
+              "Server-side scan planning cannot return table %s: several deletion vectors are"
+                  + " stored in %s, which the plan response format cannot reference separately;"
+                  + " plan the scan on the client",
+              tableIdentifier, deleteFile.location());
+        }
+      }
+    }
+  }
+
+  private static String withoutSchemaStruct(String message) {
+    // Iceberg's binding errors append the whole table struct; it is not useful to a client.
+    return message == null ? null : message.replaceAll(" in struct: .*$", "");
   }
 }

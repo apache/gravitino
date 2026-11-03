@@ -62,6 +62,7 @@ public class CompatibilityUtils {
           .put(OperationType.RENAME_TABLE, Operation.RENAME_TABLE)
           .put(OperationType.REGISTER_TABLE, Operation.REGISTER_TABLE)
           .put(OperationType.TABLE_EXISTS, Operation.TABLE_EXISTS)
+          .put(OperationType.REPORT_TABLE_METRICS, Operation.REPORT_TABLE_METRICS)
           .put(OperationType.CREATE_TAG, Operation.CREATE_TAG)
           .put(OperationType.GET_TAG, Operation.GET_TAG)
           .put(OperationType.GET_TAG_FOR_METADATA_OBJECT, Operation.GET_TAG_FOR_METADATA_OBJECT)
