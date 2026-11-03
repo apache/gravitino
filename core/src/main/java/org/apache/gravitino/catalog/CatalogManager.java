@@ -84,6 +84,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -711,7 +712,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
           // after reading the catalog entity, we convert it to the new fileset catalog entity.
           .map(this::convertFilesetCatalogEntity)
-          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
+          .map(this::toCatalogInfoForList)
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -1280,7 +1281,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchCatalogException, IllegalArgumentException, IOException {
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
-    try {
+    try (CatalogLease lease = acquireCatalogLease(ident)) {
       CatalogEntity updatedCatalog =
           store.update(
               ident,
@@ -1292,20 +1293,38 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         ? new HashMap<>()
                         : new HashMap<>(existing.getProperties());
 
+                // Validate a transient plaintext view before secret writes. Failed validation
+                // must not overwrite or delete a previously stored write-through secret.
+                CatalogChange[] proposedChanges =
+                    SecretAlterChanges.prepareCatalogChangesForTest(
+                        secretManager, existing.id(), changes);
+                CatalogEntity proposed =
+                    updateEntity(
+                            newCatalogBuilder(ident.namespace(), existing),
+                            new HashMap<>(currentProperties),
+                            proposedChanges)
+                        .build();
+                Map<String, String> proposedConfiguration =
+                    secretManager.toPlaintextProperties(proposed.getProperties());
+                lease
+                    .wrapper()
+                    .classLoader
+                    .withClassLoader(
+                        cl -> {
+                          lease.catalog().validateConfiguration(proposedConfiguration);
+                          return null;
+                        },
+                        IllegalArgumentException.class);
+
                 Pair<CatalogChange[], List<SecretMaterial>> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
-                CatalogChange[] effectiveChanges = secretResult.getLeft();
-
-                CatalogEntity.Builder newCatalogBuilder =
-                    newCatalogBuilder(ident.namespace(), existing);
-
-                Map<String, String> newProps =
-                    existing.getProperties() == null
-                        ? new HashMap<>()
-                        : new HashMap<>(existing.getProperties());
-                return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+                return updateEntity(
+                        newCatalogBuilder(ident.namespace(), existing),
+                        new HashMap<>(currentProperties),
+                        secretResult.getLeft())
+                    .build();
               });
       alterCommitted = true;
       return updatedCatalog;
@@ -1847,6 +1866,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           cl -> {
             validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
             catalog.validateCredentialProviders(propsToValidate);
+            if (propsToValidate != null) {
+              catalog.validateConfiguration();
+            }
             if (propsToValidate == null) {
               // Loading stays lenient for catalogs persisted with unsupported providers, so only
               // warn about them. Providers persisted as a secret are checked by their plaintext.
@@ -1919,6 +1941,30 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  /**
+   * Builds a catalog info for {@link #listCatalogsInfo}. A single catalog that fails to resolve
+   * (for example after a temporary ClassLoader error) must not fail the entire metalake listing.
+   */
+  private Catalog toCatalogInfoForList(CatalogEntity entity) {
+    try {
+      return entity.toCatalogInfoWithResolvedProps(getResolvedProperties(entity));
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to resolve catalog {} while listing; returning entity properties with secrets"
+              + " masked",
+          entity.nameIdentifier(),
+          e);
+      Map<String, String> props =
+          entity.getProperties() == null ? new HashMap<>() : new HashMap<>(entity.getProperties());
+      for (Map.Entry<String, String> entry : props.entrySet()) {
+        if (SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+          entry.setValue(HiddenPropertyMaskUtils.MASKED_VALUE);
+        }
+      }
+      return entity.toCatalogInfoWithResolvedProps(props);
+    }
+  }
+
   private Catalog toCatalogInfo(CatalogWrapper wrapper) {
     try {
       return wrapper.doWithCatalog(
@@ -1951,8 +1997,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
+    // toPlaintextOrMasked: a deleted/rotated secret must not block disable, drop, re-bind or list.
     catalog
-        .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
+        .withCatalogConf(secretManager.toPlaintextOrMasked(entity.getProperties()))
         .withCatalogEntity(entity)
         .withSecretManager(secretManager);
     catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());

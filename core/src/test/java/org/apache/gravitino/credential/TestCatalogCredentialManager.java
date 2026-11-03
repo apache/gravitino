@@ -55,4 +55,20 @@ public class TestCatalogCredentialManager {
           credentialManager.getCredentialProvider(JdbcCredential.JDBC_CREDENTIAL_TYPE).isPresent());
     }
   }
+
+  @Test
+  void testSupportsPathOnlyWhenAProviderCoversTheScheme() {
+    try (CatalogCredentialManager noProviders =
+        new CatalogCredentialManager("no-providers", ImmutableMap.of())) {
+      Assertions.assertFalse(noProviders.supportsPath("s3://bucket/warehouse/table"));
+    }
+    try (CatalogCredentialManager storageProvider =
+        new CatalogCredentialManager(
+            "storage",
+            ImmutableMap.of(
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                DummyCredentialProvider.CREDENTIAL_TYPE))) {
+      Assertions.assertTrue(storageProvider.supportsPath("s3://bucket/warehouse/table"));
+    }
+  }
 }

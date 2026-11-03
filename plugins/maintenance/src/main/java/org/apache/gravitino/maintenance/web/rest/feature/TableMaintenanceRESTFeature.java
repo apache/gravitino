@@ -26,15 +26,26 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.MaintenanceJobManager;
 import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
 import org.apache.gravitino.maintenance.policy.PolicyExpandReconciler;
-import org.apache.gravitino.maintenance.policy.PolicyExpandRegistrar;
-import org.apache.gravitino.maintenance.scheduler.TableMaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
+import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolicyResolver;
+import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
+import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceActionOperations;
 import org.apache.gravitino.maintenance.web.rest.TableMaintenanceBinder;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
+import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
+import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.glassfish.jersey.server.monitoring.ApplicationEvent;
 import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
 import org.glassfish.jersey.server.monitoring.RequestEvent;
@@ -45,6 +56,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Jersey feature that starts table maintenance db-scheduler pools and registers Spark action
  * callback REST when the extension package is enabled (§7.1 / §5.2.2).
+ *
+ * <p>This is the composition root for the TMS scheduler path: it resolves {@link GravitinoEnv} /
+ * manager singletons and relational meta services, builds the table enumerator, and starts pools.
  *
  * <p>Registers {@link TableMaintenanceActionOperations} for sample/finish callbacks. Cron and
  * commit pools poll. The expand pool stays stopped, and a policy lifecycle hook writes the matching
@@ -65,7 +79,7 @@ public class TableMaintenanceRESTFeature implements Feature {
   /** Package name for {@link Configs#REST_API_EXTENSION_PACKAGES}. */
   public static final String EXTENSION_PACKAGE = TableMaintenanceRESTFeature.class.getPackageName();
 
-  private static final AtomicReference<TableMaintenanceSchedulerPools> SCHEDULER_POOLS =
+  private static final AtomicReference<MaintenanceSchedulerPools> SCHEDULER_POOLS =
       new AtomicReference<>();
 
   private static final AtomicReference<PolicyExpandLifecycleHook> LIFECYCLE_HOOK =
@@ -78,15 +92,37 @@ public class TableMaintenanceRESTFeature implements Feature {
       return true;
     }
 
-    Config config = GravitinoEnv.getInstance().config();
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Config config = env.config();
     if (!Configs.RELATIONAL_ENTITY_STORE.equals(config.get(Configs.ENTITY_STORE))) {
       throw new IllegalStateException(
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
-    DataSource dataSource = resolveEntityStoreDataSource();
-    TableMaintenanceSchedulerPools pools = new TableMaintenanceSchedulerPools();
-    pools.start(dataSource, TableMaintenanceConfig.from(config), config);
+    TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(config);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
+    NearestPolicyTableEnumerator tableEnumerator =
+        new NearestPolicyTableEnumerator(
+            PolicyTagRelService.getInstance(),
+            TagMetaService.getInstance(),
+            SchemaMetaService.getInstance(),
+            TableMetaService.getInstance(),
+            () -> new NearestMaintenancePolicyResolver(env.entityStore()),
+            env.internalSchemaDispatcher(),
+            env.internalTableDispatcher());
+
+    DataSource dataSource = AutocommitDataSources.entityStore();
+    MaintenanceSchedulerPools pools = new MaintenanceSchedulerPools();
+    pools.start(
+        dataSource,
+        maintenanceConfig,
+        config,
+        MaintenanceJobManager.getInstance(),
+        MaintenanceActionManager.getInstance(),
+        TableMaintenanceActionMetaService.getInstance(),
+        tableEnumerator,
+        policyMetaService);
     if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {
       pools.stop();
       LOG.warn("Table maintenance scheduler pools were started concurrently; discarded duplicate");
@@ -95,7 +131,7 @@ public class TableMaintenanceRESTFeature implements Feature {
 
     try {
       registerLifecycleHook();
-      reconcileExistingPolicies();
+      reconcileExistingPolicies(metalakeMetaService, policyMetaService);
     } catch (RuntimeException e) {
       unregisterLifecycleHook();
       SCHEDULER_POOLS.set(null);
@@ -121,7 +157,7 @@ public class TableMaintenanceRESTFeature implements Feature {
    */
   public static void stopSchedulers() {
     unregisterLifecycleHook();
-    TableMaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
+    MaintenanceSchedulerPools pools = SCHEDULER_POOLS.getAndSet(null);
     if (pools != null) {
       pools.stop();
       LOG.info("Table maintenance scheduler pools stopped");
@@ -130,15 +166,16 @@ public class TableMaintenanceRESTFeature implements Feature {
 
   private static void registerLifecycleHook() {
     PolicyExpandLifecycleHook hook =
-        new PolicyExpandLifecycleHook(PolicyExpandRegistrar.joiningCurrentTransaction());
+        new PolicyExpandLifecycleHook(PolicyExpandClient.joiningCurrentTransaction());
     PolicyLifecycleHooks.register(hook);
     LIFECYCLE_HOOK.set(hook);
   }
 
-  private static void reconcileExistingPolicies() {
-    PolicyExpandRegistrar registrar = PolicyExpandRegistrar.joiningCurrentTransaction();
-    PolicyExpandLifecycleHook aligner = new PolicyExpandLifecycleHook(registrar);
-    new PolicyExpandReconciler(aligner, registrar).reconcileAll();
+  private static void reconcileExistingPolicies(
+      MetalakeMetaService metalakeMetaService, PolicyMetaService policyMetaService) {
+    new PolicyExpandReconciler(
+            PolicyExpandClient.joiningCurrentTransaction(), metalakeMetaService, policyMetaService)
+        .reconcileAll();
   }
 
   private static void unregisterLifecycleHook() {
@@ -146,19 +183,6 @@ public class TableMaintenanceRESTFeature implements Feature {
     if (hook != null) {
       PolicyLifecycleHooks.unregister(hook);
     }
-  }
-
-  private static DataSource resolveEntityStoreDataSource() {
-    Object dataSource =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getEnvironment()
-            .getDataSource();
-    if (!(dataSource instanceof DataSource)) {
-      throw new IllegalStateException("Entity store data source is not available");
-    }
-    return (DataSource) dataSource;
   }
 
   /**

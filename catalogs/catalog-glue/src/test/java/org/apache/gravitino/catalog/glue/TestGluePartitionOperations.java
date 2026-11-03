@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -457,5 +459,47 @@ class TestGluePartitionOperations {
                 ops.addPartition(
                     partition(null, new String[][] {{"dt"}, {"region"}}, "2024-01-01", "us")));
     assertTrue(e.getMessage().contains("no storage location"), e.getMessage());
+  }
+
+  @Test
+  void testAddPartitionNameIgnoresCaseOfColumnNames() {
+    PartitionInput input =
+        addAndCapture(
+            partition(
+                "DT=2024-01-01/Region=us",
+                new String[][] {{"dt"}, {"region"}},
+                "2024-01-01",
+                "us"));
+    assertEquals(List.of("2024-01-01", "us"), input.values());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.addPartition(
+                partition(
+                    "dt=2024-01-01/region=US",
+                    new String[][] {{"dt"}, {"region"}},
+                    "2024-01-01",
+                    "us")));
+  }
+
+  @Test
+  void testAddPartitionReturnsTheRequestedValuesWithoutReadingBack() {
+    IdentityPartition partition =
+        Partitions.identity(
+            null,
+            new String[][] {{"region"}, {"dt"}},
+            new org.apache.gravitino.rel.expressions.literals.Literal<?>[] {
+              Literals.stringLiteral("us"), Literals.dateLiteral(java.time.LocalDate.of(2024, 1, 1))
+            },
+            Map.of("k", "v"));
+
+    IdentityPartition result = (IdentityPartition) ops.addPartition(partition);
+
+    assertEquals("dt=2024-01-01/region=us", result.name());
+    assertArrayEquals(new String[][] {{"dt"}, {"region"}}, result.fieldNames());
+    assertEquals(Literals.dateLiteral(java.time.LocalDate.of(2024, 1, 1)), result.values()[0]);
+    assertEquals(Map.of("k", "v"), result.properties());
+    verify(mockClient, never()).getPartition(any(GetPartitionRequest.class));
   }
 }

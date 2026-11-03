@@ -265,9 +265,11 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   private static String checkStructFieldName(String name) {
     // Glue type strings have no quoting, so these characters would change how the type parses.
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(name) && !StringUtils.containsAny(name, ":,<>"),
-        "Struct field name '%s' is not supported by Glue: it must not be blank or contain ':', ',',"
-            + " '<' or '>'",
+        StringUtils.isNotBlank(name)
+            && name.equals(name.trim())
+            && !StringUtils.containsAny(name, ":,<>()"),
+        "Struct field name '%s' is not supported by Glue: it must not be blank, start or end with"
+            + " whitespace, or contain ':', ',', '<', '>', '(' or ')'",
         name);
     return name;
   }

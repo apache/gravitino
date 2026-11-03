@@ -248,7 +248,7 @@ class TestGlueTypeConverter {
 
   @Test
   void testStructFieldNameThatBreaksTypeStringIsRefused() {
-    for (String name : new String[] {"a:b", "x,y", "a<b", " "}) {
+    for (String name : new String[] {"a:b", "x,y", "a<b", " ", "a(", "b)", " a", "a "}) {
       Types.StructType struct =
           Types.StructType.of(Types.StructType.Field.nullableField(name, Types.IntegerType.get()));
       IllegalArgumentException e =
