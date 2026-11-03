@@ -651,13 +651,13 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     }
 
     @Override
-    protected boolean matchesSecondaryExpressionCondition(
+    protected boolean shouldUseSecondaryExpression(
         ExpressionCondition condition, Method method, Parameter[] parameters, Object[] args) {
       return matchOverwriteSecondary && condition == ExpressionCondition.OVERWRITE;
     }
 
     @Override
-    protected Entity.EntityType resolveSecondaryAccessEntityType(
+    protected Entity.EntityType entityTypeForSecondaryExpression(
         AuthorizationExpression annotation,
         AuthorizationTarget primaryTarget,
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {

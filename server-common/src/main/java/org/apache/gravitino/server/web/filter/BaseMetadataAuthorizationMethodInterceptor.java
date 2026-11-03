@@ -252,7 +252,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    * @param args invoked method arguments
    * @return {@code true} to evaluate the secondary expression
    */
-  protected boolean matchesSecondaryExpressionCondition(
+  protected boolean shouldUseSecondaryExpression(
       ExpressionCondition condition, Method method, Parameter[] parameters, Object[] args) {
     return false;
   }
@@ -270,7 +270,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    * @param nameIdentifierMap identifiers after request-specific handlers have run
    * @return entity type used for secondary expression evaluation
    */
-  protected Entity.EntityType resolveSecondaryAccessEntityType(
+  protected Entity.EntityType entityTypeForSecondaryExpression(
       AuthorizationExpression annotation,
       AuthorizationTarget primaryTarget,
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
@@ -383,12 +383,12 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         if (!skipStandardCheck && !shouldSkipExpressionEvaluation(target)) {
           Entity.EntityType accessEntityType = target.entityType();
           if (!expressionAnnotation.secondaryExpression().isEmpty()
-              && matchesSecondaryExpressionCondition(
+              && shouldUseSecondaryExpression(
                   expressionAnnotation.secondaryExpressionCondition(), method, parameters, args)) {
             expression = expressionAnnotation.secondaryExpression();
             deniedExpression = expression;
             accessEntityType =
-                resolveSecondaryAccessEntityType(expressionAnnotation, target, nameIdentifierMap);
+                entityTypeForSecondaryExpression(expressionAnnotation, target, nameIdentifierMap);
           }
           if (nameIdentifierMap.get(accessEntityType) != null) {
             deniedObject = nameIdentifierMap.get(accessEntityType);
