@@ -745,3 +745,42 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
 - [ ] Java and Python clients, including `matchTerms`
 - [ ] MCP `glossary` tools, with the agent rules in the tool descriptions and tests for unmatched and ambiguous words
 - [ ] OpenAPI spec (validated with `./gradlew :docs:build`) and user docs
+
+## Implementation Phases
+
+The task breakdown above groups engineering work. The two delivery phases below define what
+ships together and take precedence where earlier sections describe different first-release
+behavior. Both phases use the same term identities, relations and storage model.
+
+| Area                      | Phase 1                                                                                                                                                         | Phase 2                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Term model                | Term CRUD, definitions, synonyms, ownership, documentation links, properties and source references                                                              | Reuse the same live term model                                                                                          |
+| Term relations            | Multi-parent broader/narrower relations, related terms, cycle checks and cleanup                                                                                | Review relationship changes                                                                                             |
+| Domain membership         | Zero or more domains, optional at creation; explicit `TermDomain` relations, filters and cleanup                                                                | Review membership changes and use domains as governance scopes                                                          |
+| Descriptive tags          | Extend existing tag APIs and authorization to terms; tags do not change explicit domain membership                                                              | Reuse the same tag behavior                                                                                             |
+| Asset and metric bindings | Catalog, schema, table, view, column, fileset, topic and model bindings, plus named semantic-model metrics; both authorization paths, reverse reads and cleanup | Review binding changes through both term-editor and object-admin paths                                                  |
+| Definition privileges     | `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS` on the metalake; ownership checks, deny handling and filtered results                           | Add domain-scoped grants and inheritance                                                                                |
+| Status and editing        | Default `APPROVED`; owners with `CREATE_DEFINITION` may edit their terms in any status, including status; managers may edit any term                            | Default `DRAFT`, with an audited metalake setting that may select initial `APPROVED`; subsequent changes require review |
+| Status API                | `setStatus` in the ordinary update request; no separate status PATCH                                                                                            | Submit status changes through the same review path as other updates                                                     |
+| Change handling           | Apply authorized changes immediately; retain `TermChangeHandler` as the write extension                                                                         | Always-on submission and review, isolated pending content and no self-approval                                          |
+| Versions and history      | Technical revision and audit; retain the version-table schema without requiring content snapshots or a history API                                              | Store snapshots of accepted changes, certification metadata, readable history and diffs                                 |
+| APIs and clients          | REST, Java/Python clients and OpenAPI for terms, relations, tags, bindings and lookup                                                                           | Add proposal, decision and history APIs                                                                                 |
+| Agent lookup              | Read-only exact normalized name/synonym matching, accessible bindings, ambiguity and unmatched inputs; approved terms only                                      | Reuse lookup against the current accepted state                                                                         |
+| Audit and events          | Create, edit, status, relation, membership, binding and delete events; reuse owner/tag audit                                                                    | Add submission, approval, rejection, certification and creation-setting audit                                           |
+| Glossary UI               | Programmatic access through APIs and clients                                                                                                                    | Term management, hierarchy, asset/metric bindings, approval queue and history                                           |
+
+### Storage and Review Compatibility
+
+Keep `glossary_term_version_info` in the first-phase schema. Term reads and writes must work
+without version rows; snapshot writing is introduced with review in the second phase. Preserve
+term IDs, relation keys and existing data when adding proposal storage and history support.
+A technical revision is not an accepted-content version.
+
+The write extension must cover content, status, relations, membership and both binding-write
+paths. In the second phase, pending changes remain separate from live state. Approval rechecks
+permissions, base revisions and referenced objects, then commits live changes, snapshots and
+the decision together. Snapshot failure rolls back the live update.
+
+The initial-status setting does not disable review of later changes. `APPROVED` in the first
+phase indicates eligibility for lookup; it does not claim human certification. In the second
+phase, history distinguishes reviewer approval from policy-based initial acceptance.
