@@ -838,6 +838,14 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Not all operations require the original table information, so lazy loading is used here
     validateIndexChangeConflicts(changes);
+
+    boolean hasRename = Arrays.stream(changes).anyMatch(TableChange.RenameColumn.class::isInstance);
+    if (hasRename && changes.length > 1) {
+      throw new UnsupportedOperationException(
+          "Doris column renames must be submitted individually and cannot be combined"
+              + " with other table changes");
+    }
+
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
@@ -850,6 +858,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                 .anyMatch(DorisTableOperations::requiresVersionAwareAddColumnEscaping)
             ? Optional.of(getDorisVersion("ADD COLUMN default literal compatibility check"))
             : Optional.empty();
+
     for (int i = 0; i < changes.length; i++) {
       TableChange change = changes[i];
       if (change instanceof TableChange.UpdateComment) {

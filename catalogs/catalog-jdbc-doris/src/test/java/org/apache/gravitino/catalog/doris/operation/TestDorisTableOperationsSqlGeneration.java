@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
@@ -57,6 +58,8 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -1681,6 +1684,59 @@ public class TestDorisTableOperationsSqlGeneration {
             "test_table", TableChange.renameColumn(new String[] {"old_col"}, "new_col"));
 
     Assertions.assertEquals("ALTER TABLE `test_table`\nRENAME COLUMN `old_col` `new_col`;", sql);
+  }
+
+  /**
+   * Verifies rename batches are rejected before loading table metadata or borrowing a connection.
+   *
+   * @param description the batch scenario
+   * @param firstChange the first table change
+   * @param secondChange the second table change
+   */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("renameColumnBatches")
+  public void testRenameColumnWithMultipleOperationsFails(
+      String description, TableChange firstChange, TableChange secondChange) {
+    TestableDorisTableOperations ops = Mockito.spy(new TestableDorisTableOperations());
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    ops.setDataSource(dataSource);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> ops.alterTable("database", "test_table", firstChange, secondChange));
+
+    Assertions.assertEquals(
+        "Doris column renames must be submitted individually and cannot be combined"
+            + " with other table changes",
+        exception.getMessage());
+    Mockito.verifyNoInteractions(dataSource);
+    Mockito.verify(ops, Mockito.never())
+        .getOrCreateTable(Mockito.anyString(), Mockito.anyString(), Mockito.any());
+  }
+
+  private static Stream<Arguments> renameColumnBatches() {
+    TableChange rename = TableChange.renameColumn(new String[] {"old_col"}, "new_col");
+    TableChange add = TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get());
+    return Stream.of(
+        Arguments.of(
+            "two renames",
+            rename,
+            TableChange.renameColumn(new String[] {"other_col"}, "renamed_other_col")),
+        Arguments.of("rename then add", rename, add),
+        Arguments.of("add then rename", add, rename),
+        Arguments.of(
+            "rename then type update",
+            rename,
+            TableChange.updateColumnType(new String[] {"old_col"}, Types.LongType.get())),
+        Arguments.of(
+            "comment update then rename",
+            TableChange.updateColumnComment(new String[] {"old_col"}, "new comment"),
+            rename),
+        Arguments.of(
+            "property update then rename",
+            TableChange.setProperty(LIGHT_SCHEMA_CHANGE, "true"),
+            rename));
   }
 
   private static JdbcTable renameTableWithColumns(String... names) {
