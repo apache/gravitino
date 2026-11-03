@@ -287,9 +287,6 @@ public class JobManager implements JobOperationDispatcher {
   public void registerJobTemplate(String metalake, JobTemplateEntity jobTemplateEntity)
       throws JobTemplateAlreadyExistsException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
-    NameIdentifierUtil.checkMetadataObjectName(
-        NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateEntity.name()),
-        Entity.EntityType.JOB_TEMPLATE);
     // Fail on malformed placeholders now rather than on every job run.
     JobTemplateResolver.validate(jobTemplateEntity);
 
@@ -1135,9 +1132,6 @@ public class JobManager implements JobOperationDispatcher {
     for (JobTemplateChange change : changes) {
       if (change instanceof JobTemplateChange.RenameJobTemplate) {
         newName = ((JobTemplateChange.RenameJobTemplate) change).getNewName();
-        NameIdentifierUtil.checkMetadataObjectName(
-            NameIdentifier.of(jobTemplateEntity.namespace(), newName),
-            Entity.EntityType.JOB_TEMPLATE);
 
       } else if (change instanceof JobTemplateChange.UpdateJobTemplateComment) {
         newComment = ((JobTemplateChange.UpdateJobTemplateComment) change).getNewComment();

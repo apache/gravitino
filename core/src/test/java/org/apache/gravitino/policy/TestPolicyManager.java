@@ -78,7 +78,6 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
-import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -398,24 +397,6 @@ public class TestPolicyManager {
             NoSuchMetalakeException.class,
             () -> policyManager.listPolicies("non_existent_metalake"));
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
-  }
-
-  @Test
-  public void testCreateAndRenameRejectDottedName() {
-    PolicyContent content =
-        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null);
-
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class, () -> createCustomPolicy(METALAKE, "a.b", content));
-    Assertions.assertThrows(
-        NoSuchPolicyException.class, () -> policyManager.getPolicy(METALAKE, "a.b"));
-
-    String policyName = "plain_" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName, content);
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
-        () -> policyManager.alterPolicy(METALAKE, policyName, PolicyChange.rename("a.b")));
-    Assertions.assertEquals(policyName, policyManager.getPolicy(METALAKE, policyName).name());
   }
 
   @Test

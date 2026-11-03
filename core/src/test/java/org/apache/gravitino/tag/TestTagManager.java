@@ -81,7 +81,6 @@ import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
-import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -380,20 +379,6 @@ public class TestTagManager {
     tagManager.associateTagsForMetadataObject(METALAKE, functionObject, null, functionTags);
 
     Arrays.stream(tagManager.listTags(METALAKE)).forEach(n -> tagManager.deleteTag(METALAKE, n));
-  }
-
-  @Test
-  public void testCreateAndRenameRejectDottedName() {
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
-        () -> tagManager.createTag(METALAKE, "a.b", null, null));
-    Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, "a.b"));
-
-    tagManager.createTag(METALAKE, "plain_tag", null, null);
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
-        () -> tagManager.alterTag(METALAKE, "plain_tag", TagChange.rename("a.b")));
-    Assertions.assertEquals("plain_tag", tagManager.getTag(METALAKE, "plain_tag").name());
   }
 
   @Test

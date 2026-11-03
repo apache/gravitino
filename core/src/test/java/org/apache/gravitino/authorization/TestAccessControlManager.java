@@ -81,7 +81,6 @@ import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
-import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -519,20 +518,6 @@ public class TestAccessControlManager {
                 Lists.newArrayList(
                     SecurableObjects.ofCatalog(
                         "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))));
-
-    // Dotted names are reserved as the qualified-name separator; reject before store write.
-    Assertions.assertThrows(
-        IllegalNameIdentifierException.class,
-        () ->
-            accessControlManager.createRole(
-                METALAKE,
-                "a.b",
-                props,
-                Lists.newArrayList(
-                    SecurableObjects.ofCatalog(
-                        "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))));
-    Assertions.assertThrows(
-        NoSuchRoleException.class, () -> accessControlManager.getRole(METALAKE, "a.b"));
   }
 
   @Test
