@@ -30,6 +30,7 @@ import java.lang.reflect.Parameter;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -40,6 +41,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
@@ -48,6 +50,7 @@ import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.rest.IcebergConfigOperations;
+import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -61,12 +64,16 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
+import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.glassfish.hk2.api.ActiveDescriptor;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -133,6 +140,54 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     assertEquals(
         NameIdentifierUtil.ofTable(TEST_METALAKE, TEST_CATALOG, TEST_SCHEMA, "my-table").toString(),
         tableId.toString());
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidNamespaceRequests")
+  void testInvalidNamespaceIsBadRequestBeforeAuthorization(String operation, String namespace)
+      throws Throwable {
+    resetContext(null, false);
+    boolean update = operation.equals("updateNamespace");
+    Method method =
+        update
+            ? IcebergNamespaceOperations.class.getMethod(
+                operation, String.class, String.class, UpdateNamespacePropertiesRequest.class)
+            : IcebergNamespaceOperations.class.getMethod(operation, String.class, String.class);
+    Object[] args =
+        update
+            ? new Object[] {
+              TEST_CATALOG + "/", namespace, Mockito.mock(UpdateNamespacePropertiesRequest.class)
+            }
+            : new Object[] {TEST_CATALOG + "/", namespace};
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments()).thenReturn(args);
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    try (MockedStatic<AuthorizationUtils> authorization =
+            Mockito.mockStatic(AuthorizationUtils.class);
+        Response response = (Response) interceptor.invoke(invocation)) {
+      assertEquals(400, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      assertEquals(400, error.code());
+      assertEquals("BadRequestException", error.type());
+      assertTrue(error.message().contains("contains '.'"));
+      authorization.verifyNoInteractions();
+    }
+    Mockito.verify(invocation, Mockito.never()).proceed();
+  }
+
+  @Test
+  void testNamespaceLevelsAreDecodedOnlyOnce() throws Exception {
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+    Method method =
+        IcebergNamespaceOperations.class.getMethod("loadNamespace", String.class, String.class);
+    Map<Entity.EntityType, NameIdentifier> identifiers =
+        interceptor.extractNameIdentifierFromParameters(
+            method.getParameters(), new Object[] {TEST_CATALOG + "/", "a%252Eb"});
+    assertEquals("a%2Eb", identifiers.get(Entity.EntityType.SCHEMA).name());
   }
 
   @Test
@@ -613,6 +668,22 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
       assertTrue(errorResponse.message().contains("ghostRole"));
       Mockito.verify(invocation, Mockito.never()).proceed();
     }
+  }
+
+  private static Stream<Arguments> invalidNamespaceRequests() {
+    return Stream.of("loadNamespace", "namespaceExists", "updateNamespace", "dropNamespace")
+        .flatMap(
+            operation ->
+                Stream.of(
+                        "a.b",
+                        "a%2Eb",
+                        "a%2eb",
+                        ".",
+                        "..",
+                        "%2e%2e",
+                        "parent%1Fa.b",
+                        "a%2Eb%1Fchild")
+                    .map(namespace -> Arguments.of(operation, namespace)));
   }
 
   /** Test operations class to provide method annotations for testing. */

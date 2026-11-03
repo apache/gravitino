@@ -84,6 +84,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -711,7 +712,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
           // after reading the catalog entity, we convert it to the new fileset catalog entity.
           .map(this::convertFilesetCatalogEntity)
-          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
+          .map(this::toCatalogInfoForList)
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
@@ -1940,6 +1941,30 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  /**
+   * Builds a catalog info for {@link #listCatalogsInfo}. A single catalog that fails to resolve
+   * (for example after a temporary ClassLoader error) must not fail the entire metalake listing.
+   */
+  private Catalog toCatalogInfoForList(CatalogEntity entity) {
+    try {
+      return entity.toCatalogInfoWithResolvedProps(getResolvedProperties(entity));
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to resolve catalog {} while listing; returning entity properties with secrets"
+              + " masked",
+          entity.nameIdentifier(),
+          e);
+      Map<String, String> props =
+          entity.getProperties() == null ? new HashMap<>() : new HashMap<>(entity.getProperties());
+      for (Map.Entry<String, String> entry : props.entrySet()) {
+        if (SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+          entry.setValue(HiddenPropertyMaskUtils.MASKED_VALUE);
+        }
+      }
+      return entity.toCatalogInfoWithResolvedProps(props);
+    }
+  }
+
   private Catalog toCatalogInfo(CatalogWrapper wrapper) {
     try {
       return wrapper.doWithCatalog(
@@ -1972,8 +1997,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
+    // toPlaintextOrMasked: a deleted/rotated secret must not block disable, drop, re-bind or list.
     catalog
-        .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
+        .withCatalogConf(secretManager.toPlaintextOrMasked(entity.getProperties()))
         .withCatalogEntity(entity)
         .withSecretManager(secretManager);
     catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());

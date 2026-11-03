@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Stream;
+import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.iceberg.catalog.Namespace;
@@ -32,6 +38,8 @@ import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 /**
@@ -77,6 +85,27 @@ public class TestIcebergRequestBodyAuthzHandlers {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("invalidNamespaceLevels")
+  void testCreateRejectsDottedLevelsBeforeResolvingParent(Namespace namespace) throws Exception {
+    Method method =
+        IcebergNamespaceOperations.class.getMethod(
+            "createNamespace", String.class, CreateNamespaceRequest.class);
+    CreateNamespaceRequest request =
+        CreateNamespaceRequest.builder().withNamespace(namespace).build();
+    NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");
+    Map<EntityType, NameIdentifier> identifiers = new HashMap<>();
+    identifiers.put(EntityType.CATALOG, catalog);
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            new CreateNamespaceAuthzHandler(
+                    method.getParameters(), new Object[] {"catalog/", request})
+                .process(identifiers));
+    assertEquals(Map.of(EntityType.CATALOG, catalog), identifiers);
+  }
+
   @Test
   public void testRenameViewWithoutSourceOrDestinationIsBadRequest() throws Exception {
     Parameter[] parameters = parameters("renameView", RenameTableRequest.class);
@@ -101,6 +130,14 @@ public class TestIcebergRequestBodyAuthzHandlers {
   private static Parameter[] parameters(String methodName, Class<?> requestClass) throws Exception {
     Method method = TestOperations.class.getMethod(methodName, requestClass);
     return method.getParameters();
+  }
+
+  private static Stream<Namespace> invalidNamespaceLevels() {
+    return Stream.of(
+        Namespace.of("a.b"),
+        Namespace.of("a.b", "child"),
+        Namespace.of("parent", "a.b"),
+        Namespace.of("parent", "a.b", "child"));
   }
 
   /** Provides annotated parameters like the REST operations do. */

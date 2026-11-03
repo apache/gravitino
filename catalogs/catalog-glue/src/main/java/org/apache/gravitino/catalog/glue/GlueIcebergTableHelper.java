@@ -42,6 +42,9 @@ import static org.apache.gravitino.rel.types.Types.VarCharType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -94,15 +97,25 @@ import org.slf4j.LoggerFactory;
  */
 final class GlueIcebergTableHelper {
 
+  /** Name of the internal Iceberg catalog; it never reaches users. */
+  static final String ICEBERG_CATALOG_NAME = "gravitino-glue-iceberg";
+
   private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergTableHelper.class);
 
   private static final String DOT = ".";
+
+  private static final Set<String> S3_SCHEMES = ImmutableSet.of("s3", "s3a", "s3n");
 
   // Iceberg GlueCatalog properties (not defined in IcebergConstants).
   private static final String CATALOG_IMPL = "catalog-impl";
   private static final String GLUE_CATALOG = "GlueCatalog";
   private static final String GLUE_ID = "glue.id";
   private static final String GLUE_ENDPOINT = "glue.endpoint";
+  private static final String HTTP_CLIENT_TYPE = "http-client.type";
+  private static final String HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS =
+      "http-client.apache.connection-timeout-ms";
+  private static final String HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS =
+      "http-client.apache.socket-timeout-ms";
   private static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
   private static final String CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID =
       "client.credentials-provider.access-key-id";
@@ -146,9 +159,27 @@ final class GlueIcebergTableHelper {
     Map<String, String> icebergProps = buildIcebergCatalogProperties(config);
 
     GlueCatalog glueCatalog = new GlueCatalog();
-    glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
+    glueCatalog.initialize(ICEBERG_CATALOG_NAME, icebergProps);
     LOG.info("Initialized Iceberg GlueCatalog for region {}", config.get(GlueConstants.AWS_REGION));
     return glueCatalog;
+  }
+
+  /**
+   * Whether {@code location} is an S3 URI with a bucket, the only kind of location S3FileIO can
+   * write Iceberg metadata to.
+   *
+   * @param location the table location
+   * @return true for an {@code s3://}, {@code s3a://} or {@code s3n://} URI with a bucket
+   */
+  static boolean isS3Location(String location) {
+    try {
+      URI uri = new URI(location);
+      return uri.getScheme() != null
+          && S3_SCHEMES.contains(uri.getScheme().toLowerCase(Locale.ROOT))
+          && StringUtils.isNotBlank(uri.getRawAuthority());
+    } catch (URISyntaxException e) {
+      return false;
+    }
   }
 
   static Map<String, String> buildIcebergCatalogProperties(Map<String, String> config) {
@@ -187,6 +218,13 @@ final class GlueIcebergTableHelper {
     if (StringUtils.isNotBlank(endpoint)) {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
+
+    // The Iceberg AWS clients take no total call timeout, so bound each connection and read by
+    // the per-attempt timeout of the catalog's own Glue client.
+    String attemptTimeoutMs = String.valueOf(GlueClientProvider.apiCallAttemptTimeoutMs(config));
+    icebergProps.put(HTTP_CLIENT_TYPE, "apache");
+    icebergProps.put(HTTP_CLIENT_APACHE_CONNECTION_TIMEOUT_MS, attemptTimeoutMs);
+    icebergProps.put(HTTP_CLIENT_APACHE_SOCKET_TIMEOUT_MS, attemptTimeoutMs);
 
     icebergProps.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
     return icebergProps;
@@ -349,6 +387,14 @@ final class GlueIcebergTableHelper {
     String location = properties.get(GlueConstants.LOCATION);
     Preconditions.checkArgument(
         location != null, "Location is required for Iceberg table creation");
+    // Iceberg metadata is written through S3FileIO only, so any other scheme can never work.
+    Preconditions.checkArgument(
+        isS3Location(location),
+        "Iceberg tables need an s3://, s3a:// or s3n:// location; got '%s'. Set '%s' on the"
+            + " table, or an S3 '%s' on the catalog or LocationUri on the database.",
+        location,
+        GlueConstants.LOCATION,
+        GlueConstants.WAREHOUSE);
 
     String format = properties.get(GlueConstants.FORMAT);
     if (format != null) {
