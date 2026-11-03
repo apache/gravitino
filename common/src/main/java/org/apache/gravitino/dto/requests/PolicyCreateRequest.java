@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino.dto.requests;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.google.common.base.Preconditions;
@@ -42,7 +40,6 @@ import org.apache.gravitino.rest.RESTRequest;
 @Getter
 @EqualsAndHashCode
 @ToString
-@JsonIgnoreProperties(ignoreUnknown = false)
 public class PolicyCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
@@ -64,30 +61,6 @@ public class PolicyCreateRequest implements RESTRequest {
       include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
       property = "policyType")
   @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
-  @JsonSubTypes({
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergCompactionContentDTO.class,
-        name = "system_iceberg_compaction"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class,
-        name = "system_iceberg_orphan_file_removal"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergRewriteManifestsContentDTO.class,
-        name = "system_iceberg_rewrite_manifests"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergSnapshotExpirationContentDTO.class,
-        name = "system_iceberg_snapshot_expiration"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.RowFilterContentDTO.class,
-        name = "system_row_filter"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.ColumnMaskContentDTO.class,
-        name = "system_column_mask"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.AccessControlContentDTO.class,
-        name = "system_access_control"),
-    @JsonSubTypes.Type(value = PolicyContentDTO.CustomContentDTO.class, name = "custom")
-  })
   private final PolicyContentDTO policyContent;
 
   /**

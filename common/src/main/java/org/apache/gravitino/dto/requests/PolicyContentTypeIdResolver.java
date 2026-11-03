@@ -24,57 +24,43 @@ import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.policy.Policy;
 
 /**
- * Resolves {@code policyType} type ids for policy content polymorphism.
- *
- * <p>Known ids (built-ins and {@code custom}) are matched case-insensitively before content fields
- * are bound. Unknown {@code system_*} names and any other unregistered id fail with a type-named
- * error; there is no fallback that treats unmatched ids as custom content.
+ * Selects the policy content DTO from the sibling {@code policyType}, matching known types
+ * case-insensitively via {@link Policy.BuiltInType#fromPolicyType(String)}.
  */
 public class PolicyContentTypeIdResolver extends TypeIdResolverBase {
 
-  private static final Map<String, Class<? extends PolicyContentDTO>> CONTENT_BY_TYPE =
-      ImmutableMap.<String, Class<? extends PolicyContentDTO>>builder()
-          .put("system_iceberg_compaction", PolicyContentDTO.IcebergCompactionContentDTO.class)
+  private static final Map<Policy.BuiltInType, Class<? extends PolicyContentDTO>> CONTENT_CLASSES =
+      ImmutableMap.<Policy.BuiltInType, Class<? extends PolicyContentDTO>>builder()
           .put(
-              "system_iceberg_orphan_file_removal",
+              Policy.BuiltInType.ICEBERG_COMPACTION,
+              PolicyContentDTO.IcebergCompactionContentDTO.class)
+          .put(
+              Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
               PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class)
           .put(
-              "system_iceberg_rewrite_manifests",
+              Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
               PolicyContentDTO.IcebergRewriteManifestsContentDTO.class)
           .put(
-              "system_iceberg_snapshot_expiration",
+              Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
               PolicyContentDTO.IcebergSnapshotExpirationContentDTO.class)
-          .put("system_row_filter", PolicyContentDTO.RowFilterContentDTO.class)
-          .put("system_column_mask", PolicyContentDTO.ColumnMaskContentDTO.class)
-          .put("system_access_control", PolicyContentDTO.AccessControlContentDTO.class)
-          .put("custom", PolicyContentDTO.CustomContentDTO.class)
+          .put(Policy.BuiltInType.ROW_FILTER, PolicyContentDTO.RowFilterContentDTO.class)
+          .put(Policy.BuiltInType.COLUMN_MASK, PolicyContentDTO.ColumnMaskContentDTO.class)
+          .put(Policy.BuiltInType.ACCESS_CONTROL, PolicyContentDTO.AccessControlContentDTO.class)
+          .put(Policy.BuiltInType.CUSTOM, PolicyContentDTO.CustomContentDTO.class)
           .build();
-
-  private static final Map<Class<? extends PolicyContentDTO>, String> TYPE_BY_CONTENT_CLASS;
-
-  static {
-    ImmutableMap.Builder<Class<? extends PolicyContentDTO>, String> reverse =
-        ImmutableMap.builder();
-    for (Map.Entry<String, Class<? extends PolicyContentDTO>> entry : CONTENT_BY_TYPE.entrySet()) {
-      reverse.put(entry.getValue(), entry.getKey());
-    }
-    TYPE_BY_CONTENT_CLASS = reverse.build();
-  }
 
   private JavaType baseType;
 
   @Override
-  public void init(JavaType bt) {
-    this.baseType = bt;
+  public void init(JavaType baseType) {
+    this.baseType = baseType;
   }
 
   @Override
@@ -84,70 +70,32 @@ public class PolicyContentTypeIdResolver extends TypeIdResolverBase {
 
   @Override
   public String idFromValueAndType(Object value, Class<?> suggestedType) {
-    Class<?> type = suggestedType != null ? suggestedType : value.getClass();
-    String id = typeIdForContentClass(type);
-    if (id == null) {
-      throw new IllegalArgumentException("Unknown policy content class: " + type.getName());
+    for (Map.Entry<Policy.BuiltInType, Class<? extends PolicyContentDTO>> entry :
+        CONTENT_CLASSES.entrySet()) {
+      if (entry.getValue().isAssignableFrom(suggestedType)) {
+        return entry.getKey().policyType();
+      }
     }
-    return id;
+    throw new IllegalArgumentException("Unknown policy content class: " + suggestedType);
   }
 
   @Override
   public JavaType typeFromId(DatabindContext context, String id) throws IOException {
     try {
-      return context.constructSpecializedType(baseType, contentClassFor(id));
+      Policy.BuiltInType type = Policy.BuiltInType.fromPolicyType(id);
+      Class<? extends PolicyContentDTO> contentClass = CONTENT_CLASSES.get(type);
+      if (contentClass == null) {
+        throw new IllegalArgumentException("Unsupported policy type: " + id);
+      }
+      return context.constructSpecializedType(baseType, contentClass);
     } catch (IllegalArgumentException e) {
-      // Wrap so Jersey's JsonMappingExceptionMapper can return HTTP 400 with this message.
+      // JsonMappingExceptionMapper turns this into HTTP 400 carrying the type-named message.
       throw JsonMappingException.from((JsonParser) null, e.getMessage(), e);
     }
   }
 
   @Override
-  public String getDescForKnownTypeIds() {
-    return "Gravitino policyType content ids";
-  }
-
-  @Override
   public JsonTypeInfo.Id getMechanism() {
     return JsonTypeInfo.Id.NAME;
-  }
-
-  private static Class<? extends PolicyContentDTO> contentClassFor(String policyType) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
-    Class<? extends PolicyContentDTO> exact = CONTENT_BY_TYPE.get(policyType);
-    if (exact != null) {
-      return exact;
-    }
-    for (Map.Entry<String, Class<? extends PolicyContentDTO>> entry : CONTENT_BY_TYPE.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase(policyType)) {
-        return entry.getValue();
-      }
-    }
-    if (policyType.startsWith(Policy.BUILT_IN_TYPE_PREFIX)) {
-      throw new IllegalArgumentException(
-          String.format("Unknown built-in policy type: %s", policyType));
-    }
-    throw new IllegalArgumentException(
-        String.format(
-            "Unknown policy type: %s, it should start with '%s' or be 'custom'",
-            policyType, Policy.BUILT_IN_TYPE_PREFIX));
-  }
-
-  private static String typeIdForContentClass(Class<?> contentClass) {
-    if (contentClass == null) {
-      return null;
-    }
-    String exact = TYPE_BY_CONTENT_CLASS.get(contentClass);
-    if (exact != null) {
-      return exact;
-    }
-    for (Map.Entry<Class<? extends PolicyContentDTO>, String> entry :
-        TYPE_BY_CONTENT_CLASS.entrySet()) {
-      if (entry.getKey().isAssignableFrom(contentClass)) {
-        return entry.getValue();
-      }
-    }
-    return null;
   }
 }
