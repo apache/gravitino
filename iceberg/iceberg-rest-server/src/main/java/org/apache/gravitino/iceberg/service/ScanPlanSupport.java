@@ -22,20 +22,23 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.StructLike;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.expressions.NamedReference;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.expressions.UnboundTerm;
 import org.apache.iceberg.expressions.UnboundTransform;
@@ -51,30 +54,76 @@ final class ScanPlanSupport {
   private ScanPlanSupport() {}
 
   /**
-   * Builds a map from current-schema field names to the same field's name in the snapshot schema.
-   * Only entries whose names differ are included.
+   * Returns a branch that points at the snapshot, preferring {@code main}.
+   *
+   * <p>Iceberg's REST client sends {@code use-snapshot-schema=false} for a branch scan, and {@code
+   * TableScan#useRef} on a branch reads its snapshot with the current table schema, which is what
+   * that flag asks for.
    */
-  @VisibleForTesting
-  static Map<String, String> currentNameToSnapshotName(Schema current, Schema snapshot) {
-    Map<String, String> mapping = new HashMap<>();
-    Map<Integer, String> snapshotNames = snapshot.idToName();
-    for (Map.Entry<Integer, String> entry : current.idToName().entrySet()) {
-      String snapshotName = snapshotNames.get(entry.getKey());
-      if (snapshotName != null && !snapshotName.equals(entry.getValue())) {
-        mapping.put(entry.getValue(), snapshotName);
-      }
+  static Optional<String> branchAt(Table table, long snapshotId) {
+    SnapshotRef main = table.refs().get(SnapshotRef.MAIN_BRANCH);
+    if (main != null && main.snapshotId() == snapshotId) {
+      return Optional.of(SnapshotRef.MAIN_BRANCH);
     }
-    return Collections.unmodifiableMap(mapping);
+    return table.refs().entrySet().stream()
+        .filter(entry -> entry.getValue().isBranch() && entry.getValue().snapshotId() == snapshotId)
+        .map(Map.Entry::getKey)
+        .sorted()
+        .findFirst();
   }
 
   /**
-   * Rewrites unbound filter terms that use current-schema names so they bind against a snapshot
-   * schema after {@code TableScan#useSnapshot}.
+   * Maps column names of the current table schema to the names the same fields have in an older
+   * snapshot schema, so a scan pinned to that snapshot can serve a request written against the
+   * current schema. Names are resolved on the current schema first, so a name that only the
+   * snapshot schema has, or that a later column reuses, never binds to the snapshot's field.
    */
-  @VisibleForTesting
-  static Expression rewriteFilterNames(Expression filter, Map<String, String> currentToSnapshot) {
-    if (filter == null || currentToSnapshot.isEmpty()) {
-      return filter;
+  static final class SnapshotNames {
+    private final Schema current;
+    private final Schema snapshot;
+    private final boolean caseSensitive;
+    private final long snapshotId;
+
+    SnapshotNames(Schema current, Schema snapshot, boolean caseSensitive, long snapshotId) {
+      this.current = current;
+      this.snapshot = snapshot;
+      this.caseSensitive = caseSensitive;
+      this.snapshotId = snapshotId;
+    }
+
+    /**
+     * Returns the snapshot schema's name for a current-schema column.
+     *
+     * @param name the column name in the current table schema
+     * @return the column name in the snapshot schema, or {@code null} if the column was added after
+     *     the snapshot
+     * @throws IllegalArgumentException if the current table schema has no such column
+     */
+    @Nullable
+    String toSnapshotName(String name) {
+      Types.NestedField field =
+          caseSensitive ? current.findField(name) : current.caseInsensitiveFindField(name);
+      if (field == null) {
+        throw new IllegalArgumentException(
+            String.format("Cannot find field '%s' in the current table schema", name));
+      }
+      return snapshot.findColumnName(field.fieldId());
+    }
+
+    long snapshotId() {
+      return snapshotId;
+    }
+  }
+
+  /**
+   * Rewrites unbound filter terms from current-schema names to snapshot-schema names.
+   *
+   * @throws IllegalArgumentException if a term names a column the current schema lacks, or a column
+   *     added after the snapshot, whose values the snapshot's files do not contain
+   */
+  static Expression rewriteFilterNames(Expression filter, SnapshotNames names) {
+    if (filter == null) {
+      return null;
     }
     return ExpressionVisitors.visit(
         filter,
@@ -106,73 +155,41 @@ final class ScanPlanSupport {
 
           @Override
           public <T> Expression predicate(UnboundPredicate<T> pred) {
-            UnboundTerm<T> rewritten = rewriteTerm(pred.term(), currentToSnapshot);
-            if (rewritten == pred.term()) {
+            String name = pred.ref().name();
+            String snapshotName = names.toSnapshotName(name);
+            if (snapshotName == null) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Cannot filter on field '%s': it does not exist in snapshot %s",
+                      name, names.snapshotId()));
+            }
+            if (snapshotName.equals(name)) {
               return pred;
             }
-            return recreatePredicate(pred, rewritten);
+            UnboundTerm<T> term = renameTerm(pred.term(), snapshotName);
+            if (pred.literals() == null) {
+              return Expressions.predicate(pred.op(), term);
+            }
+            List<T> values =
+                pred.literals().stream().map(Literal::value).collect(Collectors.toList());
+            return Expressions.predicate(pred.op(), term, values);
           }
         });
   }
 
-  @SuppressWarnings("unchecked")
-  private static <T> Expression recreatePredicate(
-      UnboundPredicate<T> pred, UnboundTerm<T> rewritten) {
-    if (pred.literals() != null && !pred.literals().isEmpty()) {
-      List<T> values = pred.literals().stream().map(l -> l.value()).collect(Collectors.toList());
-      return Expressions.predicate(pred.op(), rewritten, values);
-    }
-    if (pred.literal() != null) {
-      T value = pred.literal().value();
-      switch (pred.op()) {
-        case LT:
-          return Expressions.lessThan(rewritten, value);
-        case LT_EQ:
-          return Expressions.lessThanOrEqual(rewritten, value);
-        case GT:
-          return Expressions.greaterThan(rewritten, value);
-        case GT_EQ:
-          return Expressions.greaterThanOrEqual(rewritten, value);
-        case EQ:
-          return Expressions.equal(rewritten, value);
-        case NOT_EQ:
-          return Expressions.notEqual(rewritten, value);
-        case STARTS_WITH:
-          return Expressions.startsWith((UnboundTerm<String>) rewritten, (String) value);
-        case NOT_STARTS_WITH:
-          return Expressions.notStartsWith((UnboundTerm<String>) rewritten, (String) value);
-        default:
-          if (rewritten instanceof NamedReference) {
-            return Expressions.predicate(
-                pred.op(), ((NamedReference<?>) rewritten).name(), pred.literal());
-          }
-          return pred;
-      }
-    }
-    switch (pred.op()) {
-      case IS_NULL:
-        return Expressions.isNull(rewritten);
-      case NOT_NULL:
-        return Expressions.notNull(rewritten);
-      case IS_NAN:
-        return Expressions.isNaN(rewritten);
-      case NOT_NAN:
-        return Expressions.notNaN(rewritten);
-      default:
-        return Expressions.predicate(pred.op(), rewritten);
-    }
-  }
-
-  /** Rewrites projected column names from the current schema to the snapshot schema by field id. */
-  @VisibleForTesting
-  static List<String> rewriteColumnNames(
-      List<String> columns, Map<String, String> currentToSnapshot) {
-    if (columns == null || columns.isEmpty() || currentToSnapshot.isEmpty()) {
-      return columns;
-    }
+  /**
+   * Rewrites projected or statistics column names from the current schema to the snapshot schema.
+   * Columns added after the snapshot are dropped: none of the snapshot's files contain them.
+   *
+   * @throws IllegalArgumentException if the current table schema has no such column
+   */
+  static List<String> rewriteColumnNames(List<String> columns, SnapshotNames names) {
     List<String> rewritten = Lists.newArrayListWithCapacity(columns.size());
     for (String column : columns) {
-      rewritten.add(currentToSnapshot.getOrDefault(column, column));
+      String snapshotName = names.toSnapshotName(column);
+      if (snapshotName != null) {
+        rewritten.add(snapshotName);
+      }
     }
     return rewritten;
   }
@@ -251,50 +268,10 @@ final class ScanPlanSupport {
   }
 
   @SuppressWarnings("unchecked")
-  private static <T> UnboundTerm<T> rewriteTerm(
-      UnboundTerm<T> term, Map<String, String> currentToSnapshot) {
-    if (term instanceof NamedReference) {
-      String name = ((NamedReference<?>) term).name();
-      String mapped = currentToSnapshot.get(name);
-      if (mapped == null || mapped.equals(name)) {
-        return term;
-      }
-      return (UnboundTerm<T>) Expressions.ref(mapped);
-    }
+  private static <T> UnboundTerm<T> renameTerm(UnboundTerm<T> term, String name) {
     if (term instanceof UnboundTransform) {
-      UnboundTransform<?, T> transform = (UnboundTransform<?, T>) term;
-      NamedReference<?> ref = transform.ref();
-      String mapped = currentToSnapshot.get(ref.name());
-      if (mapped == null || mapped.equals(ref.name())) {
-        return term;
-      }
-      // Recreate common transforms with the snapshot field name.
-      String transformName = transform.transform().toString();
-      if (transformName.startsWith("bucket[")) {
-        int width =
-            Integer.parseInt(
-                transformName.substring("bucket[".length(), transformName.length() - 1));
-        return (UnboundTerm<T>) Expressions.bucket(mapped, width);
-      }
-      if (transformName.startsWith("truncate[")) {
-        int width =
-            Integer.parseInt(
-                transformName.substring("truncate[".length(), transformName.length() - 1));
-        return (UnboundTerm<T>) Expressions.truncate(mapped, width);
-      }
-      switch (transformName) {
-        case "year":
-          return (UnboundTerm<T>) Expressions.year(mapped);
-        case "month":
-          return (UnboundTerm<T>) Expressions.month(mapped);
-        case "day":
-          return (UnboundTerm<T>) Expressions.day(mapped);
-        case "hour":
-          return (UnboundTerm<T>) Expressions.hour(mapped);
-        default:
-          return term;
-      }
+      return Expressions.transform(name, ((UnboundTransform<?, T>) term).transform());
     }
-    return term;
+    return (UnboundTerm<T>) Expressions.ref(name);
   }
 }

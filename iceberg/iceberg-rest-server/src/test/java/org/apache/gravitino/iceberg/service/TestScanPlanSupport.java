@@ -30,7 +30,6 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -39,40 +38,72 @@ import org.junit.jupiter.api.Test;
 
 public class TestScanPlanSupport {
 
-  @Test
-  void testCurrentNameToSnapshotName() {
-    Schema snapshot =
-        new Schema(
-            Types.NestedField.optional(1, "id", Types.LongType.get()),
-            Types.NestedField.optional(2, "l", Types.LongType.get()));
-    Schema current =
-        new Schema(
-            Types.NestedField.optional(1, "id", Types.LongType.get()),
-            Types.NestedField.optional(2, "l2", Types.LongType.get()));
+  // Field 2 was "l" at the snapshot and is "l2" now; field 3, added later, reuses the name "l".
+  private static final Schema SNAPSHOT_SCHEMA =
+      new Schema(
+          Types.NestedField.optional(1, "id", Types.LongType.get()),
+          Types.NestedField.optional(2, "l", Types.LongType.get()));
+  private static final Schema CURRENT_SCHEMA =
+      new Schema(
+          Types.NestedField.optional(1, "id", Types.LongType.get()),
+          Types.NestedField.optional(2, "l2", Types.LongType.get()),
+          Types.NestedField.optional(3, "l", Types.LongType.get()));
 
-    Assertions.assertEquals(
-        ImmutableMap.of("l2", "l"), ScanPlanSupport.currentNameToSnapshotName(current, snapshot));
-    Assertions.assertEquals(
-        ImmutableMap.of(), ScanPlanSupport.currentNameToSnapshotName(current, current));
+  @Test
+  void testSnapshotNamesResolveOnTheCurrentSchema() {
+    ScanPlanSupport.SnapshotNames names = names(true);
+    Assertions.assertEquals("id", names.toSnapshotName("id"));
+    Assertions.assertEquals("l", names.toSnapshotName("l2"));
+    // "l" is the column added after the snapshot, not the snapshot's "l".
+    Assertions.assertNull(names.toSnapshotName("l"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> names.toSnapshotName("nope"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> names.toSnapshotName("L2"));
+
+    Assertions.assertEquals("l", names(false).toSnapshotName("L2"));
   }
 
   @Test
   void testRewriteFilterNames() {
-    Map<String, String> mapping = ImmutableMap.of("l2", "l");
-    Expression rewritten =
-        ScanPlanSupport.rewriteFilterNames(Expressions.equal("l2", 10L), mapping);
-    Assertions.assertEquals(Expressions.equal("l", 10L).toString(), rewritten.toString());
+    ScanPlanSupport.SnapshotNames names = names(true);
+    Assertions.assertEquals(
+        Expressions.equal("l", 10L).toString(),
+        ScanPlanSupport.rewriteFilterNames(Expressions.equal("l2", 10L), names).toString());
+    Assertions.assertEquals(
+        Expressions.equal("id", 1L).toString(),
+        ScanPlanSupport.rewriteFilterNames(Expressions.equal("id", 1L), names).toString());
+    Assertions.assertEquals(
+        Expressions.and(Expressions.in("l", 1L, 2L), Expressions.not(Expressions.isNull("l")))
+            .toString(),
+        ScanPlanSupport.rewriteFilterNames(
+                Expressions.and(
+                    Expressions.in("l2", 1L, 2L), Expressions.not(Expressions.isNull("l2"))),
+                names)
+            .toString());
+    Assertions.assertEquals(
+        Expressions.equal(Expressions.bucket("l", 4), 1).toString(),
+        ScanPlanSupport.rewriteFilterNames(Expressions.equal(Expressions.bucket("l2", 4), 1), names)
+            .toString());
 
-    Expression unchanged = ScanPlanSupport.rewriteFilterNames(Expressions.equal("id", 1L), mapping);
-    Assertions.assertEquals(Expressions.equal("id", 1L).toString(), unchanged.toString());
+    IllegalArgumentException addedLater =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ScanPlanSupport.rewriteFilterNames(Expressions.equal("l", 10L), names));
+    Assertions.assertTrue(
+        addedLater.getMessage().contains("does not exist in snapshot 7"), addedLater.getMessage());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ScanPlanSupport.rewriteFilterNames(Expressions.equal("nope", 1L), names));
   }
 
   @Test
-  void testRewriteColumnNames() {
+  void testRewriteColumnNamesDropsColumnsAddedLater() {
     Assertions.assertEquals(
         ImmutableList.of("id", "l"),
-        ScanPlanSupport.rewriteColumnNames(
-            ImmutableList.of("id", "l2"), ImmutableMap.of("l2", "l")));
+        ScanPlanSupport.rewriteColumnNames(ImmutableList.of("id", "l2", "l"), names(true)));
+  }
+
+  private static ScanPlanSupport.SnapshotNames names(boolean caseSensitive) {
+    return new ScanPlanSupport.SnapshotNames(CURRENT_SCHEMA, SNAPSHOT_SCHEMA, caseSensitive, 7L);
   }
 
   @Test
