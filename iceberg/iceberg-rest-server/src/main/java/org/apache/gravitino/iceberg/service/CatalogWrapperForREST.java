@@ -68,6 +68,7 @@ import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -81,6 +82,7 @@ import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.util.SnapshotUtil;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -650,7 +652,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return PlanTableScanResponse.builder()
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
-        .withSpecsById(table.specs())
+        .withSpecsById(ScanPlanSupport.sanitizeSpecsForSerialization(table.specs(), fileScanTasks))
         .build();
   }
 
@@ -659,6 +661,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>If both start and end snapshot IDs are provided, uses IncrementalAppendScan. Otherwise, uses
    * regular TableScan.
+   *
+   * <p>When {@code use-snapshot-schema} is false (the REST default) and a {@code snapshot-id} is
+   * set, filter/select/stats field names are rewritten from the current table schema to the
+   * snapshot schema by field id before {@code useSnapshot}, so branch scans bind against current
+   * names as the Iceberg REST client expects.
    *
    * @param table The table to scan
    * @param tableIdentifier The table identifier for logging
@@ -687,37 +694,52 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               // sends it from appendsBetween/appendsAfter, which are exclusive as well.
               .fromSnapshotExclusive(startSnapshotId)
               .toSnapshot(endSnapshotId);
-      incrementalScan = applyScanRequest(incrementalScan, scanRequest);
+      incrementalScan = applyScanRequest(incrementalScan, scanRequest, null);
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
+      Map<String, String> currentToSnapshotNames = null;
       // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
+        if (!scanRequest.useSnapshotSchema()) {
+          currentToSnapshotNames =
+              ScanPlanSupport.currentNameToSnapshotName(
+                  table.schema(), SnapshotUtil.schemaFor(table, scanRequest.snapshotId()));
+          LOG.debug(
+              "use-snapshot-schema=false: rewriting filter/select names for snapshot {}",
+              scanRequest.snapshotId());
+        }
         tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
         LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
       }
-      tableScan = applyScanRequest(tableScan, scanRequest);
+      tableScan = applyScanRequest(tableScan, scanRequest, currentToSnapshotNames);
       return tableScan.planFiles();
     }
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanRequest(T scan, PlanTableScanRequest scanRequest) {
+  private <T extends Scan> T applyScanRequest(
+      T scan, PlanTableScanRequest scanRequest, Map<String, String> currentToSnapshotNames) {
     scan = (T) scan.caseSensitive(scanRequest.caseSensitive());
     LOG.debug("Applied case-sensitive: {}", scanRequest.caseSensitive());
-    scan = applyScanFilter(scan, scanRequest);
-    scan = applyScanSelect(scan, scanRequest);
-    scan = applyScanStatsFields(scan, scanRequest);
+    scan = applyScanFilter(scan, scanRequest, currentToSnapshotNames);
+    scan = applyScanSelect(scan, scanRequest, currentToSnapshotNames);
+    scan = applyScanStatsFields(scan, scanRequest, currentToSnapshotNames);
 
     return scan;
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanFilter(T scan, PlanTableScanRequest scanRequest) {
+  private <T extends Scan> T applyScanFilter(
+      T scan, PlanTableScanRequest scanRequest, Map<String, String> currentToSnapshotNames) {
     if (scanRequest.filter() != null) {
       try {
-        scan = (T) scan.filter(scanRequest.filter());
-        LOG.debug("Applied filter expression: {}", scanRequest.filter());
+        Expression filter =
+            ScanPlanSupport.rewriteFilterNames(
+                scanRequest.filter(),
+                currentToSnapshotNames == null ? Collections.emptyMap() : currentToSnapshotNames);
+        scan = (T) scan.filter(filter);
+        LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
         LOG.error("Failed to apply filter expression: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);
@@ -727,11 +749,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanSelect(T scan, PlanTableScanRequest scanRequest) {
+  private <T extends Scan> T applyScanSelect(
+      T scan, PlanTableScanRequest scanRequest, Map<String, String> currentToSnapshotNames) {
     if (scanRequest.select() != null && !scanRequest.select().isEmpty()) {
       try {
-        scan = (T) scan.select(scanRequest.select());
-        LOG.debug("Applied column projection: {}", scanRequest.select());
+        List<String> select =
+            ScanPlanSupport.rewriteColumnNames(
+                scanRequest.select(),
+                currentToSnapshotNames == null ? Collections.emptyMap() : currentToSnapshotNames);
+        scan = (T) scan.select(select);
+        LOG.debug("Applied column projection: {}", select);
       } catch (Exception e) {
         LOG.error("Failed to apply column projection: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid column selection: " + e.getMessage(), e);
@@ -741,9 +768,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanStatsFields(T scan, PlanTableScanRequest scanRequest) {
+  private <T extends Scan> T applyScanStatsFields(
+      T scan, PlanTableScanRequest scanRequest, Map<String, String> currentToSnapshotNames) {
     if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
-      for (String field : scanRequest.statsFields()) {
+      List<String> statsFields =
+          ScanPlanSupport.rewriteColumnNames(
+              scanRequest.statsFields(),
+              currentToSnapshotNames == null ? Collections.emptyMap() : currentToSnapshotNames);
+      for (String field : statsFields) {
         boolean known =
             scanRequest.caseSensitive()
                 ? scan.schema().findField(field) != null
@@ -753,8 +785,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         }
       }
       try {
-        scan = (T) scan.includeColumnStats(scanRequest.statsFields());
-        LOG.debug("Applied statistics fields: {}", scanRequest.statsFields());
+        scan = (T) scan.includeColumnStats(statsFields);
+        LOG.debug("Applied statistics fields: {}", statsFields);
       } catch (Exception e) {
         LOG.error("Failed to apply statistics fields: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid statistics fields: " + e.getMessage(), e);
