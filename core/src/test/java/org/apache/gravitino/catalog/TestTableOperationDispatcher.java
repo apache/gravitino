@@ -66,6 +66,7 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -102,6 +103,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -492,8 +494,17 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new SortOrder[0],
         Indexes.EMPTY_INDEXES);
 
-    // The old registration, and everything attached to it, does not carry over.
-    tableOperationDispatcher.loadTable(tableIdent);
+    // The old registration, and everything attached to it, does not carry over, and the
+    // authorizer learns at once that the name now resolves to another table.
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(authorizer);
+    try {
+      tableOperationDispatcher.loadTable(tableIdent);
+    } finally {
+      GravitinoEnv.getInstance().setGravitinoAuthorizer(null);
+    }
+    Mockito.verify(authorizer, Mockito.atLeastOnce())
+        .handleEntityNameIdMappingChange(metalake, tableIdent, TABLE);
     TableEntity second = entityStore.get(tableIdent, TABLE, TableEntity.class);
     Assertions.assertNotEquals(first.id(), second.id());
     Assertions.assertEquals("uuid-second", second.properties().get(Table.PROPERTY_TABLE_UUID));

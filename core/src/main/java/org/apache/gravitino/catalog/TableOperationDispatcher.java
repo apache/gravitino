@@ -54,6 +54,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.capability.Capability;
@@ -691,6 +692,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // Another node may already have replaced the registration; only drop the one we inspected.
       if (current != null && current.id().equals(stale.tableEntity().id())) {
         store.delete(ident, TABLE);
+        // The name now resolves to a different table. Tell the authorizer, as a drop does, so the
+        // grants of the previous table stop applying to this name immediately rather than after
+        // its caches refresh.
+        AuthorizationUtils.notifyEntityNameIdMappingChange(ident, TABLE);
+        AuthorizationUtils.authorizationPluginRemovePrivileges(
+            ident, TABLE, Collections.emptyList());
       }
     } catch (NoSuchEntityException e) {
       LOG.debug("Stale registration of table {} was already removed", ident);
