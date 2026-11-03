@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -873,10 +874,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
-      if (Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)) {
-        validateLanceColumnNames(dataset, changes);
-      }
-      for (TableChange change : changes) {
+      List<TableChange> changesToApply =
+          Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)
+              ? validateLanceColumnNames(dataset, changes)
+              : Arrays.asList(changes);
+      for (TableChange change : changesToApply) {
         if (change instanceof TableChange.AddColumn addColumn) {
           String columnName = addColumn.fieldName()[0];
 
@@ -917,17 +919,28 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
-  private static void validateLanceColumnNames(Dataset dataset, TableChange[] changes) {
+  private static List<TableChange> validateLanceColumnNames(
+      Dataset dataset, TableChange[] changes) {
     // Use the dataset schema, including out-of-band changes, and validate the whole ordered
     // request before applying any changes. A late name conflict must not leave earlier edits.
     Set<String> columnNames =
         dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+    List<TableChange> changesToApply = new ArrayList<>(changes.length);
     for (TableChange change : changes) {
       if (change instanceof TableChange.AddColumn addColumn) {
         String name = addColumn.fieldName()[0];
         Preconditions.checkArgument(columnNames.add(name), "Column already exists: %s", name);
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
-        columnNames.remove(deleteColumn.fieldName()[0]);
+        String name = deleteColumn.fieldName()[0];
+        boolean exists = columnNames.remove(name);
+        Preconditions.checkArgument(
+            exists || Boolean.TRUE.equals(deleteColumn.getIfExists()),
+            "Column does not exist: %s",
+            name);
+        if (!exists) {
+          // Honor ifExists before reaching Lance, whose dropColumns rejects missing fields.
+          continue;
+        }
       } else if (change instanceof TableChange.RenameColumn renameColumn) {
         String oldName = renameColumn.fieldName()[0];
         String newName = renameColumn.getNewName();
@@ -935,7 +948,9 @@ public class LanceTableOperations extends ManagedTableOperations {
             columnNames.remove(oldName), "Column does not exist: %s", oldName);
         Preconditions.checkArgument(columnNames.add(newName), "Column already exists: %s", newName);
       }
+      changesToApply.add(change);
     }
+    return changesToApply;
   }
 
   private static void validateLanceTableChanges(TableChange[] changes) {

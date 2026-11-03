@@ -1153,8 +1153,16 @@ public class TestLanceTableOperations {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"rename", "addThenRename", "renameThenRename"})
-  void testDuplicateColumnNameRejectsWholeRequest(String path) throws Exception {
+  @ValueSource(
+      strings = {
+        "rename",
+        "addThenRename",
+        "renameThenRename",
+        "addThenDeleteMissing",
+        "deleteTwice",
+        "deleteMissingDefault"
+      })
+  void testInvalidColumnNamesRejectWholeRequest(String path) throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "conflict");
     String location = tempDir.resolve("conflict").toString();
     Column[] columns = {
@@ -1198,12 +1206,29 @@ public class TestLanceTableOperations {
             TableChange.renameColumn(new String[] {"id"}, "extra"),
             TableChange.renameColumn(new String[] {"extra"}, "name")
           };
+          case "addThenDeleteMissing" -> new TableChange[] {
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get()),
+            TableChange.deleteColumn(new String[] {"missing"}, false)
+          };
+          case "deleteTwice" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"id"}, false),
+            TableChange.deleteColumn(new String[] {"id"}, false)
+          };
+          case "deleteMissingDefault" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"missing"}, null)
+          };
           default -> new TableChange[] {rename};
         };
     IllegalArgumentException error =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> lanceTableOps.alterTable(ident, changes));
-    Assertions.assertTrue(error.getMessage().contains("name"));
+    String invalidName =
+        switch (path) {
+          case "addThenDeleteMissing", "deleteMissingDefault" -> "missing";
+          case "deleteTwice" -> "id";
+          default -> "name";
+        };
+    Assertions.assertTrue(error.getMessage().contains(invalidName));
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
     try (Dataset dataset = lanceTableOps.openDataset(location)) {
@@ -1242,6 +1267,56 @@ public class TestLanceTableOperations {
     try (Dataset dataset = lanceTableOps.openDataset(location)) {
       Assertions.assertEquals(
           drop ? List.of("name") : List.of("new", "id"),
+          dataset.getSchema().getFields().stream()
+              .map(Field::getName)
+              .collect(Collectors.toList()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"alone", "twice", "thenAdd", "addThenDrop"})
+  void testOptionalDeletesRespectRequestOrder(String path) {
+    String location = tempDir.resolve("optional-delete").toString();
+    Column[] columns = {
+      Column.of("id", Types.LongType.get()), Column.of("name", Types.StringType.get())
+    };
+    long version;
+    try (Dataset dataset = lanceTableOps.createDataset(location, columns, Map.of())) {
+      version = dataset.getVersion().getId();
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+    TableChange[] changes =
+        switch (path) {
+          case "twice" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"name"}, false),
+            TableChange.deleteColumn(new String[] {"name"}, true)
+          };
+          case "thenAdd" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"extra"}, true),
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get())
+          };
+          case "addThenDrop" -> new TableChange[] {
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get()),
+            TableChange.deleteColumn(new String[] {"extra"}, true)
+          };
+          default -> new TableChange[] {TableChange.deleteColumn(new String[] {"missing"}, true)};
+        };
+    long result = lanceTableOps.handleLanceTableChange(table, changes);
+    if (path.equals("alone")) {
+      Assertions.assertEquals(version, result);
+    } else {
+      Assertions.assertTrue(result > version);
+    }
+    try (Dataset dataset = lanceTableOps.openDataset(location)) {
+      List<String> expected =
+          switch (path) {
+            case "twice" -> List.of("id");
+            case "thenAdd" -> List.of("id", "name", "extra");
+            default -> List.of("id", "name");
+          };
+      Assertions.assertEquals(
+          expected,
           dataset.getSchema().getFields().stream()
               .map(Field::getName)
               .collect(Collectors.toList()));

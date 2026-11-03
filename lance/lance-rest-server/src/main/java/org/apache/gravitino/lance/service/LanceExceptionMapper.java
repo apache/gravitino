@@ -106,19 +106,20 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
       String instance, WebApplicationException exception) {
     int status = exception.getResponse().getStatus();
     String message = exception.getMessage();
-    if (exception instanceof ParamException parameterException
-        && !(exception instanceof ParamException.PathParamException)) {
-      // Jersey uses 404 for query conversion failures; the route exists, but the input is invalid.
+    if (exception instanceof ParamException parameterException) {
+      // Jersey can use 404 for parameter conversion failures, but these are invalid input.
       status = Response.Status.BAD_REQUEST.getStatusCode();
       message = "Invalid value for parameter '" + parameterException.getParameterName() + "'";
     }
     LanceNamespaceException error;
+    // Framework 404s describe route misses, not an identified missing table or namespace.
+    // Keep their HTTP status, while using INVALID_INPUT instead of an entity-not-found body code.
     if (status >= 400 && status < 500) {
       error =
           switch (status) {
             case 401 -> new UnauthenticatedException(message, "", instance);
             case 403 -> new PermissionDeniedException(message, "", instance);
-            case 404 -> new NamespaceNotFoundException(message, "", instance);
+            case 404 -> new InvalidInputException(message, "", instance);
             case 405, 406, 415 -> new org.lance.namespace.errors.UnsupportedOperationException(
                 message, "", instance);
             case 409 -> new ConcurrentModificationException(message, "", instance);
@@ -199,6 +200,10 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
     if (exception instanceof UnauthenticatedException) {
       return Response.Status.UNAUTHORIZED.getStatusCode();
+    }
+
+    if (exception instanceof ThrottlingException) {
+      return 429;
     }
 
     if (exception instanceof ServiceUnavailableException) {

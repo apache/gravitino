@@ -61,6 +61,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergTable {
 
@@ -491,34 +493,57 @@ public class TestIcebergTable {
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
   }
 
-  @Test
-  void testRenameTableToExistingNamePreservesBothTables() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRenameTableToExistingNamePreservesBothTables(boolean acrossSchemas) {
     NameIdentifier source =
         NameIdentifier.of(
             schemaIdent.namespace().level(0),
             ICEBERG_CATALOG_NAME,
             ICEBERG_SCHEMA_NAME,
             "rename_source");
-    NameIdentifier target = NameIdentifier.of(source.namespace(), "rename_target");
-    Column[] columns = {Column.of("id", Types.LongType.get())};
-    for (NameIdentifier ident : List.of(source, target)) {
-      icebergCatalogOperations.createTable(
-          ident,
-          columns,
-          ident.name(),
-          Map.of(),
-          new Transform[0],
-          Distributions.NONE,
-          new SortOrder[0]);
+    NameIdentifier targetSchema =
+        NameIdentifier.of(
+            META_LAKE_NAME,
+            ICEBERG_CATALOG_NAME,
+            acrossSchemas ? "rename_target_schema" : ICEBERG_SCHEMA_NAME);
+    NameIdentifier target =
+        NameIdentifier.of(
+            META_LAKE_NAME, ICEBERG_CATALOG_NAME, targetSchema.name(), "rename_target");
+    if (acrossSchemas) {
+      icebergCatalogOperations.createSchema(targetSchema, "target schema", Map.of());
     }
-    TableAlreadyExistsException error =
-        Assertions.assertThrows(
-            TableAlreadyExistsException.class,
-            () -> icebergCatalogOperations.alterTable(source, TableChange.rename(target.name())));
-    Assertions.assertInstanceOf(AlreadyExistsException.class, error.getCause());
-    Assertions.assertTrue(error.getMessage().contains(target.toString()));
-    Assertions.assertEquals(source.name(), icebergCatalogOperations.loadTable(source).comment());
-    Assertions.assertEquals(target.name(), icebergCatalogOperations.loadTable(target).comment());
+    try {
+      Column[] columns = {Column.of("id", Types.LongType.get())};
+      for (NameIdentifier ident : List.of(source, target)) {
+        icebergCatalogOperations.createTable(
+            ident,
+            columns,
+            ident.name(),
+            Map.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0]);
+      }
+      TableAlreadyExistsException error =
+          Assertions.assertThrows(
+              TableAlreadyExistsException.class,
+              () ->
+                  icebergCatalogOperations.alterTable(
+                      source,
+                      acrossSchemas
+                          ? TableChange.rename(target.name(), targetSchema.name())
+                          : TableChange.rename(target.name())));
+      Assertions.assertInstanceOf(AlreadyExistsException.class, error.getCause());
+      Assertions.assertEquals("Table already exists: " + target, error.getMessage());
+      Assertions.assertEquals(source.name(), icebergCatalogOperations.loadTable(source).comment());
+      Assertions.assertEquals(target.name(), icebergCatalogOperations.loadTable(target).comment());
+    } finally {
+      if (acrossSchemas) {
+        icebergCatalogOperations.dropTable(target);
+        icebergCatalogOperations.dropSchema(targetSchema, false);
+      }
+    }
   }
 
   @Test

@@ -24,6 +24,10 @@ import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -727,6 +731,28 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.endpoint"));
     Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.access_key_id"));
     Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.secret_access_key"));
+  }
+
+  @Test
+  void testInvalidJsonRequestUsesLanceEnvelope() throws Exception {
+    HttpClient http = HttpClient.newHttpClient();
+    for (String body : List.of("{", "[]")) {
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(getLanceRestServiceUrl() + "/v1/namespace/missing/create"))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      Assertions.assertEquals(400, response.statusCode());
+      Assertions.assertTrue(
+          response.headers().firstValue("Content-Type").orElse("").contains("application/json"));
+      ErrorResponse error =
+          JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertEquals("Invalid JSON request", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
   }
 
   @Test

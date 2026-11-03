@@ -18,13 +18,20 @@
  */
 package org.apache.gravitino.lance.service;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import java.io.IOException;
+import javax.ws.rs.BadRequestException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ReaderInterceptorContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.rest.RESTUtils;
@@ -36,9 +43,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.NamespaceNotFoundException;
+import org.lance.namespace.errors.TableNotFoundException;
+import org.lance.namespace.errors.ThrottlingException;
+import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.ErrorResponse;
+import org.mockito.Mockito;
 
 /** Tests for {@link LanceExceptionMapper}. */
 public class TestLanceExceptionMapper extends JerseyTest {
@@ -78,6 +91,30 @@ public class TestLanceExceptionMapper extends JerseyTest {
             "table", new WebApplicationException("request rejected", original));
       }
     }
+    /**
+     * Requires a numeric path value so Jersey exercises path conversion failures.
+     *
+     * @param version the version parsed by Jersey
+     * @return the parsed version
+     */
+    @GET
+    @Path("path/{version}")
+    public String version(@PathParam("version") int version) {
+      return String.valueOf(version);
+    }
+
+    /**
+     * Reads a JSON request using the same Jackson reader configuration as the service.
+     *
+     * @param request the decoded namespace request
+     * @return its mode
+     */
+    @POST
+    @Path("json")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String json(CreateNamespaceRequest request) {
+      return request.getMode();
+    }
   }
 
   /**
@@ -96,7 +133,8 @@ public class TestLanceExceptionMapper extends JerseyTest {
     return new ResourceConfig()
         .register(ErrorResource.class)
         .register(LanceExceptionMapper.class)
-        .register(JacksonFeature.class);
+        .register(JacksonFeature.withoutExceptionMappers())
+        .register(LanceRequestBodyReaderInterceptor.class);
   }
 
   /** Verifies that an uncaught error is converted to a Lance internal error response. */
@@ -223,13 +261,103 @@ public class TestLanceExceptionMapper extends JerseyTest {
     }
   }
 
-  @Test
-  void testUnknownRouteUsesLanceNotFoundEnvelope() {
-    try (Response response = target("missing").request(MediaType.APPLICATION_JSON_TYPE).get()) {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "missing",
+        "v1/table/catalog$schema$table/missing",
+        "v1/namespace/catalog$schema/missing"
+      })
+  void testUnknownRouteUsesInvalidInputEnvelope(String path) {
+    try (Response response = target(path).request(MediaType.APPLICATION_JSON_TYPE).get()) {
       Assertions.assertEquals(404, response.getStatus());
       ErrorResponse error = response.readEntity(ErrorResponse.class);
-      Assertions.assertNotNull(error.getCode());
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
       Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  @Test
+  void testInvalidPathParameterIsInvalidInput() {
+    try (Response response = target("error/path/not-a-number").request().get()) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertTrue(error.getError().contains("version"));
+    }
+  }
+
+  @Test
+  void testTypedEntityNotFoundErrorsKeepTheirCodes() {
+    for (Exception exception :
+        new Exception[] {
+          new TableNotFoundException("table absent", "", "table"),
+          new NamespaceNotFoundException("namespace absent", "", "namespace")
+        }) {
+      try (Response response = LanceExceptionMapper.toRESTResponse("instance", exception)) {
+        Assertions.assertEquals(404, response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(
+            exception instanceof TableNotFoundException
+                ? ErrorCode.TABLE_NOT_FOUND.getCode()
+                : ErrorCode.NAMESPACE_NOT_FOUND.getCode(),
+            error.getCode());
+      }
+    }
+  }
+
+  @Test
+  void testBackendThrottlingReturns429() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "table", new ThrottlingException("Slow down", "retry later", "table"))) {
+      Assertions.assertEquals(429, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorCode.THROTTLING.getCode(), error.getCode());
+      Assertions.assertEquals("retry later", error.getDetail());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{", "[]", "{\"mode\":{\"secret\":\"private-value\"}}"})
+  void testInvalidJsonUsesLanceEnvelope(String json) {
+    try (Response response = target("error/json").request().post(Entity.json(json))) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertEquals("Invalid JSON request", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  @Test
+  void testValidJsonStillReachesResource() {
+    try (Response response =
+        target("error/json").request().post(Entity.json("{\"mode\":\"create\"}"))) {
+      Assertions.assertEquals(200, response.getStatus());
+      Assertions.assertEquals("create", response.readEntity(String.class));
+    }
+  }
+
+  @Test
+  void testReaderPreservesCauseAndDoesNotTranslateOtherFailures() throws IOException {
+    ReaderInterceptorContext context = Mockito.mock(ReaderInterceptorContext.class);
+    JsonParseException invalid = new JsonParseException(null, "private-value");
+    Mockito.when(context.proceed()).thenThrow(invalid);
+    LanceRequestBodyReaderInterceptor reader = new LanceRequestBodyReaderInterceptor();
+    BadRequestException response =
+        Assertions.assertThrows(BadRequestException.class, () -> reader.aroundReadFrom(context));
+    Assertions.assertSame(invalid, response.getCause());
+    Assertions.assertEquals("Invalid JSON request", response.getMessage());
+    IOException readFailure = new IOException("stream failed");
+    Mockito.doThrow(readFailure).when(context).proceed();
+    Assertions.assertSame(
+        readFailure,
+        Assertions.assertThrows(IOException.class, () -> reader.aroundReadFrom(context)));
+    try (Response backend = LanceExceptionMapper.toRESTResponse("table", invalid)) {
+      Assertions.assertEquals(500, backend.getStatus());
+      Assertions.assertEquals(
+          "Internal server error", ((ErrorResponse) backend.getEntity()).getError());
     }
   }
 
