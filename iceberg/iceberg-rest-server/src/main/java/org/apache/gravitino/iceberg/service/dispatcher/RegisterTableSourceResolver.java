@@ -25,6 +25,7 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,11 +74,22 @@ public final class RegisterTableSourceResolver {
       String tableLocation,
       String metadataLocation,
       List<TableIdentifier> matches) {
-    for (Namespace child : catalogWrapper.listNamespace(parent).namespaces()) {
+    List<Namespace> children;
+    List<TableIdentifier> tables;
+    try {
+      children = catalogWrapper.listNamespace(parent).namespaces();
+      // Catalogs such as JDBC reject listing tables in the root namespace, and tables always live
+      // in a named namespace, so only list tables below the root.
+      tables = parent.isEmpty() ? List.of() : catalogWrapper.listTable(parent).identifiers();
+    } catch (NoSuchNamespaceException e) {
+      // The namespace was dropped while scanning.
+      return;
+    }
+    for (Namespace child : children) {
       collectMatchingTables(
           catalogWrapper, child, target, uuid, tableLocation, metadataLocation, matches);
     }
-    for (TableIdentifier identifier : catalogWrapper.listTable(parent).identifiers()) {
+    for (TableIdentifier identifier : tables) {
       if (identifier.equals(target)) {
         continue;
       }

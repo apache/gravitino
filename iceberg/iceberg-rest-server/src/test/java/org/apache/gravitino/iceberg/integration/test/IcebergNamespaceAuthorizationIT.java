@@ -32,6 +32,9 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -469,12 +472,16 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
         .asSchemas()
         .createSchema(destNamespace, "caller schema", new HashMap<>());
 
-    // Admin owns the secret table; the normal user never receives privileges on it.
-    sql("USE %s", sourceNamespace);
-    sql("CREATE TABLE %s(id bigint, ssn string) USING iceberg", sourceTable);
-    List<Object[]> metadataResults =
-        sql("SELECT file FROM %s.%s.metadata_log_entries", sourceNamespace, sourceTable);
-    String metadataLocation = (String) metadataResults.get(metadataResults.size() - 1)[0];
+    // The super user owns the secret table; the normal user never receives privileges on it.
+    String[] sourceLevels = new String[] {sourceNamespace};
+    createTableViaIRC(sourceLevels, sourceTable);
+    String metadataLocation =
+        ((HasTableOperations)
+                adminIcebergCatalog.loadTable(
+                    TableIdentifier.of(Namespace.of(sourceLevels), sourceTable)))
+            .operations()
+            .current()
+            .metadataFileLocation();
 
     revokeUserRoles();
     resetMetalakeAndCatalogOwner();

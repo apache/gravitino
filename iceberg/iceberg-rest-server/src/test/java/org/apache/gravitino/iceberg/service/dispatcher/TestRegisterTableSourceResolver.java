@@ -30,6 +30,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.types.Types;
@@ -70,6 +71,21 @@ class TestRegisterTableSourceResolver {
   }
 
   @Test
+  void testSkipsNamespaceDroppedDuringScan() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    when(catalog.listNamespace(source.namespace()))
+        .thenThrow(new NoSuchNamespaceException("Namespace does not exist: other"));
+
+    List<TableIdentifier> found =
+        RegisterTableSourceResolver.findSourceTables(
+            catalog, TableIdentifier.of("mine", "copy"), META_LOC, tableMetadata());
+
+    Assertions.assertTrue(found.isEmpty());
+  }
+
+  @Test
   void testNormalizePathUnifiesFileUriForms() {
     Assertions.assertEquals(
         "file:/warehouse/t", RegisterTableSourceResolver.normalizePath("file:///warehouse/t"));
@@ -83,14 +99,14 @@ class TestRegisterTableSourceResolver {
     when(rootNs.namespaces()).thenReturn(List.of(ns));
     ListNamespacesResponse childNs = mock(ListNamespacesResponse.class);
     when(childNs.namespaces()).thenReturn(Collections.emptyList());
-    ListTablesResponse rootTables = mock(ListTablesResponse.class);
-    when(rootTables.identifiers()).thenReturn(Collections.emptyList());
     ListTablesResponse childTables = mock(ListTablesResponse.class);
     when(childTables.identifiers()).thenReturn(List.of(source));
 
     when(catalog.listNamespace(Namespace.empty())).thenReturn(rootNs);
     when(catalog.listNamespace(ns)).thenReturn(childNs);
-    when(catalog.listTable(Namespace.empty())).thenReturn(rootTables);
+    // Like the JDBC catalog, the root namespace cannot list tables.
+    when(catalog.listTable(Namespace.empty()))
+        .thenThrow(new NoSuchNamespaceException("Namespace does not exist: "));
     when(catalog.listTable(ns)).thenReturn(childTables);
   }
 
