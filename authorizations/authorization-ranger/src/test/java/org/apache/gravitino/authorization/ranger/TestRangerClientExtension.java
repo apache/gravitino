@@ -28,7 +28,6 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -52,6 +51,8 @@ import org.junit.jupiter.api.Test;
 public class TestRangerClientExtension {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  // The stub server and the client use the same IPv4 address, also when IPv6 is preferred.
+  private static final String LOOPBACK = "127.0.0.1";
 
   private final List<String> requests = new CopyOnWriteArrayList<>();
   private final Map<String, String> requestBodies = new ConcurrentHashMap<>();
@@ -60,7 +61,7 @@ public class TestRangerClientExtension {
 
   @BeforeEach
   public void setUp() throws IOException {
-    server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    server = HttpServer.create(new InetSocketAddress(LOOPBACK, 0), 0);
     server.createContext(
         "/service/xusers/users/external",
         exchange -> respond(exchange, 200, userJson(7L, readBody(exchange))));
@@ -106,7 +107,7 @@ public class TestRangerClientExtension {
         });
     server.start();
 
-    String url = "http://127.0.0.1:" + server.getAddress().getPort();
+    String url = "http://" + LOOPBACK + ":" + server.getAddress().getPort();
     client = new RangerClientExtension(url, "simple", "admin", "password");
   }
 

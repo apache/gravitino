@@ -39,8 +39,10 @@ dependencies {
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
     implementation(libs.woodstox.core)
-    // hadoop-common, hadoop-auth, Curator and the Hive shims bring ZooKeeper 3.6.3, which is end of
-    // life. Only the ZooKeeper client classes are on this classpath.
+    // Not a new dependency: hadoop-common, hadoop-auth, Curator and the Hive shims already bring
+    // ZooKeeper transitively, resolved to 3.6.3 (end of life). Gravitino does not use ZooKeeper; only
+    // Hadoop/Hive code paths that Gravitino does not call (HA failover, ZooKeeper token stores and
+    // discovery) reference it. This constraint only upgrades the version that is shipped.
     implementation(libs.zookeeper)
     implementation(libs.zookeeper.jute)
   }

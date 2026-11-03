@@ -36,6 +36,7 @@ import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
@@ -99,7 +100,14 @@ public class RangerITEnv {
         String.format(
             "http://%s:%d",
             containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
-    rangerClient = containerSuite.getRangerContainer().rangerClient;
+    // Use the client of the plugin, so that test updates of policies fetched from Ranger Admin
+    // are sent in a format that every supported Ranger Admin version accepts.
+    rangerClient =
+        new RangerClientExtension(
+            RANGER_ADMIN_URL,
+            RangerContainer.authType,
+            RangerContainer.rangerUserName,
+            RangerContainer.rangerPassword);
 
     rangerAuthHivePlugin =
         new RangerAuthorizationHadoopSQLPlugin(

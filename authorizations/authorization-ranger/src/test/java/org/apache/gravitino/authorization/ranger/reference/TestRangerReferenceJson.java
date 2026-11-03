@@ -81,6 +81,8 @@ public class TestRangerReferenceJson {
 
     JsonNode actual = MAPPER.readTree(JsonUtils.objectToJson(user));
 
+    // JsonDateSerializer, copied from Ranger Admin, formats in the JVM default time zone, so the
+    // expected value does too. Pinning it to UTC would fail in other time zones.
     SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
     Assertions.assertEquals(format.format(epoch), actual.get("createDate").asText());
   }
