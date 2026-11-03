@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 import java.sql.Driver;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -36,6 +37,32 @@ import org.apache.gravitino.utils.JdbcUrlUtils;
  * connection pools. The apache-dbcp2 connection pool is used here.
  */
 public class DataSourceUtils {
+
+  // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
+  // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
+  // code or let a raw property override the validated canonical connection fields:
+  //   - connectionFactoryClassName / evictionPolicyClassName / driverClassName: their values are
+  //     class names the factory loads and instantiates via reflection (Class.forName + newInstance)
+  //     when the pool creates connections (remote code execution). The legitimate driver is set
+  //     separately from the "jdbc-driver" property via an explicit setter, so the raw
+  //     "driverClassName" key is never needed.
+  //   - url / username / password: the connection identity is validated (JdbcUrlUtils, the H2
+  //     guard) and applied from the canonical "jdbc-url"/"jdbc-user"/"jdbc-password" properties via
+  //     explicit setters. A raw DBCP key here would reach the factory unvalidated and, once the
+  //     pool initializes, take effect before those setters run — e.g. a raw "url" could smuggle an
+  //     H2 or otherwise-denied URL past the guards.
+  //   - initialSize: defense in depth. A value > 0 makes the factory eagerly open a connection
+  //     during createDataSource; blocking it keeps pool creation lazy so our explicit url/driver
+  //     setters, not factory-time eager init, control how connections are created.
+  private static final List<String> UNSAFE_POOL_PROPERTIES =
+      List.of(
+          "connectionFactoryClassName",
+          "evictionPolicyClassName",
+          "driverClassName",
+          "url",
+          "username",
+          "password",
+          "initialSize");
 
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
@@ -73,8 +100,6 @@ public class DataSourceUtils {
     if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
       throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
     }
-<<<<<<< HEAD
-=======
     // Reject DBCP2 pool properties that load arbitrary classes via reflection before handing the
     // config to the factory. Kept outside the try below so the specific reason surfaces directly
     // instead of being wrapped as "Error creating datasource".
@@ -84,13 +109,11 @@ public class DataSourceUtils {
     jdbcConfig.getTestOnBorrow();
     jdbcConfig.getConnectTimeoutMs();
     jdbcConfig.getMaxWaitMs();
-    jdbcConfig.getPoolMaxIdle();
     int minSize = jdbcConfig.getPoolMinSize();
     int maxSize = jdbcConfig.getPoolMaxSize();
     if (minSize > maxSize) {
       throw new IllegalArgumentException("jdbc.pool.min-size must not exceed jdbc.pool.max-size");
     }
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
     try {
       JdbcUrlUtils.validateJdbcConfig(
           jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
@@ -168,15 +191,6 @@ public class DataSourceUtils {
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
-<<<<<<< HEAD
-    JdbcUrlUtils.validateJdbcConfig(
-        jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
-=======
-    // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
-    // configured. DBCP caches a validation query as a prepared statement, and MySQL Connector/J
-    // switches back to the database captured at prepare time when executing it. That switch fails
-    // when the captured database is empty, so healthy connections would be discarded.
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -229,6 +243,31 @@ public class DataSourceUtils {
     } while (!prev.equals(decoded) && --max > 0);
 
     return decoded;
+  }
+
+  /**
+   * Rejects DBCP2 connection-pool properties that would let catalog configuration run arbitrary
+   * classes on the server ({@code connectionFactoryClassName}, {@code evictionPolicyClassName},
+   * {@code driverClassName}) or override the validated canonical connection identity ({@code url},
+   * {@code username}, {@code password}), plus {@code initialSize} (blocked as defense in depth to
+   * keep pool creation lazy).
+   *
+   * @param config the JDBC configuration properties forwarded to the DBCP2 factory
+   * @throws GravitinoRuntimeException if an unsafe connection-pool property is present
+   */
+  private static void rejectUnsafePoolProperties(Map<String, String> config) {
+    if (config == null) {
+      return;
+    }
+    for (String key : config.keySet()) {
+      for (String unsafe : UNSAFE_POOL_PROPERTIES) {
+        if (unsafe.equalsIgnoreCase(key)) {
+          throw new GravitinoRuntimeException(
+              "Unsafe JDBC connection pool property '%s' is not allowed in catalog configuration",
+              key);
+        }
+      }
+    }
   }
 
   public static void closeDataSource(DataSource dataSource) {

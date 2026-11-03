@@ -48,6 +48,8 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
+  testImplementation(libs.commons.dbcp2)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

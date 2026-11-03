@@ -1214,23 +1214,36 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           lifecycleLock.readLock().lock();
           try {
             checkOpen();
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
+            CatalogEntity updatedCatalog;
+            try (CatalogLease lease = acquireCatalogLease(ident)) {
+              updatedCatalog =
+                  store.update(
+                      ident,
+                      CatalogEntity.class,
+                      EntityType.CATALOG,
+                      catalog -> {
+                        CatalogEntity.Builder newCatalogBuilder =
+                            newCatalogBuilder(ident.namespace(), catalog);
 
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+                        Map<String, String> newProps =
+                            catalog.getProperties() == null
+                                ? new HashMap<>()
+                                : new HashMap<>(catalog.getProperties());
+                        newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
 
-                      return newCatalogBuilder.build();
-                    });
+                        CatalogEntity proposed = newCatalogBuilder.build();
+                        lease
+                            .wrapper()
+                            .classLoader
+                            .withClassLoader(
+                                cl -> {
+                                  lease.catalog().validateConfiguration(proposed.getProperties());
+                                  return null;
+                                },
+                                IllegalArgumentException.class);
+                        return proposed;
+                      });
+            }
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -1278,69 +1291,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
-<<<<<<< HEAD
-=======
-  private CatalogEntity alterCatalogUnderLock(NameIdentifier ident, CatalogChange... changes)
-      throws NoSuchCatalogException, IllegalArgumentException, IOException {
-    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
-    boolean alterCommitted = false;
-    try (CatalogLease lease = acquireCatalogLease(ident)) {
-      CatalogEntity updatedCatalog =
-          store.update(
-              ident,
-              CatalogEntity.class,
-              EntityType.CATALOG,
-              existing -> {
-                Map<String, String> currentProperties =
-                    existing.getProperties() == null
-                        ? new HashMap<>()
-                        : new HashMap<>(existing.getProperties());
-
-                // Validate a transient plaintext view before secret writes. Failed validation
-                // must not overwrite or delete a previously stored write-through secret.
-                CatalogChange[] proposedChanges =
-                    SecretAlterChanges.prepareCatalogChangesForTest(
-                        secretManager, existing.id(), changes);
-                CatalogEntity proposed =
-                    updateEntity(
-                            newCatalogBuilder(ident.namespace(), existing),
-                            new HashMap<>(currentProperties),
-                            proposedChanges)
-                        .build();
-                Map<String, String> proposedConfiguration =
-                    secretManager.toPlaintextProperties(proposed.getProperties());
-                lease
-                    .wrapper()
-                    .classLoader
-                    .withClassLoader(
-                        cl -> {
-                          lease.catalog().validateConfiguration(proposedConfiguration);
-                          return null;
-                        },
-                        IllegalArgumentException.class);
-
-                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
-                    SecretAlterChanges.prepareCatalogChanges(
-                        secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
-                return updateEntity(
-                        newCatalogBuilder(ident.namespace(), existing),
-                        new HashMap<>(currentProperties),
-                        secretResult.getLeft())
-                    .build();
-              });
-      alterCommitted = true;
-      return updatedCatalog;
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-    } finally {
-      if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
-      }
-    }
-  }
-
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
@@ -1765,13 +1715,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     IsolatedClassLoader classLoader = createClassLoader(provider, conf);
     BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
 
-<<<<<<< HEAD
     CatalogWrapper wrapper = new CatalogWrapper(catalog, classLoader);
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
           validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
           catalog.validateCredentialProviders(propsToValidate);
+          if (propsToValidate != null) {
+            catalog.validateConfiguration();
+          }
           if (propsToValidate == null) {
             // Loading stays lenient for catalogs persisted with unsupported providers, so only
             // warn about them.
@@ -1782,39 +1734,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog {} has credential providers that cannot vend credentials: {}",
                   entity.nameIdentifier(),
                   e.getMessage());
-=======
-  /**
-   * Creates the catalog instance, validates properties, and preloads property/capability values
-   * into the given wrapper.
-   */
-  private CatalogWrapper initCatalogWrapper(
-      CatalogWrapper wrapper,
-      CatalogEntity entity,
-      @Nullable Map<String, String> propsToValidate,
-      boolean validateBackend) {
-    BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
-    wrapper.catalog = catalog;
-    try {
-      wrapper.classLoader.withClassLoader(
-          cl -> {
-            validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
-            catalog.validateCredentialProviders(propsToValidate);
-            if (propsToValidate != null) {
-              catalog.validateConfiguration();
-            }
-            if (propsToValidate == null) {
-              // Loading stays lenient for catalogs persisted with unsupported providers, so only
-              // warn about them. Providers persisted as a secret are checked by their plaintext.
-              try {
-                catalog.validateCredentialProviders(
-                    secretManager.toPlaintextProperties(entity.getProperties()));
-              } catch (IllegalArgumentException e) {
-                LOG.warn(
-                    "Catalog {} has credential providers that cannot vend credentials: {}",
-                    entity.nameIdentifier(),
-                    e.getMessage());
-              }
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
             }
           }
 

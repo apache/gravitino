@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -49,11 +50,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -833,8 +830,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         return null;
     }
   }
-<<<<<<< HEAD
-=======
 
   private boolean schemaLacksUsage(String schema) {
     try (Connection connection = dataSource.getConnection();
@@ -858,28 +853,4 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
     return text;
   }
-
-  private static String quotedIdentifier(String name) {
-    return PG_QUOTE + name.replace(PG_QUOTE, PG_QUOTE + PG_QUOTE) + PG_QUOTE;
-  }
-
-  private static void validateIndexName(@Nullable String name) {
-    if (name != null && name.getBytes(StandardCharsets.UTF_8).length > 63) {
-      throw new IllegalArgumentException(
-          "PostgreSQL index name must not exceed 63 UTF-8 bytes: " + name);
-    }
-  }
-
-  @Nullable
-  private static String metadataPattern(DatabaseMetaData metadata, @Nullable String name)
-      throws SQLException {
-    if (name == null) {
-      return null;
-    }
-    String escape = metadata.getSearchStringEscape();
-    return name.replace(escape, escape + escape)
-        .replace("%", escape + "%")
-        .replace("_", escape + "_");
-  }
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
 }

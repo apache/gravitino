@@ -78,11 +78,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-<<<<<<< HEAD
 import org.apache.gravitino.utils.IsolatedClassLoader;
-import org.apache.gravitino.utils.MapUtils;
-=======
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

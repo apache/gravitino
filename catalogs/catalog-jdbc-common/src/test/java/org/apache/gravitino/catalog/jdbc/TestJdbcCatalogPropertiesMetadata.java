@@ -329,60 +329,6 @@ public class TestJdbcCatalogPropertiesMetadata {
             .isHiddenProperty(JdbcConfig.CONNECT_TIMEOUT_MS.getKey()));
   }
 
-<<<<<<< HEAD
-=======
-  /** Verifies the actual catalog configuration path for drivers without isValid support. */
-  @ParameterizedTest
-  @CsvSource({
-    "none, true",
-    "validationQuery, true",
-    "gravitino.bypass.validationQuery, true",
-    "none, false"
-  })
-  public void testValidationQueryBypassForUnsupportedDriver(
-      String queryProperty, boolean validateOnBorrow) {
-    ImmutableMap.Builder<String, String> builder =
-        ImmutableMap.<String, String>builder()
-            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
-            .put(JdbcConfig.JDBC_DRIVER.getKey(), UnsupportedValidationDriver.class.getName())
-            .put(JdbcConfig.USERNAME.getKey(), "user")
-            .put(JdbcConfig.PASSWORD.getKey(), "password")
-            .put(JdbcConfig.TEST_ON_BORROW.getKey(), Boolean.toString(validateOnBorrow));
-    if (!queryProperty.equals("none")) {
-      builder.put(queryProperty, "SELECT 42");
-    }
-    Map<String, String> properties = builder.build();
-    CatalogInfo info =
-        new CatalogInfo(
-            1L,
-            "jdbc_catalog",
-            Catalog.Type.RELATIONAL,
-            "jdbc-test",
-            "test",
-            properties,
-            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
-            Namespace.of("metalake"));
-    try (JdbcCatalogOperations operations =
-        new JdbcCatalogOperations(
-            new SqliteExceptionConverter(),
-            new SqliteTypeConverter(),
-            new SqliteDatabaseOperations(":memory:"),
-            new SqliteTableOperations(),
-            new SqliteColumnDefaultValueConverter())) {
-      operations.initialize(properties, info, new TestJdbcCatalog());
-      if (queryProperty.equals("gravitino.bypass.validationQuery")) {
-        // Repeated borrows must use SQL validation, never the unsupported isValid method.
-        for (int i = 0; i < 3; i++) {
-          Assertions.assertDoesNotThrow(operations::getDiverInfo);
-        }
-      } else {
-        ConnectionFailedException exception =
-            Assertions.assertThrows(ConnectionFailedException.class, operations::getDiverInfo);
-        Assertions.assertTrue(exception.getMessage().contains("isValid is not supported"));
-      }
-    }
-  }
-
   /** A driver that proves settings validation does not open a connection. */
   public static class NoConnectionDriver extends JDBC {
     /** {@inheritDoc} */
@@ -392,7 +338,6 @@ public class TestJdbcCatalogPropertiesMetadata {
     }
   }
 
->>>>>>> c7a4551b0 ([#14484] fix(jdbc): validate configuration and classify PostgreSQL failures (#14485))
   private static class TestJdbcCatalog extends JdbcCatalog {
     @Override
     public String shortName() {

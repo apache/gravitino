@@ -235,7 +235,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * connections, or retain resources. The default accepts the configuration for compatibility.
    * Existing catalogs are not validated on ordinary reads.
    *
-   * @param configuration the complete effective configuration, with secret references resolved
+   * @param configuration the complete effective configuration
    * @throws IllegalArgumentException if the configuration is invalid
    */
   public void validateConfiguration(Map<String, String> configuration) {}

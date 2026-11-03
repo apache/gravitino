@@ -134,6 +134,9 @@ public class TestCatalogOperations
 
   public static final String FAIL_CREATE = "fail-create";
 
+  /** Forces operations initialization to fail without contacting a backend. */
+  public static final String FAIL_INITIALIZE = "fail-initialize";
+
   public static final String FAIL_TEST = "need-fail";
 
   public static final String VALIDATE_ON_CREATE = "validate-on-create";
@@ -155,7 +158,11 @@ public class TestCatalogOperations
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertyMetadata)
-      throws RuntimeException {}
+      throws RuntimeException {
+    if (Boolean.parseBoolean(config.get(FAIL_INITIALIZE))) {
+      throw new IllegalArgumentException("backend rejected catalog configuration");
+    }
+  }
 
   @Override
   public void close() throws IOException {}
