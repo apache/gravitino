@@ -21,9 +21,11 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -33,21 +35,26 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -68,6 +75,85 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doReturn(1000L).when(config).get(Configs.TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(Configs.TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+  }
+
+  @Test
+  void testExternalRenamePreservesSchemaIdentity() throws Exception {
+    NameIdentifier original = NameIdentifier.of(metalake, catalog, "external_rename_original");
+    NameIdentifier renamed = NameIdentifier.of(metalake, catalog, "external_rename_new");
+    dispatcher.createSchema(original, "original", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity originalEntity = entityStore.get(original, SCHEMA, SchemaEntity.class);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k1", "v1");
+    properties.put("k2", "v2");
+    properties.put(ID_KEY, StringIdentifier.fromId(originalEntity.id()).toString());
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          c.doWithSchemaOps(
+              ops -> {
+                ops.dropSchema(original, false);
+                return ops.createSchema(renamed, "renamed", properties);
+              });
+          return null;
+        });
+    EntityStore conflictingStore = mock(EntityStore.class, delegatesTo(entityStore));
+    doAnswer(
+            invocation -> {
+              Function<SchemaEntity, SchemaEntity> updater = invocation.getArgument(3);
+              return updater.apply(
+                  SchemaEntity.builder()
+                      .withId(originalEntity.id() + 1)
+                      .withName(original.name())
+                      .withNamespace(original.namespace())
+                      .withAuditInfo(originalEntity.auditInfo())
+                      .build());
+            })
+        .when(conflictingStore)
+        .update(eq(original), eq(SchemaEntity.class), eq(SCHEMA), any());
+    SchemaOperationDispatcher conflictingDispatcher =
+        new SchemaOperationDispatcher(catalogManager, conflictingStore, idGenerator);
+    SchemaAlreadyExistsException conflict =
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class, () -> conflictingDispatcher.loadSchema(renamed));
+    Assertions.assertTrue(conflict.getMessage().contains(renamed.toString()));
+    Assertions.assertTrue(conflict.getMessage().contains("retry"));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(renamed, SCHEMA));
+
+    Assertions.assertEquals(renamed.name(), dispatcher.loadSchema(renamed).name());
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(original, SCHEMA));
+  }
+
+  @Test
+  void testCopiedSchemaIdentifierCannotMoveExistingEntity() throws Exception {
+    NameIdentifier original = NameIdentifier.of(metalake, catalog, "marker_original");
+    NameIdentifier copy = NameIdentifier.of(metalake, catalog, "marker_copy");
+    dispatcher.createSchema(original, "original", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity originalEntity = entityStore.get(original, SCHEMA, SchemaEntity.class);
+    Map<String, String> copiedProperties = new HashMap<>();
+    copiedProperties.put("k1", "v1");
+    copiedProperties.put("k2", "v2");
+    copiedProperties.put(ID_KEY, StringIdentifier.fromId(originalEntity.id()).toString());
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          c.doWithSchemaOps(ops -> ops.createSchema(copy, "copy", copiedProperties));
+          return null;
+        });
+    Assertions.assertThrows(SchemaAlreadyExistsException.class, () -> dispatcher.loadSchema(copy));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
+    Assertions.assertTrue(dispatcher.dropSchema(copy, false));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertEquals(
+        originalEntity.properties(),
+        entityStore.get(original, SCHEMA, SchemaEntity.class).properties());
   }
 
   @Test
@@ -228,6 +314,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // EntityAlreadyExistsException, and the dispatcher-level retry sees the entity on the third
     // get.
     reset(entityStore);
+    doReturn(Collections.emptyList())
+        .when(entityStore)
+        .list(schemaIdent.namespace(), SchemaEntity.class, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(concurrentSchemaEntity)
@@ -263,6 +352,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
     // thrown).
     reset(entityStore);
+    doReturn(Collections.emptyList())
+        .when(entityStore)
+        .list(schemaIdent.namespace(), SchemaEntity.class, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedSchemaEntity)
