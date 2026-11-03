@@ -42,6 +42,7 @@ import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.expressions.UnboundTerm;
 import org.apache.iceberg.expressions.UnboundTransform;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -73,125 +74,42 @@ final class IcebergScanPlanHelper {
   }
 
   /**
-   * Maps column names of the current table schema to the names the same fields have in an older
-   * snapshot schema, so a scan pinned to that snapshot can serve a request written against the
-   * current schema. Names are resolved on the current schema first, so a name that only the
-   * snapshot schema has, or that a later column reuses, never binds to the snapshot's field.
+   * Rewrites filter/select/stats field names from the current table schema to the snapshot schema
+   * by field id, so a {@code useSnapshot} scan can serve a request written against the current
+   * schema. Names are resolved on the current schema first, so a name that only the snapshot schema
+   * has, or that a later column reuses, never binds to the snapshot's field. Columns added after
+   * the snapshot are dropped from select/stats; filtering on them fails.
    */
-  static final class SnapshotNames {
-    private final Schema current;
-    private final Schema snapshot;
-    private final boolean caseSensitive;
-    private final long snapshotId;
-
-    SnapshotNames(Schema current, Schema snapshot, boolean caseSensitive, long snapshotId) {
-      this.current = current;
-      this.snapshot = snapshot;
-      this.caseSensitive = caseSensitive;
-      this.snapshotId = snapshotId;
+  static PlanTableScanRequest rewriteForSnapshot(
+      PlanTableScanRequest request, Schema current, Schema snapshot, long snapshotId) {
+    PlanTableScanRequest.Builder builder =
+        PlanTableScanRequest.builder()
+            .withSnapshotId(request.snapshotId())
+            .withCaseSensitive(request.caseSensitive())
+            .withUseSnapshotSchema(request.useSnapshotSchema())
+            .withStartSnapshotId(request.startSnapshotId())
+            .withEndSnapshotId(request.endSnapshotId())
+            .withMinRowsRequested(request.minRowsRequested());
+    if (request.filter() != null) {
+      builder.withFilter(
+          rewriteFilterNames(
+              request.filter(), current, snapshot, request.caseSensitive(), snapshotId));
     }
-
-    /**
-     * Returns the snapshot schema's name for a current-schema column.
-     *
-     * @param name the column name in the current table schema
-     * @return the column name in the snapshot schema, or {@code null} if the column was added after
-     *     the snapshot
-     * @throws IllegalArgumentException if the current table schema has no such column
-     */
-    @Nullable
-    String toSnapshotName(String name) {
-      Types.NestedField field =
-          caseSensitive ? current.findField(name) : current.caseInsensitiveFindField(name);
-      if (field == null) {
-        throw new IllegalArgumentException(
-            String.format("Cannot find field '%s' in the current table schema", name));
-      }
-      return snapshot.findColumnName(field.fieldId());
-    }
-
-    long snapshotId() {
-      return snapshotId;
-    }
-  }
-
-  /**
-   * Rewrites unbound filter terms from current-schema names to snapshot-schema names.
-   *
-   * @throws IllegalArgumentException if a term names a column the current schema lacks, or a column
-   *     added after the snapshot, whose values the snapshot's files do not contain
-   */
-  static Expression rewriteFilterNames(Expression filter, SnapshotNames names) {
-    if (filter == null) {
-      return null;
-    }
-    return ExpressionVisitors.visit(
-        filter,
-        new ExpressionVisitors.ExpressionVisitor<Expression>() {
-          @Override
-          public Expression alwaysTrue() {
-            return Expressions.alwaysTrue();
-          }
-
-          @Override
-          public Expression alwaysFalse() {
-            return Expressions.alwaysFalse();
-          }
-
-          @Override
-          public Expression not(Expression result) {
-            return Expressions.not(result);
-          }
-
-          @Override
-          public Expression and(Expression left, Expression right) {
-            return Expressions.and(left, right);
-          }
-
-          @Override
-          public Expression or(Expression left, Expression right) {
-            return Expressions.or(left, right);
-          }
-
-          @Override
-          public <T> Expression predicate(UnboundPredicate<T> pred) {
-            String name = pred.ref().name();
-            String snapshotName = names.toSnapshotName(name);
-            if (snapshotName == null) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Cannot filter on field '%s': it does not exist in snapshot %s",
-                      name, names.snapshotId()));
-            }
-            if (snapshotName.equals(name)) {
-              return pred;
-            }
-            UnboundTerm<T> term = renameTerm(pred.term(), snapshotName);
-            if (pred.literals() == null) {
-              return Expressions.predicate(pred.op(), term);
-            }
-            List<T> values =
-                pred.literals().stream().map(Literal::value).collect(Collectors.toList());
-            return Expressions.predicate(pred.op(), term, values);
-          }
-        });
-  }
-
-  /**
-   * Rewrites projected or statistics column names from the current schema to the snapshot schema.
-   * Columns added after the snapshot are dropped: none of the snapshot's files contain them.
-   *
-   * @throws IllegalArgumentException if the current table schema has no such column
-   */
-  static List<String> rewriteColumnNames(List<String> columns, SnapshotNames names) {
-    List<String> rewritten = Lists.newArrayListWithCapacity(columns.size());
-    for (String column : columns) {
-      String snapshotName = names.toSnapshotName(column);
-      if (snapshotName != null) {
-        rewritten.add(snapshotName);
+    if (request.select() != null && !request.select().isEmpty()) {
+      List<String> select =
+          rewriteColumnNames(request.select(), current, snapshot, request.caseSensitive());
+      if (!select.isEmpty()) {
+        builder.withSelect(select);
       }
     }
-    return rewritten;
+    if (request.statsFields() != null && !request.statsFields().isEmpty()) {
+      List<String> statsFields =
+          rewriteColumnNames(request.statsFields(), current, snapshot, request.caseSensitive());
+      if (!statsFields.isEmpty()) {
+        builder.withStatsFields(statsFields);
+      }
+    }
+    return builder.build();
   }
 
   /**
@@ -225,6 +143,92 @@ final class IcebergScanPlanHelper {
       changed = true;
     }
     return changed ? Collections.unmodifiableMap(sanitized) : specsById;
+  }
+
+  @VisibleForTesting
+  static Expression rewriteFilterNames(
+      Expression filter, Schema current, Schema snapshot, boolean caseSensitive, long snapshotId) {
+    return ExpressionVisitors.visit(
+        filter,
+        new ExpressionVisitors.ExpressionVisitor<Expression>() {
+          @Override
+          public Expression alwaysTrue() {
+            return Expressions.alwaysTrue();
+          }
+
+          @Override
+          public Expression alwaysFalse() {
+            return Expressions.alwaysFalse();
+          }
+
+          @Override
+          public Expression not(Expression result) {
+            return Expressions.not(result);
+          }
+
+          @Override
+          public Expression and(Expression left, Expression right) {
+            return Expressions.and(left, right);
+          }
+
+          @Override
+          public Expression or(Expression left, Expression right) {
+            return Expressions.or(left, right);
+          }
+
+          @Override
+          public <T> Expression predicate(UnboundPredicate<T> pred) {
+            String name = pred.ref().name();
+            String snapshotName = toSnapshotName(name, current, snapshot, caseSensitive);
+            if (snapshotName == null) {
+              throw new IllegalArgumentException(
+                  String.format(
+                      "Cannot filter on field '%s': it does not exist in snapshot %s",
+                      name, snapshotId));
+            }
+            if (snapshotName.equals(name)) {
+              return pred;
+            }
+            UnboundTerm<T> term = renameTerm(pred.term(), snapshotName);
+            if (pred.literals() == null) {
+              return Expressions.predicate(pred.op(), term);
+            }
+            List<T> values =
+                pred.literals().stream().map(Literal::value).collect(Collectors.toList());
+            return Expressions.predicate(pred.op(), term, values);
+          }
+        });
+  }
+
+  @VisibleForTesting
+  static List<String> rewriteColumnNames(
+      List<String> columns, Schema current, Schema snapshot, boolean caseSensitive) {
+    List<String> rewritten = Lists.newArrayListWithCapacity(columns.size());
+    for (String column : columns) {
+      String snapshotName = toSnapshotName(column, current, snapshot, caseSensitive);
+      if (snapshotName != null) {
+        rewritten.add(snapshotName);
+      }
+    }
+    return rewritten;
+  }
+
+  /**
+   * Returns the snapshot schema's name for a current-schema column, or {@code null} if the column
+   * was added after the snapshot.
+   *
+   * @throws IllegalArgumentException if the current table schema has no such column
+   */
+  @Nullable
+  private static String toSnapshotName(
+      String name, Schema current, Schema snapshot, boolean caseSensitive) {
+    Types.NestedField field =
+        caseSensitive ? current.findField(name) : current.caseInsensitiveFindField(name);
+    if (field == null) {
+      throw new IllegalArgumentException(
+          String.format("Cannot find field '%s' in the current table schema", name));
+    }
+    return snapshot.findColumnName(field.fieldId());
   }
 
   private static boolean partitionTypeHasUnknown(Types.StructType partitionType) {

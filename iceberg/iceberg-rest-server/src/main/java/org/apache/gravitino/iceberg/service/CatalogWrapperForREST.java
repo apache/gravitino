@@ -696,11 +696,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               // sends it from appendsBetween/appendsAfter, which are exclusive as well.
               .fromSnapshotExclusive(startSnapshotId)
               .toSnapshot(endSnapshotId);
-      incrementalScan = applyScanRequest(incrementalScan, scanRequest, null);
+      incrementalScan = applyScanRequest(incrementalScan, scanRequest);
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
-      IcebergScanPlanHelper.SnapshotNames snapshotNames = null;
+      PlanTableScanRequest requestToApply = scanRequest;
       // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
         long snapshotId = scanRequest.snapshotId();
@@ -714,46 +714,37 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         } else {
           tableScan = tableScan.useSnapshot(snapshotId);
           if (!scanRequest.useSnapshotSchema()) {
-            snapshotNames =
-                new IcebergScanPlanHelper.SnapshotNames(
+            requestToApply =
+                IcebergScanPlanHelper.rewriteForSnapshot(
+                    scanRequest,
                     table.schema(),
                     SnapshotUtil.schemaFor(table, snapshotId),
-                    scanRequest.caseSensitive(),
                     snapshotId);
           }
           LOG.debug("Applied snapshot filter: snapshot-id={}", snapshotId);
         }
       }
-      tableScan = applyScanRequest(tableScan, scanRequest, snapshotNames);
+      tableScan = applyScanRequest(tableScan, requestToApply);
       return tableScan.planFiles();
     }
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanRequest(
-      T scan,
-      PlanTableScanRequest scanRequest,
-      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
+  private <T extends Scan> T applyScanRequest(T scan, PlanTableScanRequest scanRequest) {
     scan = (T) scan.caseSensitive(scanRequest.caseSensitive());
     LOG.debug("Applied case-sensitive: {}", scanRequest.caseSensitive());
-    scan = applyScanFilter(scan, scanRequest, snapshotNames);
-    scan = applyScanSelect(scan, scanRequest, snapshotNames);
-    scan = applyScanStatsFields(scan, scanRequest, snapshotNames);
+    scan = applyScanFilter(scan, scanRequest);
+    scan = applyScanSelect(scan, scanRequest);
+    scan = applyScanStatsFields(scan, scanRequest);
 
     return scan;
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanFilter(
-      T scan,
-      PlanTableScanRequest scanRequest,
-      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
+  private <T extends Scan> T applyScanFilter(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.filter() != null) {
       try {
-        Expression filter =
-            snapshotNames == null
-                ? scanRequest.filter()
-                : IcebergScanPlanHelper.rewriteFilterNames(scanRequest.filter(), snapshotNames);
+        Expression filter = scanRequest.filter();
         scan = (T) scan.filter(filter);
         LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
@@ -765,20 +756,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanSelect(
-      T scan,
-      PlanTableScanRequest scanRequest,
-      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
+  private <T extends Scan> T applyScanSelect(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.select() != null && !scanRequest.select().isEmpty()) {
       try {
-        List<String> select =
-            snapshotNames == null
-                ? scanRequest.select()
-                : IcebergScanPlanHelper.rewriteColumnNames(scanRequest.select(), snapshotNames);
-        if (!select.isEmpty()) {
-          scan = (T) scan.select(select);
-          LOG.debug("Applied column projection: {}", select);
-        }
+        scan = (T) scan.select(scanRequest.select());
+        LOG.debug("Applied column projection: {}", scanRequest.select());
       } catch (Exception e) {
         LOG.error("Failed to apply column projection: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid column selection: " + e.getMessage(), e);
@@ -788,16 +770,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @SuppressWarnings("unchecked")
-  private <T extends Scan> T applyScanStatsFields(
-      T scan,
-      PlanTableScanRequest scanRequest,
-      @Nullable IcebergScanPlanHelper.SnapshotNames snapshotNames) {
+  private <T extends Scan> T applyScanStatsFields(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
-      List<String> statsFields =
-          snapshotNames == null
-              ? scanRequest.statsFields()
-              : IcebergScanPlanHelper.rewriteColumnNames(scanRequest.statsFields(), snapshotNames);
-      for (String field : statsFields) {
+      for (String field : scanRequest.statsFields()) {
         boolean known =
             scanRequest.caseSensitive()
                 ? scan.schema().findField(field) != null
@@ -806,12 +781,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           throw new IllegalArgumentException("Invalid statistics fields: unknown field " + field);
         }
       }
-      if (statsFields.isEmpty()) {
-        return scan;
-      }
       try {
-        scan = (T) scan.includeColumnStats(statsFields);
-        LOG.debug("Applied statistics fields: {}", statsFields);
+        scan = (T) scan.includeColumnStats(scanRequest.statsFields());
+        LOG.debug("Applied statistics fields: {}", scanRequest.statsFields());
       } catch (Exception e) {
         LOG.error("Failed to apply statistics fields: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid statistics fields: " + e.getMessage(), e);

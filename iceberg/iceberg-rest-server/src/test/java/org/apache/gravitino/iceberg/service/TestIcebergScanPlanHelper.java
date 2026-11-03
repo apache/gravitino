@@ -31,6 +31,7 @@ import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -50,62 +51,99 @@ public class TestIcebergScanPlanHelper {
           Types.NestedField.optional(3, "l", Types.LongType.get()));
 
   @Test
-  void testSnapshotNamesResolveOnTheCurrentSchema() {
-    IcebergScanPlanHelper.SnapshotNames names = names(true);
-    Assertions.assertEquals("id", names.toSnapshotName("id"));
-    Assertions.assertEquals("l", names.toSnapshotName("l2"));
-    // "l" is the column added after the snapshot, not the snapshot's "l".
-    Assertions.assertNull(names.toSnapshotName("l"));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> names.toSnapshotName("nope"));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> names.toSnapshotName("L2"));
+  void testRewriteForSnapshotMapsCurrentNames() {
+    PlanTableScanRequest rewritten =
+        IcebergScanPlanHelper.rewriteForSnapshot(
+            PlanTableScanRequest.builder()
+                .withSnapshotId(7L)
+                .withFilter(Expressions.equal("l2", 10L))
+                .withSelect(ImmutableList.of("id", "l2", "l"))
+                .withStatsFields(ImmutableList.of("l2", "l"))
+                .build(),
+            CURRENT_SCHEMA,
+            SNAPSHOT_SCHEMA,
+            7L);
 
-    Assertions.assertEquals("l", names(false).toSnapshotName("L2"));
+    Assertions.assertEquals(Expressions.equal("l", 10L).toString(), rewritten.filter().toString());
+    Assertions.assertEquals(ImmutableList.of("id", "l"), rewritten.select());
+    Assertions.assertEquals(ImmutableList.of("l"), rewritten.statsFields());
+  }
+
+  @Test
+  void testRewriteForSnapshotResolvesCaseInsensitively() {
+    PlanTableScanRequest rewritten =
+        IcebergScanPlanHelper.rewriteForSnapshot(
+            PlanTableScanRequest.builder()
+                .withSnapshotId(7L)
+                .withCaseSensitive(false)
+                .withFilter(Expressions.equal("L2", 10L))
+                .build(),
+            CURRENT_SCHEMA,
+            SNAPSHOT_SCHEMA,
+            7L);
+
+    Assertions.assertEquals(Expressions.equal("l", 10L).toString(), rewritten.filter().toString());
   }
 
   @Test
   void testRewriteFilterNames() {
-    IcebergScanPlanHelper.SnapshotNames names = names(true);
     Assertions.assertEquals(
         Expressions.equal("l", 10L).toString(),
-        IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("l2", 10L), names).toString());
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal("l2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L)
+            .toString());
     Assertions.assertEquals(
         Expressions.equal("id", 1L).toString(),
-        IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("id", 1L), names).toString());
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal("id", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L)
+            .toString());
     Assertions.assertEquals(
         Expressions.and(Expressions.in("l", 1L, 2L), Expressions.not(Expressions.isNull("l")))
             .toString(),
         IcebergScanPlanHelper.rewriteFilterNames(
                 Expressions.and(
                     Expressions.in("l2", 1L, 2L), Expressions.not(Expressions.isNull("l2"))),
-                names)
+                CURRENT_SCHEMA,
+                SNAPSHOT_SCHEMA,
+                true,
+                7L)
             .toString());
     Assertions.assertEquals(
         Expressions.equal(Expressions.bucket("l", 4), 1).toString(),
         IcebergScanPlanHelper.rewriteFilterNames(
-                Expressions.equal(Expressions.bucket("l2", 4), 1), names)
+                Expressions.equal(Expressions.bucket("l2", 4), 1),
+                CURRENT_SCHEMA,
+                SNAPSHOT_SCHEMA,
+                true,
+                7L)
             .toString());
 
     IllegalArgumentException addedLater =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("l", 10L), names));
+            () ->
+                IcebergScanPlanHelper.rewriteFilterNames(
+                    Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
     Assertions.assertTrue(
         addedLater.getMessage().contains("does not exist in snapshot 7"), addedLater.getMessage());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> IcebergScanPlanHelper.rewriteFilterNames(Expressions.equal("nope", 1L), names));
+        () ->
+            IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal("nope", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal("L2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
   }
 
   @Test
   void testRewriteColumnNamesDropsColumnsAddedLater() {
     Assertions.assertEquals(
         ImmutableList.of("id", "l"),
-        IcebergScanPlanHelper.rewriteColumnNames(ImmutableList.of("id", "l2", "l"), names(true)));
-  }
-
-  private static IcebergScanPlanHelper.SnapshotNames names(boolean caseSensitive) {
-    return new IcebergScanPlanHelper.SnapshotNames(
-        CURRENT_SCHEMA, SNAPSHOT_SCHEMA, caseSensitive, 7L);
+        IcebergScanPlanHelper.rewriteColumnNames(
+            ImmutableList.of("id", "l2", "l"), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true));
   }
 
   @Test
