@@ -706,6 +706,60 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterPolicyContentAcceptsMisCasedKnownType() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("p_upper")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.alterPolicy(any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              PolicyChange.UpdateContent change = invocation.getArgument(2);
+              Assertions.assertEquals(
+                  Policy.BuiltInType.ICEBERG_COMPACTION.policyType(), change.getPolicyType());
+              return policy;
+            });
+
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_upper")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\","
+                        + "\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+                        + "\"newContent\":{\"maxPartitionNum\":5}}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
+  }
+
+  @Test
+  public void testAlterPolicyContentUnknownTypeNamedInError() {
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_bogus")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\","
+                        + "\"policyType\":\"system_iceberg_bogus\","
+                        + "\"newContent\":{\"maxPartitionNum\":5}}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String msg = resp.readEntity(String.class);
+    Assertions.assertTrue(msg.contains("Unknown built-in policy type: system_iceberg_bogus"), msg);
+  }
+
+  @Test
   public void testAlterPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =
