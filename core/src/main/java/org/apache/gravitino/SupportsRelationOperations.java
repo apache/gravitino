@@ -186,6 +186,42 @@ public interface SupportsRelationOperations {
       throws IOException;
 
   /**
+   * Whether identity-fenced initial table ownership is supported.
+   *
+   * <p>Post-create callers must check this before creating the table, so an old implementation
+   * fails before any external or metadata mutation. The default is false.
+   *
+   * @return whether {@link #setInitialTableOwner} is supported
+   */
+  default boolean supportsInitialTableOwner() {
+    return false;
+  }
+
+  /**
+   * Assigns the first owner of a newly created table, fenced by its stable ID.
+   *
+   * <p>Called after the create transaction has committed, outside any active transaction. The
+   * implementation must atomically check that the table is still active at the supplied identifier
+   * with the expected ID and has no owner before inserting the relation. A missing/replaced table
+   * or an existing owner returns false without modifying relations. Principal and storage failures
+   * must propagate. Implementations without this capability must fail before writing anything.
+   *
+   * @param table the fully qualified table identifier
+   * @param tableId the ID returned by creation
+   * @param owner the owner principal identifier
+   * @param ownerType USER or GROUP
+   * @return true if the owner was inserted; false if the table no longer matches or already has one
+   * @throws IOException if storage fails
+   * @throws UnsupportedOperationException if identity-fenced initialization is unsupported
+   */
+  default boolean setInitialTableOwner(
+      NameIdentifier table, long tableId, NameIdentifier owner, Entity.EntityType ownerType)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "Identity-fenced initial table ownership is unsupported");
+  }
+
+  /**
    * Batch inserts the same relation from many source entities to one destination. Parameter order
    * matches {@link #insertRelation}. All sources share one {@code srcType}. Semantics match
    * repeated {@link #insertRelation} with the same {@code relType}; a relational backend may use

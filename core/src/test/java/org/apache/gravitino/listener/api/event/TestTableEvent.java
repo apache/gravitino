@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -29,6 +30,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -114,13 +116,41 @@ public class TestTableEvent {
   }
 
   @Test
+  void testSkippedInitialOwnerStillProducesCreateSuccessEvent() {
+    DummyEventListener listener = new DummyEventListener();
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    when(owners.supportsInitialTableOwner()).thenReturn(true);
+    TableEventDispatcher withHook =
+        new TableEventDispatcher(
+            new EventBus(Arrays.asList(listener)),
+            new TableHookDispatcher(mockTableDispatcher(), () -> owners));
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", table.name());
+    Table result =
+        withHook.createTable(
+            ident,
+            table.columns(),
+            table.comment(),
+            table.properties(),
+            table.partitioning(),
+            table.distribution(),
+            table.sortOrder(),
+            table.index());
+    Assertions.assertSame(table, result);
+    Event event = listener.popPostEvent();
+    Assertions.assertInstanceOf(CreateTableEvent.class, event);
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertTrue(listener.getPostEvents().isEmpty());
+  }
+
+  @Test
   void testCreateTableOwnerFailureProducesCreateFailureEvent() {
     DummyEventListener listener = new DummyEventListener();
     EventBus eventBus = new EventBus(Arrays.asList(listener));
     OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
+    when(ownerDispatcher.supportsInitialTableOwner()).thenReturn(true);
     doThrow(new RuntimeException("Set owner failed"))
         .when(ownerDispatcher)
-        .setOwner(any(), any(), any(), any());
+        .setInitialTableOwner(any(), any(), anyLong(), any(), any());
     TableEventDispatcher dispatcherWithHook =
         new TableEventDispatcher(
             eventBus, new TableHookDispatcher(mockTableDispatcher(), () -> ownerDispatcher));
@@ -471,7 +501,10 @@ public class TestTableEvent {
     Table table = mock(Table.class);
     when(table.name()).thenReturn("table");
     when(table.comment()).thenReturn("comment");
-    when(table.properties()).thenReturn(ImmutableMap.of("a", "b"));
+    when(table.properties())
+        .thenReturn(
+            StringIdentifier.newPropertiesWithId(
+                StringIdentifier.fromId(1L), ImmutableMap.of("a", "b")));
     when(table.columns()).thenReturn(new Column[] {Column.of("a", Types.IntegerType.get())});
     when(table.distribution())
         .thenReturn(Distributions.of(Strategy.HASH, 10, NamedReference.field("a")));

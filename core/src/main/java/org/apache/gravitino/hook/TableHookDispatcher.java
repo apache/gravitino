@@ -24,9 +24,11 @@ import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -40,6 +42,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableHookDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -47,6 +51,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * or after the underlying operations.
  */
 public class TableHookDispatcher implements TableDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(TableHookDispatcher.class);
   private final TableDispatcher dispatcher;
   private final Supplier<OwnerDispatcher> ownerDispatcher;
 
@@ -84,18 +89,41 @@ public class TableHookDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
+    if (ownerManager != null && !ownerManager.supportsInitialTableOwner()) {
+      throw new UnsupportedOperationException(
+          "Identity-fenced initial table ownership is required before creating " + ident);
+    }
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+      // Use the identity returned by create, never a name lookup after the table may be replaced.
+      Table rawTable = table;
+      Long tableId = null;
+      if (table instanceof EntityCombinedTable combined) {
+        if (combined.tableFromGravitino() != null) {
+          tableId = combined.tableFromGravitino().id();
+        }
+        rawTable = combined.tableFromCatalog();
+      }
+      if (tableId == null) {
+        StringIdentifier stringId = StringIdentifier.fromProperties(rawTable.properties());
+        tableId = stringId == null ? null : stringId.id();
+      }
+      if (tableId != null) {
+        ownerManager.setInitialTableOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
+            tableId,
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      } else {
+        // An external create can succeed while storing its registration fails. That path already
+        // returns the created table; without its stable ID, assigning by name would be unsafe.
+        LOG.warn("Cannot initialize owner of created table {} without its stable ID", ident);
+      }
     }
     return table;
   }

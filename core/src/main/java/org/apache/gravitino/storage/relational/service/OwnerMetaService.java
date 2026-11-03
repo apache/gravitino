@@ -30,23 +30,27 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -207,6 +211,77 @@ public class OwnerMetaService {
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
   }
 
+  /**
+   * Initializes table ownership without adopting a same-name replacement or overwriting an owner.
+   *
+   * @param table the fully qualified table name
+   * @param tableId the stable ID from creation
+   * @param owner the owner principal
+   * @param ownerType USER or GROUP
+   * @return whether the initial owner relation was inserted
+   * @throws NoSuchEntityException if the principal disappears before assignment
+   * @throws IllegalStateException if called inside a transaction rather than after creation commits
+   */
+  public boolean setInitialTableOwner(
+      NameIdentifier table, long tableId, NameIdentifier owner, Entity.EntityType ownerType) {
+    Preconditions.checkState(
+        !SessionUtils.isInTransaction(),
+        "Initial table ownership must be assigned after the create transaction commits");
+    NameIdentifierUtil.checkTable(table);
+    Preconditions.checkArgument(
+        ownerType == Entity.EntityType.USER || ownerType == Entity.EntityType.GROUP,
+        "Unsupported owner type: %s",
+        ownerType);
+    Preconditions.checkArgument(
+        Objects.equals(
+            NameIdentifierUtil.getMetalake(table), NameIdentifierUtil.getMetalake(owner)),
+        "Table and owner must belong to the same metalake");
+    // Read directly from storage: an entity-ID cache may still refer to the dropped incarnation.
+    TablePO original = initialOwnerTableByName(table);
+    if (original == null || !Objects.equals(original.getTableId(), tableId)) {
+      return false;
+    }
+    return SessionUtils.doWithCommitAndFetchResult(
+        OwnerMetaMapper.class,
+        mapper -> {
+          try {
+            lockMetalakeForOwnerWrite(table.namespace().level(0), original.getMetalakeId(), false);
+          } catch (NoSuchEntityException deletedParent) {
+            return false;
+          }
+          TablePO current =
+              SessionUtils.getWithoutCommit(
+                  TableMetaMapper.class, tables -> tables.selectTableMetaByIdForUpdate(tableId));
+          if (current == null
+              || !Objects.equals(current.getTableName(), table.name())
+              || !Objects.equals(current.getSchemaId(), original.getSchemaId())
+              || !Objects.equals(current.getCatalogId(), original.getCatalogId())
+              || !Objects.equals(current.getMetalakeId(), original.getMetalakeId())) {
+            return false;
+          }
+          // Read names and the prior owner only after taking the object lock in a new transaction.
+          // MySQL REPEATABLE READ must see an assignment committed while this writer waited.
+          TablePO namedTable = initialOwnerTableByName(table);
+          if (namedTable == null || !Objects.equals(namedTable.getTableId(), tableId)) {
+            return false;
+          }
+          if (mapper.selectOwnerByMetadataObjectIdAndType(tableId, Entity.EntityType.TABLE.name())
+              != null) {
+            return false;
+          }
+          long ownerId = EntityIdService.getEntityId(owner, ownerType);
+          lockPrincipalForOwnerWrite(owner, ownerType, ownerId, original.getMetalakeId());
+          mapper.insertOwnerRel(
+              POConverters.initializeOwnerRelPOsWithVersion(
+                  original.getMetalakeId(),
+                  ownerType.name(),
+                  ownerId,
+                  Entity.EntityType.TABLE.name(),
+                  tableId));
+          return true;
+        });
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchSetOwner")
@@ -263,6 +338,18 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
+  }
+
+  @Nullable
+  private TablePO initialOwnerTableByName(NameIdentifier table) {
+    return SessionUtils.getWithoutCommit(
+        TableMetaMapper.class,
+        mapper ->
+            mapper.selectTableByFullQualifiedName(
+                table.namespace().level(0),
+                table.namespace().level(1),
+                table.namespace().level(2),
+                table.name()));
   }
 
   /**

@@ -770,6 +770,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public boolean supportsInitialTableOwner() {
+    return true;
+  }
+
+  @Override
+  public boolean setInitialTableOwner(
+      NameIdentifier table, long tableId, NameIdentifier owner, Entity.EntityType ownerType) {
+    return OwnerMetaService.getInstance().setInitialTableOwner(table, tableId, owner, ownerType);
+  }
+
+  @Override
   public void batchInsertRelations(
       Type relType,
       List<NameIdentifier> srcIdentifiers,

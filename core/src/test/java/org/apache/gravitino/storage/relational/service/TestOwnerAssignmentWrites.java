@@ -33,29 +33,52 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.Mockito;
 
 /**
  * Races between owner assignment and deletion of the owned object or owner principal, and between
@@ -250,6 +273,299 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
       }
       assertEquals(2, liveOwnerRows(principalId(group, principal)));
     }
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerPreservesExistingOwner() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    NameIdentifier group = insertPrincipal(true, "group");
+    assertTrue(
+        backend.setInitialTableOwner(
+            table.nameIdentifier(), table.id(), group, Entity.EntityType.GROUP));
+    assertFalse(
+        backend.setInitialTableOwner(
+            table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER));
+    assertEquals(
+        "group",
+        OwnerMetaService.getInstance()
+            .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .map(e -> ((HasIdentifier) e).nameIdentifier().name())
+            .orElseThrow());
+    OwnerMetaService.getInstance()
+        .setOwner(table.nameIdentifier(), Entity.EntityType.TABLE, alice, Entity.EntityType.USER);
+    assertFalse(
+        backend.setInitialTableOwner(
+            table.nameIdentifier(), table.id(), group, Entity.EntityType.GROUP));
+    assertEquals(
+        "alice",
+        OwnerMetaService.getInstance()
+            .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .map(e -> ((HasIdentifier) e).nameIdentifier().name())
+            .orElseThrow());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerSkipsDeletedAndRecreatedTable() throws Exception {
+    TableEntity original = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    NameIdentifier bob = insertPrincipal(false, "bob");
+    assertTrue(TableMetaService.getInstance().deleteTable(original.nameIdentifier()));
+    assertFalse(
+        backend.setInitialTableOwner(
+            original.nameIdentifier(), original.id(), alice, Entity.EntityType.USER));
+    TableEntity replacement = createAndInsertTableEntity(original.namespace(), original.name());
+    assertFalse(
+        backend.setInitialTableOwner(
+            original.nameIdentifier(), original.id(), alice, Entity.EntityType.USER));
+    assertTrue(
+        OwnerMetaService.getInstance()
+            .getOwner(replacement.nameIdentifier(), Entity.EntityType.TABLE)
+            .isEmpty());
+    assertTrue(
+        backend.setInitialTableOwner(
+            replacement.nameIdentifier(), replacement.id(), bob, Entity.EntityType.USER));
+    assertFalse(
+        backend.setInitialTableOwner(
+            original.nameIdentifier(), original.id(), alice, Entity.EntityType.USER));
+    assertEquals(
+        "bob",
+        OwnerMetaService.getInstance()
+            .getOwner(replacement.nameIdentifier(), Entity.EntityType.TABLE)
+            .map(e -> ((HasIdentifier) e).nameIdentifier().name())
+            .orElseThrow());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerSkipsRenamedTable() throws Exception {
+    TableEntity original = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    backend.<TableEntity>update(
+        original.nameIdentifier(),
+        Entity.EntityType.TABLE,
+        old ->
+            TableEntity.builder()
+                .withId(old.id())
+                .withName("renamed")
+                .withNamespace(old.namespace())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+    assertFalse(
+        backend.setInitialTableOwner(
+            original.nameIdentifier(), original.id(), alice, Entity.EntityType.USER));
+    assertTrue(
+        OwnerMetaService.getInstance()
+            .getOwner(NameIdentifier.of(original.namespace(), "renamed"), Entity.EntityType.TABLE)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerWaitsForDeleteAndSkips() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    assertNull(
+        whileTransactionHeld(
+            () -> assertTrue(TableMetaService.getInstance().deleteTable(table.nameIdentifier())),
+            () ->
+                assertFalse(
+                    backend.setInitialTableOwner(
+                        table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER)),
+            true));
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerWaitsForExplicitAssignmentAndKeepsIt() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    NameIdentifier bob = insertPrincipal(false, "bob");
+    assertNull(
+        whileTransactionHeld(
+            () ->
+                OwnerMetaService.getInstance()
+                    .setOwner(
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE,
+                        bob,
+                        Entity.EntityType.USER),
+            () ->
+                assertFalse(
+                    backend.setInitialTableOwner(
+                        table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER)),
+            true));
+    assertEquals(
+        "bob",
+        OwnerMetaService.getInstance()
+            .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .map(e -> ((HasIdentifier) e).nameIdentifier().name())
+            .orElseThrow());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerRechecksNameAfterWaitingForParentRename() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    NameIdentifier schema = NameIdentifier.of(METALAKE, "catalog", "schema");
+    assertNull(
+        whileTransactionHeld(
+            () -> {
+              backend.<SchemaEntity>update(
+                  schema,
+                  Entity.EntityType.SCHEMA,
+                  old ->
+                      SchemaEntity.builder()
+                          .withId(old.id())
+                          .withName("renamed_schema")
+                          .withNamespace(old.namespace())
+                          .withAuditInfo(AUDIT_INFO)
+                          .build());
+              SessionUtils.getWithoutCommit(
+                  TableMetaMapper.class, mapper -> mapper.selectTableMetaByIdForUpdate(table.id()));
+            },
+            () ->
+                assertFalse(
+                    backend.setInitialTableOwner(
+                        table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER)),
+            true));
+    NameIdentifier moved = NameIdentifier.of(METALAKE, "catalog", "renamed_schema", table.name());
+    assertTrue(OwnerMetaService.getInstance().getOwner(moved, Entity.EntityType.TABLE).isEmpty());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerPropagatesPrincipalDeletion() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    Throwable failure =
+        whileTransactionHeld(
+            () -> deletePrincipal(false, alice),
+            () ->
+                backend.setInitialTableOwner(
+                    table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER),
+            true);
+    assertInstanceOf(NoSuchEntityException.class, failure);
+    assertTrue(
+        OwnerMetaService.getInstance()
+            .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void testInitialTableOwnerRejectsAnExistingTransaction() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              backend.setInitialTableOwner(
+                  table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER));
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+    assertTrue(
+        OwnerMetaService.getInstance()
+            .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  void testConcurrentInitialTableOwnersInsertOnlyOne() throws Exception {
+    TableEntity table = tableForInitialOwner();
+    NameIdentifier alice = insertPrincipal(false, "alice");
+    NameIdentifier bob = insertPrincipal(false, "bob");
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<Boolean> first =
+          executor.submit(
+              () -> {
+                start.await();
+                return backend.setInitialTableOwner(
+                    table.nameIdentifier(), table.id(), alice, Entity.EntityType.USER);
+              });
+      Future<Boolean> second =
+          executor.submit(
+              () -> {
+                start.await();
+                return backend.setInitialTableOwner(
+                    table.nameIdentifier(), table.id(), bob, Entity.EntityType.USER);
+              });
+      start.countDown();
+      Assertions.assertNotEquals(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+      assertTrue(
+          OwnerMetaService.getInstance()
+              .getOwner(table.nameIdentifier(), Entity.EntityType.TABLE)
+              .isPresent());
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @TestTemplate
+  void testCreateHookReturnsOriginalSnapshotWithoutChangingReplacementOwner() throws Exception {
+    TableEntity original = tableForInitialOwner();
+    insertPrincipal(false, "alice");
+    NameIdentifier bob = insertPrincipal(false, "bob");
+    Table created = EntityCombinedTable.of(Mockito.mock(Table.class), original);
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    Mockito.when(
+            delegate.createTable(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              // Deterministically stop between the successful create and its ownership callback.
+              TableMetaService.getInstance().deleteTable(original.nameIdentifier());
+              TableEntity replacement =
+                  createAndInsertTableEntity(original.namespace(), original.name());
+              OwnerMetaService.getInstance()
+                  .setOwner(
+                      replacement.nameIdentifier(),
+                      Entity.EntityType.TABLE,
+                      bob,
+                      Entity.EntityType.USER);
+              return created;
+            });
+    RelationalEntityStore store = new RelationalEntityStore();
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    FieldUtils.writeField(store, "backend", backend, true);
+    FieldUtils.writeField(store, "cache", cache, true);
+    TableHookDispatcher hook = new TableHookDispatcher(delegate, () -> new OwnerManager(store));
+    Table returned =
+        PrincipalUtils.doAs(
+            new UserPrincipal("alice"),
+            () ->
+                hook.createTable(
+                    original.nameIdentifier(),
+                    new Column[0],
+                    null,
+                    Map.of(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[0]));
+    Assertions.assertSame(created, returned);
+    assertEquals(
+        "bob",
+        OwnerMetaService.getInstance()
+            .getOwner(original.nameIdentifier(), Entity.EntityType.TABLE)
+            .map(e -> ((HasIdentifier) e).nameIdentifier().name())
+            .orElseThrow());
+    Mockito.verifyNoInteractions(cache);
+  }
+
+  private TableEntity tableForInitialOwner() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createAndInsertCatalog(METALAKE, "catalog");
+    createAndInsertSchema(METALAKE, "catalog", "schema");
+    return createAndInsertTableEntity(Namespace.of(METALAKE, "catalog", "schema"), "table");
   }
 
   private void setOwner(CatalogEntity owned, NameIdentifier owner, Entity.EntityType ownerType) {

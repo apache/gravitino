@@ -39,6 +39,40 @@ public interface OwnerDispatcher {
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType);
 
   /**
+   * Whether identity-fenced initial table ownership is supported.
+   *
+   * <p>Post-create callers must check this before creating the table, so an old implementation
+   * fails before any external or metadata mutation. The default is false.
+   *
+   * @return whether {@link #setInitialTableOwner} is supported
+   */
+  default boolean supportsInitialTableOwner() {
+    return false;
+  }
+
+  /**
+   * Sets the first owner after table creation, fenced by the created table's ID.
+   *
+   * <p>This internal post-create operation runs after creation commits, outside a transaction. It
+   * returns false without modifying ownership if the table was dropped/replaced or already has an
+   * owner. Principal, storage and notification failures propagate. Unsupported implementations fail
+   * before writing; there is deliberately no fallback to name-only {@link #setOwner}.
+   *
+   * @param metalake the metalake name
+   * @param table the table metadata object
+   * @param tableId the stable ID returned by creation
+   * @param ownerName the principal name
+   * @param ownerType the principal type
+   * @return true if ownership was initialized, false if initialization was no longer needed
+   * @throws UnsupportedOperationException if this capability is unsupported
+   */
+  default boolean setInitialTableOwner(
+      String metalake, MetadataObject table, long tableId, String ownerName, Owner.Type ownerType) {
+    throw new UnsupportedOperationException(
+        "Identity-fenced initial table ownership is unsupported");
+  }
+
+  /**
    * Sets the same owner on multiple metadata objects in iteration order. Semantics match repeated
    * {@link #setOwner} calls; relational {@link org.apache.gravitino.EntityStore} implementations
    * may persist using {@link org.apache.gravitino.SupportsRelationOperations#batchInsertRelations}.

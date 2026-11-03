@@ -126,6 +126,51 @@ public class OwnerManager implements OwnerDispatcher {
   }
 
   @Override
+  public boolean supportsInitialTableOwner() {
+    return store.relationOperations().supportsInitialTableOwner();
+  }
+
+  @Override
+  public boolean setInitialTableOwner(
+      String metalake, MetadataObject table, long tableId, String ownerName, Owner.Type ownerType) {
+    Preconditions.checkArgument(
+        table.type() == MetadataObject.Type.TABLE, "Expected a table metadata object");
+    NameIdentifier ownerIdent;
+    Entity.EntityType principalType;
+    if (ownerType == Owner.Type.USER) {
+      ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
+      principalType = Entity.EntityType.USER;
+    } else if (ownerType == Owner.Type.GROUP) {
+      ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
+      principalType = Entity.EntityType.GROUP;
+    } else {
+      throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+    }
+    try {
+      if (!store
+          .relationOperations()
+          .setInitialTableOwner(
+              MetadataObjectUtil.toEntityIdent(metalake, table),
+              tableId,
+              ownerIdent,
+              principalType)) {
+        return false;
+      }
+      OwnerImpl newOwner = new OwnerImpl();
+      newOwner.name = ownerName;
+      newOwner.type = ownerType;
+      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+          metalake, table, plugin -> plugin.onOwnerSet(table, null, newOwner));
+      notifyOwnerChange(null, metalake, table);
+      return true;
+    } catch (NoSuchEntityException missingPrincipal) {
+      throw new NotFoundException(missingPrincipal, "Owner %s is not found", ownerName);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to initialize owner of table " + table.fullName(), e);
+    }
+  }
+
+  @Override
   public void setOwners(
       String metalake,
       List<MetadataObject> metadataObjects,
