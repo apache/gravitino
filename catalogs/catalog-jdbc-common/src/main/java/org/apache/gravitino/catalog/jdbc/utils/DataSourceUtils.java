@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc.utils;
 
+import java.sql.Driver;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
@@ -70,6 +71,22 @@ public class DataSourceUtils {
 
   public static DataSource createDataSource(JdbcConfig jdbcConfig)
       throws GravitinoRuntimeException {
+    validateConfiguration(jdbcConfig);
+    try {
+      return createDBCPDataSource(jdbcConfig);
+    } catch (Exception exception) {
+      throw new GravitinoRuntimeException(exception, "Error creating datasource");
+    }
+  }
+
+  /**
+   * Validates JDBC settings without opening a connection or retaining a pool.
+   *
+   * @param jdbcConfig the effective JDBC configuration
+   * @throws IllegalArgumentException if a boolean, pool bound, driver or URL is invalid
+   * @throws GravitinoRuntimeException if a dangerous URL or driver setting is rejected
+   */
+  public static void validateConfiguration(JdbcConfig jdbcConfig) {
     // H2 is bundled as an embedded backend and must not be used through user-facing catalog
     // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
     // to execute at connection time, and the H2 driver class must also be blocked to prevent
@@ -88,51 +105,94 @@ public class DataSourceUtils {
     // config to the factory. Kept outside the try below so the specific reason surfaces directly
     // instead of being wrapped as "Error creating datasource".
     rejectUnsafePoolProperties(jdbcConfig.getAllConfig());
+    // Validate user configuration before the data-source builder wraps infrastructure failures.
+    jdbcConfig.getVerifyOnCreate();
+    jdbcConfig.getTestOnBorrow();
+    jdbcConfig.getConnectTimeoutMs();
+    jdbcConfig.getMaxWaitMs();
+    jdbcConfig.getPoolMaxIdle();
+    int minSize = jdbcConfig.getPoolMinSize();
+    int maxSize = jdbcConfig.getPoolMaxSize();
+    if (minSize > maxSize) {
+      throw new IllegalArgumentException("jdbc.pool.min-size must not exceed jdbc.pool.max-size");
+    }
     try {
-      return createDBCPDataSource(jdbcConfig);
-    } catch (Exception exception) {
-      if (isDriverClassMissing(exception)) {
-        // Some JDBC drivers are not packaged with Gravitino and must be installed by the user.
-        // Surface a clear, actionable message naming the driver instead of a raw
-        // ClassNotFoundException.
-        throw new GravitinoRuntimeException(
-            exception,
-            "JDBC driver class '%s' was not found on the catalog classpath. Install the driver "
-                + "JAR in the catalog's libs directory and recreate the catalog.",
-            jdbcConfig.getJdbcDriver());
+      JdbcUrlUtils.validateJdbcConfig(
+          jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
+    } catch (RuntimeException e) {
+      throw new GravitinoRuntimeException(e, "Error creating datasource");
+    }
+    configuredDriver(jdbcConfig);
+    Properties properties = getProperties(jdbcConfig);
+    try {
+      validateNativePoolProperties(properties);
+    } catch (Exception invalidProperties) {
+      // Identify a malformed native alias without printing unrelated settings or credentials.
+      for (String key : properties.stringPropertyNames()) {
+        Properties singleProperty = new Properties();
+        singleProperty.setProperty(key, properties.getProperty(key));
+        try {
+          validateNativePoolProperties(singleProperty);
+        } catch (Exception invalidProperty) {
+          throw new IllegalArgumentException(
+              "Invalid native JDBC connection-pool property '"
+                  + key
+                  + "': "
+                  + invalidProperty.getMessage(),
+              invalidProperty);
+        }
       }
-      throw new GravitinoRuntimeException(exception, "Error creating datasource");
+      throw new IllegalArgumentException(
+          "Invalid native JDBC connection-pool properties; check gravitino.bypass.* settings",
+          invalidProperties);
+    }
+  }
+
+  private static void validateNativePoolProperties(Properties properties) throws Exception {
+    // initialSize and class-loading properties were rejected before this method. The factory
+    // therefore only parses an uninitialized configuration bean; no connections are opened.
+    try (BasicDataSource ignored = BasicDataSourceFactory.createDataSource(properties)) {
+      // Always close the temporary bean, including on the diagnostic path for individual keys.
     }
   }
 
   /**
-   * Returns whether the given throwable chain indicates a missing JDBC driver class. DBCP2 reports
-   * an absent driver as a {@link ClassNotFoundException} (sometimes wrapped in a {@link
-   * SQLException} whose message is "Cannot load JDBC driver class ..."), so both the exception
-   * chain and that message are checked.
+   * Creates the configured driver and verifies that it accepts the configured JDBC URL.
    *
-   * @param throwable the throwable thrown while creating the data source
-   * @return {@code true} if the failure is due to a driver class that cannot be loaded
+   * @param config the JDBC catalog configuration
+   * @return the configured JDBC driver
+   * @throws IllegalArgumentException if the driver is absent, invalid, or incompatible with the URL
    */
-  private static boolean isDriverClassMissing(Throwable throwable) {
-    for (Throwable current = throwable; current != null; current = current.getCause()) {
-      if (current instanceof ClassNotFoundException || current instanceof NoClassDefFoundError) {
-        return true;
-      }
-      String message = current.getMessage();
-      if (message != null && message.contains("Cannot load JDBC driver class")) {
-        return true;
-      }
-      if (current.getCause() == current) {
-        break;
-      }
+  public static Driver configuredDriver(JdbcConfig config) {
+    String name = config.getJdbcDriver();
+    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    if (loader == null) {
+      loader = DataSourceUtils.class.getClassLoader();
     }
-    return false;
+    try {
+      Class<?> type = Class.forName(name, false, loader);
+      if (!Driver.class.isAssignableFrom(type)) {
+        throw new IllegalArgumentException(
+            "jdbc-driver '" + name + "' must implement java.sql.Driver");
+      }
+      Driver driver = type.asSubclass(Driver.class).getDeclaredConstructor().newInstance();
+      if (!driver.acceptsURL(config.getJdbcUrl())) {
+        throw new IllegalArgumentException("jdbc-driver '" + name + "' does not accept jdbc-url");
+      }
+      return driver;
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(
+          "JDBC driver class '"
+              + name
+              + "' was not found on the catalog classpath. Install the driver JAR in the catalog's libs directory.",
+          e);
+    } catch (ReflectiveOperationException | SQLException | LinkageError e) {
+      throw new IllegalArgumentException(
+          "Invalid jdbc-driver '" + name + "': driver must be installed and usable", e);
+    }
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
-    JdbcUrlUtils.validateJdbcConfig(
-        jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
     // Keep DBCP's default Connection.isValid() validation unless a validationQuery is explicitly
     // configured. DBCP caches a validation query as a prepared statement, and MySQL Connector/J
     // switches back to the database captured at prepare time when executing it. That switch fails
@@ -142,11 +202,6 @@ public class DataSourceUtils {
     String jdbcUrl = jdbcConfig.getJdbcUrl();
     basicDataSource.setUrl(jdbcUrl);
     String driverClassName = jdbcConfig.getJdbcDriver();
-    // DBCP2 loads the driver lazily on the first connection, so a missing driver would otherwise
-    // only surface much later (and as an opaque error). Verify the driver class is on the catalog
-    // classpath now, so catalog creation fails fast with a clear, actionable message. Loaded
-    // without initialization; the H2 driver is already rejected above.
-    verifyDriverPresent(driverClassName);
     basicDataSource.setDriverClassName(driverClassName);
     String userName = jdbcConfig.getUsername();
     basicDataSource.setUsername(userName);
@@ -179,23 +234,6 @@ public class DataSourceUtils {
     JdbcConnectionTimeouts.connectionProperties(jdbcConfig, jdbcUrl)
         .forEach(basicDataSource::addConnectionProperty);
     return basicDataSource;
-  }
-
-  /**
-   * Verifies that the configured JDBC driver class is loadable from the catalog classpath. The
-   * class is resolved without initialization using the catalog's context class loader (falling back
-   * to this class's loader), so an absent driver fails catalog creation immediately rather than on
-   * the first connection.
-   *
-   * @param driverClassName the fully qualified JDBC driver class name
-   * @throws ClassNotFoundException if the driver class is not on the catalog classpath
-   */
-  private static void verifyDriverPresent(String driverClassName) throws ClassNotFoundException {
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    if (classLoader == null) {
-      classLoader = DataSourceUtils.class.getClassLoader();
-    }
-    Class.forName(driverClassName, false, classLoader);
   }
 
   private static Properties getProperties(JdbcConfig jdbcConfig) {

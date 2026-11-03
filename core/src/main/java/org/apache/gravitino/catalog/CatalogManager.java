@@ -1280,7 +1280,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchCatalogException, IllegalArgumentException, IOException {
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
-    try {
+    try (CatalogLease lease = acquireCatalogLease(ident)) {
       CatalogEntity updatedCatalog =
           store.update(
               ident,
@@ -1292,20 +1292,38 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         ? new HashMap<>()
                         : new HashMap<>(existing.getProperties());
 
+                // Validate a transient plaintext view before secret writes. Failed validation
+                // must not overwrite or delete a previously stored write-through secret.
+                CatalogChange[] proposedChanges =
+                    SecretAlterChanges.prepareCatalogChangesForTest(
+                        secretManager, existing.id(), changes);
+                CatalogEntity proposed =
+                    updateEntity(
+                            newCatalogBuilder(ident.namespace(), existing),
+                            new HashMap<>(currentProperties),
+                            proposedChanges)
+                        .build();
+                Map<String, String> proposedConfiguration =
+                    secretManager.toPlaintextProperties(proposed.getProperties());
+                lease
+                    .wrapper()
+                    .classLoader
+                    .withClassLoader(
+                        cl -> {
+                          lease.catalog().validateConfiguration(proposedConfiguration);
+                          return null;
+                        },
+                        IllegalArgumentException.class);
+
                 Pair<CatalogChange[], List<SecretMaterial>> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
-                CatalogChange[] effectiveChanges = secretResult.getLeft();
-
-                CatalogEntity.Builder newCatalogBuilder =
-                    newCatalogBuilder(ident.namespace(), existing);
-
-                Map<String, String> newProps =
-                    existing.getProperties() == null
-                        ? new HashMap<>()
-                        : new HashMap<>(existing.getProperties());
-                return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+                return updateEntity(
+                        newCatalogBuilder(ident.namespace(), existing),
+                        new HashMap<>(currentProperties),
+                        secretResult.getLeft())
+                    .build();
               });
       alterCommitted = true;
       return updatedCatalog;
@@ -1847,6 +1865,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           cl -> {
             validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
             catalog.validateCredentialProviders(propsToValidate);
+            if (propsToValidate != null) {
+              catalog.validateConfiguration();
+            }
             if (propsToValidate == null) {
               // Loading stays lenient for catalogs persisted with unsupported providers, so only
               // warn about them. Providers persisted as a secret are checked by their plaintext.

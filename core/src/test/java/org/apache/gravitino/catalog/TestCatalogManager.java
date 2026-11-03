@@ -747,6 +747,75 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testConfigurationValidationOnCreateWithoutBackendVerification() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-create");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "3",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    properties.put("validation-max", "4");
+    // The identifier is reusable after validation rollback. No backend initialization is needed.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+  }
+
+  @Test
+  void testConfigurationValidationOnAlterUsesCompleteProposedProperties() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-alter");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "1",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.setProperty("validation-min", "3")));
+    Assertions.assertEquals(
+        "1", catalogManager.loadCatalog(ident).properties().get("validation-min"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.alterCatalog(
+                ident,
+                CatalogChange.setProperty("validation-min", "3"),
+                CatalogChange.setProperty("validation-max", "4")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.removeProperty("validation-max")));
+    Assertions.assertEquals(
+        "4", catalogManager.loadCatalog(ident).properties().get("validation-max"));
+  }
+
+  @Test
   public void testCreateCatalogVerifiesBackendViaTestConnection() throws Exception {
     // Opted in via validateOnCreate() force-probe, and the probe reports the backend unreachable:
     // creation must propagate ConnectionFailedException and roll back both the cache and the store.
@@ -2277,6 +2346,37 @@ public class TestCatalogManager {
       logConfig.removeLogger(CatalogManager.class.getName());
       context.updateLoggers();
       appender.stop();
+    }
+  }
+
+  @Test
+  void testInvalidConfigurationAlterDoesNotMutateSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "invalid_settings_secret");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "original-secret")),
+          Map.of());
+      CatalogEntity original = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urn = original.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setProperty("validation-min", "3"),
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "replacement"))));
+      Assertions.assertEquals("original-secret", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          original.getProperties(),
+          entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class).getProperties());
     }
   }
 

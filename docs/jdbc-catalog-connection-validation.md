@@ -65,7 +65,7 @@ it, and closes it. If it fails, the create is rejected and rolled back (the cata
 persisted), and the caller receives a connection error that names the backend `host:port` and the
 underlying driver message.
 
-To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
+To register a catalog whose backend is temporarily unavailable, set the catalog property
 `verify-on-create` to `false`, which skips the create-time check:
 
 ```json
@@ -73,6 +73,11 @@ To register a catalog whose backend is temporarily unavailable, set the hidden c
   "verify-on-create": "false"
 }
 ```
+
+This setting skips only the backend connection probe. Driver/URL compatibility, boolean values,
+and pool bounds are still checked on catalog creation and alteration, without opening a database
+connection. Invalid alterations leave the stored configuration unchanged.
+
 
 The default is `true` (verify on create). The connection is still opened lazily on first use when
 the check is skipped.
