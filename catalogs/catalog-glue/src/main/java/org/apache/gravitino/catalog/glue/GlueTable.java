@@ -96,8 +96,23 @@ public class GlueTable extends BaseTable {
     return new GlueTableOperations(glueClient, catalogId, dbName, name, partColNames);
   }
 
+  /**
+   * Returns the Glue partition operations of a Hive-format table. Iceberg tables keep their
+   * partitions in Iceberg manifests, not in Glue, so they have none.
+   *
+   * @throws UnsupportedOperationException for an Iceberg-format table
+   */
   @Override
   public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    if (properties != null
+        && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+            properties.get(GlueConstants.TABLE_TYPE_PARAM))) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Partition operations are not supported for Iceberg-format table %s; its"
+                  + " partitions are kept in Iceberg metadata, not in Glue",
+              name));
+    }
     return (SupportsPartitions) ops();
   }
 

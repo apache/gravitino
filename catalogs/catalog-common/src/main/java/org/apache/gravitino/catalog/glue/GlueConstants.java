@@ -53,8 +53,7 @@ public final class GlueConstants {
 
   /**
    * Upper bound in milliseconds for one Glue API call made by the catalog, including all retries
-   * (optional). The AWS clients used for Iceberg tables only take the attempt timeout. Defaults to
-   * {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
+   * (optional). Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_TIMEOUT_MS = "aws-glue-api-call-timeout-ms";
 
@@ -63,8 +62,8 @@ public final class GlueConstants {
 
   /**
    * Upper bound in milliseconds for a single attempt of a Glue API call (optional). Also used as
-   * the HTTP connection and socket timeout of the AWS clients (Glue and S3) used for Iceberg
-   * tables. Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
+   * the HTTP connection and socket timeout of the S3 client used for Iceberg tables. Defaults to
+   * {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS =
       "aws-glue-api-call-attempt-timeout-ms";
@@ -74,8 +73,8 @@ public final class GlueConstants {
 
   /**
    * Maximum number of attempts of a Glue API call made by the catalog, including the first one
-   * (optional). Retries apply to throttling and transient failures. The AWS clients used for
-   * Iceberg tables keep the AWS SDK default. Defaults to {@link #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
+   * (optional). Retries apply to throttling and transient failures. Defaults to {@link
+   * #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
    */
   public static final String AWS_GLUE_MAX_ATTEMPTS = "aws-glue-max-attempts";
 
@@ -131,6 +130,13 @@ public final class GlueConstants {
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
+
+  /**
+   * Key of the {@code Table.parameters()} entry, set to {@code true}, that marks an Iceberg table
+   * registered through Gravitino from an existing metadata file. Such a table shares its files with
+   * the table it was registered from, so Gravitino changes only its Glue parameters.
+   */
+  public static final String REGISTERED_ICEBERG_TABLE_PARAM = "gravitino.iceberg.registered";
 
   /**
    * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table

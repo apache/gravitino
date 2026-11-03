@@ -106,6 +106,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static final Logger LOG = LoggerFactory.getLogger(GlueCatalogOperations.class);
 
+  /** Glue parameters that identify a registered Iceberg table and its metadata file. */
+  private static final Set<String> REGISTERED_TABLE_RESERVED_KEYS =
+      ImmutableSet.of(
+          GlueConstants.TABLE_TYPE_PARAM,
+          GlueConstants.METADATA_LOCATION,
+          GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM);
+
   /** Table property keys that map to StorageDescriptor fields, not to Table.parameters(). */
   private static final Set<String> SD_TABLE_PROPERTY_KEYS =
       ImmutableSet.of(
@@ -414,14 +421,20 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
       rejectDuplicateColumns(table, dbName);
 
-      // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
-      // AWS Glue Table.partitionKeys() is empty for Iceberg tables, so we load the Iceberg
-      // Table to obtain the accurate partition spec and sort order.
+      // The Iceberg metadata is the only source of the columns, partitioning and sort order of an
+      // Iceberg table; the Glue columns are a Hive-style copy. A table whose metadata cannot be
+      // read is reported as an error rather than with the Glue copy.
       if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
         try {
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
-        } catch (Exception e) {
-          LOG.warn("Failed to load Iceberg metadata for table {}.{}", dbName, ident.name(), e);
+        } catch (RuntimeException e) {
+          String metadataLocation = rawGlueTable.parameters().get(GlueConstants.METADATA_LOCATION);
+          throw GlueExceptionConverter.toIcebergException(
+              e,
+              metadataLocation == null
+                  ? "Iceberg metadata of table " + ident.name()
+                  : String.format(
+                      "Iceberg metadata %s of table %s", metadataLocation, ident.name()));
         }
       }
 
@@ -475,57 +488,44 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       validateHiveSortOrders(sortOrders);
     }
 
-    // For Iceberg tables, stamp table_type=ICEBERG into the Glue parameters so that
-    // isIcebergTable() detection works consistently for future alterTable/listTable calls.
-    Map<String, String> finalProps = props;
-    if (isIceberg) {
-      finalProps = new HashMap<>(props);
-      finalProps.put(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.ICEBERG_TABLE_TYPE_VALUE);
-      // Resolve location from warehouse if not explicitly provided.
-      if (!finalProps.containsKey(GlueConstants.LOCATION)) {
-        finalProps.put(GlueConstants.LOCATION, resolveTableLocation(null, dbName, ident.name()));
-      }
+    if (isIceberg && props.containsKey(GlueConstants.METADATA_LOCATION)) {
+      return registerIcebergTable(
+          ident, dbName, comment, columns, props, partitions, distribution, sortOrders);
     }
 
     if (isIceberg) {
-      boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
-      if (!registerMode) {
-        // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
-        try {
-          GlueIcebergTableHelper.createTable(
-              icebergGlueCatalog,
-              dbName,
-              ident.name(),
-              columns,
-              comment,
-              finalProps,
-              partitions,
-              sortOrders);
-        } catch (RuntimeException e) {
-          throw GlueExceptionConverter.toIcebergException(e, "table " + ident.name());
-        }
-        LOG.info("Created Iceberg table {}.{} via Iceberg SDK", dbName, ident.name());
-        return loadTable(ident);
+      Map<String, String> icebergProps = new HashMap<>(props);
+      // Resolve location from warehouse if not explicitly provided.
+      if (!icebergProps.containsKey(GlueConstants.LOCATION)) {
+        icebergProps.put(GlueConstants.LOCATION, resolveTableLocation(null, dbName, ident.name()));
       }
+      // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
+      try {
+        GlueIcebergTableHelper.createTable(
+            icebergGlueCatalog,
+            dbName,
+            ident.name(),
+            columns,
+            comment,
+            icebergProps,
+            partitions,
+            sortOrders);
+      } catch (RuntimeException e) {
+        throw GlueExceptionConverter.toIcebergException(e, "table " + ident.name());
+      }
+      LOG.info("Created Iceberg table {}.{} via Iceberg SDK", dbName, ident.name());
+      return loadTable(ident);
     }
 
     TableInput input =
         buildTableInput(
-            dbName,
-            ident.name(),
-            comment,
-            columns,
-            finalProps,
-            partitions,
-            distribution,
-            sortOrders,
-            isIceberg);
+            dbName, ident.name(), comment, columns, props, partitions, distribution, sortOrders);
 
     CreateTableRequest.Builder req =
         CreateTableRequest.builder().databaseName(dbName).tableInput(input);
 
     executeCreateTable(dbName, ident, req);
-    LOG.info("Created {} table {}.{}", isIceberg ? "Iceberg" : "Glue", dbName, ident.name());
+    LOG.info("Created Glue table {}.{}", dbName, ident.name());
 
     // Read back what Glue stored, so the response carries the derived location and storage
     // classes, as a later load does.
@@ -661,20 +661,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     TableInput input =
-        TableInput.builder()
-            .name(raw.name())
+        tableInputFrom(raw)
             .description(description)
-            .owner(raw.owner())
-            .lastAccessTime(raw.lastAccessTime())
-            .lastAnalyzedTime(raw.lastAnalyzedTime())
-            .retention(raw.retention())
             .storageDescriptor(sd)
             .partitionKeys(cols.partCols)
-            .viewOriginalText(raw.viewOriginalText())
-            .viewExpandedText(raw.viewExpandedText())
-            .tableType(raw.tableType())
             .parameters(params)
-            .targetTable(raw.targetTable())
             .build();
 
     executeUpdateTable(
@@ -839,17 +830,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
-    // Register-mode: has METADATA_LOCATION but was not created via the Gravitino Iceberg SDK
-    // (i.e., TABLE_TYPE_PARAM is absent). Fall back to the native Glue SDK update path.
-    boolean hasMetadataLocation =
-        rawGlueTable.hasParameters()
-            && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION);
-    boolean isSdkManaged =
-        rawGlueTable.hasParameters()
-            && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
-                rawGlueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
-    if (hasMetadataLocation && !isSdkManaged) {
-      return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
+    if (isRegisteredIcebergTable(rawGlueTable)) {
+      return alterRegisteredIcebergTable(ident, dbName, rawGlueTable, changes);
     }
     TableIdentifier finalId;
     try {
@@ -870,35 +852,177 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return loadTable(finalIdent);
   }
 
-  private GlueTable alterRegisterModeIcebergTable(
+  /**
+   * Registers an existing Iceberg table from its metadata file. Iceberg reads the file before the
+   * Glue table is created, and takes the Glue columns and location from it. The Glue table is then
+   * marked as registered, so that later changes through Gravitino touch only its Glue parameters
+   * and never write into the files it shares with the table it was registered from.
+   */
+  private GlueTable registerIcebergTable(
+      NameIdentifier ident,
+      String dbName,
+      String comment,
+      Column[] columns,
+      Map<String, String> props,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders) {
+    String metadataLocation = props.get(GlueConstants.METADATA_LOCATION);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metadataLocation),
+        "Property %s cannot be blank",
+        GlueConstants.METADATA_LOCATION);
+    Preconditions.checkArgument(
+        !props.containsKey(GlueConstants.LOCATION),
+        "A registered Iceberg table takes its location from %s; do not set %s",
+        GlueConstants.METADATA_LOCATION,
+        GlueConstants.LOCATION);
+    Preconditions.checkArgument(
+        (partitions == null || partitions.length == 0)
+            && (sortOrders == null || sortOrders.length == 0)
+            && (distribution == null || distribution.strategy() == Strategy.NONE),
+        "A registered Iceberg table takes its partitioning and sort order from %s; do not set"
+            + " them",
+        GlueConstants.METADATA_LOCATION);
+
+    TableIdentifier tableId = TableIdentifier.of(dbName, ident.name());
+    org.apache.iceberg.Table registered;
+    try {
+      registered = icebergGlueCatalog.registerTable(tableId, metadataLocation);
+    } catch (RuntimeException e) {
+      throw GlueExceptionConverter.toIcebergException(
+          e, String.format("registering table %s from %s", ident.name(), metadataLocation));
+    }
+
+    try {
+      checkRegisteredColumns(columns, registered.schema(), metadataLocation);
+      Table raw = getRawTable(dbName, ident.name());
+      Map<String, String> params = new HashMap<>(raw.parameters());
+      props.forEach(params::putIfAbsent);
+      params.put(GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM, "true");
+      TableInput input =
+          tableInputFrom(raw)
+              .description(comment != null ? comment : raw.description())
+              .parameters(params)
+              .build();
+      executeUpdateTable(
+          ident,
+          UpdateTableRequest.builder()
+              .databaseName(dbName)
+              .tableInput(input)
+              .versionId(raw.versionId()));
+    } catch (RuntimeException e) {
+      // Without the marker the table would be altered as its own, so do not leave it behind.
+      // Dropping the Glue entry keeps the metadata and data files.
+      try {
+        icebergGlueCatalog.dropTable(tableId, false);
+      } catch (RuntimeException dropFailure) {
+        e.addSuppressed(dropFailure);
+      }
+      throw e;
+    }
+    LOG.info("Registered Iceberg table {}.{} from {}", dbName, ident.name(), metadataLocation);
+    return loadTable(ident);
+  }
+
+  /** Request columns of a registration are optional, and must match the metadata file if given. */
+  private static void checkRegisteredColumns(
+      Column[] columns, org.apache.iceberg.Schema schema, String metadataLocation) {
+    if (columns == null || columns.length == 0) {
+      return;
+    }
+    List<String> requested =
+        Arrays.stream(columns)
+            .map(c -> c.name().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toList());
+    List<String> stored =
+        schema.columns().stream()
+            .map(f -> f.name().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        requested.equals(stored),
+        "Columns %s differ from the columns %s in %s; omit the columns to take them from the"
+            + " metadata file",
+        requested,
+        stored,
+        metadataLocation);
+  }
+
+  /**
+   * Alters an Iceberg table registered through Gravitino. Only its Glue parameters change; the
+   * metadata file and the data files belong to the table it was registered from.
+   */
+  private GlueTable alterRegisteredIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
     Map<String, String> newParams = new HashMap<>(rawGlueTable.parameters());
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         TableChange.SetProperty sp = (TableChange.SetProperty) change;
+        checkRegisteredTableParameterKey(sp.getProperty());
         newParams.put(sp.getProperty(), sp.getValue());
       } else if (change instanceof TableChange.RemoveProperty) {
-        newParams.remove(((TableChange.RemoveProperty) change).getProperty());
+        String property = ((TableChange.RemoveProperty) change).getProperty();
+        checkRegisteredTableParameterKey(property);
+        newParams.remove(property);
       } else {
         throw new IllegalArgumentException(
-            "Unsupported change for register-mode Iceberg table: "
-                + change.getClass().getSimpleName());
+            String.format(
+                "Iceberg table %s was registered from an existing metadata file, so only its"
+                    + " properties can be changed; %s is not supported",
+                ident.name(), change.getClass().getSimpleName()));
       }
     }
 
-    TableInput input =
-        TableInput.builder()
-            .name(rawGlueTable.name())
-            .description(rawGlueTable.description())
-            .tableType(rawGlueTable.tableType())
-            .parameters(newParams)
-            .storageDescriptor(rawGlueTable.storageDescriptor())
-            .build();
-
-    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
-    LOG.info(
-        "Altered register-mode Iceberg table {}.{} properties via Glue SDK", dbName, ident.name());
+    TableInput input = tableInputFrom(rawGlueTable).parameters(newParams).build();
+    executeUpdateTable(
+        ident,
+        UpdateTableRequest.builder()
+            .databaseName(dbName)
+            .tableInput(input)
+            .versionId(rawGlueTable.versionId()));
+    LOG.info("Altered registered Iceberg table {}.{} properties", dbName, ident.name());
     return loadTable(ident);
+  }
+
+  private static void checkRegisteredTableParameterKey(String property) {
+    Preconditions.checkArgument(
+        !REGISTERED_TABLE_RESERVED_KEYS.contains(property),
+        "Property %s of a registered Iceberg table cannot be changed",
+        property);
+  }
+
+  private static boolean isRegisteredIcebergTable(Table table) {
+    return table.hasParameters()
+        && "true"
+            .equalsIgnoreCase(table.parameters().get(GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM));
+  }
+
+  /** Starts a Glue table definition from the table as Glue holds it, so no field is lost. */
+  private static TableInput.Builder tableInputFrom(Table raw) {
+    return TableInput.builder()
+        .name(raw.name())
+        .description(raw.description())
+        .owner(raw.owner())
+        .lastAccessTime(raw.lastAccessTime())
+        .lastAnalyzedTime(raw.lastAnalyzedTime())
+        .retention(raw.retention())
+        .storageDescriptor(raw.storageDescriptor())
+        .partitionKeys(raw.partitionKeys())
+        .viewOriginalText(raw.viewOriginalText())
+        .viewExpandedText(raw.viewExpandedText())
+        .tableType(raw.tableType())
+        .parameters(raw.parameters())
+        .targetTable(raw.targetTable());
+  }
+
+  private Table getRawTable(String dbName, String tableName) {
+    GetTableRequest.Builder req = GetTableRequest.builder().databaseName(dbName).name(tableName);
+    applyCatalogId(catalogId, req::catalogId);
+    try {
+      return callGlue(() -> glueClient.getTable(req.build()), "table " + tableName).table();
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toTableException(e, "table " + tableName);
+    }
   }
 
   @Override
@@ -934,6 +1058,47 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       return false;
     } catch (GlueException e) {
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    }
+  }
+
+  /**
+   * Drops an Iceberg table and deletes the data and metadata files its metadata references. Hive
+   * tables in Glue are external, and registered Iceberg tables share their files with the table
+   * they were registered from, so neither can be purged.
+   */
+  @Override
+  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    String dbName = schemaName(ident.namespace());
+    Table existing;
+    try {
+      existing = getRawTable(dbName, ident.name());
+    } catch (NoSuchTableException e) {
+      return false;
+    }
+    rejectIfView(existing, ident, dbName);
+    if (!matchesFormatFilter(existing)) {
+      return false;
+    }
+    if (!GlueIcebergTableHelper.isIcebergTable(existing)) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Cannot purge table %s: Glue Hive-format tables are external, so only drop is"
+                  + " supported and the files stay in place",
+              ident.name()));
+    }
+    if (isRegisteredIcebergTable(existing)) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Cannot purge table %s: it was registered from an existing metadata file and shares"
+                  + " its files with that table; drop it instead",
+              ident.name()));
+    }
+    try {
+      boolean purged = icebergGlueCatalog.dropTable(TableIdentifier.of(dbName, ident.name()), true);
+      LOG.info("Purged Iceberg table {}.{}", dbName, ident.name());
+      return purged;
+    } catch (RuntimeException e) {
+      throw GlueExceptionConverter.toIcebergException(e, "purging table " + ident.name());
     }
   }
 
@@ -1141,8 +1306,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties,
       Transform[] partitions,
       Distribution distribution,
-      SortOrder[] sortOrders,
-      boolean isIceberg) {
+      SortOrder[] sortOrders) {
 
     int partCount = partitions.length;
     Preconditions.checkArgument(
@@ -1178,15 +1342,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
-    if (!isIceberg) {
-      StorageFormat sf =
-          resolveStorageFormat(
-              properties.get(GlueConstants.FORMAT), inputFormat, outputFormat, serdeLib);
-      if (sf != null) {
-        inputFormat = sf.getInputFormat();
-        outputFormat = sf.getOutputFormat();
-        serdeLib = sf.getSerde();
-      }
+    StorageFormat sf =
+        resolveStorageFormat(
+            properties.get(GlueConstants.FORMAT), inputFormat, outputFormat, serdeLib);
+    if (sf != null) {
+      inputFormat = sf.getInputFormat();
+      outputFormat = sf.getOutputFormat();
+      serdeLib = sf.getSerde();
     }
 
     SerDeInfo serDe =
@@ -1231,20 +1393,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             .sortColumns(glueSortCols)
             .build();
 
-    TableInput.Builder builder =
-        TableInput.builder()
-            .name(name)
-            .description(comment)
-            .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
-            .parameters(tableParams)
-            .storageDescriptor(sd);
-
-    // AWS Glue rejects partitionKeys for Iceberg-format tables.
-    if (!isIceberg) {
-      builder.partitionKeys(gluePartCols);
-    }
-
-    return builder.build();
+    return TableInput.builder()
+        .name(name)
+        .description(comment)
+        .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
+        .parameters(tableParams)
+        .storageDescriptor(sd)
+        .partitionKeys(gluePartCols)
+        .build();
   }
 
   private software.amazon.awssdk.services.glue.model.Column toGlueColumn(Column col) {
