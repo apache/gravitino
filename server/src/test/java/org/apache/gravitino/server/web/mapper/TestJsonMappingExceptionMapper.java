@@ -53,14 +53,12 @@ public class TestJsonMappingExceptionMapper {
         JsonMappingException.from(
             mockParser,
             "wrapper",
-            new IllegalArgumentException(
-                "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION"));
+            new IllegalArgumentException("Unknown built-in policy type: system_iceberg_bogus"));
     Response response = jsonMappingExceptionMapper.toResponse(mapping);
     ErrorResponse entity = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     Assertions.assertEquals(
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION",
-        entity.getMessage());
+        "Unknown built-in policy type: system_iceberg_bogus", entity.getMessage());
     Assertions.assertNull(entity.getStack());
   }
 }

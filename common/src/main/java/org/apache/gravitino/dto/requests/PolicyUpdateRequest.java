@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -128,11 +128,13 @@ public interface PolicyUpdateRequest extends RESTRequest {
    *
    * <p>{@code newContent} fully replaces the previous content. Omitted typed fields use that
    * content type's defaults; they are not merged with the previously stored values.
+   *
+   * <p>{@code policyType} accepts known type ids case-insensitively; the change stores the
+   * canonical lowercase value from {@link Policy.BuiltInType#policyType()}.
    */
   @EqualsAndHashCode
   @Getter
   @ToString
-  @JsonDeserialize(using = PolicyUpdateContentRequestDeserializer.class)
   class UpdatePolicyContentRequest implements PolicyUpdateRequest {
 
     @JsonProperty("policyType")
@@ -142,12 +144,9 @@ public interface PolicyUpdateRequest extends RESTRequest {
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-        property = "policyType",
-        defaultImpl = PolicyContentDTO.CustomContentDTO.class)
+        property = "policyType")
+    @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
     @JsonSubTypes({
-      // add mappings for built-in types here
-      // For example: @JsonSubTypes.Type(value = DataCompactionContent.class, name =
-      // "system_data_compaction")
       @JsonSubTypes.Type(
           value = PolicyContentDTO.IcebergCompactionContentDTO.class,
           name = "system_iceberg_compaction"),
@@ -168,7 +167,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
           name = "system_column_mask"),
       @JsonSubTypes.Type(
           value = PolicyContentDTO.AccessControlContentDTO.class,
-          name = "system_access_control")
+          name = "system_access_control"),
+      @JsonSubTypes.Type(value = PolicyContentDTO.CustomContentDTO.class, name = "custom")
     })
     private final PolicyContentDTO newContent;
 
@@ -191,14 +191,14 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
     @Override
     public PolicyChange policyChange() {
-      return PolicyChange.updateContent(policyType, fromDTO(newContent));
+      return PolicyChange.updateContent(
+          Policy.BuiltInType.fromPolicyType(policyType).policyType(), fromDTO(newContent));
     }
 
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
       Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
-      // Type before content: same Jackson EXTERNAL_PROPERTY + defaultImpl pitfall as create.
       Policy.BuiltInType.fromPolicyType(policyType);
       newContent.validate();
     }

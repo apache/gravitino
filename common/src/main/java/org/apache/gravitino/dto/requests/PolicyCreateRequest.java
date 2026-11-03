@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -32,11 +33,16 @@ import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a policy. */
+/**
+ * Represents a request to create a policy.
+ *
+ * <p>{@code policyType} accepts known type ids case-insensitively; storage and responses use the
+ * canonical lowercase value from {@link Policy.BuiltInType#policyType()}.
+ */
 @Getter
 @EqualsAndHashCode
 @ToString
-@JsonDeserialize(using = PolicyCreateRequestDeserializer.class)
+@JsonIgnoreProperties(ignoreUnknown = false)
 public class PolicyCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
@@ -56,12 +62,9 @@ public class PolicyCreateRequest implements RESTRequest {
   @JsonTypeInfo(
       use = JsonTypeInfo.Id.NAME,
       include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-      property = "policyType",
-      defaultImpl = PolicyContentDTO.CustomContentDTO.class)
+      property = "policyType")
+  @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
   @JsonSubTypes({
-    // add mappings for built-in types here
-    // For example: @JsonSubTypes.Type(value = DataCompactionContent.class, name =
-    // "system_data_compaction")
     @JsonSubTypes.Type(
         value = PolicyContentDTO.IcebergCompactionContentDTO.class,
         name = "system_iceberg_compaction"),
@@ -82,7 +85,8 @@ public class PolicyCreateRequest implements RESTRequest {
         name = "system_column_mask"),
     @JsonSubTypes.Type(
         value = PolicyContentDTO.AccessControlContentDTO.class,
-        name = "system_access_control")
+        name = "system_access_control"),
+    @JsonSubTypes.Type(value = PolicyContentDTO.CustomContentDTO.class, name = "custom")
   })
   private final PolicyContentDTO policyContent;
 
@@ -122,8 +126,8 @@ public class PolicyCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
     Preconditions.checkArgument(
         policyContent != null, "\"content\" is required and cannot be null");
-    // Resolve policyType before content.validate(): Jackson may have fallen back to custom content
-    // for an unknown or mis-cased type, and custom content rules would obscure the type error.
+    // Resolve the type before content rules so an unknown type is never reported as a content
+    // validation failure.
     Policy.BuiltInType.fromPolicyType(policyType);
     policyContent.validate();
   }

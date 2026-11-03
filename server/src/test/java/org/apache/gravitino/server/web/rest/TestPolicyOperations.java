@@ -74,6 +74,9 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
+import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
+import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -123,6 +126,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(PolicyOperations.class);
+    resourceConfig.register(JsonProcessingExceptionMapper.class);
+    resourceConfig.register(JsonParseExceptionMapper.class);
+    resourceConfig.register(JsonMappingExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -545,27 +551,48 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testCreatePolicyUnknownOrMisCasedTypeNamedInError() throws Exception {
+  public void testCreatePolicyUnknownTypeNamedInError() {
     assertCreatePolicyTypeNamedInError(
         "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
             + "\"enabled\":true,\"content\":{}}",
         "Unknown built-in policy type: system_iceberg_bogus");
     assertCreatePolicyTypeNamedInError(
-        "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
-            + "\"enabled\":true,\"content\":{}}",
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
+        "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
   }
 
   @Test
-  public void testCreatePolicyMisCasedTypeWithBuiltInContentNamedInError() {
-    assertCreatePolicyTypeNamedInError(
-        "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
-            + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
-    assertCreatePolicyTypeNamedInError(
-        "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
-            + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
-        "Unknown built-in policy type: system_iceberg_bogus");
+  public void testCreatePolicyAcceptsMisCasedKnownType() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("p_upper")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertEquals(
+                  Policy.BuiltInType.ICEBERG_COMPACTION, invocation.getArgument(2));
+              return policy;
+            });
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(
+                Entity.entity(
+                    "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
+                        + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
   }
 
   private void assertCreatePolicyTypeNamedInError(String body, String expectedMessage) {

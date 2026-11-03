@@ -24,8 +24,11 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.Policy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPolicyCreateRequest {
 
@@ -39,14 +42,14 @@ public class TestPolicyCreateRequest {
             .withProperties(null)
             .build();
     PolicyCreateRequest request =
-        new PolicyCreateRequest("policy_test", "test_type", "policy comment", true, content);
+        new PolicyCreateRequest("policy_test", "custom", "policy comment", true, content);
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     PolicyCreateRequest deserRequest =
         JsonUtils.objectMapper().readValue(serJson, PolicyCreateRequest.class);
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("policy_test", deserRequest.getName());
     Assertions.assertEquals("policy comment", deserRequest.getComment());
-    Assertions.assertEquals("test_type", deserRequest.getPolicyType());
+    Assertions.assertEquals("custom", deserRequest.getPolicyType());
     Assertions.assertTrue(deserRequest.getEnabled());
     Assertions.assertEquals(content, deserRequest.getPolicyContent());
 
@@ -73,14 +76,59 @@ public class TestPolicyCreateRequest {
     Assertions.assertEquals("supportedObjectTypes cannot be empty", e.getMessage());
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "system_iceberg_compaction",
+        "SYSTEM_ICEBERG_COMPACTION",
+        "System_Iceberg_Compaction"
+      })
+  public void testDeserializeAcceptsKnownPolicyTypeCaseInsensitively(String policyType)
+      throws JsonProcessingException {
+    String json =
+        "{\"name\":\"p_upper\",\"policyType\":\""
+            + policyType
+            + "\",\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}";
+    PolicyCreateRequest request =
+        JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
+    Assertions.assertEquals(policyType, request.getPolicyType());
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.IcebergCompactionContentDTO.class, request.getPolicyContent());
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_COMPACTION,
+        Policy.BuiltInType.fromPolicyType(request.getPolicyType()));
+    request.validate();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"custom", "CUSTOM", "Custom"})
+  public void testDeserializeAcceptsCustomPolicyTypeCaseInsensitively(String policyType)
+      throws JsonProcessingException {
+    String json =
+        "{\"name\":\"p\",\"policyType\":\""
+            + policyType
+            + "\",\"enabled\":true,"
+            + "\"content\":{\"customRules\":{\"a\":1},\"supportedObjectTypes\":[\"TABLE\"]}}";
+    PolicyCreateRequest request =
+        JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
+    Assertions.assertEquals(
+        Policy.BuiltInType.CUSTOM, Policy.BuiltInType.fromPolicyType(request.getPolicyType()));
+    request.validate();
+  }
+
   @Test
-  public void testDeserializeRejectsUnknownOrMisCasedPolicyType() {
+  public void testDeserializeRejectsUnknownPolicyType() {
     assertPolicyTypeNamedOnDeserialize(
         "{\"name\":\"p_bogus\",\"policyType\":\"system_iceberg_bogus\",\"enabled\":true,\"content\":{}}",
         "Unknown built-in policy type: system_iceberg_bogus");
     assertPolicyTypeNamedOnDeserialize(
-        "{\"name\":\"p_upper\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\",\"enabled\":true,\"content\":{}}",
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
+        "{\"name\":\"p_bogus\",\"policyType\":\"system_iceberg_bogus\",\"enabled\":true,"
+            + "\"content\":{\"maxPartitionNum\":5}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"name\":\"p_other\",\"policyType\":\"not_a_policy\",\"enabled\":true,"
+            + "\"content\":{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}}",
+        "Unknown policy type: not_a_policy, it should start with 'system_' or be 'custom'");
   }
 
   @Test
@@ -116,19 +164,6 @@ public class TestPolicyCreateRequest {
     PolicyCreateRequest request =
         JsonUtils.objectMapper().readValue(json, PolicyCreateRequest.class);
     Assertions.assertFalse(request.getEnabled());
-  }
-
-  @Test
-  public void testDeserializeRejectsMisCasedTypeWithBuiltInContent() {
-    // Non-empty built-in content must not become "Malformed json" via CustomContentDTO.
-    assertPolicyTypeNamedOnDeserialize(
-        "{\"name\":\"p_upper\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\",\"enabled\":true,"
-            + "\"content\":{\"maxPartitionNum\":5}}",
-        "Policy type must be 'system_iceberg_compaction', but got: SYSTEM_ICEBERG_COMPACTION");
-    assertPolicyTypeNamedOnDeserialize(
-        "{\"name\":\"p_bogus\",\"policyType\":\"system_iceberg_bogus\",\"enabled\":true,"
-            + "\"content\":{\"maxPartitionNum\":5}}",
-        "Unknown built-in policy type: system_iceberg_bogus");
   }
 
   private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage) {
