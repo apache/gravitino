@@ -116,7 +116,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             return client
 
         with patch(
-            "mcp_server.client.plain.plain_rest_client_operation.httpx.AsyncClient",
+            "mcp_server.client.plain.plain_rest_client_operation._GravitinoAsyncClient",
             side_effect=create_http_client,
         ):
             return PlainRESTClientOperation(*args, **kwargs)

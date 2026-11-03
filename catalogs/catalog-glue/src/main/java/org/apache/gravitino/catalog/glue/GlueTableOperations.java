@@ -171,6 +171,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
 
     // Glue stores values by position, so place each value under the column its field name names.
     String[] values = new String[partitionColNames.length];
+    Literal<?>[] literals = new Literal<?>[partitionColNames.length];
     for (int i = 0; i < ip.values().length; i++) {
       String[] fieldName = ip.fieldNames()[i];
       int column = fieldName.length == 1 ? partitionColumnIndex(fieldName[0]) : -1;
@@ -195,14 +196,15 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
           partitionColNames[column],
           MAX_PARTITION_VALUE_LENGTH);
       values[column] = value.toString();
+      literals[column] = ip.values()[i];
     }
     List<String> valueList = Arrays.asList(values);
     String name = buildPartitionName(valueList);
     // A given name may be written with or without Hive escaping, but must match the values.
     Preconditions.checkArgument(
         partition.name() == null
-            || partition.name().equals(name)
-            || partition.name().equals(unescapedPartitionName(valueList)),
+            || matchesEscapedName(partition.name(), valueList)
+            || matchesUnescapedName(partition.name(), valueList),
         "Partition name %s does not match its values; expected %s",
         partition.name(),
         name);
@@ -232,7 +234,13 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     }
 
     LOG.info("Added partition {} to {}.{}", name, dbName, tableName);
-    return getPartition(name);
+    // The partition is built from the validated request: reading it back could fail after the
+    // partition was created, and Glue returns every value as a string.
+    String[][] fieldNames = new String[partitionColNames.length][];
+    for (int i = 0; i < partitionColNames.length; i++) {
+      fieldNames[i] = new String[] {partitionColNames[i]};
+    }
+    return Partitions.identity(name, fieldNames, literals, partition.properties());
   }
 
   @Override
@@ -302,13 +310,40 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     return values;
   }
 
-  private String unescapedPartitionName(List<String> values) {
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < partitionColNames.length; i++) {
-      if (i > 0) sb.append('/');
-      sb.append(partitionColNames[i]).append('=').append(values.get(i));
+  /** Whether a Hive-escaped partition name names the values; column names ignore case. */
+  private boolean matchesEscapedName(String name, List<String> values) {
+    try {
+      return parsePartitionName(name).equals(values);
+    } catch (IllegalArgumentException e) {
+      return false;
     }
-    return sb.toString();
+  }
+
+  /**
+   * Whether an unescaped partition name, such as {@code p=a/b} for the value {@code a/b}, names the
+   * values. Column names ignore case and values are compared as is.
+   */
+  private boolean matchesUnescapedName(String name, List<String> values) {
+    int pos = 0;
+    for (int i = 0; i < partitionColNames.length; i++) {
+      if (i > 0) {
+        if (!name.startsWith("/", pos)) {
+          return false;
+        }
+        pos++;
+      }
+      String column = partitionColNames[i];
+      if (!name.regionMatches(true, pos, column, 0, column.length())
+          || !name.startsWith("=", pos + column.length())) {
+        return false;
+      }
+      pos += column.length() + 1;
+      if (!name.startsWith(values.get(i), pos)) {
+        return false;
+      }
+      pos += values.get(i).length();
+    }
+    return pos == name.length();
   }
 
   private int partitionColumnIndex(String name) {

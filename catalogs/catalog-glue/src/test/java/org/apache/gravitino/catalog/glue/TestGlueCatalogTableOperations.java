@@ -62,6 +62,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.ConcurrentModificationException;
@@ -82,6 +83,7 @@ import software.amazon.awssdk.services.glue.model.SkewedInfo;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
+import software.amazon.awssdk.services.glue.model.ThrottlingException;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 
@@ -1149,6 +1151,147 @@ class TestGlueCatalogTableOperations {
         .build();
   }
 
+  @Test
+  void testCreateHiveTableRefusesIcebergTableType() {
+    assertCreateRefused(
+        "is not allowed on a Hive-format table",
+        ABC,
+        Map.of(GlueConstants.TABLE_TYPE_PARAM, "ICEBERG"),
+        new Transform[0],
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateReturnsSubmittedDefinitionWhenReadBackFails() {
+    when(mockClient.createTable(any(CreateTableRequest.class)))
+        .thenReturn(CreateTableResponse.builder().build());
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenThrow(
+            ThrottlingException.builder()
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("ThrottlingException")
+                        .errorMessage("Rate exceeded")
+                        .build())
+                .build());
+
+    GlueTable table =
+        createHive(ABC, Map.of(), new Transform[0], Distributions.NONE, SortOrders.NONE);
+
+    assertEquals("hive_tbl", table.name());
+    assertEquals(3, table.columns().length);
+    assertEquals(
+        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+        table.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
+  }
+
+  @Test
+  void testCreateTreatsBlankStorageClassesAsUnset() {
+    useFakeGlueTable(null);
+    GlueTable table =
+        createHive(
+            ABC,
+            Map.of(
+                GlueConstants.INPUT_FORMAT_CLASS, " ",
+                GlueConstants.OUTPUT_FORMAT, "",
+                GlueConstants.SERDE_LIB, " "),
+            new Transform[0],
+            Distributions.NONE,
+            SortOrders.NONE);
+    assertEquals(
+        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+        table.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
+  }
+
+  @Test
+  void testCreateRefusesMismatchedBuiltInFormatClasses() {
+    assertCreateRefused(
+        "belong to different storage formats",
+        ABC,
+        Map.of(
+            GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.ORC_INPUT_FORMAT_CLASS,
+            GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.PARQUET_OUTPUT_FORMAT_CLASS,
+            GlueConstants.SERDE_LIB, HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS),
+        new Transform[0],
+        Distributions.NONE,
+        SortOrders.NONE);
+
+    // A custom SerDe over text files is a common combination.
+    useFakeGlueTable(null);
+    GlueTable table =
+        createHive(
+            ABC,
+            Map.of(
+                GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+                GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                GlueConstants.SERDE_LIB, "org.openx.data.jsonserde.JsonSerDe"),
+            new Transform[0],
+            Distributions.NONE,
+            SortOrders.NONE);
+    assertEquals(
+        "org.openx.data.jsonserde.JsonSerDe", table.properties().get(GlueConstants.SERDE_LIB));
+  }
+
+  @Test
+  void testAlterRenamesSkewedColumns() {
+    UpdateTableRequest req = alterAndCapture(TableChange.renameColumn(new String[] {"k"}, "k2"));
+    assertEquals(
+        List.of("k2"), req.tableInput().storageDescriptor().skewedInfo().skewedColumnNames());
+  }
+
+  @Test
+  void testAlterRefusesDeletingSkewedColumn() {
+    Table table = nativeTable();
+    useFakeGlueTable(
+        table.toBuilder()
+            .storageDescriptor(
+                table.storageDescriptor().toBuilder()
+                    .skewedInfo(SkewedInfo.builder().skewedColumnNames("id").build())
+                    .build())
+            .build());
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"id"}, false)));
+    assertTrue(e.getMessage().contains("skewed"), e.getMessage());
+  }
+
+  @Test
+  void testAlterRemovingStoragePropertyRemovesParameterOfSameName() {
+    Table table = nativeTable();
+    useFakeGlueTable(
+        table.toBuilder()
+            .parameters(Map.of("classification", "csv", GlueConstants.SERDE_NAME, "shadow"))
+            .storageDescriptor(
+                table.storageDescriptor().toBuilder()
+                    .serdeInfo(table.storageDescriptor().serdeInfo().toBuilder().name("s").build())
+                    .build())
+            .build());
+    ops.alterTable(ALTER_IDENT, TableChange.removeProperty(GlueConstants.SERDE_NAME));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    TableInput in = captor.getValue().tableInput();
+    assertFalse(in.parameters().containsKey(GlueConstants.SERDE_NAME));
+    assertNull(in.storageDescriptor().serdeInfo().name());
+  }
+
+  @Test
+  void testAlterRefusesChangingTableFormat() {
+    useFakeGlueTable(nativeTable());
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.setProperty(GlueConstants.TABLE_FORMAT, "iceberg"),
+          TableChange.setProperty(GlueConstants.TABLE_TYPE_PARAM, "ICEBERG"),
+          TableChange.removeProperty(GlueConstants.TABLE_FORMAT)
+        }) {
+      assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
+    }
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
   private UpdateTableRequest alterAndCapture(TableChange... changes) {
     useFakeGlueTable(nativeTable());
     ops.alterTable(ALTER_IDENT, changes);
@@ -1321,7 +1464,7 @@ class TestGlueCatalogTableOperations {
         assertThrows(
             IllegalArgumentException.class,
             () -> ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"k"}, false)));
-    assertTrue(e.getMessage().contains("bucket or sort column"), e.getMessage());
+    assertTrue(e.getMessage().contains("Cannot delete column k"), e.getMessage());
   }
 
   @Test
