@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.ibatis.session.SqlSession;
 
 /**
  * This class provides utility methods to perform database operations with MyBatis mappers in the
@@ -104,6 +105,20 @@ public class SessionUtils {
     } catch (Throwable t) {
       SqlSessions.rollbackAndCloseSqlSession();
       throw t;
+    }
+  }
+
+  /**
+   * Clears MyBatis's first-level cache of the current session. A read earlier in the session, for
+   * example by a caller's outer transaction, may be cached; a read that must see the database as it
+   * is now, such as one that follows a locking read, calls this first.
+   */
+  public static void clearSessionCache() {
+    SqlSession session = SqlSessions.getSqlSession();
+    try {
+      session.clearCache();
+    } finally {
+      SqlSessions.closeSqlSession();
     }
   }
 

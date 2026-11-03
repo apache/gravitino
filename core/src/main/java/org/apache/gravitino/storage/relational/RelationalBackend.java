@@ -32,12 +32,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 
 /** Interface defining the operations for a Relation Backend. */
-public interface RelationalBackend extends Closeable, SupportsRelationOperations {
+public interface RelationalBackend
+    extends Closeable, SupportsRelationOperations, SupportsDomainOperations {
 
   /**
    * Initializes the Relational Backend environment with the provided configuration.
