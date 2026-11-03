@@ -342,13 +342,14 @@ class AccessControlContent(PolicyContent):
     APPLICABLE_ROLES_KEY: ClassVar[str] = "applicableRoles"
 
     # The privileges a tag is allowed to confer. An allowlist rather than a
-    # denylist, so the boundary fails closed. Note: the Java API also permits
-    # PROBE_TABLE_LIKE, which is not yet present in the Python client's
-    # Privilege.Name enum, so it cannot be listed here.
+    # denylist, so the boundary fails closed: a privilege added to
+    # Privilege.Name later confers nothing through a tag until it is added
+    # here deliberately.
     PERMITTED_PRIVILEGES: ClassVar[frozenset] = frozenset(
         {
             Privilege.Name.SELECT_TABLE,
             Privilege.Name.MODIFY_TABLE,
+            Privilege.Name.PROBE_TABLE_LIKE,
             Privilege.Name.SELECT_VIEW,
             Privilege.Name.READ_FILESET,
             Privilege.Name.WRITE_FILESET,

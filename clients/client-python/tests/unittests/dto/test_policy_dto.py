@@ -86,6 +86,28 @@ class TestPolicyDTO(unittest.TestCase):
         )
         self.assertEqual(policy, PolicyDTO.from_json(policy.to_json()))
 
+    def test_access_control_probe_table_like_round_trip(self) -> None:
+        # The Java server permits PROBE_TABLE_LIKE in access-control
+        # policies (see TestPolicyDTO.testAccessControlPolicySerDe), so
+        # decoding such a policy must not raise KeyError.
+        policy = PolicyDTO.from_json(
+            _policy_json(
+                "system_access_control",
+                {
+                    "privileges": ["SELECT_TABLE", "PROBE_TABLE_LIKE"],
+                    "applicableRoles": ["analyst", "auditor"],
+                },
+            )
+        )
+        content = policy.content()
+        self.assertIsInstance(content, AccessControlContentDTO)
+        self.assertEqual(
+            [Privilege.Name.SELECT_TABLE, Privilege.Name.PROBE_TABLE_LIKE],
+            content.privileges(),
+        )
+        self.assertEqual(["analyst", "auditor"], content.applicable_roles())
+        self.assertEqual(policy, PolicyDTO.from_json(policy.to_json()))
+
     def test_access_control_domain_conversion(self) -> None:
         dto = AccessControlContentDTO.from_dict(
             {"privileges": ["select_table"], "applicableRoles": ["r1"]},
