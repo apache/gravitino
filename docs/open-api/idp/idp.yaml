@@ -67,8 +67,12 @@ paths:
               examples:
                 AlreadyExistsException:
                   $ref: "#/components/examples/IdpAlreadyExistsException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -95,8 +99,12 @@ paths:
               examples:
                 IdpUserGetResponse:
                   $ref: "#/components/examples/IdpUserGetResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "404":
           description: Not Found - The specified local user store user does not exist
           content:
@@ -118,8 +126,12 @@ paths:
       responses:
         "200":
           $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -168,8 +180,12 @@ paths:
               examples:
                 IllegalArgumentException:
                   $ref: "#/components/examples/IdpChangePasswordIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "404":
           description: Not Found - The specified local user store user does not exist
           content:
@@ -223,8 +239,12 @@ paths:
               examples:
                 IllegalArgumentException:
                   $ref: "#/components/examples/IdpUpdateEnabledIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "404":
           description: Not Found - The specified local user store user does not exist
           content:
@@ -281,8 +301,12 @@ paths:
               examples:
                 AlreadyExistsException:
                   $ref: "#/components/examples/IdpGroupAlreadyExistsException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -306,8 +330,12 @@ paths:
               examples:
                 IdpGroupGetResponse:
                   $ref: "#/components/examples/IdpGroupGetResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "404":
           description: Not Found - The specified local user store group does not exist
           content:
@@ -331,8 +359,12 @@ paths:
       responses:
         "200":
           $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "409":
           description: Conflict - The group is not empty and force is false
           content:
@@ -383,8 +415,12 @@ paths:
               examples:
                 IllegalArgumentException:
                   $ref: "#/components/examples/IdpGroupMembershipIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
         "404":
           description: Not Found - The specified local user store group or user does not exist
           content:
@@ -563,12 +599,23 @@ components:
           $ref: "#/components/schemas/IdpGroup"
 
   responses:
+    IdpUnauthorizedErrorResponse:
+      description: Unauthorized - Authentication credentials are missing or invalid
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            UnauthorizedException:
+              $ref: "#/components/examples/IdpUnauthorizedException"
+
     IdpForbiddenErrorResponse:
       description:
         Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
         user store users and groups. Authenticated non-admin users may only `GET`
         `/idp/users/{user}` or `PUT` `/idp/users/{user}/password` for their own username.
-        Unauthenticated requests and other non-admin IdP management calls receive this response.
+        Other authenticated non-admin IdP management calls receive this response. Missing or
+        invalid credentials return 401 instead.
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -576,6 +623,19 @@ components:
           examples:
             ForbiddenException:
               $ref: "#/components/examples/IdpForbiddenException"
+
+    IdpNotAcceptableErrorResponse:
+      description: >
+        Not Acceptable - The `Accept` header must allow
+        `application/vnd.gravitino.v1+json` (for example `*/*`). Requests that accept only
+        incompatible media types such as `application/json` receive this response.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            NotAcceptableException:
+              $ref: "#/components/examples/IdpNotAcceptableException"
 
   examples:
     AddUserRequest:
@@ -789,9 +849,23 @@ components:
         "message": "Failed to operate local user store group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
       }
 
+    IdpUnauthorizedException:
+      value: {
+        "code": 1011,
+        "type": "UnauthorizedException",
+        "message": "The provided credentials did not support"
+      }
+
     IdpForbiddenException:
       value: {
         "code": 1008,
         "type": "ForbiddenException",
         "message": "Only service admins can manage local user store users and groups."
+      }
+
+    IdpNotAcceptableException:
+      value: {
+        "code": 1000,
+        "type": "RESTException",
+        "message": "HTTP 406 Not Acceptable"
       }
