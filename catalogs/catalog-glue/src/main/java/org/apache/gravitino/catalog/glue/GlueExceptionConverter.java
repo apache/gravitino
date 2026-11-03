@@ -419,6 +419,20 @@ final class GlueExceptionConverter {
       if (t instanceof S3Exception) {
         return toS3Exception((S3Exception) t, context, e);
       }
+      if (t instanceof SdkClientException) {
+        // The failing client may be the Glue or the S3 client of the Iceberg catalog.
+        SdkClientException clientException = (SdkClientException) t;
+        if (isCredentialFailure(clientException)) {
+          return toCredentialException(clientException, context);
+        }
+        return new ConnectionFailedException(
+            e,
+            "Failed to reach AWS (Glue or S3) for %s: %s",
+            context,
+            StringUtils.defaultIfBlank(
+                ExceptionMessages.usefulMessage(clientException),
+                clientException.getClass().getSimpleName()));
+      }
       if (t instanceof SdkException) {
         return toGenericException((SdkException) t, context, null);
       }

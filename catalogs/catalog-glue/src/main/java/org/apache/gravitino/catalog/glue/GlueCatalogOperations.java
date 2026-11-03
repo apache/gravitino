@@ -106,10 +106,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static final Logger LOG = LoggerFactory.getLogger(GlueCatalogOperations.class);
 
-  /** Glue parameters that identify a registered Iceberg table and its metadata file. */
-  private static final Set<String> REGISTERED_TABLE_RESERVED_KEYS =
+  /**
+   * Properties that identify the format of an Iceberg table, its metadata file and whether it was
+   * registered; an alter cannot change them.
+   */
+  private static final Set<String> ICEBERG_RESERVED_KEYS =
       ImmutableSet.of(
           GlueConstants.TABLE_TYPE_PARAM,
+          GlueConstants.TABLE_FORMAT,
           GlueConstants.METADATA_LOCATION,
           GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM);
 
@@ -463,14 +467,28 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String dbName = schemaName(ident.namespace());
     Map<String, String> props = properties != null ? properties : Collections.emptyMap();
 
-    String tableFormat = props.getOrDefault(GlueConstants.TABLE_FORMAT, defaultTableFormat);
-    boolean isIceberg = GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableFormat);
-    String normalizedFormat =
-        isIceberg
-            ? GlueConstants.ICEBERG_TABLE_TYPE_VALUE.toLowerCase(Locale.ROOT)
-            : props
-                .getOrDefault(GlueConstants.TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE)
-                .toLowerCase(Locale.ROOT);
+    String tableFormat =
+        props.getOrDefault(
+            GlueConstants.TABLE_FORMAT,
+            defaultTableFormat != null
+                ? defaultTableFormat
+                : GlueConstants.DEFAULT_TABLE_FORMAT_VALUE);
+    Preconditions.checkArgument(
+        GlueConstants.TABLE_FORMAT_HIVE.equalsIgnoreCase(tableFormat)
+            || GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat),
+        "Unsupported value '%s' of '%s': use %s or %s",
+        tableFormat,
+        GlueConstants.TABLE_FORMAT,
+        GlueConstants.TABLE_FORMAT_HIVE,
+        GlueConstants.TABLE_FORMAT_ICEBERG);
+    boolean isIceberg = GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat);
+    String normalizedFormat = tableFormat.toLowerCase(Locale.ROOT);
+    // table-format only chooses how the table is created; the format of a stored table is its
+    // table_type, so table-format is not stored.
+    if (props.containsKey(GlueConstants.TABLE_FORMAT)) {
+      props = new HashMap<>(props);
+      props.remove(GlueConstants.TABLE_FORMAT);
+    }
     // A table of an excluded format would be created but stay invisible through this catalog.
     Preconditions.checkArgument(
         isFormatVisible(normalizedFormat),
@@ -891,6 +909,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty) {
+        checkIcebergTableParameterKey(((TableChange.SetProperty) change).getProperty());
+      } else if (change instanceof TableChange.RemoveProperty) {
+        checkIcebergTableParameterKey(((TableChange.RemoveProperty) change).getProperty());
+      }
+    }
     if (isRegisteredIcebergTable(rawGlueTable)) {
       return alterRegisteredIcebergTable(ident, dbName, rawGlueTable, changes);
     }
@@ -1019,11 +1044,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         TableChange.SetProperty sp = (TableChange.SetProperty) change;
-        checkRegisteredTableParameterKey(sp.getProperty());
+        checkIcebergTableParameterKey(sp.getProperty());
         newParams.put(sp.getProperty(), sp.getValue());
       } else if (change instanceof TableChange.RemoveProperty) {
         String property = ((TableChange.RemoveProperty) change).getProperty();
-        checkRegisteredTableParameterKey(property);
+        checkIcebergTableParameterKey(property);
         newParams.remove(property);
       } else {
         throw new IllegalArgumentException(
@@ -1045,10 +1070,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return loadTable(ident);
   }
 
-  private static void checkRegisteredTableParameterKey(String property) {
+  private static void checkIcebergTableParameterKey(String property) {
     Preconditions.checkArgument(
-        !REGISTERED_TABLE_RESERVED_KEYS.contains(property),
-        "Property %s of a registered Iceberg table cannot be changed",
+        !ICEBERG_RESERVED_KEYS.contains(property),
+        "Property %s of an Iceberg table cannot be changed",
         property);
   }
 
@@ -1307,17 +1332,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   // NOTE: parameter type is the Glue SDK Table, not GlueTable (our domain class).
   // The Glue SDK's Column model is also referenced by FQN throughout this class because its
   // simple name conflicts with the imported org.apache.gravitino.rel.Column.
+  /**
+   * A table is an Iceberg table when its native {@code table_type} parameter says so, and a
+   * Hive-format table otherwise, the same classification every other operation uses.
+   */
   private boolean matchesFormatFilter(Table table) {
     if (tableFormatFilter == null) return true;
-    String fmt = table.hasParameters() ? table.parameters().get(GlueConstants.TABLE_FORMAT) : null;
-    // Fall back to checking native Glue table_type for tables created without the Gravitino
-    // table-format property (e.g. created via default-table-format config or external tooling).
-    if (fmt == null && GlueIcebergTableHelper.isIcebergTable(table)) {
-      fmt = GlueConstants.ICEBERG_TABLE_TYPE_VALUE;
-    }
-    String normalized =
-        fmt != null ? fmt.toLowerCase(Locale.ROOT) : GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
-    return isFormatVisible(normalized);
+    String format =
+        GlueIcebergTableHelper.isIcebergTable(table)
+            ? GlueConstants.TABLE_FORMAT_ICEBERG
+            : GlueConstants.TABLE_FORMAT_HIVE;
+    return isFormatVisible(format.toLowerCase(Locale.ROOT));
   }
 
   private boolean isFormatVisible(String normalizedFormat) {

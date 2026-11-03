@@ -113,14 +113,17 @@ public final class GlueConstants {
   // -------------------------------------------------------------------------
 
   /**
-   * Glue table format parameter key stored in {@code Table.parameters()}. Common values: {@code
-   * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
-   * internally to determine the table format when reading Glue tables.
+   * Table property that chooses the format of a table at create: {@code HIVE} or {@code ICEBERG}.
+   * It is not stored; a loaded table reports it from its {@link #TABLE_TYPE_PARAM} parameter, and
+   * it cannot be changed.
    */
   public static final String TABLE_FORMAT = "table-format";
 
-  /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
+  /** Value of {@link #TABLE_FORMAT} for an Iceberg table. */
   public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
+
+  /** Value of {@link #TABLE_FORMAT} for a Hive-format table. */
+  public static final String TABLE_FORMAT_HIVE = "HIVE";
 
   /**
    * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format

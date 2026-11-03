@@ -148,6 +148,14 @@ final class GlueIcebergTableHelper {
           GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS,
           GlueConstants.AWS_GLUE_MAX_ATTEMPTS);
 
+  /** Table properties that Glue holds about the table, which Iceberg properties cannot shadow. */
+  private static final Set<String> GLUE_OWNED_PROPS =
+      ImmutableSet.of(
+          GlueConstants.TABLE_TYPE_PARAM,
+          GlueConstants.TABLE_FORMAT,
+          GlueConstants.METADATA_LOCATION,
+          GlueConstants.REGISTERED_ICEBERG_TABLE_PARAM);
+
   private static final Set<String> EXCLUDED_TABLE_PROPS =
       Set.of(
           GlueConstants.LOCATION,
@@ -279,9 +287,17 @@ final class GlueIcebergTableHelper {
     }
 
     // Merge Iceberg table properties (stored in metadata.json) into the Gravitino properties.
-    // Iceberg properties take precedence over Glue parameters for overlapping keys.
+    // Iceberg properties take precedence over Glue parameters for overlapping keys, except for the
+    // ones Glue holds about the table itself, such as its format and metadata file.
     Map<String, String> mergedProps = new HashMap<>(table.properties());
-    mergedProps.putAll(icebergTable.properties());
+    icebergTable
+        .properties()
+        .forEach(
+            (key, value) -> {
+              if (!GLUE_OWNED_PROPS.contains(key)) {
+                mergedProps.put(key, value);
+              }
+            });
     table.setProperties(mergedProps);
 
     // Overwrite Glue's Hive-style column types with the accurate types from the Iceberg schema.
@@ -449,11 +465,6 @@ final class GlueIcebergTableHelper {
     String format = properties.get(GlueConstants.FORMAT);
     if (format != null) {
       tableProps.put("write.format.default", format.toLowerCase(Locale.ROOT));
-    }
-
-    String tableFormat = properties.get(GlueConstants.TABLE_FORMAT);
-    if (tableFormat != null) {
-      tableProps.put(GlueConstants.TABLE_FORMAT, tableFormat);
     }
 
     TableIdentifier tableId = TableIdentifier.of(dbName, tableName);

@@ -421,6 +421,37 @@ class TestGlueCatalogOperationsForIceberg {
     verify(mockIcebergCatalog, never()).dropTable(any(TableIdentifier.class), Mockito.anyBoolean());
   }
 
+  @Test
+  void testIcebergPropertiesCannotShadowGlueFormat() {
+    stubGlueTable(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE));
+    Table icebergTable = mockIcebergTable();
+    when(icebergTable.properties())
+        .thenReturn(Map.of(TABLE_TYPE_PARAM, "HIVE", GlueConstants.TABLE_FORMAT, "HIVE", "k", "v"));
+    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class))).thenReturn(icebergTable);
+
+    GlueTable table = ops.loadTable(NameIdentifier.of("cat", "ns", DB, TABLE));
+
+    assertEquals(ICEBERG_TABLE_TYPE_VALUE, table.properties().get(TABLE_TYPE_PARAM));
+    assertEquals("ICEBERG", table.properties().get(GlueConstants.TABLE_FORMAT));
+    assertEquals("v", table.properties().get("k"));
+    assertThrows(UnsupportedOperationException.class, table::supportPartitions);
+  }
+
+  @Test
+  void testIcebergAlterRefusesFormatProperties() {
+    stubGlueTable(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE));
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.setProperty(TABLE_TYPE_PARAM, "HIVE"),
+          TableChange.setProperty(GlueConstants.TABLE_FORMAT, "HIVE"),
+          TableChange.removeProperty(METADATA_LOCATION)
+        }) {
+      assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ident, change));
+    }
+    verify(mockIcebergCatalog, never()).loadTable(any(TableIdentifier.class));
+  }
+
   private static Map<String, String> registeredParams() {
     return Map.of(
         TABLE_TYPE_PARAM,
