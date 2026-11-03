@@ -62,6 +62,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 @SuppressWarnings("deprecation")
@@ -86,6 +88,24 @@ public class TestIcebergRESTUtils {
         IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
         NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidNamespaces")
+  void testRejectsDotInAnyNamespaceLevel(Namespace namespace) {
+    BadRequestException error =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> IcebergRESTUtils.checkNamespaceLevels(namespace));
+    Assertions.assertTrue(error.getMessage().contains("contains '.'"));
+  }
+
+  @Test
+  void testAllowsValidNamespaceLevelsWithoutDecodingAgain() {
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.checkNamespaceLevels(Namespace.empty()));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("parent", "child")));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("literal%2Ename")));
   }
 
   @Test
@@ -518,5 +538,14 @@ public class TestIcebergRESTUtils {
 
     RESTRequest valid = () -> {};
     Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.validateRequest(valid, "X"));
+  }
+
+  private static List<Namespace> invalidNamespaces() {
+    return List.of(
+        Namespace.of("a.b"),
+        Namespace.of("."),
+        Namespace.of(".."),
+        Namespace.of("a.b", "child"),
+        Namespace.of("parent", "a.b"));
   }
 }
