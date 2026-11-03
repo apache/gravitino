@@ -649,4 +649,10 @@ public class TestCatalogRegister {
     field.setAccessible(true);
     field.set(target, value);
   }
+
+  @Test
+  public void testTrinoCatalogNameIsUnquotedLowerCase() {
+    assertEquals("gglue_a8_mx", CatalogRegister.trinoCatalogName("gglue_a8_MX"));
+    assertEquals("ml.glue_mx", CatalogRegister.trinoCatalogName("\"ml.Glue_MX\""));
+  }
 }

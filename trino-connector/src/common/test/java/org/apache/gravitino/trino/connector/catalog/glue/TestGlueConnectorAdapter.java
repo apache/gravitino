@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.trino.connector.catalog.glue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.type.TimestampType;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.AwsSecretKeyCredential;
@@ -90,5 +95,29 @@ class TestGlueConnectorAdapter {
     Assertions.assertEquals("glue-sk", config.get("hive.metastore.glue.aws-secret-key"));
     Assertions.assertEquals("s3-ak", config.get("hive.s3.aws-access-key"));
     Assertions.assertEquals("s3-sk", config.get("hive.s3.aws-secret-key"));
+  }
+
+  @Test
+  void testMetadataAdapterUsesCatalogDefaultTableFormat() {
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "test_glue",
+            "glue",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            ImmutableMap.of("aws-region", "us-east-1", "default-table-format", "iceberg"));
+    GlueMetadataAdapter metadataAdapter =
+        (GlueMetadataAdapter)
+            new GlueConnectorAdapter().getMetadataAdapter(new GravitinoCatalog("test", mockCatalog));
+
+    ConnectorTableMetadata tableMetadata =
+        new ConnectorTableMetadata(
+            new SchemaTableName("db", "tbl"),
+            ImmutableList.of(
+                ColumnMetadata.builder()
+                    .setName("ts")
+                    .setType(TimestampType.TIMESTAMP_MICROS)
+                    .build()));
+    Assertions.assertDoesNotThrow(() -> metadataAdapter.createTable(tableMetadata));
   }
 }

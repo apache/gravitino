@@ -45,6 +45,7 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   private static final String PROP_AWS_REGION = "aws-region";
   private static final String PROP_AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
   private static final String PROP_AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
+  private static final String PROP_DEFAULT_TABLE_FORMAT = "default-table-format";
 
   // Trino Hive connector configuration keys for Glue
   private static final String HIVE_METASTORE = "hive.metastore";
@@ -124,6 +125,13 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return new GlueMetadataAdapter(propertyMetadata.getSchemaPropertyMetadata());
+  }
+
+  @Override
+  public CatalogConnectorMetadataAdapter getMetadataAdapter(GravitinoCatalog catalog) {
+    return new GlueMetadataAdapter(
+        propertyMetadata.getSchemaPropertyMetadata(),
+        catalog.getProperty(PROP_DEFAULT_TABLE_FORMAT, GlueMetadataAdapter.HIVE_TABLE_TYPE));
   }
 
   @Override

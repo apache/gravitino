@@ -321,6 +321,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public Optional<ConnectorTableLayout> getNewTableLayout(
       ConnectorSession session, ConnectorTableMetadata tableMetadata) {
+    if (metadataAdapter.skipsInternalNewTableLayout()) {
+      return Optional.empty();
+    }
     try {
       return internalMetadata
           .getNewTableLayout(session, tableMetadata)

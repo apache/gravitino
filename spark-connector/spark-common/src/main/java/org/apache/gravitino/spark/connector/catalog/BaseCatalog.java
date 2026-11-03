@@ -169,6 +169,28 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return new SparkTableChangeConverter(sparkTypeConverter);
   }
 
+  /**
+   * Returns the type converter for the columns of a new table. Catalogs that hold tables of
+   * several formats override this to pick the converter of the format the table is created in.
+   *
+   * @param gravitinoTableProperties the Gravitino properties of the new table
+   * @return the type converter for the columns of the table
+   */
+  protected SparkTypeConverter getSparkTypeConverter(Map<String, String> gravitinoTableProperties) {
+    return sparkTypeConverter;
+  }
+
+  /**
+   * Returns the converter for the changes of an existing table. Catalogs that hold tables of
+   * several formats override this to pick the converter of the table's format.
+   *
+   * @param ident the table identifier
+   * @return the table change converter for the table
+   */
+  protected SparkTableChangeConverter getSparkTableChangeConverter(Identifier ident) {
+    return sparkTableChangeConverter;
+  }
+
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
@@ -241,13 +263,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws NoSuchSchemaException, org.apache.gravitino.exceptions.TableAlreadyExistsException {
     NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
-    org.apache.gravitino.rel.Column[] gravitinoColumns =
-        Arrays.stream(schema.fields())
-            .map(structField -> createGravitinoColumn(structField))
-            .toArray(org.apache.gravitino.rel.Column[]::new);
-
     Map<String, String> gravitinoProperties =
         propertiesConverter.toGravitinoTableProperties(properties);
+    SparkTypeConverter columnTypeConverter = getSparkTypeConverter(gravitinoProperties);
+    org.apache.gravitino.rel.Column[] gravitinoColumns =
+        Arrays.stream(schema.fields())
+            .map(structField -> createGravitinoColumn(structField, columnTypeConverter))
+            .toArray(org.apache.gravitino.rel.Column[]::new);
+
     // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
     String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
 
@@ -307,7 +330,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
     org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
         Arrays.stream(changes)
-            .map(sparkTableChangeConverter::toGravitinoTableChange)
+            .map(getSparkTableChangeConverter(ident)::toGravitinoTableChange)
             .toArray(org.apache.gravitino.rel.TableChange[]::new);
     try {
       invalidateTable(ident);
@@ -659,10 +682,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return catalogDefaultNamespace[0];
   }
 
-  private org.apache.gravitino.rel.Column createGravitinoColumn(StructField structField) {
+  private static org.apache.gravitino.rel.Column createGravitinoColumn(
+      StructField structField, SparkTypeConverter typeConverter) {
     return org.apache.gravitino.rel.Column.of(
         structField.name(),
-        sparkTypeConverter.toGravitinoType(structField.dataType()),
+        typeConverter.toGravitinoType(structField.dataType()),
         structField.getComment().isEmpty() ? null : structField.getComment().get(),
         structField.nullable(),
         // Spark doesn't support autoIncrement

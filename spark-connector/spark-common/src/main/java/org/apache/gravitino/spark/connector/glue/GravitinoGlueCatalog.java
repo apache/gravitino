@@ -28,6 +28,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
@@ -70,6 +71,15 @@ import org.slf4j.LoggerFactory;
 public class GravitinoGlueCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
+
+  private static final String DEFAULT_TABLE_FORMAT = "default-table-format";
+
+  /**
+   * Iceberg tables follow Iceberg type semantics: a Spark {@code timestamp} is an Iceberg {@code
+   * timestamptz} and a Spark {@code timestamp_ntz} an Iceberg {@code timestamp}, as with the
+   * Iceberg catalog. The Hive rules of {@link SparkHiveTypeConverter} apply to the other tables.
+   */
+  private static final SparkTypeConverter ICEBERG_TYPE_CONVERTER = new SparkTypeConverter();
 
   // Lazily initialized Iceberg GlueCatalog for Iceberg tables
   volatile SparkCatalog icebergGlueCatalog;
@@ -202,7 +212,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           getOrCreateIcebergGlueCatalog(),
           propertiesConverter,
           sparkTransformConverter,
-          sparkTypeConverter);
+          ICEBERG_TYPE_CONVERTER);
     }
 
     return new SparkHiveTable(
@@ -231,6 +241,34 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  /**
+   * {@inheritDoc} A table created without {@code table-format} gets the catalog's default table
+   * format.
+   */
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter(Map<String, String> gravitinoTableProperties) {
+    String tableFormat =
+        gravitinoTableProperties.getOrDefault(
+            GlueConstants.TABLE_FORMAT,
+            catalogProperties == null ? null : catalogProperties.get(DEFAULT_TABLE_FORMAT));
+    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
+        ? ICEBERG_TYPE_CONVERTER
+        : super.getSparkTypeConverter(gravitinoTableProperties);
+  }
+
+  /** {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. */
+  @Override
+  protected SparkTableChangeConverter getSparkTableChangeConverter(Identifier ident) {
+    try {
+      if (isIcebergTable(loadGravitinoTable(ident))) {
+        return getSparkTableChangeConverter(ICEBERG_TYPE_CONVERTER);
+      }
+    } catch (NoSuchTableException e) {
+      // The alter reports the missing table.
+    }
+    return super.getSparkTableChangeConverter(ident);
   }
 
   /**

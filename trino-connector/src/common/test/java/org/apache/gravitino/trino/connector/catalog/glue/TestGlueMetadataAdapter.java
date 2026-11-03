@@ -21,10 +21,13 @@ package org.apache.gravitino.trino.connector.catalog.glue;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -38,10 +41,13 @@ import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
@@ -243,6 +249,118 @@ class TestGlueMetadataAdapter {
     @SuppressWarnings("unchecked")
     List<String> partitionedBy = (List<String>) trinoProperties.get("partitioned_by");
     assertEquals(ImmutableList.of("year(event_time)", "bucket(user_id, 4)"), partitionedBy);
+  }
+
+  @Test
+  void testGetTableMetadataShowsIcebergTransformSortOrder() {
+    Map<String, String> properties = Map.of("table_type", "ICEBERG", "location", "s3://b/t");
+    Table mockTable =
+        mockTable(
+            "tbl",
+            new Column[] {
+              Column.of("id", Types.LongType.get()),
+              Column.of("ts", Types.TimestampType.withoutTimeZone(6))
+            },
+            properties,
+            new Transform[] {Transforms.day("ts")},
+            new SortOrder[] {
+              SortOrders.of(
+                  NamedReference.field("id"), SortDirection.DESCENDING, NullOrdering.NULLS_LAST),
+              SortOrders.ascending(FunctionExpression.of("day", NamedReference.field("ts"))),
+              SortOrders.ascending(
+                  FunctionExpression.of(
+                      "bucket", Literals.integerLiteral(4), NamedReference.field("id")))
+            },
+            Distributions.NONE);
+
+    ConnectorTableMetadata tableMetadata =
+        adapter.getTableMetadata(new GravitinoTable("db", "tbl", mockTable));
+
+    assertEquals("ICEBERG", tableMetadata.getProperties().get("type"));
+    assertEquals(ImmutableList.of("day(ts)"), tableMetadata.getProperties().get("partitioned_by"));
+    assertEquals(
+        ImmutableList.of("id DESC"),
+        tableMetadata.getProperties().get("sorted_by"));
+    assertEquals(2, tableMetadata.getColumns().size());
+  }
+
+  @Test
+  void testGetTableMetadataDerivesHiveStorageFormat() {
+    Map<String, String> properties =
+        Map.of(
+            "input-format", "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat",
+            "output-format", "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat",
+            "serde-lib", "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
+            "location", "s3://b/t");
+    Table mockTable =
+        mockTable(
+            "tbl",
+            new Column[] {Column.of("id", Types.LongType.get())},
+            properties,
+            new Transform[0],
+            new SortOrder[0],
+            Distributions.NONE);
+
+    Map<String, Object> trinoProperties =
+        adapter.getTableMetadata(new GravitinoTable("db", "tbl", mockTable)).getProperties();
+
+    assertEquals("HIVE", trinoProperties.get("type"));
+    assertEquals("ORC", trinoProperties.get("format"));
+  }
+
+  @Test
+  void testGetTableMetadataLeavesOutColumnsTrinoCannotRepresent() {
+    Table mockTable =
+        mockTable(
+            "tbl",
+            new Column[] {
+              Column.of("id", Types.LongType.get()),
+              Column.of(
+                  "u", Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get())),
+              Column.of("d", Types.IntervalDayType.get())
+            },
+            Map.of(),
+            new Transform[0],
+            new SortOrder[0],
+            Distributions.NONE);
+
+    ConnectorTableMetadata tableMetadata =
+        adapter.getTableMetadata(new GravitinoTable("db", "tbl", mockTable));
+
+    assertEquals(1, tableMetadata.getColumns().size());
+    assertEquals("id", tableMetadata.getColumns().get(0).getName());
+  }
+
+  @Test
+  void testCreateTableTimestampPrecisionFollowsTableFormat() {
+    ConnectorTableMetadata iceberg = timestampTable(Map.of("type", "ICEBERG"));
+    GravitinoTable table = adapter.createTable(iceberg);
+    assertEquals(Types.TimestampType.withoutTimeZone(6), table.getColumns().get(0).getType());
+
+    TrinoException e =
+        assertThrows(TrinoException.class, () -> adapter.createTable(timestampTable(Map.of())));
+    assertTrue(e.getMessage().contains("Hive-format tables support timestamp(3)"), e.getMessage());
+
+    GlueMetadataAdapter icebergDefault = new GlueMetadataAdapter(ImmutableList.of(), "iceberg");
+    assertEquals(
+        Types.TimestampType.withoutTimeZone(6),
+        icebergDefault.createTable(timestampTable(Map.of())).getColumns().get(0).getType());
+  }
+
+  @Test
+  void testNewTableLayoutIsNotAskedFromLakehouseConnector() {
+    assertTrue(adapter.skipsInternalNewTableLayout());
+  }
+
+  private static ConnectorTableMetadata timestampTable(Map<String, Object> properties) {
+    return new ConnectorTableMetadata(
+        new SchemaTableName("db", "tbl"),
+        ImmutableList.of(
+            ColumnMetadata.builder()
+                .setName("ts")
+                .setType(TimestampType.TIMESTAMP_MICROS)
+                .build()),
+        new HashMap<>(properties));
   }
 
   private static Table mockTable(

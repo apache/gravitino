@@ -138,10 +138,7 @@ public class CatalogConnectorMetadataAdapter {
   public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
     SchemaTableName schemaTableName =
         new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
-    ArrayList<ColumnMetadata> columnMetadataList = new ArrayList<>();
-    for (GravitinoColumn column : gravitinoTable.getColumns()) {
-      columnMetadataList.add(getColumnMetadata(column));
-    }
+    List<ColumnMetadata> columnMetadataList = getColumnMetadataList(gravitinoTable);
 
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
     return new ConnectorTableMetadata(
@@ -149,6 +146,46 @@ public class CatalogConnectorMetadataAdapter {
         columnMetadataList,
         properties,
         Optional.ofNullable(gravitinoTable.getComment()));
+  }
+
+  /**
+   * Whether the internal connector cannot plan the layout of a new table from the table metadata of
+   * a CREATE TABLE AS SELECT statement, whose properties are decoded with this adapter's property
+   * metadata.
+   *
+   * @return true if the internal connector is not asked for the layout of a new table
+   */
+  public boolean skipsInternalNewTableLayout() {
+    return false;
+  }
+
+  /**
+   * Converts the columns of a Gravitino table to Trino columns. A column whose type Trino cannot
+   * represent is left out with a warning, so that the other columns of the table stay queryable.
+   *
+   * @param gravitinoTable the Gravitino table
+   * @return the Trino columns of the table
+   */
+  protected List<ColumnMetadata> getColumnMetadataList(GravitinoTable gravitinoTable) {
+    List<ColumnMetadata> columns = new ArrayList<>();
+    for (GravitinoColumn column : gravitinoTable.getColumns()) {
+      try {
+        columns.add(getColumnMetadata(column));
+      } catch (TrinoException e) {
+        if (!GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE
+            .toErrorCode()
+            .equals(e.getErrorCode())) {
+          throw e;
+        }
+        LOG.warn(
+            "Column %s of table %s.%s is not available in Trino: %s",
+            column.getName(),
+            gravitinoTable.getSchemaName(),
+            gravitinoTable.getName(),
+            e.getMessage());
+      }
+    }
+    return columns;
   }
 
   /**

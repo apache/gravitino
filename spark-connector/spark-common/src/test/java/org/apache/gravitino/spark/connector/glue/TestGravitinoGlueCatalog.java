@@ -50,6 +50,7 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -255,6 +256,46 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertNotNull(typeConverter);
     Assertions.assertInstanceOf(
         org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter.class, typeConverter);
+  }
+
+  @Test
+  void testIcebergTablesUseIcebergTimestampTypes() {
+    SparkTypeConverter converter =
+        gravitinoGlueCatalog.getSparkTypeConverter(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), converter.toGravitinoType(DataTypes.TimestampType));
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(),
+        converter.toGravitinoType(DataTypes.TimestampNTZType));
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone(6)));
+  }
+
+  @Test
+  void testIcebergTableChangesUseIcebergTimestampTypes() {
+    Table icebergTable =
+        createMockGravitinoTable(
+            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) {
+            return icebergTable;
+          }
+        };
+
+    org.apache.gravitino.rel.TableChange change =
+        catalog
+            .getSparkTableChangeConverter(Identifier.of(new String[] {"db"}, "tbl"))
+            .toGravitinoTableChange(
+                org.apache.spark.sql.connector.catalog.TableChange.addColumn(
+                    new String[] {"ts"}, DataTypes.TimestampType));
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(),
+        ((org.apache.gravitino.rel.TableChange.AddColumn) change).getDataType());
   }
 
   @Test
