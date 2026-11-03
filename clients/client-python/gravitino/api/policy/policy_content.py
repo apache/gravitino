@@ -15,8 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# pylint: disable=too-many-lines
+
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
@@ -229,9 +232,6 @@ class AbstractExecutablePolicyContent(ExecutablePolicyContent):
     def execution_spec(self) -> PolicyExecutionSpec:
         return self._execution_spec
 
-    def validate(self) -> None:
-        super().validate()
-
     def _execution_fields_equal(self, that: AbstractExecutablePolicyContent) -> bool:
         return self.execution_spec() == that.execution_spec()
 
@@ -247,9 +247,6 @@ class ReadRestrictionContent(PolicyContent):
 
     def properties(self) -> dict[str, str]:
         return {}
-
-    def validate(self) -> None:
-        super().validate()
 
     @staticmethod
     def validate_source(source: str | None, field_name: str) -> None:
@@ -444,7 +441,9 @@ class AccessControlContent(PolicyContent):
         )
 
 
-class IcebergDataCompactionContent(AbstractExecutablePolicyContent):
+class IcebergDataCompactionContent(  # pylint: disable=too-many-instance-attributes
+    AbstractExecutablePolicyContent
+):
     """Content of an Iceberg data-compaction policy."""
 
     STRATEGY_TYPE_KEY: ClassVar[str] = "strategy.type"
@@ -480,6 +479,35 @@ class IcebergDataCompactionContent(AbstractExecutablePolicyContent):
         REWRITE_STRATEGY_BINPACK,
         REWRITE_STRATEGY_SORT,
     }
+    # Names and value kinds mirror Iceberg RewriteDataFiles /
+    # SizeBasedFileRewriter, as in the Java content's supported-option map.
+    _SUPPORTED_REWRITE_OPTIONS: ClassVar[dict] = {
+        "target-file-size-bytes": "positive_long",
+        "min-file-size-bytes": "positive_long",
+        "max-file-size-bytes": "positive_long",
+        "max-file-group-size-bytes": "positive_long",
+        "min-input-files": "positive_int",
+        "max-concurrent-file-group-rewrites": "positive_int",
+        "partial-progress.max-commits": "positive_int",
+        "partial-progress.max-failed-commits": "non_negative_int",
+        "output-spec-id": "non_negative_int",
+        "delete-file-threshold": "non_negative_int",
+        "rewrite-all": "boolean",
+        "partial-progress.enabled": "boolean",
+        "use-starting-sequence-number": "boolean",
+        "remove-dangling-deletes": "boolean",
+        "rewrite-job-order": "rewrite_job_order",
+        "delete-ratio-threshold": "ratio",
+    }
+    _REWRITE_JOB_ORDERS: ClassVar[set] = {
+        "bytes-asc",
+        "bytes-desc",
+        "files-asc",
+        "files-desc",
+        "none",
+    }
+    _OPTION_KEY_PATTERN: ClassVar[re.Pattern] = re.compile(r"[A-Za-z0-9._-]+")
+    _INTEGER_PATTERN: ClassVar[re.Pattern] = re.compile(r"[+-]?[0-9]+")
     _SUPPORTED_OBJECT_TYPES: ClassVar[set] = {
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,
@@ -544,7 +572,7 @@ class IcebergDataCompactionContent(AbstractExecutablePolicyContent):
             else self.DEFAULT_MAX_PARTITION_NUM
         )
         self._rewrite_strategy = (
-            rewrite_strategy
+            rewrite_strategy.strip().lower()
             if rewrite_strategy is not None
             else self.DEFAULT_REWRITE_STRATEGY
         )
@@ -640,12 +668,89 @@ class IcebergDataCompactionContent(AbstractExecutablePolicyContent):
                 f"'{self.REWRITE_STRATEGY_BINPACK}'"
             )
         for key, value in self._rewrite_options.items():
-            if key is None or key.strip() == "":
-                raise IllegalArgumentException("rewrite option key is blank")
-            if value is None or value.strip() == "":
+            self._validate_rewrite_option(key, value)
+
+    @staticmethod
+    def _validate_rewrite_option(key: str, value: str) -> None:
+        # Mirrors the Java content's validateRewriteOption contract.
+        if key is None or key.strip() == "":
+            raise IllegalArgumentException("rewrite option key is blank")
+        if not IcebergDataCompactionContent._OPTION_KEY_PATTERN.fullmatch(key):
+            raise IllegalArgumentException(
+                f"rewrite option key '{key}' contains illegal characters"
+            )
+        if key.startswith(IcebergDataCompactionContent.JOB_OPTIONS_PREFIX):
+            raise IllegalArgumentException(
+                f"rewrite option key '{key}' must not start with "
+                f"'{IcebergDataCompactionContent.JOB_OPTIONS_PREFIX}'"
+            )
+        if value is None or value.strip() == "":
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' must have non-empty value"
+            )
+        kind = IcebergDataCompactionContent._SUPPORTED_REWRITE_OPTIONS.get(key)
+        if kind is None:
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' is not supported by "
+                f"rewrite_data_files; supported options are "
+                f"{sorted(IcebergDataCompactionContent._SUPPORTED_REWRITE_OPTIONS)}"
+            )
+        IcebergDataCompactionContent._check_rewrite_option_value(key, value, kind)
+
+    @staticmethod
+    def _check_rewrite_option_value(key: str, value: str, kind: str) -> None:
+        if kind in ("positive_long", "positive_int", "non_negative_int"):
+            IcebergDataCompactionContent._check_integer_option(key, value, kind)
+        elif kind == "boolean":
+            if value.lower() not in ("true", "false"):
                 raise IllegalArgumentException(
-                    f"rewrite option '{key}' must have non-empty value"
+                    f"rewrite option '{key}' must be true or false"
                 )
+        elif kind == "rewrite_job_order":
+            if value.lower() not in IcebergDataCompactionContent._REWRITE_JOB_ORDERS:
+                raise IllegalArgumentException(
+                    f"rewrite option '{key}' must be one of "
+                    f"{sorted(IcebergDataCompactionContent._REWRITE_JOB_ORDERS)}, "
+                    f"but got '{value}'"
+                )
+        elif kind == "ratio":
+            IcebergDataCompactionContent._check_ratio_option(key, value)
+
+    @staticmethod
+    def _check_integer_option(key: str, value: str, kind: str) -> None:
+        bits = 64 if kind == "positive_long" else 32
+        kind_name = "a long" if kind == "positive_long" else "an int"
+        text = value.strip()
+        if not IcebergDataCompactionContent._INTEGER_PATTERN.fullmatch(text):
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' must be {kind_name}"
+            )
+        parsed = int(text)
+        if not -(2 ** (bits - 1)) <= parsed <= 2 ** (bits - 1) - 1:
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' must be {kind_name}"
+            )
+        if kind == "non_negative_int":
+            if parsed < 0:
+                raise IllegalArgumentException(
+                    f"rewrite option '{key}' must be a non-negative int"
+                )
+        elif parsed <= 0:
+            label = "a positive long" if kind == "positive_long" else "a positive int"
+            raise IllegalArgumentException(f"rewrite option '{key}' must be {label}")
+
+    @staticmethod
+    def _check_ratio_option(key: str, value: str) -> None:
+        try:
+            ratio = float(value.strip())
+        except ValueError:
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' must be a number between 0 and 1"
+            ) from None
+        if not 0.0 <= ratio <= 1.0:
+            raise IllegalArgumentException(
+                f"rewrite option '{key}' must be a number between 0 and 1"
+            )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, IcebergDataCompactionContent):

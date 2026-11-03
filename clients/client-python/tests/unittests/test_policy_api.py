@@ -208,6 +208,53 @@ class TestIcebergDataCompactionContent(unittest.TestCase):
         with self.assertRaises(IllegalArgumentException):
             PolicyContents.iceberg_data_compaction(max_partition_num=0).validate()
 
+    def test_rewrite_strategy_is_normalized(self) -> None:
+        content = PolicyContents.iceberg_data_compaction(
+            rewrite_strategy=" SORT ", sort_order="id"
+        )
+        self.assertEqual("sort", content.rewrite_strategy())
+        content.validate()
+        self.assertEqual(
+            PolicyContents.iceberg_data_compaction(rewrite_strategy="binpack"),
+            PolicyContents.iceberg_data_compaction(rewrite_strategy=" BinPack "),
+        )
+
+    def test_valid_rewrite_options(self) -> None:
+        PolicyContents.iceberg_data_compaction(
+            rewrite_options={
+                "target-file-size-bytes": "1048576",
+                "min-input-files": "5",
+                "partial-progress.max-failed-commits": "0",
+                "rewrite-all": "true",
+                "partial-progress.enabled": "FALSE",
+                "rewrite-job-order": "Bytes-Asc",
+                "delete-ratio-threshold": "0.5",
+            }
+        ).validate()
+
+    def test_invalid_rewrite_options(self) -> None:
+        invalid_options = [
+            {"target-file-size-bytes": "-1"},
+            {"target-file-size-bytes": "0"},
+            {"target-file-size-bytes": "1.5"},
+            {"min-input-files": "0"},
+            {"partial-progress.max-failed-commits": "-1"},
+            {"rewrite-all": "yes"},
+            {"rewrite-job-order": "random"},
+            {"delete-ratio-threshold": "1.5"},
+            {"delete-ratio-threshold": "abc"},
+            {"unknown-option": "1"},
+            {"job.options.target-file-size-bytes": "1"},
+            {"bad key!": "1"},
+            {"target-file-size-bytes": ""},
+        ]
+        for options in invalid_options:
+            with self.subTest(options=options):
+                with self.assertRaises(IllegalArgumentException):
+                    PolicyContents.iceberg_data_compaction(
+                        rewrite_options=options
+                    ).validate()
+
 
 class TestIcebergOrphanFileRemovalContent(unittest.TestCase):
     def test_defaults_and_rules(self) -> None:
@@ -320,6 +367,18 @@ class TestCustomContent(unittest.TestCase):
                 {"rule1": 123}, {MetadataObject.Type.TABLE}, {"key": "value"}
             ),
         )
+
+    def test_custom_content_hash_with_nested_rule_values(self) -> None:
+        rules = {"rule": ["a", "b"], "nested": {"x": [1, 2], "y": {"z": 3}}}
+        content = PolicyContents.custom(rules, {MetadataObject.Type.TABLE}, {})
+        equal_content = PolicyContents.custom(
+            {"nested": {"y": {"z": 3}, "x": [1, 2]}, "rule": ["a", "b"]},
+            {MetadataObject.Type.TABLE},
+            {},
+        )
+        self.assertEqual(content, equal_content)
+        self.assertEqual(hash(content), hash(equal_content))
+        self.assertIn(content, {equal_content})
 
 
 class TestBuiltInType(unittest.TestCase):

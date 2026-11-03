@@ -216,7 +216,9 @@ class CustomContentDTO(PolicyContentDTO):
 @_register_policy_content_dto("system_iceberg_compaction")
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class IcebergCompactionContentDTO(PolicyContentDTO, ExecutionPeersDTO):
+class IcebergCompactionContentDTO(
+    PolicyContentDTO, ExecutionPeersDTO
+):  # pylint: disable=too-many-instance-attributes
     """Data transfer object for the content of an Iceberg data-compaction
     policy."""
 
@@ -352,7 +354,9 @@ class IcebergCompactionContentDTO(PolicyContentDTO, ExecutionPeersDTO):
 @_register_policy_content_dto("system_iceberg_orphan_file_removal")
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class IcebergOrphanFileRemovalContentDTO(PolicyContentDTO, ExecutionPeersDTO):
+class IcebergOrphanFileRemovalContentDTO(
+    PolicyContentDTO, ExecutionPeersDTO
+):  # pylint: disable=too-many-instance-attributes
     """Data transfer object for the content of an Iceberg orphan-file-removal
     policy."""
 
@@ -429,7 +433,9 @@ class IcebergOrphanFileRemovalContentDTO(PolicyContentDTO, ExecutionPeersDTO):
 @_register_policy_content_dto("system_iceberg_rewrite_manifests")
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class IcebergRewriteManifestsContentDTO(PolicyContentDTO, ExecutionPeersDTO):
+class IcebergRewriteManifestsContentDTO(
+    PolicyContentDTO, ExecutionPeersDTO
+):  # pylint: disable=too-many-instance-attributes
     """Data transfer object for the content of an Iceberg rewrite-manifests
     policy. Note that the threshold fields use snake_case wire names, unlike
     the camelCase execution peer fields."""
@@ -530,7 +536,9 @@ class IcebergRewriteManifestsContentDTO(PolicyContentDTO, ExecutionPeersDTO):
 @_register_policy_content_dto("system_iceberg_snapshot_expiration")
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class IcebergSnapshotExpirationContentDTO(PolicyContentDTO, ExecutionPeersDTO):
+class IcebergSnapshotExpirationContentDTO(
+    PolicyContentDTO, ExecutionPeersDTO
+):  # pylint: disable=too-many-instance-attributes
     """Data transfer object for the content of an Iceberg
     snapshot-expiration policy."""
 

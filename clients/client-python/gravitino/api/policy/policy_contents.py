@@ -32,6 +32,17 @@ from gravitino.api.policy.policy_content import (
 )
 
 
+def _freeze_value(value: object) -> object:
+    """Recursively converts nested collections to hashable equivalents."""
+    if isinstance(value, dict):
+        return frozenset((key, _freeze_value(item)) for key, item in value.items())
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_value(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_freeze_value(item) for item in value)
+    return value
+
+
 class PolicyContents:
     """Convenience factories for creating policy contents."""
 
@@ -74,7 +85,10 @@ class PolicyContents:
         def __hash__(self) -> int:
             return hash(
                 (
-                    frozenset(self._custom_rules.items()),
+                    frozenset(
+                        (key, _freeze_value(value))
+                        for key, value in self._custom_rules.items()
+                    ),
                     frozenset(self._supported_object_types),
                     frozenset(self._properties.items()),
                 )
@@ -100,7 +114,7 @@ class PolicyContents:
         return PolicyContents.CustomContent(rules, supported_object_types, properties)
 
     @staticmethod
-    def iceberg_data_compaction(
+    def iceberg_data_compaction(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         min_data_file_mse: int | None = None,
         min_delete_file_number: int | None = None,
         data_file_mse_weight: int | None = None,

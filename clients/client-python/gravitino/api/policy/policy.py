@@ -146,7 +146,9 @@ class Policy(Auditable):
                 return self._content_class
             # Late import: policy_contents imports this module's Policy only
             # for typing, but CustomContent lives there.
-            from gravitino.api.policy.policy_contents import PolicyContents
+            from gravitino.api.policy.policy_contents import (  # pylint: disable=import-outside-toplevel
+                PolicyContents,
+            )
 
             return PolicyContents.CustomContent
 

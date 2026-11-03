@@ -46,6 +46,15 @@ class TestPolicyChange(unittest.TestCase):
             str(policy_change),
         )
 
+    def test_update_content_hash_with_nested_custom_rules(self) -> None:
+        content = PolicyContents.custom({"rule": ["a", "b"]})
+        policy_change = PolicyChange.update_content("custom", content)
+        equal_change = PolicyChange.update_content(
+            "custom", PolicyContents.custom({"rule": ["a", "b"]})
+        )
+        self.assertEqual(policy_change, equal_change)
+        self.assertEqual(hash(policy_change), hash(equal_change))
+
     def test_equality(self) -> None:
         self.assertEqual(PolicyChange.rename("a"), PolicyChange.rename("a"))
         self.assertNotEqual(PolicyChange.rename("a"), PolicyChange.rename("b"))
