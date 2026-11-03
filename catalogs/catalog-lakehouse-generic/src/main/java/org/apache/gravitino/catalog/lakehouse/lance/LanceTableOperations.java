@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -872,6 +873,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
+      if (Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)) {
+        validateLanceColumnNames(dataset, changes);
+      }
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn addColumn) {
           String columnName = addColumn.fieldName()[0];
@@ -910,6 +914,27 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
+    }
+  }
+
+  private static void validateLanceColumnNames(Dataset dataset, TableChange[] changes) {
+    // Use the dataset schema, including out-of-band changes, and validate the whole ordered
+    // request before applying any changes. A late name conflict must not leave earlier edits.
+    Set<String> columnNames =
+        dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String name = addColumn.fieldName()[0];
+        Preconditions.checkArgument(columnNames.add(name), "Column already exists: %s", name);
+      } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        columnNames.remove(deleteColumn.fieldName()[0]);
+      } else if (change instanceof TableChange.RenameColumn renameColumn) {
+        String oldName = renameColumn.fieldName()[0];
+        String newName = renameColumn.getNewName();
+        Preconditions.checkArgument(
+            columnNames.remove(oldName), "Column does not exist: %s", oldName);
+        Preconditions.checkArgument(columnNames.add(newName), "Column already exists: %s", newName);
+      }
     }
   }
 

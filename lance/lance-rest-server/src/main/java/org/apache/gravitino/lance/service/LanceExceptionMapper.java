@@ -20,6 +20,8 @@ package org.apache.gravitino.lance.service;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
@@ -29,6 +31,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ServerHealth;
+import org.glassfish.jersey.server.ParamException;
 import org.lance.namespace.errors.ConcurrentModificationException;
 import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
@@ -40,6 +43,7 @@ import org.lance.namespace.errors.PermissionDeniedException;
 import org.lance.namespace.errors.ServiceUnavailableException;
 import org.lance.namespace.errors.TableAlreadyExistsException;
 import org.lance.namespace.errors.TableNotFoundException;
+import org.lance.namespace.errors.ThrottlingException;
 import org.lance.namespace.errors.UnauthenticatedException;
 import org.lance.namespace.model.ErrorResponse;
 import org.slf4j.Logger;
@@ -77,6 +81,9 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(String instance, Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
+    if (ex instanceof WebApplicationException webException) {
+      return handleWebApplicationException(instance, webException);
+    }
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex
@@ -93,6 +100,42 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   @Override
   public Response toResponse(Throwable ex) {
     return toRESTResponse("", ex);
+  }
+
+  private static Response handleWebApplicationException(
+      String instance, WebApplicationException exception) {
+    int status = exception.getResponse().getStatus();
+    String message = exception.getMessage();
+    if (exception instanceof ParamException parameterException
+        && !(exception instanceof ParamException.PathParamException)) {
+      // Jersey uses 404 for query conversion failures; the route exists, but the input is invalid.
+      status = Response.Status.BAD_REQUEST.getStatusCode();
+      message = "Invalid value for parameter '" + parameterException.getParameterName() + "'";
+    }
+    LanceNamespaceException error;
+    if (status >= 400 && status < 500) {
+      error =
+          switch (status) {
+            case 401 -> new UnauthenticatedException(message, "", instance);
+            case 403 -> new PermissionDeniedException(message, "", instance);
+            case 404 -> new NamespaceNotFoundException(message, "", instance);
+            case 405, 406, 415 -> new org.lance.namespace.errors.UnsupportedOperationException(
+                message, "", instance);
+            case 409 -> new ConcurrentModificationException(message, "", instance);
+            case 429 -> new ThrottlingException(message, "", instance);
+            default -> new InvalidInputException(message, "", instance);
+          };
+    } else {
+      LOG.warn("Lance REST framework failure:", exception);
+      error = new InternalException("Internal server error", "", instance);
+    }
+    // Keep protocol headers such as Allow, WWW-Authenticate and Retry-After, while replacing any
+    // framework entity with the Lance error envelope. Never expose a framework stack or 5xx detail.
+    return Response.fromResponse(exception.getResponse())
+        .status(status)
+        .entity(errorResponse(error))
+        .type(MediaType.APPLICATION_JSON_TYPE)
+        .build();
   }
 
   private static LanceNamespaceException toLanceNamespaceException(String instance, Throwable ex) {
@@ -161,11 +204,15 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
   }
 
   private static Response handleLanceNamespaceException(LanceNamespaceException ex) {
+    return Response.status(toHttpStatus(ex)).entity(errorResponse(ex)).build();
+  }
+
+  private static ErrorResponse errorResponse(LanceNamespaceException ex) {
     ErrorResponse errResp = new ErrorResponse();
     errResp.setCode(ex.getCode());
     errResp.setError(ex.getMessage());
     errResp.setDetail(ex.getDetail());
     errResp.setInstance(ex.getInstance());
-    return Response.status(toHttpStatus(ex)).entity(errResp).build();
+    return errResp;
   }
 }

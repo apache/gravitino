@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.service;
 import java.io.IOException;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -33,6 +34,9 @@ import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.lance.namespace.errors.InternalException;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.model.ErrorResponse;
 
@@ -123,6 +127,55 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(400, response.getStatus());
       Assertions.assertEquals(
           "field must be positive", ((ErrorResponse) response.getEntity()).getDetail());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {400, 401, 403, 404, 405, 406, 409, 415, 429})
+  void testFrameworkClientStatusAndHeadersArePreserved(int status) {
+    try (Response original =
+            Response.status(status)
+                .header("Allow", "GET")
+                .header("WWW-Authenticate", "Basic realm=\"lance\"")
+                .header("Retry-After", "3")
+                .entity("framework entity")
+                .build();
+        Response response =
+            LanceExceptionMapper.toRESTResponse(
+                "table", new WebApplicationException("request rejected", original))) {
+      Assertions.assertEquals(status, response.getStatus());
+      Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("request rejected", error.getError());
+      Assertions.assertEquals("table", error.getInstance());
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertNotEquals(new InternalException("", "", "").getCode(), error.getCode());
+      Assertions.assertEquals("GET", response.getHeaderString("Allow"));
+      Assertions.assertEquals(
+          "Basic realm=\"lance\"", response.getHeaderString("WWW-Authenticate"));
+      Assertions.assertEquals("3", response.getHeaderString("Retry-After"));
+    }
+  }
+
+  @Test
+  void testFrameworkServerErrorDoesNotExposeDetails() {
+    try (Response response =
+        LanceExceptionMapper.toRESTResponse(
+            "table", new WebApplicationException("private-backend-detail", 503))) {
+      Assertions.assertEquals(503, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("Internal server error", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  @Test
+  void testUnknownRouteUsesLanceNotFoundEnvelope() {
+    try (Response response = target("missing").request(MediaType.APPLICATION_JSON_TYPE).get()) {
+      Assertions.assertEquals(404, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertNotNull(error.getCode());
+      Assertions.assertEquals("", error.getDetail());
     }
   }
 

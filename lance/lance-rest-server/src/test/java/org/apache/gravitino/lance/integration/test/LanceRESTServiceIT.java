@@ -52,6 +52,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -746,6 +747,32 @@ public class LanceRESTServiceIT extends BaseIT {
 
     TableApi tableApi = createTableApi();
     String delimiter = DELIMITER;
+
+    AlterTableAlterColumnsRequest conflictRequest = new AlterTableAlterColumnsRequest();
+    conflictRequest.setId(ids);
+    AlterColumnsEntry conflict = new AlterColumnsEntry();
+    conflict.setPath("id");
+    conflict.setRename("value");
+    conflictRequest.setAlterations(List.of(conflict));
+    ApiException conflictError =
+        Assertions.assertThrows(
+            ApiException.class,
+            () ->
+                tableApi.alterTableAlterColumns(
+                    String.join(delimiter, ids), conflictRequest, delimiter));
+    Assertions.assertEquals(400, conflictError.getCode());
+    ErrorResponse conflictBody =
+        JsonUtils.anyFieldMapper().readValue(conflictError.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), conflictBody.getCode());
+    Assertions.assertTrue(conflictBody.getError().contains("value"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    NameIdentifier.of(SCHEMA_NAME, ids.get(2)),
+                    TableChange.renameColumn(new String[] {"id"}, "value")));
 
     AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
     alterRequest.setId(ids);

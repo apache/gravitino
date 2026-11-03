@@ -47,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -120,6 +121,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     JacksonJaxbJsonProvider provider = new JacksonJaxbJsonProvider();
     provider.setMapper(mapper);
     resourceConfig.register(provider);
+    resourceConfig.register(LanceExceptionMapper.class);
     resourceConfig.register(LanceNamespaceOperations.class);
     resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableOperations.class);
     resourceConfig.register(
@@ -138,6 +140,32 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   public static void setup() {
     when(namespaceWrapper.asNamespaceOps()).thenReturn(namespaceOps);
     when(namespaceWrapper.asTableOps()).thenReturn(tableOps);
+  }
+
+  @Test
+  void testUnsupportedCreateContentTypeReturns415() {
+    try (Response response =
+        target("/v1/table/catalog$schema$table/create").request().post(Entity.json("{}"))) {
+      Assertions.assertEquals(415, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertNotEquals(18, error.getCode());
+    }
+  }
+
+  @Test
+  void testInvalidListLimitReturns400() {
+    try (Response response =
+        target("/v1/namespace/catalog$schema/table/list")
+            .queryParam("limit", "x")
+            .request()
+            .get()) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertTrue(error.getError().contains("limit"));
+      Assertions.assertEquals("", error.getDetail());
+      Assertions.assertNotEquals(18, error.getCode());
+    }
   }
 
   @Test

@@ -56,6 +56,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.DistributionMode;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -488,6 +489,36 @@ public class TestIcebergTable {
 
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
+  }
+
+  @Test
+  void testRenameTableToExistingNamePreservesBothTables() {
+    NameIdentifier source =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            ICEBERG_CATALOG_NAME,
+            ICEBERG_SCHEMA_NAME,
+            "rename_source");
+    NameIdentifier target = NameIdentifier.of(source.namespace(), "rename_target");
+    Column[] columns = {Column.of("id", Types.LongType.get())};
+    for (NameIdentifier ident : List.of(source, target)) {
+      icebergCatalogOperations.createTable(
+          ident,
+          columns,
+          ident.name(),
+          Map.of(),
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0]);
+    }
+    TableAlreadyExistsException error =
+        Assertions.assertThrows(
+            TableAlreadyExistsException.class,
+            () -> icebergCatalogOperations.alterTable(source, TableChange.rename(target.name())));
+    Assertions.assertInstanceOf(AlreadyExistsException.class, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(target.toString()));
+    Assertions.assertEquals(source.name(), icebergCatalogOperations.loadTable(source).comment());
+    Assertions.assertEquals(target.name(), icebergCatalogOperations.loadTable(target).comment());
   }
 
   @Test
