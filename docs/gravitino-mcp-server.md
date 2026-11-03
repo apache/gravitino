@@ -195,6 +195,9 @@ indicating whether it was dropped. It removes semantic metadata without deleting
 
 ### Domains (read-only)
 
+See [Domains](./domains.md) for membership semantics and the
+[Domain guide](./manage-domains-in-gravitino.md) for SDK and REST mutations.
+
 Use `--include-tool-tags domain` to expose the five Domain tools.
 All are annotated as read-only and idempotent and issue only GET requests.
 
@@ -223,8 +226,8 @@ For example, call `list_domain_members` with:
 }
 ```
 
-`types` is a list of leaf object types; `domains` filters source domain names
-using repeated query parameters.
+`types` is a list of leaf object types; `domains` selects the union of named scopes using repeated query parameters.
+Selecting the requested domain includes its visible children. Well-formed names outside that scope are ignored.
 `name_contains` matches a case-insensitive substring of the full metadata object name.
 Omitted or blank values leave this filter unset.
 Omitted or empty type/domain lists leave those filters unset.

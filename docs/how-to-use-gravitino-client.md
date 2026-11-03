@@ -103,3 +103,8 @@ Catch this exception, reload the latest metadata, reconsider your intended chang
 retry with a bounded number of attempts. Do not replay a stale update unchanged or
 retry every HTTP 409 response, since other conflicts may require a different action.
 For a model-version read conflict, retry the read with a bounded number of attempts.
+
+## Domains
+
+See [Manage domains](./manage-domains-in-gravitino.md) for a complete executable example
+covering creation, publication, tag membership, reverse lookup and cleanup.
