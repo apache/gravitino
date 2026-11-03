@@ -34,6 +34,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -42,7 +43,9 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.aws.AwsClientProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.DateType;
 import org.apache.iceberg.types.Types.DecimalType;
@@ -349,5 +352,30 @@ class TestGlueIcebergTableHelper {
     assertEquals("apache", icebergProps.get("http-client.type"));
     assertEquals("2500", icebergProps.get("http-client.apache.connection-timeout-ms"));
     assertEquals("2500", icebergProps.get("http-client.apache.socket-timeout-ms"));
+  }
+
+  @Test
+  void testAlterTableFindsMixedCaseColumnsByLowerCaseName() throws IOException {
+    try (InMemoryCatalog catalog = new InMemoryCatalog()) {
+      catalog.initialize("test", new HashMap<>());
+      catalog.createNamespace(Namespace.of("db"));
+      catalog.createTable(
+          TableIdentifier.of("db", "events"),
+          new Schema(
+              NestedField.optional(1, "UserId", LongType.get()),
+              NestedField.optional(2, "EventTime", TimestampType.withoutZone())));
+
+      // Gravitino folds column names in requests to lower case before they reach the catalog.
+      GlueIcebergTableHelper.alterTable(
+          catalog,
+          "db",
+          "events",
+          TableChange.deleteColumn(new String[] {"userid"}, false),
+          TableChange.renameColumn(new String[] {"eventtime"}, "event_time"));
+
+      Schema schema = catalog.loadTable(TableIdentifier.of("db", "events")).schema();
+      assertEquals(1, schema.columns().size());
+      assertEquals("event_time", schema.columns().get(0).name());
+    }
   }
 }

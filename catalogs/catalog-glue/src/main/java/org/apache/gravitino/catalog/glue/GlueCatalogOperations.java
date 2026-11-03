@@ -29,13 +29,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -56,15 +56,18 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
@@ -73,6 +76,7 @@ import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
@@ -203,13 +207,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
-    Map<String, String> params = properties != null ? properties : Collections.emptyMap();
+    Map<String, String> params = properties != null ? new HashMap<>(properties) : new HashMap<>();
+    // The location is stored only as the database LocationUri, which other engines read.
+    String location = params.remove(LOCATION);
 
     DatabaseInput.Builder inputBuilder =
         DatabaseInput.builder().name(ident.name()).description(comment).parameters(params);
-
-    String location = params.get(LOCATION);
-    if (location != null) {
+    if (StringUtils.isNotBlank(location)) {
       inputBuilder.locationUri(location);
     }
 
@@ -226,10 +230,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     LOG.info("Created Glue schema (database) {}", ident.name());
 
+    // The response carries the location like a later load, which reads it from LocationUri.
+    Map<String, String> created = new HashMap<>(params);
+    if (StringUtils.isNotBlank(location)) {
+      created.put(LOCATION, location);
+    }
     return GlueSchema.builder()
         .withName(ident.name())
         .withComment(comment)
-        .withProperties(params)
+        .withProperties(created)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(PrincipalUtils.getCurrentUserName())
@@ -257,35 +266,51 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public GlueSchema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    Database current = getDatabase(ident.name());
 
-    GlueSchema current = loadSchema(ident);
-
-    Map<String, String> newProps = new HashMap<>(current.properties());
+    // UpdateDatabase replaces the whole definition, so start from what Glue holds and change
+    // only what the request asks for.
+    Map<String, String> newParams = new HashMap<>();
+    if (current.parameters() != null) {
+      newParams.putAll(current.parameters());
+    }
+    String location = current.locationUri();
+    if (StringUtils.isBlank(location)) {
+      location = newParams.get(LOCATION);
+    }
+    newParams.remove(LOCATION);
 
     for (SchemaChange change : changes) {
       if (change instanceof SchemaChange.SetProperty) {
         SchemaChange.SetProperty sp = (SchemaChange.SetProperty) change;
-        newProps.put(sp.getProperty(), sp.getValue());
+        if (LOCATION.equals(sp.getProperty())) {
+          location = sp.getValue();
+        } else {
+          newParams.put(sp.getProperty(), sp.getValue());
+        }
       } else if (change instanceof SchemaChange.RemoveProperty) {
-        newProps.remove(((SchemaChange.RemoveProperty) change).getProperty());
+        String property = ((SchemaChange.RemoveProperty) change).getProperty();
+        if (LOCATION.equals(property)) {
+          location = null;
+        } else {
+          newParams.remove(property);
+        }
       } else {
         throw new IllegalArgumentException(
             "Unsupported schema change: " + change.getClass().getSimpleName());
       }
     }
 
-    DatabaseInput.Builder inputBuilder =
+    DatabaseInput input =
         DatabaseInput.builder()
-            .name(ident.name())
-            .description(current.comment())
-            .parameters(newProps);
-
-    String location = newProps.get(LOCATION);
-    if (location != null) {
-      inputBuilder.locationUri(location);
-    }
-
-    DatabaseInput input = inputBuilder.build();
+            .name(current.name())
+            .description(current.description())
+            .locationUri(StringUtils.isBlank(location) ? null : location)
+            .parameters(newParams)
+            .createTableDefaultPermissions(current.createTableDefaultPermissions())
+            .targetDatabase(current.targetDatabase())
+            .federatedDatabase(current.federatedDatabase())
+            .build();
 
     UpdateDatabaseRequest.Builder req =
         UpdateDatabaseRequest.builder().name(ident.name()).databaseInput(input);
@@ -298,13 +323,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     LOG.info("Altered Glue schema (database) {}", ident.name());
+    return loadSchema(ident);
+  }
 
-    return GlueSchema.builder()
-        .withName(ident.name())
-        .withComment(current.comment())
-        .withProperties(newProps)
-        .withAuditInfo(current.auditInfo())
-        .build();
+  private Database getDatabase(String name) {
+    GetDatabaseRequest.Builder req = GetDatabaseRequest.builder().name(name);
+    applyCatalogId(catalogId, req::catalogId);
+    try {
+      return callGlue(() -> glueClient.getDatabase(req.build()), "schema " + name).database();
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toSchemaException(e, "schema " + name);
+    }
   }
 
   @Override
@@ -383,6 +412,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       rejectIfView(rawGlueTable, ident, dbName);
       rejectIfFormatHidden(rawGlueTable, ident, dbName);
       GlueTable table = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
+      rejectDuplicateColumns(table, dbName);
 
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
       // AWS Glue Table.partitionKeys() is empty for Iceberg tables, so we load the Iceberg
@@ -437,18 +467,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         GlueConstants.TABLE_FORMAT_FILTER,
         tableFormatFilter);
 
-    // Non-Iceberg (Hive) tables only support identity partitioning.
-    // Iceberg tables delegate to GlueIcebergCatalogHelper which supports all transforms.
+    validateColumns(columns);
+    // Iceberg tables delegate partitioning and ordering to GlueIcebergTableHelper.
     if (!isIceberg) {
-      for (Transform t : partitions) {
-        Preconditions.checkArgument(
-            t instanceof Transforms.IdentityTransform,
-            "Glue catalog only supports identity partitioning, got: %s",
-            t.name());
-        Preconditions.checkArgument(
-            ((Transforms.IdentityTransform) t).fieldName().length == 1,
-            "Glue catalog does not support nested field partitioning");
-      }
+      validateHivePartitioning(columns, partitions);
+      validateHiveDistribution(distribution);
+      validateHiveSortOrders(sortOrders);
     }
 
     // For Iceberg tables, stamp table_type=ICEBERG into the Glue parameters so that
@@ -503,27 +527,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     executeCreateTable(dbName, ident, req);
     LOG.info("Created {} table {}.{}", isIceberg ? "Iceberg" : "Glue", dbName, ident.name());
 
-    if (isIceberg) {
-      // Load from Glue to pick up any server-set parameters (e.g. current-schema-id).
-      return loadTable(ident);
-    }
-    GlueTable created =
-        GlueTable.builder()
-            .withName(ident.name())
-            .withComment(comment)
-            .withColumns(columns)
-            .withProperties(props)
-            .withPartitioning(partitions)
-            .withDistribution(distribution != null ? distribution : Distributions.NONE)
-            .withSortOrders(sortOrders != null ? sortOrders : new SortOrder[0])
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .build();
-    created.initOpsContext(glueClient, catalogId, dbName);
-    return created;
+    // Read back what Glue stored, so the response carries the derived location and storage
+    // classes, as a later load does.
+    return loadTable(ident);
   }
 
   @Override
@@ -550,70 +556,285 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       return alterIcebergTable(ident, dbName, rawGlueTable, changes);
     }
 
-    GlueTable current = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
-    current.initOpsContext(glueClient, catalogId, dbName);
+    return alterHiveTable(ident, dbName, rawGlueTable, changes);
+  }
 
-    String newName = current.name();
-    String newComment = current.comment();
-    Map<String, String> newProps = new HashMap<>(current.properties());
-
-    // Separate data columns from partition columns
-    int partCount = current.partitioning().length;
-    List<Column> allCols = new ArrayList<>(Arrays.asList(current.columns()));
-    List<Column> dataCols = new ArrayList<>(allCols.subList(0, allCols.size() - partCount));
-    List<Column> partCols =
-        new ArrayList<>(allCols.subList(allCols.size() - partCount, allCols.size()));
+  /**
+   * Alters a Hive-format table. Glue UpdateTable replaces the whole table definition, so the new
+   * definition starts from the table as Glue holds it and only the requested parts change; fields
+   * Gravitino does not model, and column types that are not changed, are written back as read. The
+   * version read is sent along, so Glue refuses the update if the table changed in between.
+   */
+  private GlueTable alterHiveTable(
+      NameIdentifier ident, String dbName, Table raw, TableChange... changes) {
+    StorageDescriptor rawSd = raw.storageDescriptor();
+    HiveColumns cols =
+        new HiveColumns(
+            rawSd != null && rawSd.hasColumns() ? rawSd.columns() : Collections.emptyList(),
+            raw.hasPartitionKeys() ? raw.partitionKeys() : Collections.emptyList(),
+            rawSd != null && rawSd.hasBucketColumns()
+                ? rawSd.bucketColumns()
+                : Collections.emptyList(),
+            rawSd != null && rawSd.hasSortColumns()
+                ? rawSd.sortColumns()
+                : Collections.emptyList());
+    String description = raw.description();
+    Map<String, String> params =
+        raw.hasParameters() ? new HashMap<>(raw.parameters()) : new HashMap<>();
+    SerDeInfo rawSerde = rawSd != null ? rawSd.serdeInfo() : null;
+    String location = rawSd != null ? rawSd.location() : null;
+    String serdeName = rawSerde != null ? rawSerde.name() : null;
+    Map<String, String> serdeParams =
+        rawSerde != null && rawSerde.hasParameters()
+            ? new HashMap<>(rawSerde.parameters())
+            : new HashMap<>();
+    boolean storageChanged = false;
+    boolean changed = false;
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         throw new UnsupportedOperationException("Glue does not support table rename");
       } else if (change instanceof TableChange.UpdateComment) {
-        newComment = ((TableChange.UpdateComment) change).getNewComment();
+        description = ((TableChange.UpdateComment) change).getNewComment();
+        changed = true;
       } else if (change instanceof TableChange.SetProperty) {
+        // Storage properties map to storage descriptor fields, the rest to table parameters.
         TableChange.SetProperty sp = (TableChange.SetProperty) change;
-        newProps.put(sp.getProperty(), sp.getValue());
+        String property = sp.getProperty();
+        if (GlueConstants.LOCATION.equals(property)) {
+          location = sp.getValue();
+          storageChanged = true;
+        } else if (GlueConstants.SERDE_NAME.equals(property)) {
+          serdeName = sp.getValue();
+          storageChanged = true;
+        } else if (property.startsWith(GlueConstants.SERDE_PARAMETER_PREFIX)) {
+          serdeParams.put(
+              property.substring(GlueConstants.SERDE_PARAMETER_PREFIX.length()), sp.getValue());
+          storageChanged = true;
+        } else {
+          checkTableParameterKey(property);
+          params.put(property, sp.getValue());
+        }
+        changed = true;
       } else if (change instanceof TableChange.RemoveProperty) {
-        newProps.remove(((TableChange.RemoveProperty) change).getProperty());
+        String property = ((TableChange.RemoveProperty) change).getProperty();
+        if (GlueConstants.LOCATION.equals(property)) {
+          storageChanged |= location != null;
+          location = null;
+        } else if (GlueConstants.SERDE_NAME.equals(property)) {
+          storageChanged |= serdeName != null;
+          serdeName = null;
+        } else if (property.startsWith(GlueConstants.SERDE_PARAMETER_PREFIX)) {
+          storageChanged |=
+              serdeParams.remove(property.substring(GlueConstants.SERDE_PARAMETER_PREFIX.length()))
+                  != null;
+        } else {
+          checkTableParameterKey(property);
+          changed |= params.remove(property) != null;
+        }
+        changed |= storageChanged;
       } else if (change instanceof TableChange.ColumnChange) {
-        applyColumnChange(dataCols, partCols, (TableChange.ColumnChange) change);
+        changed |= cols.apply((TableChange.ColumnChange) change);
       } else {
         throw new IllegalArgumentException(
             "Unsupported table change: " + change.getClass().getSimpleName());
       }
     }
 
-    List<Column> newAllCols = new ArrayList<>(dataCols);
-    newAllCols.addAll(partCols);
-    Column[] newColumns = newAllCols.toArray(new Column[0]);
+    if (!changed) {
+      return loadTable(ident);
+    }
+
+    StorageDescriptor sd = rawSd;
+    if (rawSd != null || !cols.dataCols.isEmpty() || storageChanged) {
+      StorageDescriptor.Builder sdBuilder =
+          rawSd != null ? rawSd.toBuilder() : StorageDescriptor.builder();
+      sdBuilder.columns(cols.dataCols).bucketColumns(cols.bucketCols).sortColumns(cols.sortCols);
+      if (storageChanged) {
+        SerDeInfo.Builder serdeBuilder =
+            rawSerde != null ? rawSerde.toBuilder() : SerDeInfo.builder();
+        sdBuilder
+            .location(location)
+            .serdeInfo(serdeBuilder.name(serdeName).parameters(serdeParams).build());
+      }
+      sd = sdBuilder.build();
+    }
 
     TableInput input =
-        buildTableInput(
-            dbName,
-            newName,
-            newComment,
-            newColumns,
-            newProps,
-            current.partitioning(),
-            current.distribution(),
-            current.sortOrder(),
-            false);
-
-    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
-    LOG.info("Altered Glue table {}.{}", dbName, ident.name());
-
-    GlueTable altered =
-        GlueTable.builder()
-            .withName(newName)
-            .withComment(newComment)
-            .withColumns(newColumns)
-            .withProperties(newProps)
-            .withPartitioning(current.partitioning())
-            .withDistribution(current.distribution())
-            .withSortOrders(current.sortOrder())
-            .withAuditInfo(current.auditInfo())
+        TableInput.builder()
+            .name(raw.name())
+            .description(description)
+            .owner(raw.owner())
+            .lastAccessTime(raw.lastAccessTime())
+            .lastAnalyzedTime(raw.lastAnalyzedTime())
+            .retention(raw.retention())
+            .storageDescriptor(sd)
+            .partitionKeys(cols.partCols)
+            .viewOriginalText(raw.viewOriginalText())
+            .viewExpandedText(raw.viewExpandedText())
+            .tableType(raw.tableType())
+            .parameters(params)
+            .targetTable(raw.targetTable())
             .build();
-    altered.initOpsContext(glueClient, catalogId, dbName);
-    return altered;
+
+    executeUpdateTable(
+        ident,
+        UpdateTableRequest.builder()
+            .databaseName(dbName)
+            .tableInput(input)
+            .versionId(raw.versionId()));
+    LOG.info("Altered Glue table {}.{}", dbName, ident.name());
+    return loadTable(ident);
+  }
+
+  /** The storage format and classes are set at create only. */
+  private static void checkTableParameterKey(String property) {
+    Preconditions.checkArgument(
+        !SD_TABLE_PROPERTY_KEYS.contains(property),
+        "Property %s of a Glue table cannot be changed",
+        property);
+  }
+
+  /**
+   * The column lists of a Hive-format table as Glue holds them, edited in place by column changes.
+   * Glue column names are compared without regard to case, as Glue folds them to lower case.
+   */
+  private final class HiveColumns {
+    private final List<software.amazon.awssdk.services.glue.model.Column> dataCols;
+    private final List<software.amazon.awssdk.services.glue.model.Column> partCols;
+    private final List<String> bucketCols;
+    private final List<Order> sortCols;
+
+    private HiveColumns(
+        List<software.amazon.awssdk.services.glue.model.Column> dataCols,
+        List<software.amazon.awssdk.services.glue.model.Column> partCols,
+        List<String> bucketCols,
+        List<Order> sortCols) {
+      this.dataCols = new ArrayList<>(dataCols);
+      this.partCols = new ArrayList<>(partCols);
+      this.bucketCols = new ArrayList<>(bucketCols);
+      this.sortCols = new ArrayList<>(sortCols);
+    }
+
+    /**
+     * Applies one column change.
+     *
+     * @return whether the table changed
+     */
+    private boolean apply(TableChange.ColumnChange change) {
+      String[] fieldName = change.fieldName();
+      Preconditions.checkArgument(
+          fieldName != null && fieldName.length > 0, "Column change field name cannot be empty");
+      Preconditions.checkArgument(
+          fieldName.length == 1,
+          "Glue Hive-format tables do not support changes to nested field %s; change the whole"
+              + " column instead",
+          String.join(".", fieldName));
+      String name = fieldName[0];
+
+      if (change instanceof TableChange.AddColumn) {
+        TableChange.AddColumn add = (TableChange.AddColumn) change;
+        Preconditions.checkArgument(
+            !add.isAutoIncrement(), "Glue does not support auto-increment columns: %s", name);
+        Preconditions.checkArgument(
+            indexOf(dataCols, name) < 0 && indexOf(partCols, name) < 0,
+            "Column %s already exists",
+            name);
+        software.amazon.awssdk.services.glue.model.Column column =
+            software.amazon.awssdk.services.glue.model.Column.builder()
+                .name(name)
+                .type(toGlueType(name, add.getDataType()))
+                .comment(add.getComment())
+                .build();
+        dataCols.add(insertIndex(add.getPosition(), dataCols.size()), column);
+        return true;
+      }
+
+      if (change instanceof TableChange.UpdateColumnComment) {
+        String comment = ((TableChange.UpdateColumnComment) change).getNewComment();
+        List<software.amazon.awssdk.services.glue.model.Column> owner =
+            indexOf(dataCols, name) >= 0 ? dataCols : partCols;
+        int index = requireColumn(owner, name);
+        owner.set(index, owner.get(index).toBuilder().comment(comment).build());
+        return true;
+      }
+
+      Preconditions.checkArgument(
+          indexOf(partCols, name) < 0,
+          "Glue does not support %s on partition column %s",
+          change.getClass().getSimpleName(),
+          name);
+
+      if (change instanceof TableChange.DeleteColumn) {
+        int index = indexOf(dataCols, name);
+        if (index < 0) {
+          Boolean ifExists = ((TableChange.DeleteColumn) change).getIfExists();
+          Preconditions.checkArgument(
+              Boolean.TRUE.equals(ifExists), "Column %s does not exist", name);
+          return false;
+        }
+        Preconditions.checkArgument(
+            bucketCols.stream().noneMatch(name::equalsIgnoreCase)
+                && sortCols.stream().noneMatch(o -> name.equalsIgnoreCase(o.column())),
+            "Cannot delete column %s: it is a bucket or sort column of the table",
+            name);
+        dataCols.remove(index);
+        return true;
+      }
+
+      int index = requireColumn(dataCols, name);
+      software.amazon.awssdk.services.glue.model.Column old = dataCols.get(index);
+      if (change instanceof TableChange.RenameColumn) {
+        String newName = ((TableChange.RenameColumn) change).getNewName();
+        Preconditions.checkArgument(
+            (indexOf(dataCols, newName) < 0 || name.equalsIgnoreCase(newName))
+                && indexOf(partCols, newName) < 0,
+            "Column %s already exists",
+            newName);
+        dataCols.set(index, old.toBuilder().name(newName).build());
+        bucketCols.replaceAll(c -> c.equalsIgnoreCase(name) ? newName : c);
+        sortCols.replaceAll(
+            o -> name.equalsIgnoreCase(o.column()) ? o.toBuilder().column(newName).build() : o);
+      } else if (change instanceof TableChange.UpdateColumnType) {
+        Type newType = ((TableChange.UpdateColumnType) change).getNewDataType();
+        dataCols.set(index, old.toBuilder().type(toGlueType(name, newType)).build());
+      } else if (change instanceof TableChange.UpdateColumnPosition) {
+        dataCols.remove(index);
+        dataCols.add(
+            insertIndex(((TableChange.UpdateColumnPosition) change).getPosition(), dataCols.size()),
+            old);
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported column change: " + change.getClass().getSimpleName());
+      }
+      return true;
+    }
+
+    private int insertIndex(TableChange.ColumnPosition position, int defaultIndex) {
+      if (position instanceof TableChange.First) {
+        return 0;
+      }
+      if (position instanceof TableChange.After) {
+        return requireColumn(dataCols, ((TableChange.After) position).getColumn()) + 1;
+      }
+      return defaultIndex;
+    }
+
+    private int requireColumn(
+        List<software.amazon.awssdk.services.glue.model.Column> cols, String name) {
+      int index = indexOf(cols, name);
+      Preconditions.checkArgument(index >= 0, "Column %s does not exist", name);
+      return index;
+    }
+
+    private int indexOf(List<software.amazon.awssdk.services.glue.model.Column> cols, String name) {
+      for (int i = 0; i < cols.size(); i++) {
+        if (cols.get(i).name().equalsIgnoreCase(name)) {
+          return i;
+        }
+      }
+      return -1;
+    }
   }
 
   private GlueTable alterIcebergTable(
@@ -733,6 +954,123 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /** Rejects a Glue object that is a view, so that it is not acted on through the table API. */
+  /**
+   * Glue accepts a table whose columns share a name (Glue folds names to lower case), but such a
+   * table cannot be represented in Gravitino.
+   */
+  private static void rejectDuplicateColumns(GlueTable table, String dbName) {
+    Set<String> names = new HashSet<>();
+    for (Column column : table.columns()) {
+      Preconditions.checkArgument(
+          names.add(column.name().toLowerCase(Locale.ROOT)),
+          "Table %s.%s has more than one column named %s; fix the table in Glue",
+          dbName,
+          table.name(),
+          column.name());
+    }
+  }
+
+  /** Checks the column options Glue cannot store and the names Glue would fold together. */
+  private static void validateColumns(Column[] columns) {
+    Set<String> names = new HashSet<>();
+    for (Column column : columns) {
+      Preconditions.checkArgument(
+          !column.autoIncrement(),
+          "Glue does not support auto-increment columns: %s",
+          column.name());
+      // Glue stores column names in lower case.
+      Preconditions.checkArgument(
+          names.add(column.name().toLowerCase(Locale.ROOT)),
+          "Duplicate column name: %s; Glue column names are case-insensitive",
+          column.name());
+    }
+  }
+
+  /**
+   * Checks that a Hive-format table is partitioned by identity transforms on distinct primitive
+   * columns that are the last columns of the table, in partitioning order, because Glue stores the
+   * partition columns as a separate trailing list.
+   */
+  private static void validateHivePartitioning(Column[] columns, Transform[] partitions) {
+    Preconditions.checkArgument(
+        columns.length >= partitions.length,
+        "The table has %s columns but %s partition columns",
+        columns.length,
+        partitions.length);
+    int firstPartitionColumn = columns.length - partitions.length;
+    for (int i = 0; i < partitions.length; i++) {
+      Transform t = partitions[i];
+      Preconditions.checkArgument(
+          t instanceof Transforms.IdentityTransform,
+          "Glue catalog only supports identity partitioning, got: %s",
+          t.name());
+      String[] fieldName = ((Transforms.IdentityTransform) t).fieldName();
+      Preconditions.checkArgument(
+          fieldName.length == 1, "Glue catalog does not support nested field partitioning");
+      Column column = columns[firstPartitionColumn + i];
+      Preconditions.checkArgument(
+          column.name().equalsIgnoreCase(fieldName[0]),
+          "Partition column %s must be at position %s: partition columns must be the last columns"
+              + " of the table, in partitioning order",
+          fieldName[0],
+          firstPartitionColumn + i + 1);
+      Type type = column.dataType();
+      Preconditions.checkArgument(
+          !(type instanceof Types.StructType
+              || type instanceof Types.ListType
+              || type instanceof Types.MapType
+              || type instanceof Types.UnionType),
+          "Partition column %s has type %s; Glue partition columns must have a primitive type",
+          column.name(),
+          type.simpleString());
+    }
+  }
+
+  /** Checks that a distribution is one Glue can store: hash bucketing on plain columns. */
+  private static void validateHiveDistribution(Distribution distribution) {
+    if (distribution == null || distribution.strategy() == Strategy.NONE) {
+      return;
+    }
+    Preconditions.checkArgument(
+        distribution.strategy() == Strategy.HASH,
+        "Glue only supports hash distribution (bucketing), got: %s",
+        distribution.strategy());
+    Preconditions.checkArgument(
+        distribution.number() >= 1,
+        "Glue bucketing needs a number of buckets of at least 1, got: %s",
+        distribution.number());
+    Preconditions.checkArgument(
+        distribution.expressions().length > 0, "Glue bucketing needs at least one bucket column");
+    for (Expression e : distribution.expressions()) {
+      Preconditions.checkArgument(
+          e instanceof NamedReference.FieldReference
+              && ((NamedReference.FieldReference) e).fieldName().length == 1,
+          "Glue only supports bucketing on plain columns, got: %s",
+          e);
+    }
+  }
+
+  /** Checks that sort orders are ones Glue can store: plain columns with the default nulls. */
+  private static void validateHiveSortOrders(SortOrder[] sortOrders) {
+    if (sortOrders == null) {
+      return;
+    }
+    for (SortOrder so : sortOrders) {
+      Preconditions.checkArgument(
+          so.expression() instanceof NamedReference.FieldReference
+              && ((NamedReference.FieldReference) so.expression()).fieldName().length == 1,
+          "Glue only supports sort orders on plain columns, got: %s",
+          so.expression());
+      // Glue stores only the sort direction; the null ordering is implied by it.
+      Preconditions.checkArgument(
+          so.nullOrdering() == so.direction().defaultNullOrdering(),
+          "Glue does not support %s for a %s sort order on %s",
+          so.nullOrdering(),
+          so.direction(),
+          so.expression());
+    }
+  }
+
   private static void rejectIfView(Table table, NameIdentifier ident, String dbName) {
     if (isView(table)) {
       throw new NoSuchTableException(
@@ -837,24 +1175,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
-    // Translate format name to input/output/serde class names if not explicitly set.
-    String format = properties.getOrDefault(GlueConstants.FORMAT, StorageFormat.PARQUET.name());
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
-
-    boolean needsFormatClasses =
-        !isIceberg && (inputFormat == null || outputFormat == null || serdeLib == null);
-    if (needsFormatClasses) {
-      String upperFormat = format.toUpperCase(Locale.ROOT);
-      Preconditions.checkArgument(
-          Arrays.stream(StorageFormat.values()).anyMatch(f -> f.name().equals(upperFormat)),
-          "Unsupported table format: %s",
-          format);
-      StorageFormat sf = StorageFormat.valueOf(upperFormat);
-      if (inputFormat == null) inputFormat = sf.getInputFormat();
-      if (outputFormat == null) outputFormat = sf.getOutputFormat();
-      if (serdeLib == null) serdeLib = sf.getSerde();
+    if (!isIceberg) {
+      StorageFormat sf =
+          resolveStorageFormat(
+              properties.get(GlueConstants.FORMAT), inputFormat, outputFormat, serdeLib);
+      if (sf != null) {
+        inputFormat = sf.getInputFormat();
+        outputFormat = sf.getOutputFormat();
+        serdeLib = sf.getSerde();
+      }
     }
 
     SerDeInfo serDe =
@@ -918,9 +1250,67 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private software.amazon.awssdk.services.glue.model.Column toGlueColumn(Column col) {
     return software.amazon.awssdk.services.glue.model.Column.builder()
         .name(col.name())
-        .type(typeConverter.fromGravitino(col.dataType()))
+        .type(toGlueType(col.name(), col.dataType()))
         .comment(col.comment())
         .build();
+  }
+
+  private String toGlueType(String columnName, Type type) {
+    try {
+      return typeConverter.fromGravitino(type);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format("Column %s: %s", columnName, e.getMessage()), e);
+    }
+  }
+
+  /**
+   * Resolves the storage classes of a Hive-format table. A {@code format} sets all three classes,
+   * and any class given next to it must match. Without a format, either all three classes are
+   * given, or none and the table is a text table, as in Hive and Athena.
+   *
+   * @return the storage format to apply, or null when all three classes are given explicitly
+   */
+  private static StorageFormat resolveStorageFormat(
+      String format, String inputFormat, String outputFormat, String serdeLib) {
+    if (format == null) {
+      boolean anyClass = inputFormat != null || outputFormat != null || serdeLib != null;
+      if (!anyClass) {
+        return StorageFormat.TEXTFILE;
+      }
+      Preconditions.checkArgument(
+          inputFormat != null && outputFormat != null && serdeLib != null,
+          "Set all of '%s', '%s' and '%s', or set '%s' instead",
+          GlueConstants.INPUT_FORMAT_CLASS,
+          GlueConstants.OUTPUT_FORMAT,
+          GlueConstants.SERDE_LIB,
+          GlueConstants.FORMAT);
+      return null;
+    }
+
+    String upperFormat = format.trim().toUpperCase(Locale.ROOT);
+    Preconditions.checkArgument(
+        Arrays.stream(StorageFormat.values()).anyMatch(f -> f.name().equals(upperFormat)),
+        "Unsupported table format: %s. Supported formats: %s",
+        format,
+        Arrays.toString(StorageFormat.values()));
+    StorageFormat sf = StorageFormat.valueOf(upperFormat);
+    checkFormatClass(format, GlueConstants.INPUT_FORMAT_CLASS, inputFormat, sf.getInputFormat());
+    checkFormatClass(format, GlueConstants.OUTPUT_FORMAT, outputFormat, sf.getOutputFormat());
+    checkFormatClass(format, GlueConstants.SERDE_LIB, serdeLib, sf.getSerde());
+    return sf;
+  }
+
+  private static void checkFormatClass(
+      String format, String property, String given, String expected) {
+    Preconditions.checkArgument(
+        given == null || given.equals(expected),
+        "'%s' is %s, which conflicts with '%s'=%s (expected %s)",
+        property,
+        given,
+        GlueConstants.FORMAT,
+        format,
+        expected);
   }
 
   /**
@@ -931,7 +1321,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
    * name in between.
    */
   private String resolveTableLocation(String explicitLocation, String dbName, String tableName) {
-    if (explicitLocation != null) {
+    // A blank location is treated as absent, so the documented fallbacks apply.
+    if (StringUtils.isNotBlank(explicitLocation)) {
       return explicitLocation;
     }
     String databaseLocation = databaseLocationUri(dbName);
@@ -962,59 +1353,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private static void applyColumnChange(
-      List<Column> dataCols, List<Column> partCols, TableChange.ColumnChange change) {
-
-    String[] fieldNameParts = change.fieldName();
-    Preconditions.checkArgument(
-        fieldNameParts != null && fieldNameParts.length > 0,
-        "Column change field name cannot be empty");
-    String fieldName = fieldNameParts[0];
-
-    if (change instanceof TableChange.AddColumn) {
-      TableChange.AddColumn add = (TableChange.AddColumn) change;
-      dataCols.add(
-          GlueColumn.builder()
-              .withName(add.fieldName()[0])
-              .withType(add.getDataType())
-              .withComment(add.getComment())
-              .withNullable(add.isNullable())
-              .build());
-
-    } else if (change instanceof TableChange.DeleteColumn) {
-      boolean isPartition = partCols.stream().anyMatch(c -> c.name().equals(fieldName));
-      Preconditions.checkArgument(!isPartition, "Cannot delete partition column: %s", fieldName);
-      dataCols.removeIf(c -> c.name().equals(fieldName));
-
-    } else if (change instanceof TableChange.RenameColumn) {
-      boolean isPartition = partCols.stream().anyMatch(c -> c.name().equals(fieldName));
-      Preconditions.checkArgument(!isPartition, "Cannot rename partition column: %s", fieldName);
-      String newColName = ((TableChange.RenameColumn) change).getNewName();
-      replaceColumn(
-          dataCols, fieldName, old -> copyColumn(old, newColName, old.dataType(), old.comment()));
-
-    } else if (change instanceof TableChange.UpdateColumnType) {
-      boolean isPartition = partCols.stream().anyMatch(c -> c.name().equals(fieldName));
-      Preconditions.checkArgument(
-          !isPartition, "Cannot update type of partition column: %s", fieldName);
-      Type newType = ((TableChange.UpdateColumnType) change).getNewDataType();
-      replaceColumn(
-          dataCols, fieldName, old -> copyColumn(old, old.name(), newType, old.comment()));
-
-    } else if (change instanceof TableChange.UpdateColumnComment) {
-      String newCmt = ((TableChange.UpdateColumnComment) change).getNewComment();
-      if (!replaceColumn(
-          dataCols, fieldName, old -> copyColumn(old, old.name(), old.dataType(), newCmt))) {
-        replaceColumn(
-            partCols, fieldName, old -> copyColumn(old, old.name(), old.dataType(), newCmt));
-      }
-
-    } else {
-      throw new IllegalArgumentException(
-          "Unsupported column change: " + change.getClass().getSimpleName());
-    }
-  }
-
   /** Passes {@code catalogId} to {@code setter} when it is non-null. */
   static void applyCatalogId(String catalogId, Consumer<String> setter) {
     if (catalogId != null) setter.accept(catalogId);
@@ -1034,29 +1372,5 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       RuntimeException converted = GlueExceptionConverter.toClientException(e, context, glueClient);
       throw converted != null ? converted : e;
     }
-  }
-
-  /**
-   * Finds the first column matching {@code name} in {@code cols}, replaces it with the result of
-   * {@code updater}, and returns {@code true} if a replacement was made.
-   */
-  private static boolean replaceColumn(
-      List<Column> cols, String name, UnaryOperator<Column> updater) {
-    for (int i = 0; i < cols.size(); i++) {
-      if (cols.get(i).name().equals(name)) {
-        cols.set(i, updater.apply(cols.get(i)));
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static Column copyColumn(Column src, String name, Type type, String comment) {
-    return GlueColumn.builder()
-        .withName(name)
-        .withType(type)
-        .withComment(comment)
-        .withNullable(src.nullable())
-        .build();
   }
 }

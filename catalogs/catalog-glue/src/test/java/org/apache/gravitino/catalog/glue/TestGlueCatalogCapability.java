@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -67,9 +66,9 @@ class TestGlueCatalogCapability {
   }
 
   @Test
-  void testCaseSensitiveOnColumnIsSupported() {
-    // Column name case folding is not documented in Glue Column API — treated as supported.
+  void testCaseSensitiveOnColumnIsUnsupported() {
+    // Glue folds column names to lower case, like database and table names.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
-    assertTrue(result.supported());
+    assertFalse(result.supported());
   }
 }

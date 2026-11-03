@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,26 +34,39 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
+import software.amazon.awssdk.services.glue.model.ConcurrentModificationException;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.CreateTableResponse;
 import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
@@ -62,8 +76,12 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.GetTablesRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesResponse;
+import software.amazon.awssdk.services.glue.model.Order;
+import software.amazon.awssdk.services.glue.model.SerDeInfo;
+import software.amazon.awssdk.services.glue.model.SkewedInfo;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
+import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 
@@ -79,6 +97,49 @@ class TestGlueCatalogTableOperations {
     ops.glueClient = mockClient;
     ops.warehouseLocation = "s3://test-bucket/warehouse";
     stubDatabaseLocation(null);
+    useFakeGlueTable(null);
+  }
+
+  /**
+   * Makes the mock behave like Glue for one table: creates and updates are visible to later reads,
+   * which the catalog uses to build its responses.
+   */
+  private void useFakeGlueTable(Table initial) {
+    AtomicReference<Table> stored = new AtomicReference<>(initial);
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenAnswer(
+            inv -> {
+              if (stored.get() == null) {
+                throw EntityNotFoundException.builder().message("not found").build();
+              }
+              return GetTableResponse.builder().table(stored.get()).build();
+            });
+    when(mockClient.createTable(any(CreateTableRequest.class)))
+        .thenAnswer(
+            inv -> {
+              stored.set(toTable(((CreateTableRequest) inv.getArgument(0)).tableInput()));
+              return CreateTableResponse.builder().build();
+            });
+    when(mockClient.updateTable(any(UpdateTableRequest.class)))
+        .thenAnswer(
+            inv -> {
+              stored.set(toTable(((UpdateTableRequest) inv.getArgument(0)).tableInput()));
+              return UpdateTableResponse.builder().build();
+            });
+  }
+
+  private static Table toTable(TableInput in) {
+    return Table.builder()
+        .name(in.name())
+        .description(in.description())
+        .owner(in.owner())
+        .retention(in.retention())
+        .storageDescriptor(in.storageDescriptor())
+        .partitionKeys(in.partitionKeys())
+        .tableType(in.tableType())
+        .parameters(in.parameters())
+        .createTime(Instant.now())
+        .build();
   }
 
   /** Stubs the database lookup used to resolve table locations. */
@@ -566,10 +627,7 @@ class TestGlueCatalogTableOperations {
             .storageDescriptor(StorageDescriptor.builder().build())
             .createTime(Instant.now())
             .build();
-    when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(glueTable).build());
-    when(mockClient.updateTable(any(UpdateTableRequest.class)))
-        .thenReturn(UpdateTableResponse.builder().build());
+    useFakeGlueTable(glueTable);
 
     GlueTable result = ops.alterTable(ident, TableChange.updateComment("new comment"));
 
@@ -612,10 +670,7 @@ class TestGlueCatalogTableOperations {
             .storageDescriptor(StorageDescriptor.builder().build())
             .createTime(Instant.now())
             .build();
-    when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(glueTable).build());
-    when(mockClient.updateTable(any(UpdateTableRequest.class)))
-        .thenReturn(UpdateTableResponse.builder().build());
+    useFakeGlueTable(glueTable);
 
     GlueTable result = ops.alterTable(ident, TableChange.setProperty("newKey", "newVal"));
 
@@ -641,10 +696,7 @@ class TestGlueCatalogTableOperations {
                     .build())
             .createTime(Instant.now())
             .build();
-    when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(glueTable).build());
-    when(mockClient.updateTable(any(UpdateTableRequest.class)))
-        .thenReturn(UpdateTableResponse.builder().build());
+    useFakeGlueTable(glueTable);
 
     GlueTable result =
         ops.alterTable(
@@ -785,5 +837,504 @@ class TestGlueCatalogTableOperations {
         .viewOriginalText("/* Presto View: abc */")
         .parameters(Map.of("presto_view", "true"))
         .build();
+  }
+
+  // -------------------------------------------------------------------------
+  // Hive-format create validation
+  // -------------------------------------------------------------------------
+
+  private static final NameIdentifier HIVE_IDENT =
+      NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+
+  private static Column col(String name, Type type) {
+    return GlueColumn.builder().withName(name).withType(type).withNullable(true).build();
+  }
+
+  private GlueTable createHive(
+      Column[] columns,
+      Map<String, String> props,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders) {
+    return ops.createTable(
+        HIVE_IDENT,
+        columns,
+        null,
+        props,
+        partitions,
+        distribution,
+        sortOrders,
+        Indexes.EMPTY_INDEXES);
+  }
+
+  private void assertCreateRefused(
+      String expectedText,
+      Column[] columns,
+      Map<String, String> props,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders) {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> createHive(columns, props, partitions, distribution, sortOrders));
+    assertTrue(e.getMessage().contains(expectedText), e.getMessage());
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  private static final Column[] ABC = {
+    col("a", Types.StringType.get()),
+    col("b", Types.IntegerType.get()),
+    col("c", Types.DateType.get())
+  };
+
+  @Test
+  void testCreateRefusesPartitionColumnsThatAreNotTrailing() {
+    assertCreateRefused(
+        "must be the last columns",
+        ABC,
+        Collections.emptyMap(),
+        new Transform[] {Transforms.identity("a")},
+        Distributions.NONE,
+        SortOrders.NONE);
+    assertCreateRefused(
+        "must be the last columns",
+        ABC,
+        Collections.emptyMap(),
+        new Transform[] {Transforms.identity("c"), Transforms.identity("b")},
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateStoresTrailingPartitionColumns() {
+    GlueTable created =
+        createHive(
+            ABC,
+            Collections.emptyMap(),
+            new Transform[] {Transforms.identity("b"), Transforms.identity("c")},
+            Distributions.NONE,
+            SortOrders.NONE);
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockClient).createTable(captor.capture());
+    TableInput input = captor.getValue().tableInput();
+    assertEquals(List.of("b", "c"), input.partitionKeys().stream().map(c -> c.name()).toList());
+    assertEquals(2, created.partitioning().length);
+  }
+
+  @Test
+  void testCreateRefusesComplexPartitionColumn() {
+    Column[] columns = {
+      col("id", Types.LongType.get()),
+      col("m", Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()))
+    };
+    assertCreateRefused(
+        "primitive type",
+        columns,
+        Collections.emptyMap(),
+        new Transform[] {Transforms.identity("m")},
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesDuplicateAndAutoIncrementColumns() {
+    assertCreateRefused(
+        "Duplicate column name",
+        new Column[] {col("abc", Types.IntegerType.get()), col("Abc", Types.StringType.get())},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+    Column autoInc =
+        GlueColumn.builder()
+            .withName("id")
+            .withType(Types.LongType.get())
+            .withNullable(true)
+            .withAutoIncrement(true)
+            .build();
+    assertCreateRefused(
+        "auto-increment",
+        new Column[] {autoInc},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesUnsupportedDistributionAndSortOrder() {
+    assertCreateRefused(
+        "hash distribution",
+        ABC,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.of(Strategy.RANGE, 4, NamedReference.field("a")),
+        SortOrders.NONE);
+    assertCreateRefused(
+        "at least 1",
+        ABC,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(0, NamedReference.field("a")),
+        SortOrders.NONE);
+    assertCreateRefused(
+        "plain columns",
+        ABC,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(4, FunctionExpression.of("abs", NamedReference.field("b"))),
+        SortOrders.NONE);
+    assertCreateRefused(
+        "nulls_first",
+        ABC,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field("a"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+        });
+  }
+
+  @Test
+  void testCreateDefaultsToTextStorage() {
+    createHive(
+        ABC,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockClient).createTable(captor.capture());
+    StorageDescriptor sd = captor.getValue().tableInput().storageDescriptor();
+    assertEquals(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, sd.inputFormat());
+    assertEquals(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS, sd.outputFormat());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+  }
+
+  @Test
+  void testCreateRefusesConflictingOrPartialStorageClasses() {
+    assertCreateRefused(
+        "conflicts",
+        ABC,
+        Map.of(
+            GlueConstants.FORMAT,
+            "csv",
+            GlueConstants.INPUT_FORMAT_CLASS,
+            HiveStorageConstants.ORC_INPUT_FORMAT_CLASS),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+    assertCreateRefused(
+        "Set all of",
+        ABC,
+        Map.of(GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.ORC_INPUT_FORMAT_CLASS),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+    assertCreateRefused(
+        "Unsupported table format",
+        ABC,
+        Map.of(
+            GlueConstants.FORMAT,
+            "garbage",
+            GlueConstants.INPUT_FORMAT_CLASS,
+            "a",
+            GlueConstants.OUTPUT_FORMAT,
+            "b",
+            GlueConstants.SERDE_LIB,
+            "c"),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateTreatsBlankLocationAsAbsentAndReturnsStoredTable() {
+    GlueTable created =
+        createHive(
+            ABC,
+            Map.of(GlueConstants.LOCATION, "  "),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            SortOrders.NONE);
+
+    assertEquals(
+        "s3://test-bucket/warehouse/mydb/hive_tbl",
+        created.properties().get(GlueConstants.LOCATION));
+    assertEquals(
+        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+        created.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
+  }
+
+  @Test
+  void testCreateUnsupportedTypeNamesColumn() {
+    assertCreateRefused(
+        "Column f",
+        new Column[] {col("f", Types.FixedType.of(16))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testLoadRefusesTableWithDuplicateColumns() {
+    useFakeGlueTable(
+        Table.builder()
+            .name("dup")
+            .storageDescriptor(
+                StorageDescriptor.builder()
+                    .columns(glueCol("id", "int"), glueCol("id", "string"))
+                    .build())
+            .build());
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.loadTable(NameIdentifier.of("metalake", "catalog", "mydb", "dup")));
+    assertTrue(e.getMessage().contains("more than one column named id"), e.getMessage());
+  }
+
+  // -------------------------------------------------------------------------
+  // Hive-format alter
+  // -------------------------------------------------------------------------
+
+  private static final NameIdentifier ALTER_IDENT =
+      NameIdentifier.of("metalake", "catalog", "mydb", "native");
+
+  private static software.amazon.awssdk.services.glue.model.Column glueCol(
+      String name, String type) {
+    return software.amazon.awssdk.services.glue.model.Column.builder()
+        .name(name)
+        .type(type)
+        .build();
+  }
+
+  /** A table as a crawler or another engine leaves it, with fields Gravitino does not model. */
+  private static Table nativeTable() {
+    return Table.builder()
+        .name("native")
+        .owner("crawler")
+        .retention(7)
+        .tableType("MANAGED_TABLE")
+        .versionId("42")
+        .parameters(Map.of("classification", "csv"))
+        .partitionKeys(glueCol("dt", "string"))
+        .storageDescriptor(
+            StorageDescriptor.builder()
+                .columns(
+                    glueCol("id", "int").toBuilder().parameters(Map.of("stat", "1")).build(),
+                    glueCol("s", "struct<Outer:int>"),
+                    glueCol("k", "string"))
+                .location("s3://bucket/native")
+                .inputFormat(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS)
+                .outputFormat(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS)
+                .serdeInfo(
+                    SerDeInfo.builder()
+                        .serializationLibrary(HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS)
+                        .build())
+                .compressed(true)
+                .storedAsSubDirectories(true)
+                .numberOfBuckets(4)
+                .bucketColumns("k")
+                .sortColumns(Order.builder().column("k").sortOrder(1).build())
+                .parameters(Map.of("recordCount", "10"))
+                .skewedInfo(SkewedInfo.builder().skewedColumnNames("k").build())
+                .build())
+        .build();
+  }
+
+  private UpdateTableRequest alterAndCapture(TableChange... changes) {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(ALTER_IDENT, changes);
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    return captor.getValue();
+  }
+
+  @Test
+  void testAlterKeepsFieldsGravitinoDoesNotModel() {
+    UpdateTableRequest req = alterAndCapture(TableChange.updateComment("new"));
+
+    assertEquals("42", req.versionId());
+    TableInput in = req.tableInput();
+    assertEquals("new", in.description());
+    assertEquals("crawler", in.owner());
+    assertEquals(7, in.retention());
+    assertEquals("MANAGED_TABLE", in.tableType());
+    StorageDescriptor sd = in.storageDescriptor();
+    assertEquals(Map.of("stat", "1"), sd.columns().get(0).parameters());
+    assertEquals("struct<Outer:int>", sd.columns().get(1).type());
+    assertTrue(sd.compressed());
+    assertTrue(sd.storedAsSubDirectories());
+    assertEquals(4, sd.numberOfBuckets());
+    assertEquals(Map.of("recordCount", "10"), sd.parameters());
+    assertEquals(List.of("k"), sd.skewedInfo().skewedColumnNames());
+  }
+
+  @Test
+  void testAlterChangesLocationAndSerdeProperties() {
+    UpdateTableRequest req =
+        alterAndCapture(
+            TableChange.setProperty(GlueConstants.LOCATION, "s3://bucket/moved"),
+            TableChange.setProperty(GlueConstants.SERDE_PARAMETER_PREFIX + "field.delim", ","),
+            TableChange.setProperty(GlueConstants.SERDE_NAME, "my_serde"));
+
+    StorageDescriptor sd = req.tableInput().storageDescriptor();
+    assertEquals("s3://bucket/moved", sd.location());
+    assertEquals(",", sd.serdeInfo().parameters().get("field.delim"));
+    assertEquals("my_serde", sd.serdeInfo().name());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+    assertFalse(req.tableInput().parameters().containsKey(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAlterRefusesChangingStorageFormat() {
+    useFakeGlueTable(nativeTable());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTable(ALTER_IDENT, TableChange.setProperty(GlueConstants.FORMAT, "orc")));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testAlterTableWithoutStorageDescriptorKeepsIt() {
+    useFakeGlueTable(Table.builder().name("native").partitionKeys(glueCol("dt", "string")).build());
+
+    ops.alterTable(ALTER_IDENT, TableChange.updateComment("c"));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    assertNull(captor.getValue().tableInput().storageDescriptor());
+  }
+
+  @Test
+  void testAlterRefusesNestedAndMissingColumns() {
+    useFakeGlueTable(nativeTable());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                ALTER_IDENT,
+                TableChange.updateColumnType(new String[] {"s", "Outer"}, Types.LongType.get())));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"nope"}, false)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTable(ALTER_IDENT, TableChange.renameColumn(new String[] {"nope"}, "x")));
+
+    // Deleting a missing column with ifExists is a no-op and writes nothing.
+    ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"nope"}, true));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testAlterMatchesColumnNamesWithoutCase() {
+    UpdateTableRequest req =
+        alterAndCapture(TableChange.updateColumnComment(new String[] {"ID"}, "the id"));
+    assertEquals("the id", req.tableInput().storageDescriptor().columns().get(0).comment());
+  }
+
+  @Test
+  void testAlterAddColumnHonorsPosition() {
+    UpdateTableRequest req =
+        alterAndCapture(
+            TableChange.addColumn(
+                new String[] {"first_col"},
+                Types.StringType.get(),
+                null,
+                TableChange.ColumnPosition.first()),
+            TableChange.addColumn(
+                new String[] {"after_id"},
+                Types.StringType.get(),
+                null,
+                TableChange.ColumnPosition.after("id")));
+
+    assertEquals(
+        List.of("first_col", "id", "after_id", "s", "k"),
+        req.tableInput().storageDescriptor().columns().stream().map(c -> c.name()).toList());
+  }
+
+  @Test
+  void testAlterRefusesBadAddColumns() {
+    useFakeGlueTable(nativeTable());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                ALTER_IDENT,
+                TableChange.addColumn(
+                    new String[] {"x"},
+                    Types.StringType.get(),
+                    null,
+                    TableChange.ColumnPosition.after("nope"))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                ALTER_IDENT,
+                TableChange.addColumn(
+                    new String[] {"x"},
+                    Types.LongType.get(),
+                    null,
+                    TableChange.ColumnPosition.defaultPos(),
+                    true,
+                    true)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                ALTER_IDENT, TableChange.addColumn(new String[] {"ID"}, Types.StringType.get())));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testAlterUpdatesColumnPosition() {
+    UpdateTableRequest req =
+        alterAndCapture(
+            TableChange.updateColumnPosition(
+                new String[] {"k"}, TableChange.ColumnPosition.first()));
+    assertEquals(
+        List.of("k", "id", "s"),
+        req.tableInput().storageDescriptor().columns().stream().map(c -> c.name()).toList());
+  }
+
+  @Test
+  void testAlterRenameBucketColumnUpdatesBucketAndSortColumns() {
+    UpdateTableRequest req = alterAndCapture(TableChange.renameColumn(new String[] {"k"}, "k2"));
+    StorageDescriptor sd = req.tableInput().storageDescriptor();
+    assertEquals(List.of("k2"), sd.bucketColumns());
+    assertEquals("k2", sd.sortColumns().get(0).column());
+  }
+
+  @Test
+  void testAlterRefusesDeletingBucketColumn() {
+    useFakeGlueTable(nativeTable());
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"k"}, false)));
+    assertTrue(e.getMessage().contains("bucket or sort column"), e.getMessage());
+  }
+
+  @Test
+  void testAlterConcurrentModificationIsConflict() {
+    useFakeGlueTable(nativeTable());
+    when(mockClient.updateTable(any(UpdateTableRequest.class)))
+        .thenThrow(
+            ConcurrentModificationException.builder()
+                .message("Update table failed due to concurrent modifications")
+                .build());
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> ops.alterTable(ALTER_IDENT, TableChange.setProperty("k", "v")));
   }
 }
