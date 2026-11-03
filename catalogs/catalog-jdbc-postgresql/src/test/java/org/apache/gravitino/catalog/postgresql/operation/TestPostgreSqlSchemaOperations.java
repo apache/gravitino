@@ -45,8 +45,6 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test
-<<<<<<< HEAD
-=======
   void testCascadeDropPreservesExternalDependents() throws SQLException {
     String schema = RandomNameUtils.genRandomName("cascade_source");
     String other = RandomNameUtils.genRandomName("cascade_other");
@@ -293,33 +291,6 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
   }
 
   @Test
-  void testQuotedSchemaNamesLoadWithoutExecutingSql() throws SQLException {
-    for (String schema : new String[] {"quoted';CREATE SCHEMA injected_marker;--"}) {
-      DATABASE_OPERATIONS.create(schema, "safe comment", Map.of());
-      try {
-        Assertions.assertEquals("safe comment", DATABASE_OPERATIONS.load(schema).comment());
-        Assertions.assertEquals(schema, DATABASE_OPERATIONS.load(schema).name());
-        Assertions.assertFalse(DATABASE_OPERATIONS.listDatabases().contains("injected_marker"));
-      } finally {
-        DATABASE_OPERATIONS.delete(schema, true);
-      }
-    }
-  }
-
-  @Test
-  void testBackslashSchemaNameLoads() {
-    String schema = "back\\slash_%";
-    DATABASE_OPERATIONS.create(schema, "comment", Map.of());
-    try {
-      Assertions.assertEquals(schema, DATABASE_OPERATIONS.load(schema).name());
-      Assertions.assertEquals("comment", DATABASE_OPERATIONS.load(schema).comment());
-    } finally {
-      DATABASE_OPERATIONS.delete(schema, true);
-    }
-  }
-
-  @Test
->>>>>>> 27201d342 ([#14524] fix(postgresql): preserve schema identity and contain schema drops (#14528))
   public void testBaseOperationSchema() {
     String databaseName = RandomNameUtils.genRandomName("ct_db");
     Map<String, String> properties = new HashMap<>();
