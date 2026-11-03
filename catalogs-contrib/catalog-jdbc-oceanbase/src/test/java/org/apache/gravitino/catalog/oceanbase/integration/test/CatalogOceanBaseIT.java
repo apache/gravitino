@@ -1462,9 +1462,13 @@ public class CatalogOceanBaseIT extends BaseIT {
         catalog.asTableCatalog().listTables(Namespace.of(testSchemaName));
     Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
 
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> catalog.asTableCatalog().purgeTable(tableIdent));
+    Assertions.assertTrue(catalog.asTableCatalog().tableExists(tableIdent));
     Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
-    Assertions.assertFalse(catalog.asTableCatalog().purgeTable(tableIdent));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> catalog.asTableCatalog().purgeTable(tableIdent));
     catalog.asSchemas().dropSchema(testSchemaName, true);
 
     // sql injection

@@ -538,7 +538,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` MEDIUMTEXT DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` MEDIUMTEXT DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -548,6 +552,21 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_metric_meta` (
+    `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'stable internal metric id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `metric_name` MEDIUMTEXT NOT NULL COMMENT 'metric name',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metric retired at',
+    PRIMARY KEY (`metric_id`),
+    KEY `idx_smmm_model_live` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smmm_mid` (`metalake_id`),
+    KEY `idx_smmm_cid` (`catalog_id`),
+    KEY `idx_smmm_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metric identities';
 
 CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
     `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
@@ -601,32 +620,32 @@ CREATE TABLE IF NOT EXISTS `scheduled_commit_tasks` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance commit schedule metadata';
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `action_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'maintenance action id',
     `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
-    `after_snapshot_id` BIGINT(20) NULL COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    `before_metrics_id` BIGINT(20) UNSIGNED NULL COMMENT 'table_snapshot_metrics.metrics_id for S0 sample',
+    `after_metrics_id` BIGINT(20) UNSIGNED NULL COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tma_job_id` (`job_id`),
+    `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    PRIMARY KEY (`action_id`),
+    KEY `idx_tma_job_id` (`job_id`),
     -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
     UNIQUE KEY `uk_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
-    KEY `idx_tma_before_sid` (`table_id`, `before_snapshot_id`),
-    KEY `idx_tma_after_sid` (`table_id`, `after_snapshot_id`),
+    KEY `idx_tma_before_metrics` (`before_metrics_id`),
+    KEY `idx_tma_after_metrics` (`after_metrics_id`),
     KEY `idx_tma_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance action metadata';
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metrics_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'metrics row id',
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
     `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
     `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'metrics value as JSON',
     `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
+    PRIMARY KEY (`metrics_id`),
+    KEY `idx_tsm_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
     KEY `idx_tsm_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table snapshot metrics metadata';
 
@@ -663,6 +682,15 @@ SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'policy_meta' AND column_name = 'occ_version'),
     'SELECT 1',
     'ALTER TABLE `policy_meta` ADD COLUMN `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT ''policy optimistic concurrency version'' AFTER `last_version`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Role deletion soft-deletes relation rows by role_id.
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'group_role_rel' AND column_name = 'role_id' AND seq_in_index = 1),
+    'SELECT 1',
+    'ALTER TABLE `group_role_rel` ADD INDEX `group_role_rel_idx_role_id` (`role_id`)');
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

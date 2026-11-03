@@ -56,10 +56,10 @@ import org.slf4j.LoggerFactory;
  *       in-use}, {@code numFiles}).
  * </ul>
  *
- * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys (except
- * credential-vending keys), and sensitive-named undeclared keys. Credential property keys are
- * recovered via {@code getCredentials()} instead. See {@code
- * org.apache.gravitino.secret.SupportsSecrets}.
+ * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys that
+ * are not also {@code reserved} (reserved+hidden keys such as {@code gravitino.identifier} stay
+ * omitted), and sensitive-named undeclared keys. Credential property keys are recovered via {@code
+ * getCredentials()} instead. See {@code org.apache.gravitino.secret.SupportsSecrets}.
  *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code

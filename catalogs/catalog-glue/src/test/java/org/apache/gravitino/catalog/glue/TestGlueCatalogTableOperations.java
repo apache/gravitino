@@ -141,6 +141,114 @@ class TestGlueCatalogTableOperations {
     assertEquals("ice_tbl", result[0].name());
   }
 
+  @Test
+  void testFormatFilterHidesTableFromLoadAlterAndDrop() {
+    ops.tableFormatFilter = Set.of("iceberg");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+    Table hiveTable =
+        Table.builder()
+            .name("hive_tbl")
+            .parameters(Collections.emptyMap())
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(hiveTable).build());
+
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(ident));
+    assertThrows(
+        NoSuchTableException.class, () -> ops.alterTable(ident, TableChange.setProperty("k", "v")));
+    assertFalse(ops.dropTable(ident));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+    verify(mockClient, never()).deleteTable(any(DeleteTableRequest.class));
+  }
+
+  @Test
+  void testFormatFilterRefusesCreateOfHiddenFormat() {
+    ops.tableFormatFilter = Set.of("iceberg");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+    Column[] columns = {
+      GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(true).build()
+    };
+
+    IllegalArgumentException ex =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTable(
+                    ident,
+                    columns,
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    SortOrders.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(ex.getMessage().contains(GlueConstants.TABLE_FORMAT_FILTER), ex.getMessage());
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testFormatFilterKeepsVisibleFormatUsable() {
+    ops.tableFormatFilter = Set.of("iceberg");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "ice_tbl");
+    Table icebergTable =
+        Table.builder()
+            .name("ice_tbl")
+            .parameters(Map.of(GlueConstants.TABLE_FORMAT, "ICEBERG"))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(icebergTable).build());
+
+    assertEquals("ice_tbl", ops.loadTable(ident).name());
+  }
+
+  @Test
+  void testFormatFilterCreateUsesDefaultTableFormat() {
+    ops.tableFormatFilter = Set.of("hive");
+    ops.defaultTableFormat = "iceberg";
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+    Column[] columns = {
+      GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(true).build()
+    };
+
+    // Without table-format the default (iceberg) applies, which the filter hides.
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Collections.emptyMap(),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    ops.createTable(
+        ident,
+        columns,
+        null,
+        Map.of(GlueConstants.TABLE_FORMAT, "hive", GlueConstants.LOCATION, "s3://bucket/path"),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+    verify(mockClient).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
+  void testFormatFilterAllExposesEveryFormat() {
+    ops.tableFormatFilter = Set.of("all", "iceberg");
+    Namespace ns = Namespace.of("metalake", "catalog", "mydb");
+    Table hiveTable = Table.builder().name("hive_tbl").parameters(Collections.emptyMap()).build();
+    when(mockClient.getTables(any(GetTablesRequest.class)))
+        .thenReturn(GetTablesResponse.builder().tableList(hiveTable).nextToken(null).build());
+
+    assertEquals(1, ops.listTables(ns).length);
+  }
+
   // -------------------------------------------------------------------------
   // loadTable
   // -------------------------------------------------------------------------

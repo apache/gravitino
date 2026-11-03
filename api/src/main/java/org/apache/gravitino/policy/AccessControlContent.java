@@ -56,6 +56,9 @@ public final class AccessControlContent implements PolicyContent {
    * It holds only privileges that act on the tagged object itself. Privileges that hand out access,
    * create entities, change what other principals execute, or open a path to untagged objects are
    * excluded.
+   *
+   * <p>The {@code AccessControlContent} schema in {@code docs/open-api/policies.yaml} mirrors this
+   * list as an enum; change both together.
    */
   public static final Set<Privilege.Name> PERMITTED_PRIVILEGES =
       ImmutableSet.of(
@@ -68,7 +71,8 @@ public final class AccessControlContent implements PolicyContent {
           Privilege.Name.CONSUME_TOPIC,
           Privilege.Name.PRODUCE_TOPIC,
           Privilege.Name.USE_MODEL,
-          Privilege.Name.EXECUTE_FUNCTION);
+          Privilege.Name.EXECUTE_FUNCTION,
+          Privilege.Name.USE_SEMANTIC_MODEL);
 
   // The object types a tag can be applied to, minus COLUMN, which no permitted privilege can be
   // scoped to. METALAKE is absent because a tag cannot be applied to a metalake.
@@ -81,7 +85,8 @@ public final class AccessControlContent implements PolicyContent {
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION);
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   private final List<Privilege.Name> privileges;
   private final List<String> applicableRoles;

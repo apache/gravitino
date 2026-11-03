@@ -22,9 +22,7 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BAC
 import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
@@ -43,6 +41,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -79,7 +78,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(lanceConfig, LanceConfig.LANCE_CONFIG_PREFIX);
     LanceExceptionMapper.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
 
     server = new LanceJettyServer();
@@ -87,6 +87,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, lanceConfig);
+    if (metricsEnabled) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
@@ -139,11 +143,15 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(container, LANCE_SPEC);
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
-    server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
-    server.addFilter(
-        new HttpAuditFilter(
-            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
-        LANCE_SPEC);
+    ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
+    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), LANCE_SPEC);
+    server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), LANCE_SPEC);
+    if (metricsEnabled) {
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
+      }
+    }
     server.addSystemFilters(LANCE_SPEC);
     if (auxMode) {
       server.addFilter(
@@ -152,27 +160,29 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
-    // systems that expect a /health endpoint. Not part of JettyServer.METRICS_PATH_SPECS below:
+    // systems that expect a /health endpoint.
     // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
     // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
     // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
-    registerMetricsPathFilters(server, eventBus);
-
-    // Custom filters are registered once, across every filtered path in a single call, so a
-    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
-    // once per pathSpec.
-    List<String> customFilterPaths = new ArrayList<>(JettyServer.METRICS_PATH_SPECS);
-    customFilterPaths.add(LANCE_SPEC);
-    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          LANCE_SPEC, JettyServer.METRICS_PATH_SPECS.get(0), JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(LANCE_SPEC);
+    }
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
         auxMode ? "auxiliary" : "standalone",
         enableMetadataAuthorization ? "enabled" : "disabled");
+  }
+
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, LanceConfig lanceConfig) {
+    return !auxiliaryMode && lanceConfig.get(LanceConfig.METRICS_ENABLED);
   }
 
   @Override
@@ -200,26 +210,6 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-  /**
-   * Registers request-context tracking and audit-on-failure coverage on {@link
-   * JettyServer#METRICS_PATH_SPECS}. {@code /metrics} and {@code /prometheus/metrics} used to
-   * receive no such coverage at all, with nothing in the build catching it; {@code
-   * RequestContextFilter} is included too so query-parameter capture applies uniformly, matching
-   * {@link #LANCE_SPEC}. Package-private and static so a unit test can exercise it directly against
-   * a plain {@link JettyServer}, without booting the rest of {@link #serviceInit}. See GH-12760.
-   *
-   * @param server the Jetty server whose {@link JettyServer#METRICS_PATH_SPECS} need filter
-   *     coverage
-   * @param eventBus the event bus audit events are dispatched through
-   */
-  static void registerMetricsPathFilters(JettyServer server, EventBus eventBus) {
-    for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
-      server.addFilter(new RequestContextFilter(eventBus), pathSpec);
-      server.addFilter(
-          new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), pathSpec);
-    }
-  }
-
   private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
@@ -233,5 +223,14 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
       throw new RuntimeException("Failed to load namespace implementation", e);
     }
+  }
+
+  private static HttpAuditFilter createHttpAuditFilter(
+      EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        eventBus,
+        EventSource.GRAVITINO_LANCE_REST_SERVER,
+        new LanceHealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 }

@@ -125,7 +125,11 @@ CREATE TABLE IF NOT EXISTS semantic_model_version_info (
     version INT NOT NULL,
     semantic_model_name VARCHAR(128) NOT NULL,
     semantic_model_comment TEXT DEFAULT NULL,
-    semantic_model_definition TEXT NOT NULL,
+    datasets TEXT NOT NULL,
+    relationships TEXT DEFAULT NULL,
+    metrics TEXT DEFAULT NULL,
+    ai_context TEXT DEFAULT NULL,
+    custom_extensions TEXT DEFAULT NULL,
     properties TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -146,10 +150,37 @@ COMMENT ON COLUMN semantic_model_version_info.semantic_model_id IS 'semantic mod
 COMMENT ON COLUMN semantic_model_version_info.version IS 'semantic model version';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_name IS 'semantic model name snapshot';
 COMMENT ON COLUMN semantic_model_version_info.semantic_model_comment IS 'semantic model comment snapshot';
-COMMENT ON COLUMN semantic_model_version_info.semantic_model_definition IS 'structured definition snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.datasets IS 'dataset definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.relationships IS 'relationship definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.metrics IS 'metric definitions snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.ai_context IS 'model AI context snapshot (JSON)';
+COMMENT ON COLUMN semantic_model_version_info.custom_extensions IS 'model custom extensions snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.properties IS 'semantic model properties snapshot (JSON)';
 COMMENT ON COLUMN semantic_model_version_info.audit_info IS 'semantic model version audit info';
 COMMENT ON COLUMN semantic_model_version_info.deleted_at IS 'version deleted at';
+
+CREATE TABLE IF NOT EXISTS semantic_model_metric_meta (
+    metric_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    metric_name TEXT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (metric_id)
+);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_model_live ON semantic_model_metric_meta (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_metalake_id ON semantic_model_metric_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_catalog_id ON semantic_model_metric_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS semantic_model_metric_meta_idx_schema_id ON semantic_model_metric_meta (schema_id);
+COMMENT ON TABLE semantic_model_metric_meta IS 'semantic model metric identities';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_id IS 'stable internal metric id';
+COMMENT ON COLUMN semantic_model_metric_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN semantic_model_metric_meta.catalog_id IS 'catalog id';
+COMMENT ON COLUMN semantic_model_metric_meta.schema_id IS 'schema id';
+COMMENT ON COLUMN semantic_model_metric_meta.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_metric_meta.metric_name IS 'metric name';
+COMMENT ON COLUMN semantic_model_metric_meta.deleted_at IS 'metric retired at';
 
 CREATE TABLE IF NOT EXISTS scheduled_expand_tasks (
     task_name VARCHAR(100) NOT NULL,
@@ -239,43 +270,43 @@ COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execut
 COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
 
 CREATE TABLE IF NOT EXISTS table_maintenance_action (
-    id BIGSERIAL PRIMARY KEY,
+    action_id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
-    before_snapshot_id BIGINT,
-    after_snapshot_id BIGINT,
-    finished_at BIGINT NOT NULL DEFAULT 0,
-    created_at BIGINT NOT NULL
+    before_metrics_id BIGINT,
+    after_metrics_id BIGINT,
+    created_at BIGINT NOT NULL,
+    finished_at BIGINT NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_job_id ON table_maintenance_action (job_id);
+CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
-CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
-CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_before_metrics ON table_maintenance_action (before_metrics_id);
+CREATE INDEX IF NOT EXISTS idx_tma_after_metrics ON table_maintenance_action (after_metrics_id);
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
 COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
-COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.action_id IS 'maintenance action id';
 COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
-COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
-COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
+COMMENT ON COLUMN table_maintenance_action.before_metrics_id IS 'table_snapshot_metrics.metrics_id for S0 sample';
+COMMENT ON COLUMN table_maintenance_action.after_metrics_id IS 'table_snapshot_metrics.metrics_id for S1 sample';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
-    id BIGSERIAL PRIMARY KEY,
+    metrics_id BIGSERIAL PRIMARY KEY,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
     snapshot_id BIGINT NOT NULL,
     metrics_value TEXT NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
 COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
-COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_id IS 'metrics row id';
 COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
@@ -306,3 +337,7 @@ COMMENT ON COLUMN fileset_meta.occ_version IS 'fileset optimistic concurrency ve
 
 ALTER TABLE policy_meta ADD COLUMN IF NOT EXISTS occ_version INT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN policy_meta.occ_version IS 'policy optimistic concurrency version';
+
+-- Role deletion soft-deletes relation rows by role_id.
+CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
+CREATE INDEX IF NOT EXISTS group_role_rel_idx_role_id ON group_role_rel (role_id);

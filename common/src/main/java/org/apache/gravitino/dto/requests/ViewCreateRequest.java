@@ -36,6 +36,7 @@ import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.RepresentationDTO;
 import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to create a view. */
 @Getter
@@ -126,6 +127,7 @@ public class ViewCreateRequest implements RESTRequest {
                 Preconditions.checkArgument(column != null, "column must not be null");
                 column.validate();
               });
+      WritableDataTypeValidator.validateColumns(columns, "columns");
     }
 
     validateNoDuplicateDialects(representations);

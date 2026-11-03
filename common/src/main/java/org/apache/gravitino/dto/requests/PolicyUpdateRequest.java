@@ -121,7 +121,12 @@ public interface PolicyUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {}
   }
 
-  /** The policy update request for updating a policy content. */
+  /**
+   * The policy update request for updating a policy content.
+   *
+   * <p>{@code newContent} fully replaces the previous content. Omitted typed fields use that
+   * content type's defaults; they are not merged with the previously stored values.
+   */
   @EqualsAndHashCode
   @Getter
   @ToString
@@ -157,7 +162,10 @@ public interface PolicyUpdateRequest extends RESTRequest {
           name = "system_row_filter"),
       @JsonSubTypes.Type(
           value = PolicyContentDTO.ColumnMaskContentDTO.class,
-          name = "system_column_mask")
+          name = "system_column_mask"),
+      @JsonSubTypes.Type(
+          value = PolicyContentDTO.AccessControlContentDTO.class,
+          name = "system_access_control")
     })
     private final PolicyContentDTO newContent;
 

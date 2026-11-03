@@ -570,9 +570,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalogClient
               .asFunctionCatalog()
               .listFunctionInfos(Namespace.of(gravitinoNamespace));
-      // Filter functions that have Spark runtime implementation
+      // Only list functions that loadFunction can load
       return Arrays.stream(functions)
-          .filter(this::hasSparkImplementation)
+          .filter(this::hasSparkJavaImplementation)
           .map(f -> Identifier.of(new String[] {gravitinoNamespace}, f.name()))
           .toArray(Identifier[]::new);
     } catch (NoSuchSchemaException e) {
@@ -595,10 +595,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalogClient.asFunctionCatalog().getFunction(gravitinoIdentifier);
       for (FunctionDefinition definition : function.definitions()) {
         for (FunctionImpl impl : definition.impls()) {
-          if (!isSparkImplementation(impl)) {
+          if (!isSparkJavaImplementation(impl)) {
             continue;
           }
-          String className = extractClassName(impl);
+          String className = ((JavaImpl) impl).className();
           if (StringUtils.isBlank(className)) {
             continue;
           }
@@ -678,10 +678,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return gravitinoIdentifier.namespace().level(0);
   }
 
-  private boolean hasSparkImplementation(Function function) {
+  private boolean hasSparkJavaImplementation(Function function) {
     for (FunctionDefinition definition : function.definitions()) {
       for (FunctionImpl impl : definition.impls()) {
-        if (isSparkImplementation(impl)) {
+        if (isSparkJavaImplementation(impl)) {
           return true;
         }
       }
@@ -689,16 +689,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return false;
   }
 
-  private boolean isSparkImplementation(FunctionImpl impl) {
-    return FunctionImpl.RuntimeType.SPARK.equals(impl.runtime());
-  }
-
-  private String extractClassName(FunctionImpl impl) {
-    if (impl instanceof JavaImpl) {
-      return ((JavaImpl) impl).className();
-    }
-    throw new IllegalArgumentException(
-        String.format("Unsupported function implementation %s", impl.getClass().getName()));
+  private boolean isSparkJavaImplementation(FunctionImpl impl) {
+    return FunctionImpl.RuntimeType.SPARK.equals(impl.runtime()) && impl instanceof JavaImpl;
   }
 
   private UnboundFunction instantiateFunction(String className, Identifier ident)

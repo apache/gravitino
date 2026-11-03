@@ -126,7 +126,9 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     IcebergColumnFieldValidator.validateUpdate(updateTableRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .updateTable(tableIdentifier, updateTableRequest);
+        .updateTable(
+            tableIdentifier,
+            IcebergOwnerPropertyGuard.protect(updateTableRequest, context.userName()));
   }
 
   @Override

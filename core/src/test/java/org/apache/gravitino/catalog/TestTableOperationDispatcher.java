@@ -63,6 +63,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
+import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
@@ -90,6 +91,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -1492,6 +1494,142 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testLoadFailsWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_load");
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    IllegalStateException e =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> tableOperationDispatcher.loadTable(tableIdent));
+
+    Assertions.assertTrue(e.getMessage().contains("without a column list"), e.getMessage());
+    Assertions.assertTrue(e.getMessage().contains(catalog), e.getMessage());
+    Assertions.assertEquals(ids, columnIds(tableIdent));
+  }
+
+  @Test
+  public void testAlterKeepsStoredColumnsWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_alter");
+    Map<String, Long> ids = columnIds(tableIdent);
+
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3"));
+
+    // The catalog applied the change, the stored columns are kept and reported instead.
+    Assertions.assertEquals(
+        "v3", testCatalogOperations().loadTable(tableIdent).properties().get("k3"));
+    Assertions.assertEquals(ids, columnIds(tableIdent));
+    Assertions.assertArrayEquals(
+        new String[] {"c1"}, Arrays.stream(altered.columns()).map(Column::name).toArray());
+  }
+
+  @Test
+  public void testRenameCompletesWhenCatalogReportsNoColumns() throws IOException {
+    NameIdentifier tableIdent = createTableReportingNoColumns("schema_null_columns_rename");
+    Map<String, Long> ids = columnIds(tableIdent);
+    NameIdentifier newIdent = NameIdentifier.of(tableIdent.namespace(), "table_null_columns_new");
+
+    Table altered =
+        tableOperationDispatcher.alterTable(tableIdent, TableChange.rename(newIdent.name()));
+
+    // The rename completes, so the hook's authorization rename that follows it runs too.
+    Assertions.assertEquals(newIdent.name(), altered.name());
+    Assertions.assertArrayEquals(
+        new String[] {"c1"}, Arrays.stream(altered.columns()).map(Column::name).toArray());
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+    Assertions.assertEquals(ids, columnIds(newIdent));
+  }
+
+  @Test
+  public void testAlterUnstoredTableFailsWhenCatalogReportsNoColumns() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns_unstored");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    // Created in the catalog only, so Gravitino has no stored table and no id for it.
+    testCatalogOperations()
+        .replaceTable(
+            tableIdent,
+            TestTable.builder()
+                .withName(tableIdent.name())
+                .withProperties(props)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                .build());
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> tableOperationDispatcher.alterTable(tableIdent, TableChange.setProperty("k3", "v3")));
+    Assertions.assertEquals(
+        "v3", testCatalogOperations().loadTable(tableIdent).properties().get("k3"));
+  }
+
+  @Test
+  public void testCreateFailsWhenCatalogReportsNoColumns() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_null_columns_create");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("c1")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+
+    TestCatalogOperations ops = testCatalogOperations();
+    ops.setReportNoColumnsOnCreate(true);
+    try {
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              tableOperationDispatcher.createTable(
+                  tableIdent, columns, "comment", props, new Transform[0]));
+    } finally {
+      ops.setReportNoColumnsOnCreate(false);
+    }
+
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  private NameIdentifier createTableReportingNoColumns(String schemaName) {
+    Namespace tableNs = Namespace.of(metalake, catalog, schemaName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_columns");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("c1")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    testCatalogOperations()
+        .replaceTable(
+            tableIdent,
+            TestTable.builder()
+                .withName(tableIdent.name())
+                .withComment("comment")
+                .withProperties(props)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                .build());
+    return tableIdent;
+  }
+
+  private TestCatalogOperations testCatalogOperations() {
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    return (TestCatalogOperations) testCatalog.ops();
+  }
+
+  @Test
   public void testRenameIntoNameOfStaleStoredColumn() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema_stale_column");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -1533,6 +1671,74 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(ids.get("z"), afterRename.get("b"));
     Assertions.assertEquals(ids.get("c"), afterRename.get("c"));
     Assertions.assertEquals(2, afterRename.size());
+  }
+
+  @Test
+  public void testAlterTableKeepsColumnIdWhenRenameDiffersInCase() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_rename_case");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_column_rename_case");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    // A catalog that matches column names case-insensitively, such as MySQL, accepts "col" for a
+    // column stored as "Col".
+    entityStore.update(
+        tableIdent,
+        TableEntity.class,
+        TABLE,
+        (TableEntity old) -> renameStoredColumn(old, "col", "Col"));
+    long colId = columnIds(tableIdent).get("Col");
+
+    tableOperationDispatcher.alterTable(
+        tableIdent, TableChange.renameColumn(new String[] {"col"}, "renamed"));
+
+    Map<String, Long> ids = columnIds(tableIdent);
+    Assertions.assertEquals(ImmutableMap.of("renamed", colId), ids);
+  }
+
+  @Test
+  public void testAlignNameChangesWithStoredColumns() {
+    List<ColumnEntity> stored =
+        Arrays.asList(storedColumn("Col"), storedColumn("Other"), storedColumn("dup"));
+
+    Map<String, String> changes = new HashMap<>();
+    changes.put("col", "renamed");
+    changes.put("OTHER", null);
+    Map<String, String> expected = new HashMap<>();
+    expected.put("Col", "renamed");
+    expected.put("Other", null);
+    Assertions.assertEquals(
+        expected, TableOperationDispatcher.alignNameChangesWithStoredColumns(changes, stored));
+
+    // An exact match wins, and a name matching several stored columns is left as it is.
+    List<ColumnEntity> ambiguous =
+        Arrays.asList(
+            storedColumn("a"), storedColumn("A"), storedColumn("Dup"), storedColumn("DUP"));
+    Map<String, String> exactAndAmbiguous = ImmutableMap.of("a", "b", "dup", "c");
+    Assertions.assertEquals(
+        exactAndAmbiguous,
+        TableOperationDispatcher.alignNameChangesWithStoredColumns(exactAndAmbiguous, ambiguous));
+  }
+
+  private static ColumnEntity storedColumn(String name) {
+    return ColumnEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withPosition(0)
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
   }
 
   @Test
