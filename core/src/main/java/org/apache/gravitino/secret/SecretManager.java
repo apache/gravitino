@@ -36,6 +36,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -515,13 +516,32 @@ public class SecretManager implements Closeable {
    * Returns a copy of {@code properties} with secret URN values replaced by plaintext.
    *
    * <p>Used so connectors receive plaintext conf while entity storage keeps URN strings. Non-secret
-   * entries are copied unchanged.
+   * entries are copied unchanged. Missing secrets fail with {@link IllegalArgumentException}.
    *
    * @param properties entity or request properties (may be null)
    * @return a new map with secret URNs replaced by plaintext; empty map when {@code properties} is
    *     null
    */
   public Map<String, String> toPlaintextProperties(@Nullable Map<String, String> properties) {
+    return resolvePlaintextProperties(properties, true);
+  }
+
+  /**
+   * Like {@link #toPlaintextProperties(Map)}, but unresolved secrets become {@link
+   * HiddenPropertyMaskUtils#MASKED_VALUE} instead of throwing.
+   *
+   * <p>Catalog load for disable / drop / re-bind / listing uses this so a deleted or rotated secret
+   * does not block management of the catalog.
+   *
+   * @param properties entity or request properties (may be null)
+   * @return a new map with secret URNs replaced by plaintext or the masked placeholder
+   */
+  public Map<String, String> toPlaintextOrMasked(@Nullable Map<String, String> properties) {
+    return resolvePlaintextProperties(properties, false);
+  }
+
+  private Map<String, String> resolvePlaintextProperties(
+      @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {
       return properties == null ? Map.of() : Map.copyOf(properties);
     }
@@ -530,7 +550,19 @@ public class SecretManager implements Closeable {
       String key = entry.getKey();
       String value = entry.getValue();
       if (SecretPropertyUtils.isSecretProperty(key, value)) {
-        plaintext.put(key, readSecret(SecretUrn.parse(value)));
+        try {
+          plaintext.put(key, readSecret(SecretUrn.parse(value)));
+        } catch (IllegalArgumentException e) {
+          if (failOnMissing) {
+            throw e;
+          }
+          LOG.warn(
+              "Secret for property '{}' could not be resolved during catalog load; "
+                  + "using masked placeholder so management operations can proceed: {}",
+              key,
+              e.getMessage());
+          plaintext.put(key, HiddenPropertyMaskUtils.MASKED_VALUE);
+        }
       } else {
         plaintext.put(key, value);
       }
@@ -551,7 +583,15 @@ public class SecretManager implements Closeable {
       SecretBinding binding = bindings.get(propertyKey);
       Preconditions.checkArgument(
           binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-      secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
+      String plaintext = binding.plaintext();
+      // Same rule as alter setSecretBinding: never persist the read-path mask as a real secret.
+      if (HiddenPropertyMaskUtils.isMaskedPlaceholder(plaintext)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Property '%s' cannot be set to the masked placeholder value '%s'",
+                propertyKey, HiddenPropertyMaskUtils.MASKED_VALUE));
+      }
+      secretMaterials.add(new SecretMaterial(urn, plaintext));
     }
     return List.copyOf(secretMaterials);
   }

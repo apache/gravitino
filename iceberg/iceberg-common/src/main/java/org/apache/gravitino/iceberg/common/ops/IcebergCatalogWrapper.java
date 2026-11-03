@@ -41,11 +41,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -280,7 +282,30 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public void purgeTable(TableIdentifier tableIdentifier) {
     getMetadataCache().invalidate(tableIdentifier);
-    CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
+    Table table = getCatalog().loadTable(tableIdentifier);
+    if (!(table instanceof HasTableOperations)) {
+      CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
+      return;
+    }
+    // Iceberg drops the catalog entry first and then deletes the files, giving up on the first
+    // file it cannot read (for example a missing manifest list). The request then fails although
+    // the table is gone, and no request is left that could delete the files. Read the metadata
+    // first, drop the entry, then delete every file that can still be reached.
+    TableOperations ops = ((HasTableOperations) table).operations();
+    TableMetadata metadata = ops.current();
+    FileIO io = ops.io();
+    if (!getCatalog().dropTable(tableIdentifier, false)) {
+      throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
+    }
+    try {
+      CatalogUtil.dropTableData(io, metadata);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Purge of {} could not read all table files ({}); deleting the files that can be read",
+          tableIdentifier,
+          e.getMessage());
+      IcebergPurgeUtil.deleteReachableFiles(io, metadata);
+    }
   }
 
   /**

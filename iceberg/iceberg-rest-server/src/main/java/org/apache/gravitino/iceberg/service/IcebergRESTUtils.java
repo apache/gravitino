@@ -552,12 +552,33 @@ public class IcebergRESTUtils {
     return catalogName;
   }
 
+  /**
+   * Copies an Iceberg REST request or response through its JSON form, so event listeners get an
+   * object detached from the one the server works on.
+   *
+   * <p>Events are built after the operation has been applied, so a copy that fails must not turn a
+   * completed operation into an error. Some valid requests cannot be serialized again by Iceberg,
+   * for example a partition field sent without its optional {@code field-id}; for those the
+   * original object, which Iceberg does not modify, is returned instead.
+   *
+   * @param message the object to copy
+   * @param className the class of the copy
+   * @param <T> the type of the copy
+   * @return the copy, or the original object if it cannot be copied
+   */
   public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
     ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
     try {
       byte[] values = icebergObjectMapper.writeValueAsBytes(message);
       return icebergObjectMapper.readValue(values, className);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
+      if (className.isInstance(message)) {
+        LOG.warn(
+            "Cannot copy {} for an event, the event carries the original object: {}",
+            className.getSimpleName(),
+            e.getMessage());
+        return className.cast(message);
+      }
       throw new RuntimeException(e);
     }
   }

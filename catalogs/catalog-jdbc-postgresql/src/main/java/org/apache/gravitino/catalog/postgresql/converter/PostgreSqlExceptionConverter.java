@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.postgresql.converter;
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -35,6 +36,7 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   private static final String INVALID_SCHEMA_NAME = "3D000";
   private static final String INVALID_SCHEMA = "3F000";
   private static final String UNDEFINED_TABLE = "42P01";
+  private static final String INSUFFICIENT_PRIVILEGE = "42501";
 
   /**
    * SQLSTATE '08' is the class code of connection exceptions See <a
@@ -43,34 +45,35 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
    */
   private static final String CONNECTION_EXCEPTION = "08";
 
-  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     if (null != se.getSQLState()) {
       switch (se.getSQLState()) {
+        case INSUFFICIENT_PRIVILEGE:
+          return new ForbiddenException(se, "%s", se.getMessage());
         case DUPLICATE_DATABASE:
         case DUPLICATE_SCHEMA:
-          return new SchemaAlreadyExistsException(se.getMessage(), se);
+          return new SchemaAlreadyExistsException(se, "%s", se.getMessage());
         case DUPLICATE_TABLE:
-          return new TableAlreadyExistsException(se.getMessage(), se);
+          return new TableAlreadyExistsException(se, "%s", se.getMessage());
         case INVALID_SCHEMA_NAME:
         case INVALID_SCHEMA:
-          return new NoSuchSchemaException(se.getMessage(), se);
+          return new NoSuchSchemaException(se, "%s", se.getMessage());
         case UNDEFINED_TABLE:
-          return new NoSuchTableException(se.getMessage(), se);
+          return new NoSuchTableException(se, "%s", se.getMessage());
         default:
           {
             if (se.getSQLState().startsWith(CONNECTION_EXCEPTION)) {
-              return new ConnectionFailedException(se.getMessage(), se);
+              return new ConnectionFailedException(se, "%s", se.getMessage());
             }
-            return new GravitinoRuntimeException(se.getMessage(), se);
+            return new GravitinoRuntimeException(se, "%s", se.getMessage());
           }
       }
     } else {
       if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
-        return new ConnectionFailedException(se.getMessage(), se);
+        return new ConnectionFailedException(se, "%s", se.getMessage());
       }
-      return new GravitinoRuntimeException(se.getMessage(), se);
+      return new GravitinoRuntimeException(se, "%s", se.getMessage());
     }
   }
 }
