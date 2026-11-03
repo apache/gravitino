@@ -22,6 +22,7 @@ import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -449,7 +450,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             SCHEMA,
             existing -> {
               if (!existing.id().equals(schemaEntity.id())) {
-                throw new OptimisticLockException("Schema identifier changed during import");
+                throw new IllegalStateException(
+                    "Schema identifier changed during import: " + identifier);
               }
               return schemaEntity;
             });

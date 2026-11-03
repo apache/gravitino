@@ -24,6 +24,7 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -37,6 +38,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -50,6 +52,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -78,7 +81,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier renamed = NameIdentifier.of(metalake, catalog, "external_rename_new");
     dispatcher.createSchema(original, "original", ImmutableMap.of("k1", "v1", "k2", "v2"));
     SchemaEntity originalEntity = entityStore.get(original, SCHEMA, SchemaEntity.class);
-    Map<String, String> properties = new HashMap<>(originalEntity.properties());
+    Map<String, String> properties = new HashMap<>();
     properties.put("k1", "v1");
     properties.put("k2", "v2");
     properties.put(ID_KEY, StringIdentifier.fromId(originalEntity.id()).toString());
@@ -96,6 +99,49 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(
         originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
     Assertions.assertFalse(entityStore.exists(original, SCHEMA));
+  }
+
+  @Test
+  void testExternalRenameRejectsChangedSchemaIdentity() throws Exception {
+    NameIdentifier original = NameIdentifier.of(metalake, catalog, "replaced_original");
+    NameIdentifier renamed = NameIdentifier.of(metalake, catalog, "replaced_renamed");
+    dispatcher.createSchema(original, "original", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity originalEntity = entityStore.get(original, SCHEMA, SchemaEntity.class);
+    Map<String, String> properties = new HashMap<>();
+    properties.put("k1", "v1");
+    properties.put("k2", "v2");
+    properties.put(ID_KEY, StringIdentifier.fromId(originalEntity.id()).toString());
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          c.doWithSchemaOps(
+              ops -> {
+                ops.dropSchema(original, false);
+                return ops.createSchema(renamed, "renamed", properties);
+              });
+          return null;
+        });
+    SchemaEntity replacement =
+        SchemaEntity.builder()
+            .withId(originalEntity.id() + 1)
+            .withName(original.name())
+            .withNamespace(original.namespace())
+            .withAuditInfo(originalEntity.auditInfo())
+            .build();
+    doAnswer(
+            invocation -> {
+              Function<SchemaEntity, SchemaEntity> updater = invocation.getArgument(3);
+              return updater.apply(replacement);
+            })
+        .when(entityStore)
+        .update(eq(original), eq(SchemaEntity.class), eq(SCHEMA), any());
+    RuntimeException error =
+        Assertions.assertThrows(RuntimeException.class, () -> dispatcher.loadSchema(renamed));
+    Assertions.assertInstanceOf(IllegalStateException.class, error.getCause());
+    Assertions.assertTrue(error.getCause().getMessage().contains(renamed.toString()));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(renamed, SCHEMA));
   }
 
   @Test
