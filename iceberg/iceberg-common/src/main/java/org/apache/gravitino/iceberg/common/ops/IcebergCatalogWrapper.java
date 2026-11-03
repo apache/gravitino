@@ -652,8 +652,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   static void validateTableDefinition(CreateTableRequest request) {
     Map<String, String> properties = request.properties();
     String value = properties == null ? null : properties.get(TableProperties.FORMAT_VERSION);
-    if (value == null) {
-      // The catalog's table defaults decide the version; Iceberg checks the schema against it.
+    if (StringUtils.isBlank(value)) {
+      // Missing or empty format-version is unset. The catalog's table defaults decide the version;
+      // Iceberg checks the schema against it.
       return;
     }
     int formatVersion;

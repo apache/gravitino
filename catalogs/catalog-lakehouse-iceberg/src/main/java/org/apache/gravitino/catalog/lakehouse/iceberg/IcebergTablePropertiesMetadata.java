@@ -42,6 +42,13 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String FORMAT_VERSION = IcebergConstants.FORMAT_VERSION;
   public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
 
+  /**
+   * The default Iceberg table format version Gravitino applies when {@link #FORMAT_VERSION} is not
+   * explicitly set (including when the value is blank). Gravitino stamps this onto the table at
+   * creation rather than deferring to the Iceberg library's version-dependent default.
+   */
+  public static final int ICEBERG_DEFAULT_FORMAT_VERSION = 2;
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {

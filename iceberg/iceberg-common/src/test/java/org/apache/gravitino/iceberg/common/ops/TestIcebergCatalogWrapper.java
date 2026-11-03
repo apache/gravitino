@@ -229,6 +229,16 @@ public class TestIcebergCatalogWrapper {
               .build();
       Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(request));
     }
+    // An explicit empty format-version is unset and defers to the catalog default.
+    for (String version : new String[] {"", "  "}) {
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("t")
+              .withSchema(schema)
+              .setProperties(ImmutableMap.of("format-version", version))
+              .build();
+      Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(request));
+    }
   }
 
   @Test
