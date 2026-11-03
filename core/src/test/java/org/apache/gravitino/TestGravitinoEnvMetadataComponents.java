@@ -56,6 +56,7 @@ import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
+import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
@@ -156,6 +157,7 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.secretPropertyOperationDispatcher());
       assertNotNull(env.internalTagDispatcher());
       assertNotNull(env.internalPolicyDispatcher());
+      assertInstanceOf(DomainManager.class, env.internalDomainDispatcher());
       assertInstanceOf(StatisticManager.class, env.internalStatisticDispatcher());
       assertNotNull(env.lockManager());
       assertNotNull(env.metricsSystem());
@@ -175,6 +177,7 @@ class TestGravitinoEnvMetadataComponents {
       assertNull(env.viewDispatcher());
       assertNull(env.tagDispatcher());
       assertNull(env.policyDispatcher());
+      assertNull(env.domainDispatcher());
       assertNull(env.statisticDispatcher());
       assertNull(env.internalAccessControlDispatcher());
       assertNull(env.internalOwnerDispatcher());
@@ -237,6 +240,9 @@ class TestGravitinoEnvMetadataComponents {
           .thenReturn(entityStore);
 
       env.initializeFullComponents(config);
+
+      assertInstanceOf(DomainManager.class, env.internalDomainDispatcher());
+      assertSame(env.internalDomainDispatcher(), env.domainDispatcher());
 
       assertDispatcherChain(
           env.filesetDispatcher(),
