@@ -132,6 +132,21 @@ class TestIcebergAsyncPurge {
   }
 
   @Test
+  void testAsyncPurgeIsForwardedForRestCatalog() {
+    // A remote REST catalog deletes its own files, so an async purge request is forwarded to it
+    // instead of being queued for this server to delete the files.
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    when(wrapper.isRESTCatalog()).thenReturn(true);
+
+    tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true);
+
+    verify(wrapper).purgeTable(TABLE);
+    verify(wrapper, never()).loadTableMetadata(any());
+    verify(cleanup, never()).addJob(any());
+  }
+
+  @Test
   void testPlainDropWhenNotPurge() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);

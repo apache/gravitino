@@ -51,8 +51,10 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.jdbc.JdbcCatalog;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
@@ -357,6 +359,27 @@ public class TestIcebergCatalogWrapper {
       Assertions.assertEquals(!gcEnabled, Files.exists(first));
       Assertions.assertEquals(!gcEnabled, Files.exists(second));
       Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
+    }
+  }
+
+  @Test
+  void testPurgeIsForwardedToRestCatalog(@TempDir Path warehouseDir) throws Exception {
+    // A remote REST catalog owns its files: the purge is forwarded with purgeRequested, and this
+    // server neither loads the table nor deletes any file itself.
+    RESTCatalog remote = Mockito.mock(RESTCatalog.class);
+    TableIdentifier ident = TableIdentifier.of("db", "t");
+    Mockito.when(remote.dropTable(ident, true)).thenReturn(true);
+    try (IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir))))) {
+      Mockito.doReturn(remote).when(wrapper).getCatalog();
+
+      wrapper.purgeTable(ident);
+
+      Mockito.verify(remote).dropTable(ident, true);
+      Mockito.verify(remote, Mockito.never()).loadTable(Mockito.any());
+
+      Mockito.when(remote.dropTable(ident, true)).thenReturn(false);
+      Assertions.assertThrows(NoSuchTableException.class, () -> wrapper.purgeTable(ident));
     }
   }
 

@@ -282,6 +282,14 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public void purgeTable(TableIdentifier tableIdentifier) {
     getMetadataCache().invalidate(tableIdentifier);
+    if (isRESTCatalog()) {
+      // A remote REST catalog owns its table files and the storage access to them. Forward the
+      // purge so the remote deletes the files, rather than deleting them from this server.
+      if (!getCatalog().dropTable(tableIdentifier, true)) {
+        throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
+      }
+      return;
+    }
     Table table = getCatalog().loadTable(tableIdentifier);
     if (!(table instanceof HasTableOperations)) {
       CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);

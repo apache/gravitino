@@ -142,7 +142,8 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     }
 
     // Async cleanup is opt-in per request and only wired in auxiliary mode; otherwise purge inline.
-    if (!context.asyncPurge()) {
+    // A remote REST catalog deletes its own files, so its purge is always forwarded inline.
+    if (!context.asyncPurge() || wrapper.isRESTCatalog()) {
       wrapper.purgeTable(tableIdentifier);
       return;
     }
