@@ -37,6 +37,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -437,6 +438,161 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     } finally {
       reset(entityStore);
     }
+  }
+
+  @Test
+  public void testTableReplacedOutsideGravitinoGetsNewRegistration() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_replaced_externally");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_replaced_externally");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    TestCatalogOperations ops =
+        (TestCatalogOperations)
+            ((TestCatalog)
+                    catalogManager
+                        .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                        .catalog())
+                .ops();
+
+    // A table created outside Gravitino is registered on first load, with its external id.
+    ops.createTable(
+        tableIdent,
+        columns,
+        "comment",
+        ImmutableMap.of("k1", "v1", Table.PROPERTY_TABLE_UUID, "uuid-first"),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    tableOperationDispatcher.loadTable(tableIdent);
+    TableEntity first = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals("uuid-first", first.properties().get(Table.PROPERTY_TABLE_UUID));
+
+    // Loading the same table again keeps the registration.
+    tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertEquals(first.id(), entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+
+    // The table is dropped and another one created under the same name, outside Gravitino.
+    ops.dropTable(tableIdent);
+    ops.createTable(
+        tableIdent,
+        columns,
+        "comment",
+        ImmutableMap.of("k1", "v1", Table.PROPERTY_TABLE_UUID, "uuid-second"),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+
+    // The old registration, and everything attached to it, does not carry over.
+    tableOperationDispatcher.loadTable(tableIdent);
+    TableEntity second = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertNotEquals(first.id(), second.id());
+    Assertions.assertEquals("uuid-second", second.properties().get(Table.PROPERTY_TABLE_UUID));
+  }
+
+  @Test
+  public void testRegistrationWithoutUuidRecordsItOnLoad() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_uuid_backfill");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_uuid_backfill");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    TestCatalogOperations ops =
+        (TestCatalogOperations)
+            ((TestCatalog)
+                    catalogManager
+                        .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                        .catalog())
+                .ops();
+    ops.createTable(
+        tableIdent,
+        columns,
+        "comment",
+        ImmutableMap.of("k1", "v1", Table.PROPERTY_TABLE_UUID, "uuid-backfill"),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    tableOperationDispatcher.loadTable(tableIdent);
+
+    // Simulate a registration made before identifiers were recorded.
+    entityStore.update(
+        tableIdent,
+        TableEntity.class,
+        TABLE,
+        e ->
+            TableEntity.builder()
+                .withId(e.id())
+                .withName(e.name())
+                .withNamespace(e.namespace())
+                .withColumns(e.columns())
+                .withAuditInfo(e.auditInfo())
+                .build());
+    Assertions.assertNull(
+        entityStore.get(tableIdent, TABLE, TableEntity.class).properties() == null
+            ? null
+            : entityStore
+                .get(tableIdent, TABLE, TableEntity.class)
+                .properties()
+                .get(Table.PROPERTY_TABLE_UUID));
+
+    tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertEquals(
+        "uuid-backfill",
+        entityStore
+            .get(tableIdent, TABLE, TableEntity.class)
+            .properties()
+            .get(Table.PROPERTY_TABLE_UUID));
+  }
+
+  @Test
+  public void testIsReplacedExternally() {
+    Table catalogTable = mock(Table.class);
+    TableEntity.Builder entity =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of(metalake, catalog, "s"))
+            .withAuditInfo(AuditInfo.EMPTY);
+
+    when(catalogTable.properties()).thenReturn(ImmutableMap.of(Table.PROPERTY_TABLE_UUID, "b"));
+    Assertions.assertTrue(
+        TableOperationDispatcher.isReplacedExternally(
+            EntityCombinedTable.of(
+                catalogTable,
+                entity.withProperties(ImmutableMap.of(Table.PROPERTY_TABLE_UUID, "a")).build())));
+    Assertions.assertFalse(
+        TableOperationDispatcher.isReplacedExternally(
+            EntityCombinedTable.of(
+                catalogTable,
+                entity.withProperties(ImmutableMap.of(Table.PROPERTY_TABLE_UUID, "b")).build())));
+    // A registration made before the id was recorded is never treated as replaced.
+    Assertions.assertFalse(
+        TableOperationDispatcher.isReplacedExternally(
+            EntityCombinedTable.of(catalogTable, entity.withProperties(null).build())));
+    // A catalog that reports no id never triggers replacement.
+    when(catalogTable.properties()).thenReturn(ImmutableMap.of());
+    Assertions.assertFalse(
+        TableOperationDispatcher.isReplacedExternally(
+            EntityCombinedTable.of(
+                catalogTable,
+                entity.withProperties(ImmutableMap.of(Table.PROPERTY_TABLE_UUID, "a")).build())));
   }
 
   @Test

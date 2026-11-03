@@ -55,6 +55,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.Table;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
@@ -190,6 +191,49 @@ public class TestIcebergTableHookDispatcher {
             .findFirst()
             .orElseThrow(() -> new RuntimeException("InstanceHolder class not found"));
     FieldUtils.writeStaticField(holderClass, "INSTANCE", null, true);
+  }
+
+  @Test
+  public void testReplacedTableRegistrationIsReconciledBeforeServing() throws IOException {
+    when(GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION)).thenReturn(false);
+    TableIdentifier tableId = TableIdentifier.of("db", "t");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    TableEntity registered =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(ident.namespace())
+            .withProperties(ImmutableMap.of(Table.PROPERTY_TABLE_UUID, "old-uuid"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(mockEntityStore.get(ident, Entity.EntityType.TABLE, TableEntity.class))
+        .thenReturn(registered);
+
+    // Same table: nothing to reconcile.
+    Assertions.assertFalse(
+        hookDispatcher.reconcileReplacedTable(mockContext, tableId, "old-uuid", "expr"));
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+
+    // Another table under the same name: the registration is replaced through the dispatcher.
+    Assertions.assertTrue(
+        hookDispatcher.reconcileReplacedTable(mockContext, tableId, "new-uuid", "expr"));
+    verify(mockInternalTableDispatcher).loadTable(ident);
+  }
+
+  @Test
+  public void testRegistrationWithoutUuidIsNotReconciled() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("db", "t");
+    NameIdentifier ident =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    when(mockEntityStore.get(ident, Entity.EntityType.TABLE, TableEntity.class))
+        .thenThrow(new NoSuchEntityException("no entity"));
+
+    Assertions.assertFalse(
+        hookDispatcher.reconcileReplacedTable(mockContext, tableId, "new-uuid", "expr"));
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
   }
 
   @Test

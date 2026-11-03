@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Test;
 
 public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
@@ -49,6 +50,8 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
             PropertyEntry.stringRequiredPropertyEntry(
                 TEST_REQUIRED_KEY, "test required k1 property", false, false),
             PropertyEntry.stringReservedPropertyEntry(COMMENT_KEY, "table comment", true),
+            PropertyEntry.stringReservedPropertyEntry(
+                Table.PROPERTY_TABLE_UUID, "external table identifier", false),
             PropertyEntry.stringImmutablePropertyEntry(
                 TEST_IMMUTABLE_KEY, "test immutable property", false, null, false, false));
 

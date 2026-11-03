@@ -31,6 +31,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.rel.Table;
 import org.apache.iceberg.TableProperties;
 
 public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
@@ -92,6 +93,8 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(
                 IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false),
             stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false),
+            stringReservedPropertyEntry(
+                Table.PROPERTY_TABLE_UUID, "The Iceberg table UUID from table metadata", false),
             formatVersionPropertyEntry(),
             stringImmutablePropertyEntry(
                 PROVIDER,

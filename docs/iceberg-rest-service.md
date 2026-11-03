@@ -296,6 +296,8 @@ gravitino.iceberg-rest.s3-region = xx
 gravitino.iceberg-rest.s3-role-arn = xx
 ```
 
+When a table is dropped in IRC2 and another table is created under the same name, Gravitino recognizes the new table by its Iceberg table UUID. Grants, tags, policies and the owner of the dropped table do not carry over to the new one.
+
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).

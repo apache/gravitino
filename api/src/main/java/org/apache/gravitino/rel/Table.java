@@ -87,6 +87,18 @@ public interface Table extends Auditable {
   String PROPERTY_LOCATION = "location";
 
   /**
+   * The property name for the stable identifier the external system assigns to the table, such as
+   * the Iceberg table UUID. It survives renames and changes when a table is dropped and another is
+   * created under the same name.
+   *
+   * <p>This property is reserved and set by catalog implementations that can report such an
+   * identifier. Gravitino uses it to recognize that a table registered under a name was replaced
+   * outside Gravitino, so the old table's grants, tags, policies and owner are not applied to the
+   * new table.
+   */
+  String PROPERTY_TABLE_UUID = "table-uuid";
+
+  /**
    * @return Name of the table.
    */
   String name();

@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.DescribeIcebergSortOrderVisitor;
+import org.apache.gravitino.rel.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.transforms.SortOrderVisitor;
@@ -59,6 +60,9 @@ public class IcebergTablePropertiesUtil {
     properties.put(LOCATION, table.location());
 
     properties.put(FORMAT_VERSION, String.valueOf(table.formatVersion()));
+    if (table.uuid() != null) {
+      properties.put(Table.PROPERTY_TABLE_UUID, table.uuid());
+    }
 
     if (!table.sortOrder().isUnsorted()) {
       properties.put(SORT_ORDER, describeIcebergSortOrder(table.sortOrder()));
