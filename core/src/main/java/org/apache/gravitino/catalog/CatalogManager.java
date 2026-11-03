@@ -1214,23 +1214,36 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           lifecycleLock.readLock().lock();
           try {
             checkOpen();
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
+            CatalogEntity updatedCatalog;
+            try (CatalogLease lease = acquireCatalogLease(ident)) {
+              updatedCatalog =
+                  store.update(
+                      ident,
+                      CatalogEntity.class,
+                      EntityType.CATALOG,
+                      catalog -> {
+                        CatalogEntity.Builder newCatalogBuilder =
+                            newCatalogBuilder(ident.namespace(), catalog);
 
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+                        Map<String, String> newProps =
+                            catalog.getProperties() == null
+                                ? new HashMap<>()
+                                : new HashMap<>(catalog.getProperties());
+                        newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
 
-                      return newCatalogBuilder.build();
-                    });
+                        CatalogEntity proposed = newCatalogBuilder.build();
+                        lease
+                            .wrapper()
+                            .classLoader
+                            .withClassLoader(
+                                cl -> {
+                                  lease.catalog().validateConfiguration(proposed.getProperties());
+                                  return null;
+                                },
+                                IllegalArgumentException.class);
+                        return proposed;
+                      });
+            }
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -1708,6 +1721,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         cl -> {
           validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
           catalog.validateCredentialProviders(propsToValidate);
+          if (propsToValidate != null) {
+            catalog.validateConfiguration();
+          }
           if (propsToValidate == null) {
             // Loading stays lenient for catalogs persisted with unsupported providers, so only
             // warn about them.

@@ -42,8 +42,8 @@ public class PostgreSqlCatalog extends JdbcCatalog {
 
   /** {@inheritDoc} */
   @Override
-  public JdbcCatalog withCatalogConf(Map<String, String> conf) {
-    return super.withCatalogConf(resolveJdbcDatabase(conf, PostgreSqlCatalog::databaseFromUrl));
+  protected Map<String, String> prepareConfiguration(Map<String, String> conf) {
+    return resolveJdbcDatabase(conf, PostgreSqlCatalog::databaseFromUrl);
   }
 
   @Override

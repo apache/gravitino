@@ -203,9 +203,9 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
-    GravitinoRuntimeException gre =
+    IllegalArgumentException gre =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+            IllegalArgumentException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertTrue(
         gre.getMessage().contains(missingDriver),
         "message should name the missing driver: " + gre.getMessage());
