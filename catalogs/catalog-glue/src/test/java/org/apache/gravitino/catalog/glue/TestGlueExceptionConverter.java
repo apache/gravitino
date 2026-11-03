@@ -29,9 +29,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -385,14 +383,15 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
-  public void testIcebergConcurrentCommitIsConflict() {
+  public void testIcebergConcurrentCommitIsRetryableFailure() {
     RuntimeException raw =
         new org.apache.iceberg.exceptions.CommitFailedException(
             ConcurrentModificationException.builder().message("concurrent update").build(),
             "Cannot commit db.t because Glue detected concurrent update");
 
-    assertInstanceOf(
-        OptimisticLockException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+    assertEquals(RuntimeException.class, converted.getClass());
+    assertTrue(converted.getMessage().contains("changed concurrently"), converted.getMessage());
   }
 
   @Test
@@ -421,13 +420,12 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
-  public void testIcebergThrottlingCauseIsServiceUnavailable() {
+  public void testIcebergThrottlingCauseIsConnectionFailed() {
     RuntimeException raw =
         new RuntimeException(ThrottlingException.builder().message("Rate exceeded").build());
 
     assertInstanceOf(
-        ServiceUnavailableException.class,
-        GlueExceptionConverter.toIcebergException(raw, "table t"));
+        ConnectionFailedException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
   }
 
   @Test
@@ -441,7 +439,7 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
-  public void testUnmodeledThrottlingStatusIsServiceUnavailable() {
+  public void testUnmodeledThrottlingStatusIsConnectionFailed() {
     GlueException tooMany =
         (GlueException)
             GlueException.builder()
@@ -455,7 +453,7 @@ public class TestGlueExceptionConverter {
                 .build();
 
     assertInstanceOf(
-        ServiceUnavailableException.class,
+        ConnectionFailedException.class,
         GlueExceptionConverter.toClientException(tooMany, "table t", null));
   }
 

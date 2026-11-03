@@ -34,6 +34,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORM
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -43,14 +44,10 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
-<<<<<<< HEAD
-=======
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.cloud.storage.AWSPropertiesMetadata;
->>>>>>> 30a11bb0c ([#14516] fix(catalog-glue): Map AWS errors to client-facing statuses and validate catalog properties (#14517))
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import software.amazon.awssdk.regions.Region;
@@ -90,8 +87,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   false /* required */,
                   true /* immutable */,
                   null /* defaultValue */,
-<<<<<<< HEAD
-                  false /* hidden */))
+                  GlueCatalogPropertiesMetadata::checkCatalogId))
           .put(
               AWS_ACCESS_KEY_ID,
               stringOptionalPropertyEntry(
@@ -110,11 +106,6 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
-=======
-                  GlueCatalogPropertiesMetadata::checkCatalogId))
-          .put(AWS_ACCESS_KEY_ID, AWSPropertiesMetadata.AWS_ACCESS_KEY_ID)
-          .put(AWS_SECRET_ACCESS_KEY, AWSPropertiesMetadata.AWS_SECRET_ACCESS_KEY)
->>>>>>> 30a11bb0c ([#14516] fix(catalog-glue): Map AWS errors to client-facing statuses and validate catalog properties (#14517))
           .put(
               AWS_GLUE_ENDPOINT,
               stringEntry(

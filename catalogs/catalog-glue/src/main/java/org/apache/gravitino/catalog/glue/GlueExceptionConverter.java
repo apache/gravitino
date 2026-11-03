@@ -27,9 +27,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.iceberg.exceptions.CommitFailedException;
@@ -255,7 +253,7 @@ final class GlueExceptionConverter {
           awsErrorDetail(glueException));
     }
     if (e instanceof ThrottlingException || glueException.isThrottlingException()) {
-      return new ServiceUnavailableException(
+      return new ConnectionFailedException(
           e,
           "AWS Glue throttled the request for %s; the request can be retried. AWS error: %s",
           context,
@@ -334,9 +332,9 @@ final class GlueExceptionConverter {
    * and S3 errors either as its own exception types or wrapped around the AWS SDK exception, so the
    * cause chain is walked from the outside in and the first recognized type decides the result:
    * Iceberg not-found, already-exists, validation and forbidden errors map to the matching
-   * Gravitino types, a commit conflict maps to {@link OptimisticLockException}, and AWS SDK causes
-   * go through {@link #toGenericException}. A commit whose state is unknown is reported as such,
-   * because the change may have been applied. {@link GravitinoRuntimeException}, {@link
+   * Gravitino types, a commit conflict maps to a retryable {@link RuntimeException}, and AWS SDK
+   * causes go through {@link #toGenericException}. A commit whose state is unknown is reported as
+   * such, because the change may have been applied. {@link GravitinoRuntimeException}, {@link
    * IllegalArgumentException} and {@link UnsupportedOperationException} are returned as is.
    *
    * @param e the failure raised by an Iceberg catalog call
@@ -368,8 +366,10 @@ final class GlueExceptionConverter {
       if (t instanceof CommitFailedException) {
         Throwable awsCause = findCause(t, SdkException.class);
         return awsCause == null || awsCause instanceof ConcurrentModificationException
-            ? new OptimisticLockException(
-                e, "%s: the table was changed concurrently, retry: %s", context, describe(t))
+            ? new RuntimeException(
+                String.format(
+                    "%s: the table was changed concurrently, retry: %s", context, describe(t)),
+                e)
             : toGenericException((SdkException) awsCause, context, null);
       }
       if (t instanceof AlreadyExistsException) {

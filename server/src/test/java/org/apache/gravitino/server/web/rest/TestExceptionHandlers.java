@@ -22,18 +22,9 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-<<<<<<< HEAD
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-=======
-import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.exceptions.InUseException;
-import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
->>>>>>> 30a11bb0c ([#14516] fix(catalog-glue): Map AWS errors to client-facing statuses and validate catalog properties (#14517))
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -108,40 +99,6 @@ public class TestExceptionHandlers {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  public void testOptimisticLockConflictReturnsConflict() {
-    Response response =
-        ExceptionHandlers.handleTableException(
-            OperationType.ALTER,
-            "table",
-            "schema",
-            new OptimisticLockException("The table was modified concurrently"));
-
-    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
-    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    Assertions.assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResponse.getCode());
-    Assertions.assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
-  }
-
-  @Test
-  public void testServiceUnavailableReturnsServiceUnavailable() {
-    Response response =
-        ExceptionHandlers.handleTableException(
-            OperationType.LOAD,
-            "table",
-            "schema",
-            new ServiceUnavailableException("secret provider 'vault' is unavailable"));
-
-    Assertions.assertEquals(
-        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
-    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
-    Assertions.assertEquals(
-        ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
-  }
-
-  @Test
   void testPartitionForbiddenReturnsForbidden() {
     Response response =
         ExceptionHandlers.handlePartitionException(
@@ -157,7 +114,6 @@ public class TestExceptionHandlers {
   }
 
   @Test
->>>>>>> 30a11bb0c ([#14516] fix(catalog-glue): Map AWS errors to client-facing statuses and validate catalog properties (#14517))
   void testUnsupportedOperationReturnsNotImplemented() {
     UnsupportedOperationException exception =
         new UnsupportedOperationException("Operation is not supported");

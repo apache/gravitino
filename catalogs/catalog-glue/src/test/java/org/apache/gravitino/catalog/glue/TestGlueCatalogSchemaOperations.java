@@ -41,7 +41,6 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -236,7 +235,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testLoadSchemaMapsThrottlingToServiceUnavailable() {
+  void testLoadSchemaMapsThrottlingToConnectionFailed() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "db");
     when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
         .thenThrow(
@@ -249,8 +248,8 @@ class TestGlueCatalogSchemaOperations {
                         .build())
                 .build());
 
-    ServiceUnavailableException ex =
-        assertThrows(ServiceUnavailableException.class, () -> ops.loadSchema(ident));
+    ConnectionFailedException ex =
+        assertThrows(ConnectionFailedException.class, () -> ops.loadSchema(ident));
 
     assertTrue(ex.getMessage().contains("can be retried"), ex.getMessage());
   }

@@ -33,11 +33,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTE
 import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-<<<<<<< HEAD
-=======
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
->>>>>>> 30a11bb0c ([#14516] fix(catalog-glue): Map AWS errors to client-facing statuses and validate catalog properties (#14517))
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
