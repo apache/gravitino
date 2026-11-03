@@ -29,9 +29,13 @@ from mcp_server.client import (
     TableOperation,
     TagOperation,
 )
+from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
+)
+from mcp_server.client.plain.plain_rest_client_domain_operation import (
+    PlainRESTClientDomainOperation,
 )
 from mcp_server.client.plain.plain_rest_client_fileset_operation import (
     PlainRESTClientFilesetOperation,
@@ -121,6 +125,9 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._model_operation = PlainRESTClientModelOperation(
             metalake_name, _rest_client
         )
+        self._domain_operation = PlainRESTClientDomainOperation(
+            metalake_name, _rest_client
+        )
         self._tag_operation = PlainRESTClientTagOperation(
             metalake_name, _rest_client
         )
@@ -195,3 +202,6 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_semantic_model_operation(self) -> SemanticModelOperation:
         return self._semantic_model_operation
+
+    def as_domain_operation(self) -> DomainOperation:
+        return self._domain_operation
