@@ -203,6 +203,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    * @param schemaName The name identifier of the schema.
    * @return The {@link Schema} with specified identifier.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
+   * @throws SchemaAlreadyExistsException if an external schema carries another existing schema's
+   *     identifier. Remove the copied source marker before importing an independent copy.
    */
   @Override
   public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
@@ -252,10 +254,14 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   /**
    * Drop the schema with specified identifier.
    *
+   * <p>Cascade support depends on the catalog. PostgreSQL refuses non-empty schemas even when
+   * cascade is requested, because native cascade may remove objects in other schemas.
+   *
    * @param schemaName The name identifier of the schema.
-   * @param cascade Whether to drop all the tables under the schema.
+   * @param cascade Whether to request recursive deletion, subject to catalog support.
    * @return true if the schema is dropped successfully, false otherwise.
-   * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
+   * @throws NonEmptySchemaException if the schema is non-empty and cascade is false, or the catalog
+   *     cannot safely cascade within the schema.
    */
   @Override
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {

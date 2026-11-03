@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +38,7 @@ import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.RetryableValidationException;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -42,6 +47,7 @@ import org.apache.iceberg.SnapshotRefType;
 import org.apache.iceberg.SortField;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UnboundPartitionSpec;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -50,6 +56,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.JsonUtil;
 
 /**
  * Checks a table commit against the metadata it is applied to, before Iceberg applies it.
@@ -123,6 +130,131 @@ public final class IcebergCommitValidation implements UpdateRequirement {
       requirements.add(new IcebergCommitValidation(request.updates(), fileIO));
     }
     return new UpdateTableRequest(requirements.build(), request.updates());
+  }
+
+  /**
+   * Gives partition fields that an add-spec sends without a {@code field-id} the id the table
+   * assigns: the id of the same field (source and transform) in an earlier spec, or the next id
+   * above {@code last-partition-id}. The REST spec makes {@code field-id} optional, but Iceberg's
+   * metadata builder numbers such fields from 1000 again, so they would take the ids of existing
+   * partition fields.
+   *
+   * @param request the table commit request
+   * @param current supplies the table's current metadata, or null if it cannot be loaded; called
+   *     only when a field needs an id
+   * @return the request with every added partition field carrying an id
+   */
+  public static UpdateTableRequest assignPartitionFieldIds(
+      UpdateTableRequest request, Supplier<TableMetadata> current) {
+    if (request == null
+        || request.updates() == null
+        || request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance)) {
+      // A create starts from no partition fields, so numbering from 1000 is right.
+      return request;
+    }
+    boolean missingIds = false;
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddPartitionSpec) {
+        for (Object field : fields(((MetadataUpdate.AddPartitionSpec) update).spec())) {
+          missingIds |= partitionId(field) == null;
+        }
+      }
+    }
+    if (!missingIds) {
+      return request;
+    }
+    TableMetadata base = current.get();
+    if (base == null || base.formatVersion() < 2) {
+      return request;
+    }
+
+    Map<String, Integer> knownIds = new HashMap<>();
+    for (PartitionSpec spec : base.specs()) {
+      for (PartitionField field : spec.fields()) {
+        knownIds.putIfAbsent(
+            partitionFieldKey(field.sourceId(), field.transform().toString()), field.fieldId());
+      }
+    }
+    int lastAssigned = Math.max(base.lastAssignedPartitionId(), PARTITION_DATA_ID_START - 1);
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddPartitionSpec) {
+        for (Object field : fields(((MetadataUpdate.AddPartitionSpec) update).spec())) {
+          Integer id = partitionId(field);
+          if (id != null) {
+            knownIds.putIfAbsent(partitionFieldKey(field), id);
+            lastAssigned = Math.max(lastAssigned, id);
+          }
+        }
+      }
+    }
+
+    List<MetadataUpdate> updates = new ArrayList<>();
+    for (MetadataUpdate update : request.updates()) {
+      if (!(update instanceof MetadataUpdate.AddPartitionSpec)) {
+        updates.add(update);
+        continue;
+      }
+      UnboundPartitionSpec spec = ((MetadataUpdate.AddPartitionSpec) update).spec();
+      ObjectNode specNode = JsonUtil.mapper().createObjectNode();
+      specNode.put("spec-id", spec.specId());
+      ArrayNode fields = specNode.putArray("fields");
+      for (Object field : fields(spec)) {
+        Integer id = partitionId(field);
+        if (id == null) {
+          String key = partitionFieldKey(field);
+          id = knownIds.get(key);
+          if (id == null) {
+            id = ++lastAssigned;
+            knownIds.put(key, id);
+          }
+        }
+        fields
+            .addObject()
+            .put("name", (String) fieldValue(field, "name"))
+            .put("transform", (String) fieldValue(field, "transformAsString"))
+            .put("source-id", (Integer) fieldValue(field, "sourceId"))
+            .put("field-id", id);
+      }
+      updates.add(new MetadataUpdate.AddPartitionSpec(PartitionSpecParser.fromJson(specNode)));
+    }
+    return request.identifier() == null
+        ? new UpdateTableRequest(request.requirements(), updates)
+        : UpdateTableRequest.create(request.identifier(), request.requirements(), updates);
+  }
+
+  private static List<?> fields(UnboundPartitionSpec spec) {
+    return spec.fields();
+  }
+
+  @Nullable
+  private static Integer partitionId(Object unboundField) {
+    return (Integer) fieldValue(unboundField, "partitionId");
+  }
+
+  private static String partitionFieldKey(Object unboundField) {
+    return partitionFieldKey(
+        (Integer) fieldValue(unboundField, "sourceId"),
+        (String) fieldValue(unboundField, "transformAsString"));
+  }
+
+  /**
+   * Reads an accessor of {@code UnboundPartitionSpec.UnboundPartitionField}. Its accessors are
+   * public but the class is package-private in Iceberg 1.11, and no public API exposes whether a
+   * field was sent without a {@code field-id}.
+   */
+  private static Object fieldValue(Object unboundField, String accessor) {
+    try {
+      Method method = unboundField.getClass().getMethod(accessor);
+      method.setAccessible(true);
+      return method.invoke(unboundField);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException("Cannot read partition field " + accessor, e);
+    }
+  }
+
+  private static String partitionFieldKey(int sourceId, String transform) {
+    return sourceId + ":" + transform;
   }
 
   @Override
