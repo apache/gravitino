@@ -247,7 +247,13 @@ public class BaseIT {
     containerSuite.startPostgreSQLContainer(META_DATA);
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
-    String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
+    // The embedded server runs on the test host, which may not route container-internal IPs.
+    String pgUrlWithoutSchema =
+        String.format(
+            "jdbc:postgresql://%s:%d/%s",
+            POSTGRESQL_CONTAINER.getContainer().getHost(),
+            POSTGRESQL_CONTAINER.getMappedPort(PostgreSQLContainer.PG_PORT),
+            META_DATA);
     String randomSchemaName = RandomStringUtils.random(10, true, false);
     // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
@@ -298,7 +304,13 @@ public class BaseIT {
     containerSuite.startMySQLContainer(META_DATA);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
+    // Use published ports for metadata-store connections from the host JVM.
+    String mysqlUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/%s",
+            MYSQL_CONTAINER.getContainer().getHost(),
+            MYSQL_CONTAINER.getMappedPort(MySQLContainer.MYSQL_PORT),
+            META_DATA);
     LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =

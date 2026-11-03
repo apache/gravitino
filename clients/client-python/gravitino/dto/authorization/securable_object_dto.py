@@ -54,7 +54,11 @@ class SecurableObjectDTO(SecurableObject):
     )
 
     def __post_init__(self):
-        if self._full_name and "." in self._full_name:
+        if (
+            self._type != MetadataObject.Type.DOMAIN
+            and self._full_name
+            and "." in self._full_name
+        ):
             index = self._full_name.rfind(".")
             self._parent = self._full_name[:index]
             self._name = self._full_name[index + 1 :]
