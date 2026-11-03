@@ -71,6 +71,9 @@ INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, 
 VALUES ('Sample text 1', 'same9', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 1992382342, DATE '2024-01-01',
         NULL, TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
+-- Failed inserts must roll back their JDBC staging tables.
+SHOW TABLES;
+
 CREATE TABLE tb03  (int_array ARRAY(INTEGER));
 
 INSERT INTO tb03 VALUES (ARRAY[1, 2, 3, 4, 5]);
@@ -83,4 +86,4 @@ drop table tb02;
 
 drop table tb03;
 
-drop schema gt_postgresql.gt_db1 cascade;
+drop schema gt_postgresql.gt_db1;
