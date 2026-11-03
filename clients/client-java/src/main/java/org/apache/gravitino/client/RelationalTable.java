@@ -34,6 +34,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.requests.AddPartitionsRequest;
@@ -77,6 +79,7 @@ class RelationalTable
     implements Table,
         SupportsPartitions,
         SupportsTags,
+        SupportsDomains,
         SupportsRoles,
         SupportsPolicies,
         SupportsStatistics,
@@ -88,6 +91,8 @@ class RelationalTable
   private final RESTClient restClient;
 
   private final Namespace namespace;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
@@ -125,6 +130,8 @@ class RelationalTable
             MetadataObject.Type.TABLE);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
     this.objectPolicyOperations =
@@ -351,6 +358,24 @@ class RelationalTable
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
   protected static String formatPartitionRequestPath(String prefix, String partitionName) {
     return prefix + "/" + RESTUtils.encodeString(partitionName);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
   }
 
   @Override
