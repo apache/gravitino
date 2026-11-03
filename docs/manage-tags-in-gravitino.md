@@ -16,6 +16,9 @@ resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 Policies can be associated with tags to govern objects carrying those tags. See
 [Policy-to-Tag Associations](./manage-policies-in-gravitino.md#policy-to-tag-associations).
 
+Domains derive membership from explicit backing tags and existing assignments. See
+[Manage domains](./manage-domains-in-gravitino.md) for binding, ownership and conflict rules.
+
 ## Tag Operations
 
 ### Create a Tag

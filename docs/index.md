@@ -58,6 +58,9 @@ Use either to manage metadata. See
 
 * [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
   metalakes.
+* [Manage domains in Gravitino](./manage-domains-in-gravitino.md) to learn how to create domains,
+  manage backing tags, and query membership using REST and the Java/Python clients. Start with
+  [Domains](./domains.md) for concepts, hierarchy, and membership semantics.
 * [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
   to learn how to manage relational metadata.
 * [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
@@ -163,6 +166,8 @@ Gravitino supports different catalogs to manage the metadata in different source
 
 Gravitino provides governance features to manage metadata in a unified way. See:
 
+* [Domains](./domains.md): business groupings, membership and hierarchy.
+* [Manage domains in Gravitino](./manage-domains-in-gravitino.md): Java/Python examples, REST lifecycle and backing tags.
 * [Manage tags in Gravitino](./manage-tags-in-gravitino.md): a complete guide to using Gravitino
   to manage tags.
 * [Manage policies in Gravitino](./manage-policies-in-gravitino.md): a complete guide to using Gravitino

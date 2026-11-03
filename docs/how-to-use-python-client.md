@@ -227,3 +227,8 @@ Process finished with exit code 0
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
 
+
+## Domains
+
+See [Manage domains](./manage-domains-in-gravitino.md) for a complete executable example
+covering creation, publication, tag membership, reverse lookup and cleanup.
