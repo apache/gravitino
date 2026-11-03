@@ -522,6 +522,18 @@ public class TestGlueExceptionConverter {
     assertTrue(other.getMessage().contains("[InternalError]"), other.getMessage());
   }
 
+  @Test
+  void testIcebergClientFailureDoesNotBlameGlue() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new RuntimeException(
+                "wrapped",
+                SdkClientException.create("Unable to execute HTTP request: Read timed out")),
+            "Iceberg metadata of table t");
+    assertInstanceOf(ConnectionFailedException.class, converted);
+    assertTrue(converted.getMessage().contains("AWS (Glue or S3)"), converted.getMessage());
+  }
+
   private static RuntimeException s3Exception(int status, String code) {
     return new RuntimeException(
         "wrapped",
