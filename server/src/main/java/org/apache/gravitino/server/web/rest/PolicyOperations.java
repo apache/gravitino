@@ -233,19 +233,18 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
-            for (PolicyUpdateRequest update : request.getUpdates()) {
-              if (update instanceof PolicyUpdateRequest.RenamePolicyRequest) {
-                NameIdentifierUtil.checkMetadataObjectName(
-                    NameIdentifierUtil.ofPolicy(
-                        metalake, ((PolicyUpdateRequest.RenamePolicyRequest) update).getNewName()),
-                    Entity.EntityType.POLICY);
-              }
-            }
-
             PolicyChange[] changes =
                 request.getUpdates().stream()
                     .map(PolicyUpdateRequest::policyChange)
                     .toArray(PolicyChange[]::new);
+            for (PolicyChange change : changes) {
+              if (change instanceof PolicyChange.RenamePolicy) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofPolicy(
+                        metalake, ((PolicyChange.RenamePolicy) change).getNewName()),
+                    Entity.EntityType.POLICY);
+              }
+            }
             PolicyEntity policy = policyDispatcher.alterPolicy(metalake, name, changes);
 
             LOG.info("Altered policy: {} under metalake: {}", name, metalake);
