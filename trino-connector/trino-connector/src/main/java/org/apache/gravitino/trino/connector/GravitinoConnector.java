@@ -227,6 +227,14 @@ public class GravitinoConnector implements Connector {
   }
 
   @Override
+  public void rollback(ConnectorTransactionHandle transactionHandle) {
+    GravitinoTransactionHandle gravitinoTransactionHandle =
+        (GravitinoTransactionHandle) transactionHandle;
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    internalConnector.rollback(gravitinoTransactionHandle.getInternalHandle());
+  }
+
+  @Override
   public ConnectorAccessControl getAccessControl() {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     return internalConnector.getAccessControl();
