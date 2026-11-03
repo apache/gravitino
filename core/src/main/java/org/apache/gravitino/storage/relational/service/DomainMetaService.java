@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -34,8 +35,10 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
@@ -124,32 +127,32 @@ public class DomainMetaService {
   }
 
   /**
-   * Inserts a domain.
+   * Inserts a top-level domain. A sub-domain, whose parent must be locked and checked, is inserted
+   * with {@link #insertDomain(DomainEntity, Consumer)}. Replacing a domain keeps its status and its
+   * parent: the status is changed only under the locks its rules need, by {@link
+   * DomainRelService#updateDomainStatusAndGet}.
    *
    * @param domainEntity The domain to insert.
    * @param overwritten Whether to replace an active domain with the same name or ID.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists and {@code
    *     overwritten} is false.
+   * @throws IllegalArgumentException If the domain has a parent, or replaces a domain with another
+   *     status.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertDomain")
   public void insertDomain(DomainEntity domainEntity, boolean overwritten) throws IOException {
+    Preconditions.checkArgument(
+        !domainEntity.parent().isPresent(),
+        "The domain %s has a parent and must be inserted with its parent locked",
+        domainEntity.nameIdentifier());
     Namespace ns = domainEntity.namespace();
     String metalakeName = ns.level(0);
 
     try {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
-
+      MetalakePO metalakePO = getMetalakePO(metalakeName);
       DomainPO domainPO = DomainPO.initializeDomainPO(domainEntity, metalakePO.getMetalakeId());
 
       SessionUtils.doMultipleWithCommit(
@@ -174,6 +177,75 @@ public class DomainMetaService {
   }
 
   /**
+   * Inserts a new domain after a check of the locked state. If the domain has a parent, it is
+   * inserted as a sub-domain of that parent, together with its parent edge, in one transaction.
+   *
+   * <p>The metalake row is locked shared, then the parent row, if any, is locked shared, so the
+   * parent cannot be attached elsewhere, deleted or have its status changed until the domain is
+   * committed. The check gets the new domain, the parent with its own parent set, and no
+   * sub-domains.
+   *
+   * <p>This operation must own its transaction so a failed check rolls back the inserted domain. It
+   * cannot run inside another transaction.
+   *
+   * @param domainEntity The domain to insert; its parent, if set, is the parent to insert it under.
+   * @param check The check of the locked state; nothing is inserted if it throws.
+   * @throws IOException If the domain cannot be stored.
+   * @throws EntityAlreadyExistsException If a domain with the same name exists.
+   * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws IllegalStateException If it is called inside a transaction.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertDomainWithCheck")
+  public void insertDomain(DomainEntity domainEntity, Consumer<LockedDomainState> check)
+      throws IOException {
+    Preconditions.checkState(
+        !SessionUtils.isInTransaction(),
+        "The domain %s cannot be inserted with a check inside another transaction",
+        domainEntity.nameIdentifier());
+    Namespace ns = domainEntity.namespace();
+    String metalakeName = ns.level(0);
+
+    try {
+      MetalakePO metalakePO = getMetalakePO(metalakeName);
+      DomainPO domainPO = DomainPO.initializeDomainPO(domainEntity, metalakePO.getMetalakeId());
+
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              lockMetalakeForDomainWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
+          () -> {
+            DomainEntity parent =
+                domainEntity
+                    .parent()
+                    .map(
+                        parentName ->
+                            DomainRelService.getInstance()
+                                .lockAndGetParentOfNewSubDomain(NameIdentifier.of(ns, parentName)))
+                    .orElse(null);
+            // The domain is written before the check, so that a duplicate name fails as such.
+            insertNewDomainWithoutCommit(domainPO);
+            check.accept(new LockedDomainState(domainEntity, parent, Collections.emptyList()));
+            if (parent != null) {
+              DomainRelService.getInstance()
+                  .insertDomainRelOfNewSubDomain(
+                      metalakePO.getMetalakeId(),
+                      parent.id(),
+                      domainPO.domainId(),
+                      AuditInfo.builder()
+                          .withCreator(domainEntity.auditInfo().creator())
+                          .withCreateTime(domainEntity.auditInfo().createTime())
+                          .build());
+            }
+          });
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(
+          e, Entity.EntityType.DOMAIN, domainEntity.nameIdentifier().toString());
+      throw e;
+    }
+  }
+
+  /**
    * Updates a domain. The domain row is locked before the updater runs, so the updater is given the
    * current domain and concurrent alters apply one after another instead of failing on each other.
    * The write still compares the locked version as a backstop.
@@ -187,8 +259,9 @@ public class DomainMetaService {
    * changing the new domain; a later call with the name acts on the new domain.
    *
    * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
-   * the tag it is now bound to rather than from the updater's entity. The parent cannot be changed
-   * by an update, an updater that changes it is rejected; {@link DomainRelService} changes it.
+   * the tag it is now bound to rather than from the updater's entity. The parent and the status
+   * cannot be changed by an update, an updater that changes either is rejected; {@link
+   * DomainRelService} changes them under the locks their rules need.
    *
    * @param identifier The domain identifier.
    * @param updater The function that returns the updated domain.
@@ -229,6 +302,11 @@ public class DomainMetaService {
             Preconditions.checkArgument(
                 Objects.equals(oldDomainEntity.parent(), updatedDomainEntity.parent()),
                 "The parent of domain %s cannot be changed by an update, use DomainRelService",
+                identifier);
+            Preconditions.checkArgument(
+                oldDomainEntity.status() == updatedDomainEntity.status(),
+                "The status of domain %s cannot be changed by an update, use"
+                    + " DomainRelService#updateDomainStatusAndGet",
                 identifier);
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
@@ -414,6 +492,10 @@ public class DomainMetaService {
       return;
     }
 
+    Preconditions.checkArgument(
+        Objects.equals(existingDomainPO.status(), domainEntity.status().name()),
+        "The status of domain %s cannot be changed by replacing it",
+        domainEntity.nameIdentifier());
     DomainPO replacementDomainPO = DomainPO.updateDomainPO(existingDomainPO, domainEntity);
     NameIdentifier observedIdentifier =
         NameIdentifier.of(domainEntity.namespace(), existingDomainPO.domainName());
@@ -497,6 +579,19 @@ public class DomainMetaService {
         current ->
             Objects.equals(current.domainName(), observedDomainPO.domainName())
                 && Objects.equals(current.metalakeId(), observedDomainPO.metalakeId()));
+  }
+
+  private MetalakePO getMetalakePO(String metalakeName) {
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+    if (metalakePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
+    }
+    return metalakePO;
   }
 
   private DomainPO getDomainPOByMetalakeAndName(String metalakeName, String domainName) {

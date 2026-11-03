@@ -26,9 +26,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.mapper.LiveEndpointMapper;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.ibatis.session.SqlSession;
 
 /**
  * Fences metadata-object endpoints while a relation write is in progress.
@@ -82,12 +80,7 @@ public final class LiveEndpointService {
 
     // An earlier name lookup in this transaction may be in MyBatis's first-level cache. The
     // locking reads above must be followed by a database read of the current name-to-ID chain.
-    SqlSession session = SqlSessions.getSqlSession();
-    try {
-      session.clearCache();
-    } finally {
-      SqlSessions.closeSqlSession();
-    }
+    SessionUtils.clearSessionCache();
     NamespacedEntityId current =
         new RelationalEntityStoreIdResolver().getEntityIds(identifier, type);
     if (!Arrays.equals(current.fullIds(), observed.fullIds())) {
