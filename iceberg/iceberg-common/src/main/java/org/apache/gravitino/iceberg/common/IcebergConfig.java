@@ -262,6 +262,28 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
               "The value must be `user-token` or `service-account`")
           .createWithDefault(IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN);
 
+  /**
+   * Who issues storage credentials for tables of a federated REST catalog. {@code remote} passes
+   * through what the remote catalog vends; {@code gravitino} issues credentials through this
+   * catalog's credential providers, scoped to the table and to the caller's privilege.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_CREDENTIAL_VENDING =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING)
+          .doc(
+              "Who issues storage credentials for tables of a federated REST catalog. `remote`"
+                  + " passes through the credentials the remote catalog vends. `gravitino` does not"
+                  + " request credentials from the remote catalog and issues them through this"
+                  + " catalog's `credential-providers`, scoped to the table location and to the"
+                  + " caller's privilege on the table.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE.equals(value)
+                      || IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO.equals(value),
+              "The value must be `remote` or `gravitino`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE);
+
   /** HTTP connection timeout in milliseconds for the REST catalog backend. */
   public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
       new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)
@@ -462,6 +484,17 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public boolean isRestBackendServiceAccount() {
     return IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(
         get(REST_BACKEND_AUTH_TYPE));
+  }
+
+  /**
+   * Returns whether Gravitino, rather than the remote catalog, issues storage credentials for
+   * tables of a federated REST catalog.
+   *
+   * @return {@code true} if {@code rest-backend-credential-vending} is {@code gravitino}
+   */
+  public boolean isRestBackendGravitinoCredentialVending() {
+    return IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO.equals(
+        get(REST_BACKEND_CREDENTIAL_VENDING));
   }
 
   @Override

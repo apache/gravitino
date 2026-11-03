@@ -91,6 +91,8 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCatalogWrapperForREST {
 
@@ -829,6 +831,105 @@ public class TestCatalogWrapperForREST {
           credential.config().get("client.refresh-credentials-endpoint"));
       Assertions.assertEquals(
           "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino-vending", "service-account"})
+  void testFederatedLoadTableWithGravitinoCredentialVending(String mode) throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadataParser.fromJson(
+            "s3://bucket/db/tbl/metadata/v1.metadata.json",
+            TableMetadataParser.toJson(
+                TableMetadata.newTableMetadata(
+                    new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+                    PartitionSpec.unpartitioned(),
+                    SortOrder.unsorted(),
+                    "s3://bucket/db/tbl",
+                    Collections.emptyMap())));
+    // The remote returns broad credentials even when none are requested. With Gravitino
+    // credential vending they must not reach the client.
+    org.apache.iceberg.rest.credentials.Credential upstreamCredential =
+        IcebergRESTUtils.toRESTCredential(
+            "s3://bucket/",
+            ImmutableMap.of(
+                "s3.access-key-id", "upstream-key", "s3.secret-access-key", "upstream-secret"));
+    String upstreamJson =
+        LoadTableResponseParser.toJson(
+            LoadTableResponse.builder()
+                .withTableMetadata(metadata)
+                .addAllConfig(ImmutableMap.of("io-impl", "org.apache.iceberg.aws.s3.S3FileIO"))
+                .addCredential(upstreamCredential)
+                .build());
+
+    AtomicReference<String> accessDelegationHeader = new AtomicReference<>("unset");
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          accessDelegationHeader.set(
+              exchange.getRequestHeaders().getFirst("X-Iceberg-Access-Delegation"));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse",
+                  CredentialConstants.CREDENTIAL_PROVIDERS,
+                  DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+                  // A service account catalog issues credentials through Gravitino even when
+                  // credential vending is left at its default.
+                  mode.equals("service-account")
+                      ? IcebergConstants.REST_BACKEND_AUTH_TYPE
+                      : IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING,
+                  mode.equals("service-account")
+                      ? IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT
+                      : IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadTableResponse response = wrapper.loadTable(table, true, CredentialPrivilege.READ);
+
+      Assertions.assertNull(accessDelegationHeader.get(), "remote must not be asked to vend");
+      Assertions.assertEquals(1, response.credentials().size());
+      Credential credential = response.credentials().get(0);
+      Assertions.assertEquals("s3://bucket/db/tbl", credential.prefix());
+      Assertions.assertNotEquals("upstream-key", credential.config().get("s3.access-key-id"));
+      Assertions.assertNotEquals("upstream-key", response.config().get("s3.access-key-id"));
+      Assertions.assertEquals(
+          "org.apache.iceberg.aws.s3.S3FileIO", response.config().get("io-impl"));
+
+      LoadTableResponse withoutRequest = wrapper.loadTable(table, false, CredentialPrivilege.READ);
+      Assertions.assertNull(accessDelegationHeader.get());
+      Assertions.assertTrue(
+          withoutRequest.credentials().stream()
+              .noneMatch(c -> "upstream-key".equals(c.config().get("s3.access-key-id"))),
+          "remote credentials returned without a request are passed through only in remote mode");
     } finally {
       server.stop(0);
     }

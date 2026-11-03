@@ -165,6 +165,14 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "OAuth2 scope requested with the service account's client credential",
                 false /* immutable */,
                 null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING,
+                "Who issues storage credentials for a federated REST catalog: remote passes"
+                    + " through the remote catalog's credentials, gravitino issues them through"
+                    + " this catalog's credential providers",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));

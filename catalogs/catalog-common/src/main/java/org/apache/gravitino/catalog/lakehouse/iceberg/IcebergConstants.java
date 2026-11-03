@@ -165,6 +165,22 @@ public class IcebergConstants {
   /** Gravitino config key for the OAuth2 scope requested with the client credential. */
   public static final String REST_BACKEND_SCOPE = "rest-backend-scope";
 
+  /**
+   * Gravitino config key selecting who issues storage credentials for tables of a federated REST
+   * catalog: {@link #REST_BACKEND_CREDENTIAL_VENDING_REMOTE} or {@link
+   * #REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO}.
+   */
+  public static final String REST_BACKEND_CREDENTIAL_VENDING = "rest-backend-credential-vending";
+
+  /** Pass through the storage credentials the remote catalog vends. */
+  public static final String REST_BACKEND_CREDENTIAL_VENDING_REMOTE = "remote";
+
+  /**
+   * Do not request credentials from the remote catalog; issue them through this catalog's own
+   * credential providers, scoped to the table and to the caller's privilege.
+   */
+  public static final String REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO = "gravitino";
+
   /** Iceberg REST client property for a static bearer token. */
   public static final String ICEBERG_REST_TOKEN = "token";
 

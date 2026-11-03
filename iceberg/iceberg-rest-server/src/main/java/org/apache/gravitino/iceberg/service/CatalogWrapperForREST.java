@@ -608,8 +608,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * Inject vended credentials into a scan response using the already-loaded table, avoiding a
    * redundant {@code loadTable} call. Follows the same eligibility logic as {@link
    * #shouldGenerateCredential} and the same credential generation as {@link #getCredential}.
+   *
+   * @param tableIdentifier the table identifier
+   * @param table the loaded table
+   * @param response the scan response to add credentials to
+   * @param privilege the caller's privilege on the table
+   * @return the response with credentials, or unchanged if none could be generated
    */
-  private PlanTableScanResponse injectScanCredentials(
+  protected PlanTableScanResponse injectScanCredentials(
       TableIdentifier tableIdentifier,
       Table table,
       PlanTableScanResponse response,
