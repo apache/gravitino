@@ -22,11 +22,5 @@ public enum ExpressionCondition {
   NEVER,
   REQUIRED_MODIFY_PRIVILEGES,
   /** The request carries proposed changes that are not saved, for example in its request body. */
-  HAS_PROPOSED_CHANGES,
-  /**
-   * The request overwrites an existing object (for example Iceberg {@code registerTable} with
-   * {@code overwrite=true}), so the secondary expression authorizes a modification rather than a
-   * create.
-   */
-  OVERWRITE
+  HAS_PROPOSED_CHANGES
 }

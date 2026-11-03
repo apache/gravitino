@@ -40,14 +40,12 @@ import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
-import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /**
  * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
@@ -70,36 +68,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         extractNameIdentifierFromParameters(parameters, args);
     return new AuthorizationTarget(
         nameIdentifierMap, EntityType.valueOf(annotation.accessMetadataType().name()));
-  }
-
-  @Override
-  protected boolean shouldUseSecondaryExpression(
-      ExpressionCondition condition, Method method, Parameter[] parameters, Object[] args) {
-    if (condition != ExpressionCondition.OVERWRITE) {
-      return false;
-    }
-    for (int i = 0; i < parameters.length; i++) {
-      IcebergAuthorizationMetadata metadata =
-          parameters[i].getAnnotation(IcebergAuthorizationMetadata.class);
-      if (metadata != null
-          && metadata.type() == RequestType.REGISTER_TABLE
-          && args[i] instanceof RegisterTableRequest) {
-        return ((RegisterTableRequest) args[i]).overwrite();
-      }
-    }
-    return false;
-  }
-
-  @Override
-  protected Entity.EntityType entityTypeForSecondaryExpression(
-      AuthorizationExpression annotation,
-      AuthorizationTarget primaryTarget,
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-    // registerTable overwrite authorizes the named table, which the handler adds to the map.
-    if (nameIdentifierMap.containsKey(EntityType.TABLE)) {
-      return EntityType.TABLE;
-    }
-    return primaryTarget.entityType();
   }
 
   /**

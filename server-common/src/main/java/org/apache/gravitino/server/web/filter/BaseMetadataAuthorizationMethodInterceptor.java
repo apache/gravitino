@@ -40,7 +40,6 @@ import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailure
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -124,6 +123,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
      *     standard expression-based authorization
      */
     boolean authorizationCompleted();
+
+    /**
+     * Returns the entity type this handler authorizes the request against, used to attribute
+     * denials and audit events. Called after {@link #process}, also when it fails.
+     *
+     * @param defaultType entity type resolved from the method annotation
+     * @return the effective access entity type, {@code defaultType} unless the handler targets a
+     *     different object
+     */
+    default Entity.EntityType entityType(Entity.EntityType defaultType) {
+      return defaultType;
+    }
   }
 
   /** Invokes the protocol operation after authorization succeeds. */
@@ -239,45 +250,6 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
-   * Returns whether {@link AuthorizationExpression#secondaryExpression()} should replace the
-   * primary expression for this request.
-   *
-   * <p>Protocols that understand an {@link ExpressionCondition} (for example {@link
-   * ExpressionCondition#OVERWRITE}) override this hook. The default never selects the secondary
-   * expression.
-   *
-   * @param condition secondary expression condition from the method annotation
-   * @param method invoked protocol method
-   * @param parameters invoked method parameters
-   * @param args invoked method arguments
-   * @return {@code true} to evaluate the secondary expression
-   */
-  protected boolean shouldUseSecondaryExpression(
-      ExpressionCondition condition, Method method, Parameter[] parameters, Object[] args) {
-    return false;
-  }
-
-  /**
-   * Returns the entity type to authorize against when the secondary expression is selected.
-   *
-   * <p>Defaults to the primary {@link AuthorizationTarget#entityType()}. Protocols may return a
-   * different type when the secondary expression addresses a deeper object that a request-specific
-   * handler added to {@code nameIdentifierMap} (for example TABLE for an overwrite of a named
-   * table).
-   *
-   * @param annotation authorization annotation on the invoked method
-   * @param primaryTarget authorization target resolved from the primary annotation fields
-   * @param nameIdentifierMap identifiers after request-specific handlers have run
-   * @return entity type used for secondary expression evaluation
-   */
-  protected Entity.EntityType entityTypeForSecondaryExpression(
-      AuthorizationExpression annotation,
-      AuthorizationTarget primaryTarget,
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-    return primaryTarget.entityType();
-  }
-
-  /**
    * Authorizes a protocol method and maps all failures through the protocol hook.
    *
    * <p>The protocol-specific interceptor adapts its invocation framework to these plain Java
@@ -376,24 +348,20 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
-          authzHandler.process(nameIdentifierMap);
+          try {
+            authzHandler.process(nameIdentifierMap);
+          } finally {
+            // Attribute denials to the object the handler authorizes, including its own denials.
+            NameIdentifier handlerTarget =
+                nameIdentifierMap.get(authzHandler.entityType(target.entityType()));
+            if (handlerTarget != null) {
+              deniedObject = handlerTarget;
+            }
+          }
           skipStandardCheck = authzHandler.authorizationCompleted();
         }
 
         if (!skipStandardCheck && !shouldSkipExpressionEvaluation(target)) {
-          Entity.EntityType accessEntityType = target.entityType();
-          if (!expressionAnnotation.secondaryExpression().isEmpty()
-              && shouldUseSecondaryExpression(
-                  expressionAnnotation.secondaryExpressionCondition(), method, parameters, args)) {
-            expression = expressionAnnotation.secondaryExpression();
-            deniedExpression = expression;
-            accessEntityType =
-                entityTypeForSecondaryExpression(expressionAnnotation, target, nameIdentifierMap);
-          }
-          if (nameIdentifierMap.get(accessEntityType) != null) {
-            deniedObject = nameIdentifierMap.get(accessEntityType);
-          }
-
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
@@ -402,9 +370,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
                   nameIdentifierMap,
                   pathParams,
                   authorizationRequestContext,
-                  Optional.of(accessEntityType.name()));
+                  Optional.of(target.entityType().name()));
           if (!authorizeResult) {
-            NameIdentifier accessMetadataName = nameIdentifierMap.get(accessEntityType);
+            NameIdentifier accessMetadataName = nameIdentifierMap.get(target.entityType());
             String currentUser = PrincipalUtils.getCurrentUserName();
             String methodName = method.getName();
             String notAuthzMessage =

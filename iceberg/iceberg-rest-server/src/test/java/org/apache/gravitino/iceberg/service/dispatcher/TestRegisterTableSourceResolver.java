@@ -86,6 +86,24 @@ class TestRegisterTableSourceResolver {
   }
 
   @Test
+  void testUnreadableSourceMetadataPropagates() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    // The live table moved on to a corrupt current metadata file; the caller registers an older
+    // one.
+    when(catalog.getTableMetadataLocation(source))
+        .thenReturn(Optional.of("file:/warehouse/other/secret/metadata/v2.metadata.json"));
+    when(catalog.loadTableMetadata(source)).thenThrow(new RuntimeException("corrupt metadata"));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            RegisterTableSourceResolver.findSourceTables(
+                catalog, TableIdentifier.of("mine", "copy"), META_LOC, tableMetadata()));
+  }
+
+  @Test
   void testNormalizePathUnifiesFileUriForms() {
     Assertions.assertEquals(
         "file:/warehouse/t", RegisterTableSourceResolver.normalizePath("file:///warehouse/t"));
@@ -104,9 +122,9 @@ class TestRegisterTableSourceResolver {
 
     when(catalog.listNamespace(Namespace.empty())).thenReturn(rootNs);
     when(catalog.listNamespace(ns)).thenReturn(childNs);
-    // Like the JDBC catalog, the root namespace cannot list tables.
+    // Like Iceberg's HiveCatalog, the root namespace cannot list tables.
     when(catalog.listTable(Namespace.empty()))
-        .thenThrow(new NoSuchNamespaceException("Namespace does not exist: "));
+        .thenThrow(new IllegalArgumentException("Missing database in namespace: "));
     when(catalog.listTable(ns)).thenReturn(childTables);
   }
 

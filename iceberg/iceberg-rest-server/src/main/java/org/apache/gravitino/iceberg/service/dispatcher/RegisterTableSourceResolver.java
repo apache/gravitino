@@ -27,8 +27,6 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Resolves live catalog tables that share a register-table metadata file.
@@ -37,8 +35,6 @@ import org.slf4j.LoggerFactory;
  * authorization interceptor handlers.
  */
 public final class RegisterTableSourceResolver {
-
-  private static final Logger LOG = LoggerFactory.getLogger(RegisterTableSourceResolver.class);
 
   private RegisterTableSourceResolver() {}
 
@@ -118,10 +114,8 @@ public final class RegisterTableSourceResolver {
           && !tableLocation.isEmpty()
           && tableLocation.equals(normalizePath(existing.location()));
     } catch (NoSuchTableException e) {
-      return false;
-    } catch (RuntimeException e) {
-      LOG.debug(
-          "Skip table {} while resolving register-table source: {}", identifier, e.toString());
+      // Only a table that no longer exists is unrelated. Any other failure to read its metadata
+      // must not be mistaken for unrelated metadata, which would skip source authorization.
       return false;
     }
   }

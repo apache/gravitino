@@ -181,6 +181,29 @@ class TestRegisterTableAuthzHandler {
     assertEquals(PROCEEDED, interceptor.invoke(registerInvocation(false, "copy", META_LOC)));
   }
 
+  @Test
+  void testOverwriteDenialChecksTableBeforeScanningSources() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    MethodInvocation overwrite = registerInvocation(true, TABLE, META_LOC);
+    assertForbidden(interceptor.invoke(overwrite));
+    verify(catalogWrapper, never()).listNamespace(any());
+  }
+
+  @Test
+  void testUnreadableSourceMetadataBlocksRegister() throws Throwable {
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(source);
+    when(catalogWrapper.getTableMetadataLocation(source))
+        .thenReturn(Optional.of("file:/warehouse/other/secret/metadata/v2.metadata.json"));
+    when(catalogWrapper.loadTableMetadata(source)).thenThrow(new RuntimeException("corrupt"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    MethodInvocation invocation = registerInvocation(false, "copy", META_LOC);
+    interceptor.invoke(invocation);
+    verify(invocation, never()).proceed();
+  }
+
   private MethodInvocation registerInvocation(
       boolean overwrite, String tableName, String metadataLocation) throws Throwable {
     Method method =
@@ -214,14 +237,14 @@ class TestRegisterTableAuthzHandler {
     when(rootNs.namespaces()).thenReturn(List.of(ns));
     ListNamespacesResponse childNs = mock(ListNamespacesResponse.class);
     when(childNs.namespaces()).thenReturn(Collections.emptyList());
-    ListTablesResponse rootTables = mock(ListTablesResponse.class);
-    when(rootTables.identifiers()).thenReturn(Collections.emptyList());
     ListTablesResponse childTables = mock(ListTablesResponse.class);
     when(childTables.identifiers()).thenReturn(List.of(source));
 
     when(catalogWrapper.listNamespace(Namespace.empty())).thenReturn(rootNs);
     when(catalogWrapper.listNamespace(ns)).thenReturn(childNs);
-    when(catalogWrapper.listTable(Namespace.empty())).thenReturn(rootTables);
+    // Like Iceberg's HiveCatalog, the root namespace cannot list tables.
+    when(catalogWrapper.listTable(Namespace.empty()))
+        .thenThrow(new IllegalArgumentException("Missing database in namespace: "));
     when(catalogWrapper.listTable(ns)).thenReturn(childTables);
     when(catalogWrapper.getTableMetadataLocation(source)).thenReturn(Optional.of(META_LOC));
     when(catalogWrapper.loadTableMetadata(source)).thenReturn(tableMetadata());
