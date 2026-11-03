@@ -409,7 +409,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_compaction]
+              enum: [system_iceberg_compaction, SYSTEM_ICEBERG_COMPACTION]
             content:
               $ref: '#/components/schemas/IcebergCompactionContent'
 
@@ -453,7 +453,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_orphan_file_removal]
+              enum: [system_iceberg_orphan_file_removal, SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL]
             content:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
@@ -511,7 +511,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_rewrite_manifests]
+              enum: [system_iceberg_rewrite_manifests, SYSTEM_ICEBERG_REWRITE_MANIFESTS]
             content:
               $ref: '#/components/schemas/IcebergRewriteManifestsContent'
 
@@ -562,7 +562,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_snapshot_expiration]
+              enum: [system_iceberg_snapshot_expiration, SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION]
             content:
               $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
 
@@ -656,7 +656,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_row_filter]
+              enum: [system_row_filter, SYSTEM_ROW_FILTER]
             content:
               $ref: '#/components/schemas/RowFilterContent'
 
@@ -680,7 +680,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_column_mask]
+              enum: [system_column_mask, SYSTEM_COLUMN_MASK]
             content:
               $ref: '#/components/schemas/ColumnMaskContent'
 
@@ -704,7 +704,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_access_control]
+              enum: [system_access_control, SYSTEM_ACCESS_CONTROL]
             content:
               $ref: '#/components/schemas/AccessControlContent'
 
@@ -895,9 +895,11 @@ components:
         policyType:
           type: string
           description: >-
-            The type of the policy. Known values are matched case-insensitively; the server
-            stores and returns the canonical lowercase value. An unknown value is rejected with
-            HTTP 400 naming the type.
+            The type of the policy. The server matches known values case-insensitively and
+            stores/returns the canonical lowercase form. Request schemas list both the
+            lowercase and uppercase spellings so OpenAPI validation accepts either;
+            response schemas use only the canonical lowercase value. An unknown value is
+            rejected with HTTP 400 naming the type.
         enabled:
           type: boolean
           description: Whether the policy is enabled
@@ -914,7 +916,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask, system_access_control]
+                enum: [system_iceberg_compaction, SYSTEM_ICEBERG_COMPACTION, system_iceberg_orphan_file_removal, SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL, system_iceberg_rewrite_manifests, SYSTEM_ICEBERG_REWRITE_MANIFESTS, system_iceberg_snapshot_expiration, SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION, system_row_filter, SYSTEM_ROW_FILTER, system_column_mask, SYSTEM_COLUMN_MASK, system_access_control, SYSTEM_ACCESS_CONTROL]
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -934,13 +936,29 @@ components:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
+          CUSTOM: '#/components/schemas/CustomPolicyCreateRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+          SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
           system_iceberg_rewrite_manifests: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
+          SYSTEM_ICEBERG_REWRITE_MANIFESTS: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
           system_iceberg_snapshot_expiration: '#/components/schemas/IcebergSnapshotExpirationPolicyCreateRequest'
+          SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION: '#/components/schemas/IcebergSnapshotExpirationPolicyCreateRequest'
           system_iceberg_compaction: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+          SYSTEM_ICEBERG_COMPACTION: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
           system_row_filter: '#/components/schemas/RowFilterPolicyCreateRequest'
+          SYSTEM_ROW_FILTER: '#/components/schemas/RowFilterPolicyCreateRequest'
           system_column_mask: '#/components/schemas/ColumnMaskPolicyCreateRequest'
+          SYSTEM_COLUMN_MASK: '#/components/schemas/ColumnMaskPolicyCreateRequest'
           system_access_control: '#/components/schemas/AccessControlPolicyCreateRequest'
+          SYSTEM_ACCESS_CONTROL: '#/components/schemas/AccessControlPolicyCreateRequest'
+      example: {
+        "name": "compaction_upper",
+        "policyType": "SYSTEM_ICEBERG_COMPACTION",
+        "enabled": true,
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
 
 
     PolicyUpdatesRequest:
@@ -1021,9 +1039,11 @@ components:
         policyType:
           type: string
           description: >-
-            The type of the policy. Known values are matched case-insensitively; the server
-            stores the canonical lowercase value. An unknown value is rejected with HTTP 400
-            naming the type.
+            The type of the policy. The server matches known values case-insensitively and
+            stores the canonical lowercase form. Request schemas list both the lowercase
+            and uppercase spellings so OpenAPI validation accepts either; response schemas
+            use only the canonical lowercase value. An unknown value is rejected with HTTP
+            400 naming the type.
 
     UpdateCustomPolicyContentRequest:
       allOf:
@@ -1033,7 +1053,7 @@ components:
             policyType:
               type: string
               not:
-                enum: [system_iceberg_compaction, system_iceberg_orphan_file_removal, system_iceberg_rewrite_manifests, system_iceberg_snapshot_expiration, system_row_filter, system_column_mask, system_access_control]
+                enum: [system_iceberg_compaction, SYSTEM_ICEBERG_COMPACTION, system_iceberg_orphan_file_removal, SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL, system_iceberg_rewrite_manifests, SYSTEM_ICEBERG_REWRITE_MANIFESTS, system_iceberg_snapshot_expiration, SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION, system_row_filter, SYSTEM_ROW_FILTER, system_column_mask, SYSTEM_COLUMN_MASK, system_access_control, SYSTEM_ACCESS_CONTROL]
             newContent:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -1044,7 +1064,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_compaction]
+              enum: [system_iceberg_compaction, SYSTEM_ICEBERG_COMPACTION]
             newContent:
               $ref: '#/components/schemas/IcebergCompactionContent'
 
@@ -1055,7 +1075,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_orphan_file_removal]
+              enum: [system_iceberg_orphan_file_removal, SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL]
             newContent:
               $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
 
@@ -1066,7 +1086,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_rewrite_manifests]
+              enum: [system_iceberg_rewrite_manifests, SYSTEM_ICEBERG_REWRITE_MANIFESTS]
             newContent:
               $ref: '#/components/schemas/IcebergRewriteManifestsContent'
 
@@ -1077,7 +1097,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_iceberg_snapshot_expiration]
+              enum: [system_iceberg_snapshot_expiration, SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION]
             newContent:
               $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
 
@@ -1088,7 +1108,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_row_filter]
+              enum: [system_row_filter, SYSTEM_ROW_FILTER]
             newContent:
               $ref: '#/components/schemas/RowFilterContent'
 
@@ -1099,7 +1119,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_column_mask]
+              enum: [system_column_mask, SYSTEM_COLUMN_MASK]
             newContent:
               $ref: '#/components/schemas/ColumnMaskContent'
 
@@ -1110,7 +1130,7 @@ components:
           properties:
             policyType:
               type: string
-              enum: [system_access_control]
+              enum: [system_access_control, SYSTEM_ACCESS_CONTROL]
             newContent:
               $ref: '#/components/schemas/AccessControlContent'
 
@@ -1129,13 +1149,21 @@ components:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/UpdateCustomPolicyContentRequest'
+          CUSTOM: '#/components/schemas/UpdateCustomPolicyContentRequest'
           system_iceberg_compaction: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+          SYSTEM_ICEBERG_COMPACTION: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
           system_iceberg_orphan_file_removal: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+          SYSTEM_ICEBERG_ORPHAN_FILE_REMOVAL: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
           system_iceberg_rewrite_manifests: '#/components/schemas/UpdateIcebergRewriteManifestsPolicyContentRequest'
+          SYSTEM_ICEBERG_REWRITE_MANIFESTS: '#/components/schemas/UpdateIcebergRewriteManifestsPolicyContentRequest'
           system_iceberg_snapshot_expiration: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
+          SYSTEM_ICEBERG_SNAPSHOT_EXPIRATION: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
           system_row_filter: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+          SYSTEM_ROW_FILTER: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
           system_column_mask: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
+          SYSTEM_COLUMN_MASK: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
           system_access_control: '#/components/schemas/UpdateAccessControlPolicyContentRequest'
+          SYSTEM_ACCESS_CONTROL: '#/components/schemas/UpdateAccessControlPolicyContentRequest'
       example: {
         "@type": "updateContent",
         "policyType": "custom",
