@@ -192,6 +192,20 @@ public class TestExceptionHandlers {
   }
 
   @Test
+  void testUnsupportedSecretObjectTypeReturnsBadRequest() {
+    String reason = "Doesn't support secret property operations for metadata object type";
+    try (Response response =
+        ExceptionHandlers.handleSecretException(
+            OperationType.GET, "probe_tag", new IllegalArgumentException(reason))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("probe_tag"));
+      Assertions.assertTrue(error.getMessage().contains(reason));
+    }
+  }
+
+  @Test
   void testUnmodifiableOperationReturnsConflict() {
     UnmodifiableStatisticException exception =
         new UnmodifiableStatisticException("Statistic is unmodifiable");

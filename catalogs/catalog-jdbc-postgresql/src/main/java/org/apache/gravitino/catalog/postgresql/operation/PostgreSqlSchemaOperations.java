@@ -40,11 +40,15 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
+
+  private static final String DEPENDENT_OBJECTS_STILL_EXIST = "2BP01";
 
   private String database;
 
@@ -131,17 +135,63 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
    */
   private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getSchemas(connection.getCatalog(), schemaName);
+    String escape = metaData.getSearchStringEscape();
+    String pattern =
+        schemaName == null
+            ? null
+            : schemaName
+                .replace(escape, escape + escape)
+                .replace("%", escape + "%")
+                .replace("_", escape + "_");
+    return metaData.getSchemas(connection.getCatalog(), pattern);
   }
 
+  /**
+   * Generates an atomic, restrictive schema drop even when cascade is requested.
+   *
+   * <p>PostgreSQL cascade can remove objects outside this schema. Until schema-local cascade is
+   * supported safely, the generated statement refuses every non-empty schema.
+   *
+   * @param schema the schema to drop
+   * @param cascade whether cascade was requested; it does not enable PostgreSQL native cascade
+   * @return the restrictive drop statement
+   */
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
-    StringBuilder sqlBuilder =
-        new StringBuilder(String.format("DROP SCHEMA %s%s%s", PG_QUOTE, schema, PG_QUOTE));
-    if (cascade) {
-      sqlBuilder.append(" CASCADE");
+    // PostgreSQL CASCADE also removes objects outside the schema. A client-side dependency
+    // preflight cannot close the race with concurrent DDL, so always let PostgreSQL enforce
+    // RESTRICT atomically. Non-empty cascade requests are refused until a schema-local cascade
+    // can be guaranteed for every object kind and dependency type.
+    return "DROP SCHEMA " + quoteName(schema) + " RESTRICT";
+  }
+
+  /**
+   * Drops an empty schema without requiring explicit locks on its relations.
+   *
+   * @param schema the schema to drop
+   * @param cascade whether cascade was requested
+   * @throws NonEmptySchemaException if the schema is non-empty, including when cascade is requested
+   */
+  @Override
+  protected void dropDatabase(String schema, boolean cascade) {
+    try (Connection connection = getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(schema, cascade));
+    } catch (SQLException e) {
+      if (DEPENDENT_OBJECTS_STILL_EXIST.equals(e.getSQLState())) {
+        throw new NonEmptySchemaException(
+            e,
+            "Cannot drop non-empty PostgreSQL schema %s: a schema-local cascade cannot be "
+                + "guaranteed. Remove its objects explicitly, then retry dropping the empty schema. "
+                + "PostgreSQL reason: %s",
+            schema,
+            e.getMessage());
+      }
+      throw exceptionMapper.toGravitinoException(e);
     }
-    return sqlBuilder.toString();
+  }
+
+  private static String quoteName(String name) {
+    return "\"" + name.replace("\"", "\"\"") + "\"";
   }
 
   @Override
@@ -154,7 +204,8 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   protected String generateDatabaseExistSql(String databaseName) {
     return String.format(
-        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'", databaseName);
+        "SELECT n.datname FROM pg_catalog.pg_database n where n.datname='%s'",
+        databaseName.replace("'", "''"));
   }
 
   @Override
@@ -178,17 +229,16 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return false;
   }
 
-  private String getShowSchemaCommentSql(String schema) {
-    return String.format(
-        "SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
-            + "FROM pg_catalog.pg_namespace n\n"
-            + "WHERE n.nspname = '%s';\n",
-        schema);
+  private String getShowSchemaCommentSql() {
+    return ("SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
+        + "FROM pg_catalog.pg_namespace n\n"
+        + "WHERE n.nspname = ?;\n");
   }
 
   private String getSchemaComment(String schema, Connection connection) throws SQLException {
     try (PreparedStatement preparedStatement =
-        connection.prepareStatement(getShowSchemaCommentSql(schema))) {
+        connection.prepareStatement(getShowSchemaCommentSql())) {
+      preparedStatement.setString(1, schema);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (resultSet.next()) {
           return resultSet.getString("comment");
