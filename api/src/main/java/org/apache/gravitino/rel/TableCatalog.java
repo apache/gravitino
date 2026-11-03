@@ -104,7 +104,7 @@ public interface TableCatalog {
    * after creation.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -133,7 +133,7 @@ public interface TableCatalog {
    * Create a table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -161,7 +161,7 @@ public interface TableCatalog {
    * Create a table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -191,7 +191,7 @@ public interface TableCatalog {
    * Create a table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -219,7 +219,7 @@ public interface TableCatalog {
    * Create a table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -247,7 +247,7 @@ public interface TableCatalog {
    * Create a partitioned table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -286,7 +286,7 @@ public interface TableCatalog {
    * Create a table in the catalog.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *

@@ -126,3 +126,7 @@ healthy connects. Cancellation is best effort: an uninterruptible driver or clos
 a worker and its driver resources until it returns or the server restarts. Completed workers
 restore their context class loader. The adapter does not bound arbitrary driver constructor
 work or clean up driver-owned global threads.
+
+Each attempt and its late connection cleanup use the submitting caller's access-control
+context and JAAS subject. Shared workers are created without inheriting the first caller's
+subject, so reusing a worker does not reuse that caller's authentication context.

@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.utils;
 
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.ProtectionDomain;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverPropertyInfo;
@@ -48,15 +52,21 @@ import org.slf4j.LoggerFactory;
  * never handed to a pool. Cancellation is best effort: a driver ignoring interruption retains a
  * worker until it returns. A JVM-wide limit of 64 workers, with no queue, bounds that retention;
  * excess attempts fail with {@link SQLTransientConnectionException}. Workers are daemon threads and
- * release their catalog context class loader after each attempt.
+ * release their catalog context class loader after each attempt. Each attempt, including late
+ * connection cleanup, runs with the submitting caller's access-control context and JAAS subject;
+ * shared workers do not inherit the identity of the request that creates them.
  *
  * <p>After a timeout, further attempts through this instance fail immediately until the abandoned
  * attempt finishes cleanup. This prevents a lazy pool's initialization lock from serializing a
  * backlog of new attempts against the same unreachable backend. Normal pool waits and SQL execution
  * have their own budgets and are not bounded by this adapter.
  */
+@SuppressWarnings("removal") // JDK 17 associates JAAS subjects with access-control contexts.
 public final class BoundedConnectionDriver implements Driver {
   private static final Logger LOG = LoggerFactory.getLogger(BoundedConnectionDriver.class);
+
+  private static final AccessControlContext WORKER_CONTEXT =
+      new AccessControlContext(new ProtectionDomain[0]);
 
   private static final ExecutorService WORKERS =
       new ThreadPoolExecutor(
@@ -65,12 +75,17 @@ public final class BoundedConnectionDriver implements Driver {
           60,
           TimeUnit.SECONDS,
           new SynchronousQueue<>(),
-          task -> {
-            Thread thread = new Thread(task, "jdbc-connect-timeout");
-            thread.setDaemon(true);
-            thread.setContextClassLoader(BoundedConnectionDriver.class.getClassLoader());
-            return thread;
-          });
+          task ->
+              AccessController.doPrivileged(
+                  (PrivilegedAction<Thread>)
+                      () -> {
+                        Thread thread = new Thread(task, "jdbc-connect-timeout");
+                        thread.setDaemon(true);
+                        thread.setContextClassLoader(
+                            BoundedConnectionDriver.class.getClassLoader());
+                        return thread;
+                      },
+                  WORKER_CONTEXT));
 
   private final Driver delegate;
   private final long timeoutMs;
@@ -113,9 +128,18 @@ public final class BoundedConnectionDriver implements Driver {
     }
     Attempt attempt = new Attempt();
     ClassLoader context = Thread.currentThread().getContextClassLoader();
+    AccessControlContext callerContext = AccessController.getContext();
     Properties properties = (Properties) info.clone();
     try {
-      workers.execute(() -> attempt.run(url, properties, context));
+      workers.execute(
+          () ->
+              AccessController.doPrivileged(
+                  (PrivilegedAction<Void>)
+                      () -> {
+                        attempt.run(url, properties, context);
+                        return null;
+                      },
+                  callerContext));
     } catch (RejectedExecutionException e) {
       throw new SQLTransientConnectionException(
           "The JDBC connection attempt limit has been reached. Try again after an attempt finishes.",

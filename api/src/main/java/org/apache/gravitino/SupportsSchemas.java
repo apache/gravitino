@@ -101,7 +101,7 @@ public interface SupportsSchemas {
    * <p>Delegates to {@link #createSchema(String, String, Map, Map, Map)} with empty secret maps.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *
@@ -125,7 +125,7 @@ public interface SupportsSchemas {
    * must override this method.
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
-   * particular, catalog creation can succeed before Gravitino registration fails. Resolve the
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
    * reported error and verify catalog state before retrying; creation is not automatically
    * replayed.
    *

@@ -40,6 +40,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.security.AccessController;
+import java.security.PrivilegedExceptionAction;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.SQLException;
@@ -56,6 +58,8 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.security.auth.Subject;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -98,6 +102,130 @@ class TestBoundedConnectionDriver {
     assertSame(
         workerLoader, workers.submit(() -> Thread.currentThread().getContextClassLoader()).get());
     verify(connection, never()).close();
+  }
+
+  @Test
+  @SuppressWarnings("removal")
+  void testConnectPreservesCallerSubjectOnExistingWorker() throws Exception {
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    Driver driver = mock(Driver.class);
+    Connection connection = mock(Connection.class);
+    AtomicReference<Subject> observed = new AtomicReference<>();
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              observed.set(Subject.getSubject(AccessController.getContext()));
+              return connection;
+            });
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 5000, workers);
+    Subject subject = new Subject();
+
+    assertSame(
+        connection,
+        Subject.doAs(
+            subject,
+            (PrivilegedExceptionAction<Connection>)
+                () -> bounded.connect("jdbc:test", new Properties())));
+    assertSame(subject, observed.get());
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertNull(workers.submit(() -> Subject.getSubject(AccessController.getContext())).get());
+  }
+
+  @Test
+  @SuppressWarnings("removal")
+  void testReusedWorkerDoesNotAuthenticateAsPreviousCaller() throws Exception {
+    Driver driver = mock(Driver.class);
+    AtomicReference<Subject> observed = new AtomicReference<>();
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              observed.set(Subject.getSubject(AccessController.getContext()));
+              return null;
+            });
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 5000, workers);
+    Subject first = new Subject();
+    Subject second = new Subject();
+    Subject.doAs(
+        first,
+        (PrivilegedExceptionAction<Connection>)
+            () -> bounded.connect("jdbc:test", new Properties()));
+    assertSame(first, observed.get());
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    Subject.doAs(
+        second,
+        (PrivilegedExceptionAction<Connection>)
+            () -> bounded.connect("jdbc:test", new Properties()));
+    assertSame(second, observed.get());
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    bounded.connect("jdbc:test", new Properties());
+    assertNull(observed.get());
+  }
+
+  @Test
+  @SuppressWarnings("removal")
+  void testSharedWorkerDoesNotInheritCreatingCallerSubject() throws Exception {
+    ThreadPoolExecutor pool =
+        (ThreadPoolExecutor)
+            FieldUtils.readStaticField(BoundedConnectionDriver.class, "WORKERS", true);
+    AtomicReference<Subject> observed = new AtomicReference<>();
+    Subject subject = new Subject();
+    Thread worker =
+        Subject.doAs(
+            subject,
+            (PrivilegedExceptionAction<Thread>)
+                () ->
+                    pool.getThreadFactory()
+                        .newThread(
+                            () -> observed.set(Subject.getSubject(AccessController.getContext()))));
+    worker.start();
+    worker.join(10000);
+    assertFalse(worker.isAlive());
+    assertNull(observed.get());
+  }
+
+  @Test
+  @SuppressWarnings("removal")
+  void testLateClosePreservesSubmittingSubject() throws Exception {
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicReference<Subject> observed = new AtomicReference<>();
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              entered.countDown();
+              awaitIgnoringInterrupts(release);
+              return late;
+            });
+    doAnswer(
+            invocation -> {
+              observed.set(Subject.getSubject(AccessController.getContext()));
+              return null;
+            })
+        .when(late)
+        .close();
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers);
+    Subject subject = new Subject();
+    try {
+      Subject.doAs(
+          subject,
+          (PrivilegedExceptionAction<Void>)
+              () -> {
+                assertThrows(
+                    SQLTimeoutException.class,
+                    () -> bounded.connect("jdbc:test", new Properties()));
+                return null;
+              });
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    verify(late).close();
+    assertSame(subject, observed.get());
+    assertNull(workers.submit(() -> Subject.getSubject(AccessController.getContext())).get());
   }
 
   @Test
