@@ -17,19 +17,26 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
-from dataclasses_json import config, dataclass_json
+from dataclasses_json import config
 
 from gravitino.dto.policy_dto import PolicyContentDTO
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.utils.precondition import Precondition
 
 
-@dataclass_json
 @dataclass
 class PolicyCreateRequest(RESTRequest):
-    """Represents a request to create a policy."""
+    """Represents a request to create a policy.
+
+    Deserialization is implemented explicitly (rather than through
+    dataclasses_json) because the concrete type of the ``content`` field is
+    selected by the sibling ``policyType`` field, which dataclasses_json
+    cannot dispatch on. Serialization still goes through the inherited
+    dataclasses_json machinery.
+    """
 
     _name: str = field(metadata=config(field_name="name"))
     _policy_type: str = field(metadata=config(field_name="policyType"))
@@ -57,6 +64,45 @@ class PolicyCreateRequest(RESTRequest):
             self._content is not None, '"content" must not be null'
         )
         self._content.validate()
+
+    @classmethod
+    def from_dict(
+        cls, kvs: dict, *, infer_missing: bool = False
+    ) -> PolicyCreateRequest:
+        """Deserializes a policy create request, dispatching the content on
+        the sibling ``policyType`` field, as PolicyDTO.from_dict does.
+
+        Args:
+            kvs: The serialized request.
+            infer_missing: Accepted for compatibility with the
+                dataclasses_json API; content deserialization always
+                infers missing fields, mirroring PolicyContentDTO.
+
+        Returns:
+            PolicyCreateRequest: The deserialized request.
+        """
+        content_data = kvs.get("content")
+        return cls(
+            _name=kvs.get("name"),
+            _policy_type=kvs.get("policyType"),
+            _comment=kvs.get("comment"),
+            _enabled=kvs.get("enabled", True),
+            _content=(
+                PolicyContentDTO.from_dict_by_type(content_data, kvs.get("policyType"))
+                if content_data is not None
+                else None
+            ),
+        )
+
+    @classmethod
+    def from_json(
+        cls, s: str, *, infer_missing: bool = False, **kwargs
+    ) -> PolicyCreateRequest:
+        """Deserializes a policy create request from a JSON string.
+
+        Extra keyword arguments are passed through to json.loads.
+        """
+        return cls.from_dict(json.loads(s, **kwargs), infer_missing=infer_missing)
 
     @property
     def name(self) -> str:

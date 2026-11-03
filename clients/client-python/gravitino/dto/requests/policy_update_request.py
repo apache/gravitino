@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
@@ -91,10 +92,16 @@ class PolicyUpdateRequest:
         def policy_change(self) -> PolicyChange.UpdatePolicyComment:
             return PolicyChange.UpdatePolicyComment(self._new_comment)
 
-    @dataclass_json
     @dataclass
     class UpdatePolicyContentRequest(PolicyUpdateRequestBase):
-        """The policy update request for updating a policy's content."""
+        """The policy update request for updating a policy's content.
+
+        Deserialization is implemented explicitly (rather than through
+        dataclasses_json) because the concrete type of the ``newContent``
+        field is selected by the sibling ``policyType`` field, which
+        dataclasses_json cannot dispatch on. Serialization still goes
+        through the inherited dataclasses_json machinery.
+        """
 
         _policy_type: str = field(metadata=config(field_name="policyType"))
         _new_content: PolicyContentDTO = field(
@@ -131,6 +138,45 @@ class PolicyUpdateRequest:
         @property
         def new_content(self) -> PolicyContentDTO:
             return self._new_content
+
+        @classmethod
+        def from_dict(
+            cls, kvs: dict, *, infer_missing: bool = False
+        ) -> PolicyUpdateRequest.UpdatePolicyContentRequest:
+            """Deserializes an update-content request, dispatching the new
+            content on the sibling ``policyType`` field, as
+            PolicyDTO.from_dict does for a policy's content.
+
+            Args:
+                kvs: The serialized request.
+                infer_missing: Accepted for compatibility with the
+                    dataclasses_json API; content deserialization always
+                    infers missing fields, mirroring PolicyContentDTO.
+
+            Returns:
+                UpdatePolicyContentRequest: The deserialized request.
+            """
+            content_data = kvs.get("newContent")
+            return cls(
+                _policy_type=kvs.get("policyType"),
+                _new_content=(
+                    PolicyContentDTO.from_dict_by_type(
+                        content_data, kvs.get("policyType")
+                    )
+                    if content_data is not None
+                    else None
+                ),
+            )
+
+        @classmethod
+        def from_json(
+            cls, s: str, *, infer_missing: bool = False, **kwargs
+        ) -> PolicyUpdateRequest.UpdatePolicyContentRequest:
+            """Deserializes an update-content request from a JSON string.
+
+            Extra keyword arguments are passed through to json.loads.
+            """
+            return cls.from_dict(json.loads(s, **kwargs), infer_missing=infer_missing)
 
         def policy_change(self) -> PolicyChange.UpdateContent:
             return PolicyChange.UpdateContent(

@@ -20,7 +20,15 @@ import unittest
 
 from gravitino.api.policy.policy_contents import PolicyContents
 from gravitino.dto.policy_dto import (
+    AccessControlContentDTO,
+    ColumnMaskContentDTO,
+    CustomContentDTO,
+    IcebergCompactionContentDTO,
+    IcebergOrphanFileRemovalContentDTO,
+    IcebergRewriteManifestsContentDTO,
+    IcebergSnapshotExpirationContentDTO,
     PolicyAssociationSelectorDTO,
+    PolicyContentDTO,
     RowFilterContentDTO,
 )
 from gravitino.dto.requests.policy_create_request import PolicyCreateRequest
@@ -33,6 +41,42 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 def _row_filter_content() -> RowFilterContentDTO:
     return RowFilterContentDTO.from_dict({"expression": "age > 18"}, infer_missing=True)
+
+
+_CONTENT_ROUND_TRIP_CASES = [
+    (
+        "custom",
+        {
+            "customRules": {"rule1": 456},
+            "supportedObjectTypes": ["CATALOG", "TABLE"],
+            "properties": {"k": "v"},
+        },
+        CustomContentDTO,
+    ),
+    ("system_iceberg_compaction", {"minDataFileMse": 7}, IcebergCompactionContentDTO),
+    (
+        "system_iceberg_orphan_file_removal",
+        {"olderThanDays": 10, "location": "s3://b/t", "dryRun": True},
+        IcebergOrphanFileRemovalContentDTO,
+    ),
+    (
+        "system_iceberg_rewrite_manifests",
+        {"manifest_count_critical": 900},
+        IcebergRewriteManifestsContentDTO,
+    ),
+    (
+        "system_iceberg_snapshot_expiration",
+        {"olderThanDays": 9},
+        IcebergSnapshotExpirationContentDTO,
+    ),
+    ("system_row_filter", {"expression": "age > 18"}, RowFilterContentDTO),
+    ("system_column_mask", {"expression": "mask(x)"}, ColumnMaskContentDTO),
+    (
+        "system_access_control",
+        {"privileges": ["select_table"], "applicableRoles": ["analyst"]},
+        AccessControlContentDTO,
+    ),
+]
 
 
 class TestPolicyCreateRequest(unittest.TestCase):
@@ -85,6 +129,24 @@ class TestPolicyCreateRequest(unittest.TestCase):
                 ),
             ).validate()
 
+    def test_json_round_trip_decodes_content_by_policy_type(self) -> None:
+        for policy_type, payload, content_type in _CONTENT_ROUND_TRIP_CASES:
+            with self.subTest(policy_type=policy_type):
+                content = PolicyContentDTO.from_dict_by_type(dict(payload), policy_type)
+                request = PolicyCreateRequest(
+                    _name="policy1",
+                    _policy_type=policy_type,
+                    _comment="a comment",
+                    _enabled=False,
+                    _content=content,
+                )
+                decoded = PolicyCreateRequest.from_json(request.to_json())
+                self.assertIsInstance(decoded.content, content_type)
+                decoded.validate()
+                self.assertEqual(
+                    json.loads(request.to_json()), json.loads(decoded.to_json())
+                )
+
 
 class TestPolicyUpdateRequest(unittest.TestCase):
     def test_rename_request(self) -> None:
@@ -125,6 +187,25 @@ class TestPolicyUpdateRequest(unittest.TestCase):
             PolicyUpdateRequest.UpdatePolicyContentRequest(
                 "system_row_filter", None
             ).validate()
+
+    def test_update_content_json_round_trip_decodes_content(self) -> None:
+        for policy_type, payload, content_type in _CONTENT_ROUND_TRIP_CASES:
+            with self.subTest(policy_type=policy_type):
+                content = PolicyContentDTO.from_dict_by_type(dict(payload), policy_type)
+                request = PolicyUpdateRequest.UpdatePolicyContentRequest(
+                    policy_type, content
+                )
+                decoded = PolicyUpdateRequest.UpdatePolicyContentRequest.from_json(
+                    request.to_json()
+                )
+                self.assertIsInstance(decoded.new_content, content_type)
+                decoded.validate()
+                self.assertEqual(
+                    json.loads(request.to_json()), json.loads(decoded.to_json())
+                )
+                change = decoded.policy_change()
+                self.assertEqual(policy_type, change.policy_type)
+                self.assertEqual(content.to_domain_content(), change.content)
 
 
 class TestPolicyUpdatesRequest(unittest.TestCase):
