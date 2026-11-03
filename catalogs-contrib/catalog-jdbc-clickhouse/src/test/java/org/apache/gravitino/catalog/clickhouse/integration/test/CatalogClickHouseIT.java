@@ -628,13 +628,13 @@ public class CatalogClickHouseIT extends BaseIT {
 
   @Test
   void testLoadTableWithNestedTypeConversion() {
-    // A nested pure type conversion over a DateTime column (toDate is lossless for the month
-    // granularity) is unwrapped to a structured transform.
+    // A nested pure type conversion over a Date column (toDate is identity for Date) is unwrapped
+    // to a structured transform.
     String name = GravitinoITUtils.genRandomName("nested_type_conversion");
     clickhouseService.executeQuery(
         String.format(
             "CREATE TABLE `%s`.`%s` (\n"
-                + "  `event_time` DateTime,\n"
+                + "  `event_time` Date,\n"
                 + "  `v` UInt32\n"
                 + ")\n"
                 + "ENGINE = MergeTree\n"

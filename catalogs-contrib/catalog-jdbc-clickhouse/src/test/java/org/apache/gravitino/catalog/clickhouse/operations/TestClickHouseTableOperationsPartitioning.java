@@ -179,6 +179,12 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(
         0, operations.parsePartitioning("toYear(toDateTime(ts))", dateForDateTimeColumns).length);
 
+    // toDate over DateTime is not unwrapped because the effective timezone can shift the epoch
+    // boundary (e.g. timestamp 0 is 1970 in UTC but 1969 in America/Los_Angeles).
+    Map<String, String> dateTimeForDateColumns = Map.of("ts", "DateTime");
+    Assertions.assertEquals(
+        0, operations.parsePartitioning("toYear(toDate(ts))", dateTimeForDateColumns).length);
+
     Map<String, String> dateColumns = Map.of("statis_ymd", "Date");
     // An arithmetic offset changes the semantics, so it must not be unwrapped.
     Assertions.assertEquals(

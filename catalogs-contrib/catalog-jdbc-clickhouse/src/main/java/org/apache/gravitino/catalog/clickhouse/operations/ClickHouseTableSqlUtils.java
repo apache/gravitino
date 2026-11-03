@@ -606,11 +606,12 @@ final class ClickHouseTableSqlUtils {
 
   /**
    * Unwraps a single pure type conversion (toDate/toDateTime) only when the conversion is lossless
-   * for the partition granularity. The conversion direction is checked against the source column
-   * type: toDate is lossless for Date (identity) and DateTime (drops the time-of-day, the date part
-   * is unchanged); toDateTime is lossless only for DateTime. Other combinations, such as toDateTime
-   * over Date or DateTime64, are narrowing conversions that can overflow, so they are not
-   * unwrapped. Arithmetic, casts, and nested functions are not unwrapped either.
+   * for the partition granularity. Only same-type conversions are unwrapped: toDate is unwrapped
+   * only for a Date column (identity), and toDateTime only for a DateTime column (identity). toDate
+   * over DateTime is not unwrapped because the effective timezone can shift the epoch boundary
+   * (e.g. Unix timestamp 0 is 1970 in UTC but 1969 in America/Los_Angeles). Other combinations are
+   * narrowing conversions that can overflow, so they are not unwrapped. Arithmetic, casts, and
+   * nested functions are not unwrapped either.
    */
   @Nullable
   private static String unwrapPureConversion(
@@ -627,12 +628,11 @@ final class ClickHouseTableSqlUtils {
     String typeName = columnTypeNames.get(inner);
     boolean lossless;
     if ("toDate".equalsIgnoreCase(matcher.group(1))) {
-      // toDate is lossless for Date (identity) and DateTime (drops time-of-day, date part
-      // unchanged).
-      lossless = "Date".equalsIgnoreCase(typeName) || "DateTime".equalsIgnoreCase(typeName);
+      // toDate is lossless only for Date (identity).
+      lossless = "Date".equalsIgnoreCase(typeName);
     } else {
-      // toDateTime is lossless only for DateTime; Date -> DateTime is narrowing because the Date
-      // range (up to 2149) exceeds the DateTime range (up to 2106).
+      // toDateTime is lossless only for DateTime (identity); Date -> DateTime is narrowing because
+      // the Date range (up to 2149) exceeds the DateTime range (up to 2106).
       lossless = "DateTime".equalsIgnoreCase(typeName);
     }
     return lossless ? inner : null;
