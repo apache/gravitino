@@ -81,6 +81,10 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
@@ -108,6 +112,10 @@ public class IdpUserOperations {
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
@@ -139,6 +147,49 @@ public class IdpUserOperations {
         user);
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Updates a user's enabled flag. Only service admins may call this API, and the target must not
+   * be a configured service admin.
+   *
+   * @param user the username whose enabled flag is updated
+   * @param request the enabled-flag update request
+   * @return the updated user response
+   */
+  @PUT
+  @Path("{user}/enabled")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "update-idp-user-enabled." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-idp-user-enabled", absolute = true)
+  public Response updateEnabled(@PathParam("user") String user, UpdateUserEnabledRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
+    return IdpRESTUtils.doAs(
+        httpRequest,
+        () -> {
+          request.validate();
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          List<String> serviceAdmins =
+              GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+          if (!IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+            throw new ForbiddenException("Only service admins can update the enabled flag");
+          }
+          Preconditions.checkArgument(
+              !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
+              "Cannot update the enabled flag of service admin %s",
+              user);
+          userGroupManager.updateEnabled(user, request.getEnabled());
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+        },
+        "user",
+        IdpOperationType.UPDATE,
+        user);
+  }
+
+>>>>>>> 58ef9fd6f ([#14571][#14579] docs/fix(idp): Document 401/406; reject null IdP bodies (#14572))
   @DELETE
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
