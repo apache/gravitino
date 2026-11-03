@@ -106,6 +106,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             rawNamespace =
                 RESTUtil.decodeNamespace(
                     value, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+            IcebergRESTUtils.checkNamespaceLevels(rawNamespace);
             schema = String.join(separator, rawNamespace.levels());
             nameIdentifierMap.put(
                 Entity.EntityType.SCHEMA,

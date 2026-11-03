@@ -119,6 +119,23 @@ public class IcebergRESTUtils {
   private IcebergRESTUtils() {}
 
   /**
+   * Checks that namespace levels can be represented in Gravitino metadata object names.
+   *
+   * @param namespace the decoded namespace to check
+   * @throws BadRequestException if a level contains the reserved qualified-name separator
+   */
+  public static void checkNamespaceLevels(Namespace namespace) {
+    for (String level : namespace.levels()) {
+      if (level.contains(".")) {
+        throw new BadRequestException(
+            "Invalid namespace %s: the level '%s' contains '.', which is reserved as the"
+                + " qualified-name separator",
+            namespace, level);
+      }
+    }
+  }
+
+  /**
    * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
    * scan-plan, or credentials API responses.
    *
