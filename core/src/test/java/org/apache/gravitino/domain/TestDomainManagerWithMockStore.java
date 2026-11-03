@@ -25,7 +25,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -38,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
@@ -274,6 +277,52 @@ public class TestDomainManagerWithMockStore {
     Assertions.assertTrue(e.getMessage().contains("Domain Trading"), e.getMessage());
     assertIOExceptionWrapped(
         () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.updateComment("c")));
+  }
+
+  @Test
+  public void testAlterDomainWithNullProperties() throws IOException {
+    DomainEntity stored =
+        domain("Finance", null, Domain.Status.DRAFT).toBuilder().withProperties(null).build();
+    Mockito.when(entityStore.update(eq(FINANCE), eq(DomainEntity.class), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Function<DomainEntity, DomainEntity> updater = invocation.getArgument(3);
+              return updater.apply(stored);
+            });
+
+    DomainEntity updated =
+        domainManager.alterDomain(METALAKE, "Finance", DomainChange.updateComment("new comment"));
+    Assertions.assertEquals("new comment", updated.comment());
+    Assertions.assertTrue(updated.properties().isEmpty());
+    Assertions.assertEquals(
+        Map.of("key", "value"),
+        domainManager
+            .alterDomain(METALAKE, "Finance", DomainChange.setProperty("key", "value"))
+            .properties());
+    Assertions.assertTrue(
+        domainManager
+            .alterDomain(METALAKE, "Finance", DomainChange.removeProperty("key"))
+            .properties()
+            .isEmpty());
+    Assertions.assertNull(stored.properties());
+  }
+
+  @Test
+  public void testAlterAndDeletePropagateOptimisticLockException() throws IOException {
+    OptimisticLockException conflict = new OptimisticLockException("Concurrent operation");
+    Mockito.when(entityStore.update(eq(FINANCE), eq(DomainEntity.class), any(), any()))
+        .thenThrow(conflict);
+    Mockito.when(entityStore.delete(FINANCE, Entity.EntityType.DOMAIN)).thenThrow(conflict);
+
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.updateComment("c"))));
+    Assertions.assertSame(
+        conflict,
+        Assertions.assertThrows(
+            OptimisticLockException.class, () -> domainManager.deleteDomain(METALAKE, "Finance")));
   }
 
   @Test

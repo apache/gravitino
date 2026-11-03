@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.storage.IdGenerator;
@@ -152,6 +153,13 @@ public class DomainManager implements DomainDispatcher {
               DomainChange.RenameDomain::getNewName);
       throw new DomainAlreadyExistsException(
           e, "Domain %s under metalake %s already exists", newName, metalake);
+    } catch (OptimisticLockException ole) {
+      LOG.warn(
+          "Failed to alter domain {} under metalake {} because of a concurrent operation",
+          name,
+          metalake,
+          ole);
+      throw ole;
     } catch (IOException ioe) {
       LOG.error("Failed to alter domain {} under metalake {}", name, metalake, ioe);
       throw new RuntimeException(ioe);
@@ -169,6 +177,13 @@ public class DomainManager implements DomainDispatcher {
     } catch (NonEmptyEntityException e) {
       throw new NonEmptyDomainException(
           e, "Domain %s under metalake %s has sub-domains, remove them first", name, metalake);
+    } catch (OptimisticLockException ole) {
+      LOG.warn(
+          "Failed to delete domain {} under metalake {} because of a concurrent operation",
+          name,
+          metalake,
+          ole);
+      throw ole;
     } catch (IOException ioe) {
       LOG.error("Failed to delete domain {} under metalake {}", name, metalake, ioe);
       throw new RuntimeException(ioe);
@@ -428,7 +443,8 @@ public class DomainManager implements DomainDispatcher {
   private static DomainEntity applyChanges(DomainEntity domain, DomainChange... changes) {
     String newName = domain.name();
     String newComment = domain.comment();
-    Map<String, String> newProperties = new HashMap<>(domain.properties());
+    Map<String, String> newProperties =
+        domain.properties() == null ? new HashMap<>() : new HashMap<>(domain.properties());
 
     for (DomainChange change : changes) {
       if (change instanceof DomainChange.RenameDomain) {
