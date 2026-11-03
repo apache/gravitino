@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -37,14 +38,18 @@ import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -60,6 +65,288 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"quoted\";CREATE TABLE injected_marker (id int);--"})
+  void testQuotedTableNamesStayIdentifiersDuringAlter(String name) {
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        name,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+        },
+        "comment",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, name, TableChange.renameColumn(new String[] {"id"}, "id\"quoted"));
+      Assertions.assertEquals(
+          "id\"quoted", TABLE_OPERATIONS.load(TEST_DB_NAME, name).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, name, TableChange.updateComment("updated"));
+      Assertions.assertEquals("updated", TABLE_OPERATIONS.load(TEST_DB_NAME, name).comment());
+      Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("injected_marker"));
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
+  @Test
+  void testIndexNameConflictDoesNotReportExistingTable() throws SQLException {
+    String table = RandomNameUtils.genRandomName("index_conflict");
+    String index = RandomNameUtils.genRandomName("index_name");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE TABLE " + TEST_DB_NAME + "." + table + "(id int, other int)");
+      try {
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.addIndex(IndexType.UNIQUE_KEY, index, new String[][] {{"id"}}));
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    TABLE_OPERATIONS.alterTable(
+                        TEST_DB_NAME,
+                        table,
+                        TableChange.addIndex(
+                            IndexType.UNIQUE_KEY, index, new String[][] {{"other"}})));
+        Assertions.assertTrue(error.getMessage().contains(index));
+        Assertions.assertTrue(error.getMessage().contains("index or constraint"));
+        Assertions.assertTrue(error.getCause() instanceof TableAlreadyExistsException);
+        Assertions.assertEquals(1, TABLE_OPERATIONS.load(TEST_DB_NAME, table).index().length);
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      }
+    }
+  }
+
+  @Test
+  void testUnnamedUniqueIndexesDoNotCollideAcrossTables() {
+    String first = "quoted\"" + RandomNameUtils.genRandomName("unnamed_first");
+    String second = RandomNameUtils.genRandomName("unnamed_second");
+    for (String name : new String[] {first, second}) {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          name,
+          new JdbcColumn[] {
+            JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+          },
+          null,
+          Map.of(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+    }
+    try {
+      for (String name : new String[] {first, second}) {
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            name,
+            TableChange.addIndex(IndexType.UNIQUE_KEY, null, new String[][] {{"id"}}));
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(1, table.index().length);
+        Assertions.assertNotEquals("null", table.index()[0].name());
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, first);
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, second);
+    }
+  }
+
+  @Test
+  void testListTablesEscapesSchemaPattern() throws SQLException {
+    String schema = "list\\schema_%";
+    String neighbor = "listXschema_neighbor";
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA \"" + schema + "\"");
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + neighbor);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE \"" + schema + "\".actual_table(id int)");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + neighbor + ".wrong_table(id int)");
+        Assertions.assertEquals(List.of("actual_table"), TABLE_OPERATIONS.listTables(schema));
+      } finally {
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA \"" + schema + "\" CASCADE");
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA " + neighbor + " CASCADE");
+      }
+    }
+  }
+
+  @Test
+  void testBackslashTableNameLoadsAndAlters() {
+    String name = "back\\slash_%";
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        name,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+        },
+        "comment",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      Assertions.assertEquals("id", TABLE_OPERATIONS.load(TEST_DB_NAME, name).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(TEST_DB_NAME, name, TableChange.updateComment("updated"));
+      Assertions.assertEquals("updated", TABLE_OPERATIONS.load(TEST_DB_NAME, name).comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+    }
+  }
+
+  @Test
+  void testLeastPrivilegeCreateDistinguishesMissingSchemaFromForbidden() throws SQLException {
+    String role = RandomNameUtils.genRandomName("limited_role");
+    String schema = RandomNameUtils.genRandomName("restricted_schema");
+    String table = RandomNameUtils.genRandomName("permission_table");
+    try (Connection admin = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          admin, "CREATE ROLE " + role + " LOGIN PASSWORD 'test-only-password'");
+      JdbcConnectorUtils.executeUpdate(admin, "CREATE SCHEMA " + schema);
+      try {
+        JdbcConnectorUtils.executeUpdate(admin, "REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
+        Map<String, String> properties = new HashMap<>();
+        properties.put("jdbc-driver", CONTAINER.getDriverClassName());
+        properties.put("jdbc-url", CONTAINER.getJdbcUrl());
+        properties.put("jdbc-database", admin.getCatalog());
+        properties.put("jdbc-user", role);
+        properties.put("jdbc-password", "test-only-password");
+        properties.put("jdbc.pool.max-size", "1");
+        properties.put("jdbc.pool.min-size", "1");
+        try (BasicDataSource limitedSource =
+            (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+          PostgreSqlTableOperations limited = new PostgreSqlTableOperations();
+          limited.initialize(
+              limitedSource,
+              JDBC_EXCEPTION_CONVERTER,
+              new PostgreSqlTypeConverter(),
+              new PostgreSqlColumnDefaultValueConverter(),
+              properties);
+          JdbcColumn[] columns = {
+            JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+          };
+          Assertions.assertThrows(
+              ForbiddenException.class,
+              () ->
+                  limited.create(
+                      schema,
+                      table,
+                      columns,
+                      null,
+                      Map.of(),
+                      null,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+          JdbcConnectorUtils.executeUpdate(
+              admin, "GRANT USAGE ON SCHEMA " + schema + " TO " + role);
+          Assertions.assertThrows(
+              ForbiddenException.class,
+              () ->
+                  limited.create(
+                      schema,
+                      table,
+                      columns,
+                      null,
+                      Map.of(),
+                      null,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+          JdbcConnectorUtils.executeUpdate(
+              admin, "GRANT CREATE ON SCHEMA " + schema + " TO " + role);
+          Assertions.assertDoesNotThrow(
+              () ->
+                  limited.create(
+                      schema,
+                      table,
+                      columns,
+                      null,
+                      Map.of(),
+                      null,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+          Assertions.assertEquals(table, TABLE_OPERATIONS.load(schema, table).name());
+          String absent = RandomNameUtils.genRandomName("missing_schema");
+          Assertions.assertThrows(
+              NoSuchSchemaException.class,
+              () ->
+                  limited.create(
+                      absent,
+                      table,
+                      columns,
+                      null,
+                      Map.of(),
+                      null,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+        }
+      } finally {
+        JdbcConnectorUtils.executeUpdate(admin, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(admin, "DROP ROLE IF EXISTS " + role);
+      }
+    }
+  }
+
+  @Test
+  void testNulValidationPreventsCreateAndPartialAlterDdl() {
+    String table = RandomNameUtils.genRandomName("nul_validation");
+    String invalidTable = RandomNameUtils.genRandomName("nul_create");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("col1").withType(VARCHAR).withNullable(true).build()
+    };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.create(
+                TEST_DB_NAME,
+                invalidTable,
+                columns,
+                "bad\0comment",
+                Map.of(),
+                null,
+                Distributions.NONE,
+                Indexes.EMPTY_INDEXES));
+    Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains(invalidTable));
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        columns,
+        "original",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TABLE_OPERATIONS.alterTable(
+                  TEST_DB_NAME,
+                  table,
+                  TableChange.addColumn(new String[] {"must_not_exist"}, INT),
+                  TableChange.updateComment("bad\0comment")));
+      JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, table);
+      Assertions.assertEquals(1, loaded.columns().length);
+      Assertions.assertEquals("original", loaded.comment());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TABLE_OPERATIONS.alterTable(
+                  TEST_DB_NAME,
+                  table,
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"col1"}, Literals.stringLiteral("bad\0default"))));
+      Assertions.assertEquals(
+          Literals.NULL, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[0].defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
 
   @Test
   public void testOperationTable() {

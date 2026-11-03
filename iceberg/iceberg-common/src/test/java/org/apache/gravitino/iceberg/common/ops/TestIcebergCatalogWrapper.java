@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,22 +39,33 @@ import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ViewOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
@@ -189,6 +205,161 @@ public class TestIcebergCatalogWrapper {
     Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
   }
 
+  @Test
+  public void testValidateTableDefinitionRejectsInvalidFormatVersion() {
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    for (String version : new String[] {"abc", "0", "4", "-1"}) {
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("t")
+              .withSchema(schema)
+              .setProperties(ImmutableMap.of("format-version", version))
+              .build();
+      Assertions.assertThrows(
+          BadRequestException.class,
+          () -> IcebergCatalogWrapper.validateTableDefinition(request),
+          "format-version " + version);
+    }
+    for (String version : new String[] {"1", "2", "3"}) {
+      CreateTableRequest request =
+          CreateTableRequest.builder()
+              .withName("t")
+              .withSchema(schema)
+              .setProperties(ImmutableMap.of("format-version", version))
+              .build();
+      Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(request));
+    }
+  }
+
+  @Test
+  public void testValidateTableDefinitionRejectsTypesTheVersionDoesNotSupport() {
+    Schema nanos =
+        new Schema(Types.NestedField.required(1, "ts", Types.TimestampNanoType.withZone()));
+    CreateTableRequest v2 =
+        CreateTableRequest.builder()
+            .withName("t")
+            .withSchema(nanos)
+            .setProperties(ImmutableMap.of("format-version", "2"))
+            .build();
+    Assertions.assertThrows(
+        BadRequestException.class, () -> IcebergCatalogWrapper.validateTableDefinition(v2));
+
+    CreateTableRequest v3 =
+        CreateTableRequest.builder()
+            .withName("t")
+            .withSchema(nanos)
+            .setProperties(ImmutableMap.of("format-version", "3"))
+            .build();
+    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(v3));
+
+    // Without an explicit version the catalog defaults decide; nothing is rejected up front.
+    CreateTableRequest unspecified =
+        CreateTableRequest.builder().withName("t").withSchema(nanos).build();
+    Assertions.assertDoesNotThrow(() -> IcebergCatalogWrapper.validateTableDefinition(unspecified));
+  }
+
+  @Test
+  public void testUpdateTableToUnknownDefaultSpecOrSortOrderIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier ident = TableIdentifier.of(namespace, "t");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .build());
+
+      for (MetadataUpdate update :
+          new MetadataUpdate[] {
+            new MetadataUpdate.SetDefaultPartitionSpec(7), new MetadataUpdate.SetDefaultSortOrder(7)
+          }) {
+        UpdateTableRequest request =
+            new UpdateTableRequest(Collections.emptyList(), Collections.singletonList(update));
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.updateTable(ident, request));
+      }
+
+      // Ids the table has, and -1 ("the last added"), are still accepted.
+      UpdateTableRequest existing =
+          new UpdateTableRequest(
+              Collections.emptyList(),
+              Arrays.asList(
+                  new MetadataUpdate.SetDefaultPartitionSpec(0),
+                  new MetadataUpdate.SetDefaultSortOrder(0)));
+      Assertions.assertDoesNotThrow(() -> wrapper.updateTable(ident, existing));
+    }
+  }
+
+  @Test
+  public void testRegisterTableWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      RegisterTableRequest request =
+          ImmutableRegisterTableRequest.builder()
+              .name("ghost")
+              .metadataLocation(warehouseDir.resolve("missing/v1.metadata.json").toUri().toString())
+              .build();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.registerTable(namespace, request));
+      Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(
+      boolean gcEnabled, @TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier ident = TableIdentifier.of(namespace, "purged");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      Table table =
+          wrapper
+              .getCatalog()
+              .createTable(
+                  ident,
+                  new Schema(Types.NestedField.required(1, "id", Types.LongType.get())),
+                  PartitionSpec.unpartitioned(),
+                  ImmutableMap.of("gc.enabled", Boolean.toString(gcEnabled)));
+      Path first = Files.createFile(warehouseDir.resolve("first.parquet"));
+      Path second = Files.createFile(warehouseDir.resolve("second.parquet"));
+      for (Path data : new Path[] {first, second}) {
+        table
+            .newFastAppend()
+            .appendFile(
+                DataFiles.builder(table.spec())
+                    .withPath(data.toUri().toString())
+                    .withFileSizeInBytes(1)
+                    .withRecordCount(1)
+                    .build())
+            .commit();
+      }
+      table.refresh();
+      String metadataFile =
+          ((HasTableOperations) table).operations().current().metadataFileLocation();
+      // The first snapshot's manifest list is gone.
+      Files.delete(
+          Paths.get(URI.create(table.snapshots().iterator().next().manifestListLocation())));
+
+      wrapper.purgeTable(ident);
+
+      Assertions.assertFalse(wrapper.getCatalog().tableExists(ident));
+      // Files reachable through the remaining manifest list, and the metadata, are deleted.
+      Assertions.assertEquals(!gcEnabled, Files.exists(first));
+      Assertions.assertEquals(!gcEnabled, Files.exists(second));
+      Assertions.assertFalse(Files.exists(Paths.get(URI.create(metadataFile))));
+    }
+  }
+
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)
       throws Exception {
     Method method = IcebergCatalogWrapper.class.getDeclaredMethod("getMetadataCache");
@@ -201,6 +372,18 @@ public class TestIcebergCatalogWrapper {
     config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
     config.put(IcebergConstants.URI, "jdbc:invalid://unreachable");
     config.put(IcebergConstants.WAREHOUSE, "unused");
+    return config;
+  }
+
+  private static Map<String, String> sqliteConfig(Path warehouseDir) {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+    config.put(IcebergConstants.URI, "jdbc:sqlite:" + warehouseDir.resolve("catalog.db"));
+    config.put(IcebergConstants.WAREHOUSE, warehouseDir.toUri().toString());
+    config.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    config.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
     return config;
   }
 
