@@ -68,6 +68,7 @@ import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -408,6 +409,53 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     verify(invocation).proceed();
   }
 
+  @Test
+  public void testSecondaryExpressionSelectedForOverwrite() throws Throwable {
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> Privilege.Name.MODIFY_TABLE.equals(invocation.getArgument(3)));
+    when(authorizer.deny(any(), any(), any(), any(), any())).thenReturn(false);
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(false);
+
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    interceptor.matchOverwriteSecondary = true;
+    interceptor.handler =
+        Optional.of(
+            new BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler() {
+              @Override
+              public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+                nameIdentifierMap.put(
+                    Entity.EntityType.TABLE,
+                    NameIdentifierUtil.ofTable("metalake", "catalog", "schema", "table"));
+              }
+
+              @Override
+              public boolean authorizationCompleted() {
+                return false;
+              }
+            });
+
+    TestInvocation invocation = invocation("createOrOverwrite", "authorized");
+    assertEquals("authorized", interceptor.invoke(invocation));
+    verify(authorizer).authorize(any(), any(), any(), eq(Privilege.Name.MODIFY_TABLE), any());
+  }
+
+  @Test
+  public void testPrimaryExpressionUsedWhenOverwriteConditionDoesNotMatch() throws Throwable {
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> Privilege.Name.CREATE_TABLE.equals(invocation.getArgument(3)));
+    when(authorizer.deny(any(), any(), any(), any(), any())).thenReturn(false);
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(false);
+
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    interceptor.matchOverwriteSecondary = false;
+    TestInvocation invocation = invocation("createOrOverwrite", "authorized");
+
+    assertEquals("authorized", interceptor.invoke(invocation));
+    verify(authorizer).authorize(any(), any(), any(), eq(Privilege.Name.CREATE_TABLE), any());
+    verify(authorizer, never())
+        .authorize(any(), any(), any(), eq(Privilege.Name.MODIFY_TABLE), any());
+  }
+
   /** Entry authorization, parent checks and worker filtering share one user lookup. */
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
@@ -538,6 +586,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     private boolean includeMetalake = true;
     private boolean skipAuthorization;
     private boolean skipExpressionEvaluation;
+    private boolean matchOverwriteSecondary;
     private Optional<EventSource> denialEventSource = Optional.empty();
 
     private TestInterceptor(Entity.EntityType targetType) {
@@ -600,6 +649,23 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     protected boolean shouldSkipExpressionEvaluation(AuthorizationTarget target) {
       return skipExpressionEvaluation || super.shouldSkipExpressionEvaluation(target);
     }
+
+    @Override
+    protected boolean matchesSecondaryExpressionCondition(
+        ExpressionCondition condition, Method method, Parameter[] parameters, Object[] args) {
+      return matchOverwriteSecondary && condition == ExpressionCondition.OVERWRITE;
+    }
+
+    @Override
+    protected Entity.EntityType resolveSecondaryAccessEntityType(
+        AuthorizationExpression annotation,
+        AuthorizationTarget primaryTarget,
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+      if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
+        return Entity.EntityType.TABLE;
+      }
+      return primaryTarget.entityType();
+    }
   }
 
   private static class TestProtocolException extends RuntimeException {
@@ -652,6 +718,15 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     @AuthorizationExpression(expression = "true")
     private String operationFails() {
+      return "unused";
+    }
+
+    @AuthorizationExpression(
+        expression = "SCHEMA::CREATE_TABLE",
+        secondaryExpression = "TABLE::MODIFY_TABLE",
+        secondaryExpressionCondition = ExpressionCondition.OVERWRITE,
+        accessMetadataType = MetadataObject.Type.SCHEMA)
+    private String createOrOverwrite() {
       return "unused";
     }
   }

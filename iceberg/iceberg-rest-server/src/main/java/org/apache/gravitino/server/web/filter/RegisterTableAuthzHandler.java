@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.web.filter;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
@@ -46,12 +45,14 @@ import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /**
- * Authorizes Iceberg REST {@code registerTable}.
+ * Enriches Iceberg REST {@code registerTable} authorization with the named table identifier and
+ * dynamic source-table checks.
  *
- * <p>When {@code overwrite=true}, replaces the schema-level create check with the modify-table
- * expression on the named table (same approach as Lance create overwrite). Independently, when the
- * metadata file still belongs to another live table, requires the load-table expression on that
- * source so {@code CREATE_TABLE} alone cannot adopt an unreadable table's metadata.
+ * <p>Create-versus-overwrite expression selection stays in the shared authorization pipeline via
+ * {@code secondaryExpression} / {@code secondaryExpressionCondition}. This handler only adds the
+ * TABLE identifier needed for overwrite evaluation and requires the load-table expression when the
+ * metadata file still belongs to another live table, so {@code CREATE_TABLE} alone cannot adopt an
+ * unreadable table's metadata.
  */
 @SuppressWarnings("FormatStringAnnotation")
 public class RegisterTableAuthzHandler implements AuthorizationHandler {
@@ -61,7 +62,6 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
 
   private final Parameter[] parameters;
   private final Object[] args;
-  private boolean overwrite;
 
   /**
    * Creates a handler for the register-table request arguments.
@@ -77,7 +77,6 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     RegisterTableRequest request = registerTableRequest();
-    overwrite = request.overwrite();
 
     NameIdentifier metalakeIdent = nameIdentifierMap.get(EntityType.METALAKE);
     NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
@@ -94,22 +93,13 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
 
-    if (overwrite) {
-      requireExpression(
-          MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
-          nameIdentifierMap,
-          EntityType.TABLE,
-          "User '%s' is not authorized to overwrite table '%s'",
-          nameIdentifierMap.get(EntityType.TABLE));
-    }
-
     authorizeMetadataSources(metalakeName, catalog, schema, tableName, request);
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // Overwrite is fully authorized here, so the create expression on the method must not run.
-    return overwrite;
+    // Create/overwrite expression evaluation stays in the standard authorization pipeline.
+    return false;
   }
 
   private void authorizeMetadataSources(
@@ -144,30 +134,17 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     identifiers.put(
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(metalake, catalogName, sourceSchema, source.name()));
-    requireExpression(
-        LOAD_TABLE_AUTHORIZATION_EXPRESSION,
-        identifiers,
-        EntityType.TABLE,
-        "User '%s' is not authorized to register metadata from table '%s'",
-        source);
-  }
-
-  private static void requireExpression(
-      String expression,
-      Map<EntityType, NameIdentifier> identifiers,
-      EntityType accessType,
-      String messageFormat,
-      Object deniedTarget) {
     boolean authorized =
-        new AuthorizationExpressionEvaluator(expression)
+        new AuthorizationExpressionEvaluator(LOAD_TABLE_AUTHORIZATION_EXPRESSION)
             .evaluate(
                 identifiers,
                 new HashMap<>(),
                 new AuthorizationRequestContext(),
-                Optional.of(accessType.name()));
+                Optional.of(EntityType.TABLE.name()));
     if (!authorized) {
       throw new ForbiddenException(
-          messageFormat, PrincipalUtils.getCurrentUserName(), deniedTarget);
+          "User '%s' is not authorized to register metadata from table '%s'",
+          PrincipalUtils.getCurrentUserName(), source);
     }
   }
 
