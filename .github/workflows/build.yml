@@ -60,6 +60,7 @@ jobs:
           filters: |
             source_changes:
               - '.github/**'
+              - 'bin/**'
               - 'catalogs/**'
               - 'catalogs-contrib/**'
               - 'clients/**'

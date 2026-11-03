@@ -91,6 +91,12 @@ fun getGitCommitId(): String {
 
 tasks {
   test {
+    // Launch-script tests execute these source templates directly.
+    inputs.files(
+      rootProject.fileTree("bin") {
+        include("common.sh.template", "gravitino*.sh.template")
+      }
+    )
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }
