@@ -21,19 +21,32 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.apache.iceberg.ContentFileParser;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
+import org.apache.iceberg.StructLike;
+import org.apache.iceberg.expressions.Evaluator;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.ExpressionParser;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.ResidualEvaluator;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.JsonUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -61,8 +74,7 @@ public class TestIcebergScanPlanHelper {
                 .withStatsFields(ImmutableList.of("l2", "l"))
                 .build(),
             CURRENT_SCHEMA,
-            SNAPSHOT_SCHEMA,
-            7L);
+            SNAPSHOT_SCHEMA);
 
     Assertions.assertEquals(Expressions.equal("l", 10L).toString(), rewritten.filter().toString());
     Assertions.assertEquals(ImmutableList.of("id", "l"), rewritten.select());
@@ -79,10 +91,23 @@ public class TestIcebergScanPlanHelper {
                 .withFilter(Expressions.equal("L2", 10L))
                 .build(),
             CURRENT_SCHEMA,
-            SNAPSHOT_SCHEMA,
-            7L);
+            SNAPSHOT_SCHEMA);
 
     Assertions.assertEquals(Expressions.equal("l", 10L).toString(), rewritten.filter().toString());
+  }
+
+  @Test
+  void testRewriteForSnapshotKeepsStarSelect() {
+    PlanTableScanRequest rewritten =
+        IcebergScanPlanHelper.rewriteForSnapshot(
+            PlanTableScanRequest.builder()
+                .withSnapshotId(7L)
+                .withSelect(ImmutableList.of("*"))
+                .build(),
+            CURRENT_SCHEMA,
+            SNAPSHOT_SCHEMA);
+
+    Assertions.assertEquals(ImmutableList.of("*"), rewritten.select());
   }
 
   @Test
@@ -90,12 +115,12 @@ public class TestIcebergScanPlanHelper {
     Assertions.assertEquals(
         Expressions.equal("l", 10L).toString(),
         IcebergScanPlanHelper.rewriteFilterNames(
-                Expressions.equal("l2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L)
+                Expressions.equal("l2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
             .toString());
     Assertions.assertEquals(
         Expressions.equal("id", 1L).toString(),
         IcebergScanPlanHelper.rewriteFilterNames(
-                Expressions.equal("id", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L)
+                Expressions.equal("id", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
             .toString());
     Assertions.assertEquals(
         Expressions.and(Expressions.in("l", 1L, 2L), Expressions.not(Expressions.isNull("l")))
@@ -105,8 +130,7 @@ public class TestIcebergScanPlanHelper {
                     Expressions.in("l2", 1L, 2L), Expressions.not(Expressions.isNull("l2"))),
                 CURRENT_SCHEMA,
                 SNAPSHOT_SCHEMA,
-                true,
-                7L)
+                true)
             .toString());
     Assertions.assertEquals(
         Expressions.equal(Expressions.bucket("l", 4), 1).toString(),
@@ -114,28 +138,56 @@ public class TestIcebergScanPlanHelper {
                 Expressions.equal(Expressions.bucket("l2", 4), 1),
                 CURRENT_SCHEMA,
                 SNAPSHOT_SCHEMA,
-                true,
-                7L)
+                true)
             .toString());
 
-    IllegalArgumentException addedLater =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                IcebergScanPlanHelper.rewriteFilterNames(
-                    Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
-    Assertions.assertTrue(
-        addedLater.getMessage().contains("does not exist in snapshot 7"), addedLater.getMessage());
+    // Column added after the snapshot: do not prune; keep as a residual via postSnapshotResidual.
+    Assertions.assertEquals(
+        Expressions.alwaysTrue().toString(),
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.isNull("l"), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
+            .toString());
+    Assertions.assertEquals(
+        Expressions.alwaysTrue().toString(),
+        IcebergScanPlanHelper.rewriteFilterNames(
+                Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
+            .toString());
+    Assertions.assertEquals(
+        Expressions.equal("l", 10L).toString(),
+        IcebergScanPlanHelper.postSnapshotResidual(
+                Expressions.equal("l", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true)
+            .toString());
+
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             IcebergScanPlanHelper.rewriteFilterNames(
-                Expressions.equal("nope", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
+                Expressions.equal("nope", 1L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             IcebergScanPlanHelper.rewriteFilterNames(
-                Expressions.equal("L2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true, 7L));
+                Expressions.equal("L2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true));
+  }
+
+  @Test
+  void testRemapResidualKeepsRequestFieldIdentities() {
+    Expression residualOnSnapshot =
+        IcebergScanPlanHelper.rewriteFilterNames(
+            Expressions.equal("l2", 10L), CURRENT_SCHEMA, SNAPSHOT_SCHEMA, true);
+    Assertions.assertEquals(Expressions.equal("l", 10L).toString(), residualOnSnapshot.toString());
+
+    Expression residualForClient =
+        IcebergScanPlanHelper.remapExpressionNames(
+            residualOnSnapshot, SNAPSHOT_SCHEMA, CURRENT_SCHEMA, true);
+    Assertions.assertEquals(Expressions.equal("l2", 10L).toString(), residualForClient.toString());
+
+    // With name reuse, evaluating the remapped residual against the request row is true; the
+    // snapshot-named residual would bind to the wrong field and evaluate false.
+    Types.StructType rowType = CURRENT_SCHEMA.asStruct();
+    StructLike row = new ArrayStruct(1L, 10L, null);
+    Assertions.assertTrue(new Evaluator(rowType, residualForClient).eval(row));
+    Assertions.assertFalse(new Evaluator(rowType, residualOnSnapshot).eval(row));
   }
 
   @Test
@@ -181,12 +233,165 @@ public class TestIcebergScanPlanHelper {
 
     Map<Integer, PartitionSpec> sanitized =
         IcebergScanPlanHelper.sanitizeSpecsForSerialization(
-            ImmutableMap.of(0, staleSpec), Collections.singletonList(task));
+            ImmutableMap.of(0, staleSpec),
+            Collections.singletonList(task),
+            ImmutableList.of(originalSchema, evolvedSchema));
 
     Assertions.assertFalse(
         sanitized.get(0).partitionType().fields().stream()
             .anyMatch(f -> f.type().typeId() == Type.TypeID.UNKNOWN));
     Assertions.assertEquals(
         Type.TypeID.STRING, sanitized.get(0).partitionType().fields().get(0).type().typeId());
+  }
+
+  @Test
+  void testSanitizeSpecsDedupesMultipleTransformsOfOneDroppedSource() {
+    Schema originalSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    PartitionSpec originalSpec =
+        PartitionSpec.builderFor(originalSchema).withSpecId(0).identity("s").bucket("s", 8).build();
+    Schema evolved = new Schema(Types.NestedField.optional(1, "id", Types.LongType.get()));
+    PartitionSpec stale = originalSpec.toUnbound().bind(evolved, true);
+
+    Map<Integer, PartitionSpec> sanitized =
+        IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+            ImmutableMap.of(0, stale),
+            Collections.emptyList(),
+            ImmutableList.of(originalSchema, evolved));
+
+    Assertions.assertDoesNotThrow(() -> sanitized.get(0).schema());
+    Assertions.assertEquals(
+        1,
+        sanitized.get(0).schema().columns().stream()
+            .filter(f -> f.name().startsWith("_dropped_source_"))
+            .count());
+  }
+
+  @Test
+  void testSanitizeSpecsDoesNotUseTransformResultTypeAsSource() {
+    Schema originalSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()),
+            Types.NestedField.optional(3, "ts", Types.TimestampType.withoutZone()));
+    PartitionSpec originalSpec =
+        PartitionSpec.builderFor(originalSchema).withSpecId(0).identity("s").hour("ts").build();
+    Schema evolved = new Schema(Types.NestedField.optional(1, "id", Types.LongType.get()));
+    PartitionSpec stale = originalSpec.toUnbound().bind(evolved, true);
+
+    // Partition data carries transform results (string + int), which must not become source types.
+    Types.StructType partitionDataType =
+        Types.StructType.of(
+            Types.NestedField.optional(1000, "s", Types.StringType.get()),
+            Types.NestedField.optional(1001, "ts_hour", Types.IntegerType.get()));
+    PartitionData partitionData = new PartitionData(partitionDataType);
+    partitionData.set(0, "a");
+    partitionData.set(1, 1);
+    DataFile dataFile = mock(DataFile.class);
+    doReturn(0).when(dataFile).specId();
+    doReturn(partitionData).when(dataFile).partition();
+    FileScanTask task = mock(FileScanTask.class);
+    doReturn(dataFile).when(task).file();
+
+    Map<Integer, PartitionSpec> sanitized =
+        IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+            ImmutableMap.of(0, stale),
+            Collections.singletonList(task),
+            ImmutableList.of(originalSchema, evolved));
+
+    Assertions.assertEquals(
+        Type.TypeID.STRING, sanitized.get(0).schema().findField(2).type().typeId());
+    Assertions.assertEquals(
+        Type.TypeID.TIMESTAMP, sanitized.get(0).schema().findField(3).type().typeId());
+  }
+
+  @Test
+  void testPrepareTasksRewritesUnknownSpecForClientRoundTrip() {
+    Schema originalSchema =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()));
+    PartitionSpec originalSpec =
+        PartitionSpec.builderFor(originalSchema).withSpecId(0).identity("s").build();
+    Schema evolved = new Schema(Types.NestedField.optional(1, "id", Types.LongType.get()));
+    PartitionSpec unpartitioned = PartitionSpec.builderFor(evolved).withSpecId(1).build();
+    PartitionSpec stale = originalSpec.toUnbound().bind(evolved, true);
+
+    PartitionData partitionData =
+        new PartitionData(
+            Types.StructType.of(Types.NestedField.optional(1000, "s", Types.StringType.get())));
+    partitionData.set(0, "a");
+    DataFile dataFile =
+        DataFiles.builder(originalSpec)
+            .withPath("file:///tmp/f.parquet")
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(10)
+            .withRecordCount(1)
+            .withPartition(partitionData)
+            .build();
+
+    // Build a task against the stale (client-visible) spec id.
+    org.apache.iceberg.BaseFileScanTask task =
+        new org.apache.iceberg.BaseFileScanTask(
+            DataFiles.builder(stale).copy(dataFile).withPartition(partitionData).build(),
+            null,
+            SchemaParser.toJson(evolved),
+            PartitionSpecParser.toJson(stale),
+            ResidualEvaluator.of(stale, Expressions.equal("id", 1L), true));
+
+    Map<Integer, PartitionSpec> clientSpecs = ImmutableMap.of(0, stale, 1, unpartitioned);
+    List<FileScanTask> prepared =
+        IcebergScanPlanHelper.prepareTasksForResponse(
+            Collections.singletonList(task), clientSpecs, evolved, null, null, true);
+
+    Assertions.assertEquals(1, prepared.get(0).file().specId());
+    Assertions.assertTrue(clientSpecs.get(prepared.get(0).file().specId()).isUnpartitioned());
+
+    // Serialize with sanitized specs (server), parse with the client's original broken specs.
+    Map<Integer, PartitionSpec> sanitized =
+        IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+            clientSpecs, prepared, ImmutableList.of(originalSchema, evolved));
+    String json =
+        JsonUtil.generate(
+            gen -> ContentFileParser.toJson(prepared.get(0).file(), sanitized.get(1), gen), false);
+    JsonNode node = JsonUtil.parse(json, n -> n);
+    DataFile parsed = (DataFile) ContentFileParser.fromJson(node, clientSpecs);
+    Assertions.assertEquals("file:///tmp/f.parquet", parsed.location());
+  }
+
+  @Test
+  void testRemapExpressionRoundTripThroughParser() {
+    Expression remapped =
+        IcebergScanPlanHelper.remapExpressionNames(
+            Expressions.equal("l", 10L), SNAPSHOT_SCHEMA, CURRENT_SCHEMA, true);
+    String json = ExpressionParser.toJson(remapped);
+    Expression parsed = ExpressionParser.fromJson(json);
+    Assertions.assertEquals(Expressions.equal("l2", 10L).toString(), parsed.toString());
+  }
+
+  private static final class ArrayStruct implements StructLike {
+    private final Object[] values;
+
+    private ArrayStruct(Object... values) {
+      this.values = values;
+    }
+
+    @Override
+    public int size() {
+      return values.length;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T get(int pos, Class<T> javaClass) {
+      return (T) values[pos];
+    }
+
+    @Override
+    public <T> void set(int pos, T value) {
+      values[pos] = value;
+    }
   }
 }

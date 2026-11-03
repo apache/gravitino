@@ -57,6 +57,7 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
@@ -524,17 +525,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         LOG.info("Using cached scan plan for table: {}", tableIdentifier);
         response = cachedResponse.get();
       } else {
-        List<FileScanTask> fileScanTasks = new ArrayList<>();
-
-        try (CloseableIterable<FileScanTask> scanTasks =
-            createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
-          for (FileScanTask fileScanTask : scanTasks) {
-            fileScanTasks.add(fileScanTask);
-          }
-        } catch (IOException e) {
-          LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
-          throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
-        }
+        PlannedScan planned = planFileScanTasks(table, tableIdentifier, scanRequest);
+        List<FileScanTask> fileScanTasks = planned.tasks;
 
         if (fileScanTasks.isEmpty()) {
           LOG.info(
@@ -653,8 +645,58 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
         .withSpecsById(
-            IcebergScanPlanHelper.sanitizeSpecsForSerialization(table.specs(), fileScanTasks))
+            IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+                table.specs(), fileScanTasks, table.schemas().values()))
         .build();
+  }
+
+  /** Result of server-side planning, including residual remapping context. */
+  private static final class PlannedScan {
+    private final List<FileScanTask> tasks;
+
+    private PlannedScan(List<FileScanTask> tasks) {
+      this.tasks = tasks;
+    }
+  }
+
+  private PlannedScan planFileScanTasks(
+      Table table, TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+    Schema residualFrom = null;
+    Schema residualTo = null;
+    Expression extraResidual = null;
+    List<FileScanTask> fileScanTasks = new ArrayList<>();
+    try (CloseableIterable<FileScanTask> scanTasks =
+        createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
+      // Recompute whether names were rewritten so residuals can be mapped back to the request
+      // schema. createFilePlanScanTasks applies the same rewrite rules.
+      if (scanRequest.snapshotId() != null && !scanRequest.useSnapshotSchema()) {
+        long snapshotId = scanRequest.snapshotId();
+        Optional<String> branch = IcebergScanPlanHelper.branchAt(table, snapshotId);
+        if (!branch.isPresent()) {
+          residualFrom = SnapshotUtil.schemaFor(table, snapshotId);
+          residualTo = table.schema();
+          if (scanRequest.filter() != null) {
+            extraResidual =
+                IcebergScanPlanHelper.postSnapshotResidual(
+                    scanRequest.filter(), residualTo, residualFrom, scanRequest.caseSensitive());
+          }
+        }
+      }
+      for (FileScanTask fileScanTask : scanTasks) {
+        fileScanTasks.add(fileScanTask);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
+      throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
+    }
+    return new PlannedScan(
+        IcebergScanPlanHelper.prepareTasksForResponse(
+            fileScanTasks,
+            table.specs(),
+            residualTo,
+            residualFrom,
+            extraResidual,
+            scanRequest.caseSensitive()));
   }
 
   /**
@@ -716,10 +758,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           if (!scanRequest.useSnapshotSchema()) {
             requestToApply =
                 IcebergScanPlanHelper.rewriteForSnapshot(
-                    scanRequest,
-                    table.schema(),
-                    SnapshotUtil.schemaFor(table, snapshotId),
-                    snapshotId);
+                    scanRequest, table.schema(), SnapshotUtil.schemaFor(table, snapshotId));
           }
           LOG.debug("Applied snapshot filter: snapshot-id={}", snapshotId);
         }

@@ -181,9 +181,20 @@ public class TestIcebergScanPlanning {
 
     Assertions.assertEquals(F1, planBranch(evolved, Expressions.equal("l2", 10L)));
     Assertions.assertEquals(NONE, planBranch(evolved, Expressions.equal("l2", 99L)));
-    assertInvalidScan(
-        () -> planBranch(evolved, Expressions.equal("l", 99L)), "does not exist in snapshot");
+    // Same current-schema semantics as when a branch still pointed here: "l" was added after s1,
+    // so old files are not pruned on it (they read as null under the current schema).
+    Assertions.assertEquals(F1, planBranch(evolved, Expressions.equal("l", 99L)));
     assertInvalidScan(() -> planBranch(evolved, Expressions.equal("a", 5L)), "'a'");
+
+    // Residual must keep current-schema names (l2), not the snapshot name (l) that now means a
+    // different field id after rename+reuse.
+    PlanTableScanResponse residualResponse =
+        wrapper.planTableScan(
+            evolved.ident, branchRequest(evolved).withFilter(Expressions.equal("l2", 10L)).build());
+    Assertions.assertEquals(1, residualResponse.fileScanTasks().size());
+    Assertions.assertEquals(
+        Expressions.equal("l2", 10L).toString(),
+        residualResponse.fileScanTasks().get(0).residual().toString());
 
     Assertions.assertEquals(
         F1,
@@ -199,6 +210,8 @@ public class TestIcebergScanPlanning {
             branchRequest(evolved)
                 .withCaseSensitive(false)
                 .withFilter(Expressions.equal("L2", 10L))));
+    Assertions.assertEquals(
+        F1, planFiles(evolved.ident, branchRequest(evolved).withSelect(ImmutableList.of("*"))));
   }
 
   @Test
