@@ -139,21 +139,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    LOG.info("Loading view: {}", ident);
+    return loadAndImportView(ident, AuditInfo.EMPTY);
+  }
 
-    EntityCombinedView entityCombinedView =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-
-    if (!entityCombinedView.imported()) {
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      entityCombinedView =
-          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
-    }
-
-    return entityCombinedView;
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    return loadAndImportView(ident, auditInfo);
   }
 
   /**
@@ -538,7 +531,28 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         .withImported(viewEntity != null);
   }
 
-  private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+  private View loadAndImportView(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
+    LOG.info("Loading view: {}", ident);
+
+    EntityCombinedView entityCombinedView =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+
+    if (!entityCombinedView.imported()) {
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      entityCombinedView =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+    }
+
+    return entityCombinedView;
+  }
+
+  private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -564,7 +578,16 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     }
 
     View catalogView = entityCombinedView.viewFromCatalog();
-    AuditInfo audit = EntityImportAuditContext.auditInfo(ident, catalogView.auditInfo());
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(catalogView.auditInfo().creator())
+            .withCreateTime(catalogView.auditInfo().createTime())
+            .withLastModifier(catalogView.auditInfo().lastModifier())
+            .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
+            .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     ViewEntity viewEntity =
         ViewEntity.builder()
             .withId(uid)

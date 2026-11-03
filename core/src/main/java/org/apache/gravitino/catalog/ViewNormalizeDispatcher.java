@@ -30,6 +30,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
@@ -47,6 +48,12 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   public ViewNormalizeDispatcher(ViewDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
     this.catalogManager = catalogManager;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    return dispatcher.importView(normalizeCaseSensitive(ident), auditInfo);
   }
 
   @Override

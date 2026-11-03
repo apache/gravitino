@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -47,6 +48,13 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   public SchemaNormalizeDispatcher(SchemaDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
     this.catalogManager = catalogManager;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
+      throws NoSuchSchemaException {
+    return dispatcher.importSchema(normalizeCaseSensitive(ident), auditInfo);
   }
 
   @Override

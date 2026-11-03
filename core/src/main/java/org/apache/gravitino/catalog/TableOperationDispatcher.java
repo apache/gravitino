@@ -164,41 +164,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+    return loadAndImportTable(ident, AuditInfo.EMPTY);
+  }
 
-    if (!entityCombinedTable.imported()) {
-      // Load the schema to make sure the schema is imported.
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      // Import the table.
-      try {
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
-      } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this table. Reload from the
-        // entity store to pick up the entity stored by the winning node.
-        LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
-        if (!entityCombinedTable.imported()) {
-          throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
-        }
-      }
-    }
-
-    // Update the column entities in Gravitino store if the columns are different from the ones
-    // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
-
-    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenProperties(entityCombinedTable.hiddenProperties())
-        .withImported(entityCombinedTable.imported());
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    return loadAndImportTable(ident, auditInfo);
   }
 
   /**
@@ -570,7 +543,48 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
   }
 
-  private EntityCombinedTable importTable(NameIdentifier identifier) {
+  private Table loadAndImportTable(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchTableException {
+    EntityCombinedTable entityCombinedTable =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+
+    if (!entityCombinedTable.imported()) {
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import the table.
+      try {
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(
+                schemaIdent, LockType.WRITE, () -> importTableFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this table. Reload from the
+        // entity store to pick up the entity stored by the winning node.
+        LOG.info(
+            "Table {} was concurrently imported by another node; reloading from store.", ident);
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        if (!entityCombinedTable.imported()) {
+          throw new UnsupportedOperationException(
+              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+        }
+      }
+    }
+
+    // Update the column entities in Gravitino store if the columns are different from the ones
+    // fetching from the underlying source.
+    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+
+    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
+        .withHiddenProperties(entityCombinedTable.hiddenProperties())
+        .withImported(entityCombinedTable.imported());
+  }
+
+  private EntityCombinedTable importTableFromCatalog(
+      NameIdentifier identifier, AuditInfo importAudit) {
     EntityCombinedTable table = internalLoadTable(identifier);
 
     if (table.imported()) {
@@ -599,7 +613,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       uid = idGenerator.nextId();
     }
 
-    AuditInfo audit = EntityImportAuditContext.auditInfo(identifier, table.auditInfo());
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(table.auditInfo().creator())
+            .withCreateTime(table.auditInfo().createTime())
+            .withLastModifier(table.auditInfo().lastModifier())
+            .withLastModifiedTime(table.auditInfo().lastModifiedTime())
+            .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     List<ColumnEntity> columnEntityList =
         toColumnEntities(table.tableFromCatalog().columns(), audit);
     TableEntity tableEntity =

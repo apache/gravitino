@@ -43,7 +43,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -251,8 +250,8 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"), ":");
-    verify(mockInternalTableDispatcher).loadTable(expectedIdentifier);
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(eq(expectedIdentifier), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
 
     // Verify ownership was set
     ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
@@ -270,7 +269,7 @@ public class TestIcebergTableHookDispatcher {
     when(mockDispatcher.createTable(mockContext, namespace, request))
         .thenReturn(mock(LoadTableResponse.class));
     RuntimeException importFailure = new RuntimeException("Failed to import table entity");
-    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+    when(mockInternalTableDispatcher.importTable(any(), any())).thenThrow(importFailure);
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -292,7 +291,7 @@ public class TestIcebergTableHookDispatcher {
     when(mockDispatcher.updateTable(mockContext, tableId, request))
         .thenReturn(mock(LoadTableResponse.class));
     RuntimeException importFailure = new RuntimeException("Failed to import table entity");
-    when(mockInternalTableDispatcher.loadTable(any())).thenThrow(importFailure);
+    when(mockInternalTableDispatcher.importTable(any(), any())).thenThrow(importFailure);
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -329,8 +328,8 @@ public class TestIcebergTableHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockEntityStore, never()).delete(expectedIdentifier, Entity.EntityType.TABLE);
-    verify(mockInternalTableDispatcher).loadTable(expectedIdentifier);
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(eq(expectedIdentifier), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
   }
 
   @Test
@@ -345,8 +344,8 @@ public class TestIcebergTableHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
-    verify(mockInternalTableDispatcher).loadTable(expectedIdentifier);
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(eq(expectedIdentifier), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
   }
 
   @Test
@@ -443,8 +442,8 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier destIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, dest, ":");
     verify(mockEntityStore).delete(sourceIdentifier, Entity.EntityType.TABLE);
-    verify(mockInternalTableDispatcher).loadTable(destIdentifier);
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(eq(destIdentifier), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
   }
 
   @Test
@@ -465,13 +464,13 @@ public class TestIcebergTableHookDispatcher {
     when(mockDispatcher.tableExists(mockContext, dest)).thenReturn(true);
     doThrow(new RuntimeException("import failed"))
         .when(mockInternalTableDispatcher)
-        .loadTable(any());
+        .importTable(any(), any());
 
     Assertions.assertDoesNotThrow(() -> hookDispatcher.renameTable(mockContext, request));
 
     verify(mockDispatcher).renameTable(mockContext, request);
-    verify(mockInternalTableDispatcher).loadTable(any());
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(any(), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
   }
 
   @Test
@@ -549,8 +548,8 @@ public class TestIcebergTableHookDispatcher {
     verify(mockDispatcher).createTable(mockContext, namespace, request);
 
     // Verify table import was NOT called for staged create
-    verify(mockInternalTableDispatcher, never()).loadTable(any());
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher, never()).importTable(any(), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
 
     // Verify ownership was NOT set for staged create
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
@@ -576,8 +575,8 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier gravitinoTableId =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
-    verify(mockInternalTableDispatcher).loadTable(gravitinoTableId);
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(eq(gravitinoTableId), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
 
     ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
     verify(mockInternalOwnerDispatcher)
@@ -595,10 +594,10 @@ public class TestIcebergTableHookDispatcher {
     NameIdentifier identifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
             TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"), ":");
-    when(mockInternalTableDispatcher.loadTable(identifier))
+    when(mockInternalTableDispatcher.importTable(eq(identifier), any()))
         .thenAnswer(
             invocation -> {
-              AuditInfo audit = EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY);
+              AuditInfo audit = invocation.getArgument(1);
               Assertions.assertEquals(TEST_USER, audit.creator());
               Assertions.assertNotNull(audit.createTime());
               return null;
@@ -606,10 +605,8 @@ public class TestIcebergTableHookDispatcher {
 
     hookDispatcher.createTable(mockContext, namespace, request);
 
-    verify(mockInternalTableDispatcher).loadTable(identifier);
+    verify(mockInternalTableDispatcher).importTable(eq(identifier), any());
     verify(mockEntityStore, never()).update(any(), any(), any(), any());
-    Assertions.assertNull(
-        EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY).creator());
   }
 
   @Test
@@ -631,9 +628,11 @@ public class TestIcebergTableHookDispatcher {
     hookDispatcher.updateTable(mockContext, tableId, request);
 
     verify(mockInternalTableDispatcher)
-        .loadTable(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                TEST_METALAKE, TEST_CATALOG, tableId, ":"));
+        .importTable(
+            eq(
+                IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                    TEST_METALAKE, TEST_CATALOG, tableId, ":")),
+            any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
@@ -669,8 +668,8 @@ public class TestIcebergTableHookDispatcher {
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
 
     // Verify table import was NOT called for a regular update
-    verify(mockInternalTableDispatcher, never()).loadTable(any());
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher, never()).importTable(any(), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
 
     // Verify ownership was NOT set
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
@@ -699,11 +698,11 @@ public class TestIcebergTableHookDispatcher {
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
     when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
 
-    // Import failure (the loadTable call) must propagate so the caller learns the table exists in
+    // Import failure (the importTable call) must propagate so the caller learns the table exists in
     // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
     doThrow(new RuntimeException("Import failed"))
         .when(mockInternalTableDispatcher)
-        .loadTable(any());
+        .importTable(any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -711,13 +710,9 @@ public class TestIcebergTableHookDispatcher {
             () -> hookDispatcher.createTable(mockContext, namespace, request));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
-    NameIdentifier identifier =
-        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_table");
-    Assertions.assertNull(
-        EntityImportAuditContext.auditInfo(identifier, AuditInfo.EMPTY).creator());
     verify(mockDispatcher).createTable(mockContext, namespace, request);
-    verify(mockInternalTableDispatcher).loadTable(any());
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(any(), any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }

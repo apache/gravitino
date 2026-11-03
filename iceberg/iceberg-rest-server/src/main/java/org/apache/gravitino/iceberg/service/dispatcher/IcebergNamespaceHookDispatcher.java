@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,6 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.EntityImportAuditContext;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -37,6 +37,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -94,11 +95,10 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
     // that Gravitino doesn't know about. Do not drop the namespace on import failure: another
     // client may already have created objects in it.
-    EntityImportAuditContext.withCreator(
-        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-            metalake, catalogName, leaf, HierarchicalSchemaUtil.schemaSeparator()),
-        context.userName(),
-        () -> importSchema(catalogName, leaf));
+    importSchema(
+        catalogName,
+        leaf,
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
 
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.
@@ -236,14 +236,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
-    EntityImportAuditContext.withCreator(
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake,
-            context.catalogName(),
-            TableIdentifier.of(namespace, registerTableRequest.name()),
-            HierarchicalSchemaUtil.schemaSeparator()),
-        context.userName(),
-        () -> importTable(context.catalogName(), namespace, registerTableRequest.name()));
+    importTable(
+        context.catalogName(),
+        namespace,
+        registerTableRequest.name(),
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
 
     IcebergOwnershipUtils.setTableOwner(
         metalake,
@@ -270,14 +267,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
-    EntityImportAuditContext.withCreator(
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake,
-            context.catalogName(),
-            TableIdentifier.of(namespace, registerViewRequest.name()),
-            HierarchicalSchemaUtil.schemaSeparator()),
-        context.userName(),
-        () -> importView(context.catalogName(), namespace, registerViewRequest.name()));
+    importView(
+        context.catalogName(),
+        namespace,
+        registerViewRequest.name(),
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
 
     IcebergOwnershipUtils.setViewOwner(
         metalake,
@@ -290,15 +284,17 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     return response;
   }
 
-  private void importView(String catalogName, Namespace namespace, String viewName) {
+  private void importView(
+      String catalogName, Namespace namespace, String viewName, AuditInfo auditInfo) {
     ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
-      viewDispatcher.loadView(
+      viewDispatcher.importView(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
               catalogName,
               TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator()));
+              HierarchicalSchemaUtil.schemaSeparator()),
+          auditInfo);
     }
   }
 
@@ -340,24 +336,27 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     }
   }
 
-  private void importTable(String catalogName, Namespace namespace, String tableName) {
+  private void importTable(
+      String catalogName, Namespace namespace, String tableName, AuditInfo auditInfo) {
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
     if (tableDispatcher != null) {
-      tableDispatcher.loadTable(
+      tableDispatcher.importTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
               catalogName,
               TableIdentifier.of(namespace, tableName),
-              HierarchicalSchemaUtil.schemaSeparator()));
+              HierarchicalSchemaUtil.schemaSeparator()),
+          auditInfo);
     }
   }
 
-  private void importSchema(String catalogName, Namespace namespace) {
+  private void importSchema(String catalogName, Namespace namespace, AuditInfo auditInfo) {
     SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().internalSchemaDispatcher();
     if (schemaDispatcher != null) {
-      schemaDispatcher.loadSchema(
+      schemaDispatcher.importSchema(
           IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-              metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator()));
+              metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator()),
+          auditInfo);
     }
   }
 }

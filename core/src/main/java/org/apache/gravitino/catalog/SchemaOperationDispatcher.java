@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -260,35 +261,15 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    // Load the schema and check if this schema is already imported.
-    EntityCombinedSchema schema =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
+    return loadAndImportSchema(ident, AuditInfo.EMPTY);
+  }
 
-    if (!schema.imported()) {
-      try {
-        TreeLockUtils.doWithTreeLock(
-            NameIdentifier.of(ident.namespace().levels()),
-            LockType.WRITE,
-            () -> {
-              importSchema(ident);
-              return null;
-            });
-      } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this schema. Reload from the
-        // entity store to verify the entity stored by the winning node is consistent.
-        LOG.info(
-            "Schema {} was concurrently imported by another node; reloading from store.", ident);
-        EntityCombinedSchema reloaded =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
-        if (!reloaded.imported()) {
-          throw new UnsupportedOperationException(
-              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
-        }
-      }
-    }
-
-    return schema;
+  /** {@inheritDoc} */
+  @Override
+  public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
+      throws NoSuchSchemaException {
+    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    return loadAndImportSchema(ident, auditInfo);
   }
 
   /**
@@ -626,10 +607,43 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     return newProps;
   }
 
-  private void importSchema(NameIdentifier identifier) {
+  private Schema loadAndImportSchema(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchSchemaException {
+    // Load the schema and check if this schema is already imported.
+    EntityCombinedSchema schema =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
+
+    if (!schema.imported()) {
+      try {
+        schema =
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(ident.namespace().levels()),
+                LockType.WRITE,
+                () -> importSchemaFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this schema. Reload from the
+        // entity store to verify the entity stored by the winning node is consistent.
+        LOG.info(
+            "Schema {} was concurrently imported by another node; reloading from store.", ident);
+        EntityCombinedSchema reloaded =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
+        if (!reloaded.imported()) {
+          throw new UnsupportedOperationException(
+              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+        }
+        schema = reloaded;
+      }
+    }
+
+    return schema;
+  }
+
+  private EntityCombinedSchema importSchemaFromCatalog(
+      NameIdentifier identifier, AuditInfo importAudit) {
     EntityCombinedSchema schema = internalLoadSchema(identifier);
     if (schema.imported()) {
-      return;
+      return schema;
     }
 
     StringIdentifier stringId = null;
@@ -684,6 +698,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
 
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(schema.auditInfo().creator())
+            .withCreateTime(schema.auditInfo().createTime())
+            .withLastModifier(schema.auditInfo().lastModifier())
+            .withLastModifiedTime(schema.auditInfo().lastModifiedTime())
+            .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(uid)
@@ -691,7 +715,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .withNamespace(identifier.namespace())
             .withProperties(
                 schema.properties() == null ? Collections.emptyMap() : schema.properties())
-            .withAuditInfo(EntityImportAuditContext.auditInfo(identifier, schema.auditInfo()))
+            .withAuditInfo(audit)
             .build();
     try {
       if (previousEntity == null) {
@@ -718,6 +742,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import schema entity to the store", e);
     }
+    return EntityCombinedSchema.of(schema.schema(), schemaEntity)
+        .withHiddenProperties(
+            getMaskAndOmitKeys(
+                getCatalogIdentifier(identifier),
+                HasPropertyMetadata::schemaPropertiesMetadata,
+                schema.schema().properties()))
+        .withImported(true);
   }
 
   private EntityCombinedSchema internalLoadSchema(NameIdentifier ident) {

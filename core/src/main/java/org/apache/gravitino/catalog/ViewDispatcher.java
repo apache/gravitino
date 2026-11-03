@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 
 /**
@@ -26,4 +30,17 @@ import org.apache.gravitino.rel.ViewCatalog;
  * dispatching or handling view-related events or actions that are not covered by the standard
  * {@code ViewCatalog} operations.
  */
-public interface ViewDispatcher extends ViewCatalog {}
+public interface ViewDispatcher extends ViewCatalog {
+  /**
+   * Imports an externally created view into Gravitino, or returns the already imported entity.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing entity audits
+   * are preserved. This operation does not create the view in the underlying catalog.
+   *
+   * @param ident the identifier of the existing external view
+   * @param auditInfo fallback audit information used on initial import when the catalog reports no
+   *     creator
+   * @return the imported view
+   * @throws NoSuchViewException if the external view does not exist
+   */
+  View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException;
+}

@@ -35,6 +35,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -376,6 +377,10 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
             "PHYSICAL_NAME".equals(normalizedIdent.name()) ? resolved : normalizedIdent;
     TableNormalizeDispatcher dispatcher =
         newResolvingDispatcher(mockDispatcher, resolvingCatalogOps(resolver));
+
+    AuditInfo audit = AuditInfo.builder().withCreator("creator").build();
+    dispatcher.importTable(requested, audit);
+    Mockito.verify(mockDispatcher).importTable(Mockito.eq(resolved), Mockito.same(audit));
 
     dispatcher.loadTable(requested);
     dispatcher.alterTable(requested, TableChange.rename("x"));

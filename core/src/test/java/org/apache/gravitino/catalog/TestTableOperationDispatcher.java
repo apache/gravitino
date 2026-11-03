@@ -101,6 +101,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -127,10 +128,36 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
-  /** The first import writes creator information without a separate store update. */
-  @Test
-  public void testImportIncludesCreatorInInitialWrite() throws Exception {
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_import_audit_table");
+  /**
+   * The first import writes creator information without a separate store update.
+   *
+   * @param scenario whether the catalog supplies a creator, supplies modification information, or
+   *     the caller performs an ordinary load
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "reported", "modified", "load"})
+  public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
+    Instant importTime = Instant.EPOCH.plusSeconds(60);
+    AuditInfo importAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
+    AuditInfo catalogAudit =
+        "reported".equals(scenario)
+            ? AuditInfo.builder().withCreator("catalog_user").withCreateTime(Instant.EPOCH).build()
+            : "modified".equals(scenario)
+                ? AuditInfo.builder()
+                    .withCreateTime(Instant.EPOCH)
+                    .withLastModifier("modifier")
+                    .withLastModifiedTime(Instant.EPOCH)
+                    .build()
+                : AuditInfo.EMPTY;
+    String expectedCreator =
+        "reported".equals(scenario) ? "catalog_user" : "load".equals(scenario) ? null : "alice";
+    Instant expectedTime =
+        "reported".equals(scenario) || "modified".equals(scenario)
+            ? Instant.EPOCH
+            : "load".equals(scenario) ? null : importTime;
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_audit_table_" + scenario);
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
     TestCatalog testCatalog =
@@ -144,26 +171,50 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     };
     tableOperationDispatcher.createTable(identifier, columns, "comment", props, new Transform[0]);
     TestTable catalogTable = (TestTable) operations.loadTable(identifier);
-    FieldUtils.writeField(catalogTable, "auditInfo", AuditInfo.EMPTY, true);
+    FieldUtils.writeField(catalogTable, "auditInfo", catalogAudit, true);
     entityStore.delete(identifier, TABLE);
     clearInvocations(entityStore);
 
-    EntityImportAuditContext.withCreator(
-        identifier, "alice", () -> tableOperationDispatcher.loadTable(identifier));
+    Table loaded =
+        "load".equals(scenario)
+            ? tableOperationDispatcher.loadTable(identifier)
+            : tableOperationDispatcher.importTable(identifier, importAudit);
 
     TableEntity imported = entityStore.get(identifier, TABLE, TableEntity.class);
-    Assertions.assertEquals("alice", imported.auditInfo().creator());
-    Assertions.assertNotNull(imported.auditInfo().createTime());
+    Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
+    Assertions.assertEquals(expectedCreator, loaded.auditInfo().creator());
+    Assertions.assertEquals(expectedTime, loaded.auditInfo().createTime());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? "modifier" : null, imported.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? Instant.EPOCH : null,
+        imported.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
     verify(entityStore).put(any(TableEntity.class), anyBoolean());
     verify(entityStore, never()).update(any(), any(), any(), any());
 
     clearInvocations(entityStore);
-    EntityImportAuditContext.withCreator(
-        identifier, "bob", () -> tableOperationDispatcher.loadTable(identifier));
+    tableOperationDispatcher.importTable(
+        identifier,
+        AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
     Assertions.assertEquals(
-        "alice", entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+        expectedCreator,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+    Assertions.assertEquals(
+        expectedTime,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().createTime());
     verify(entityStore, never()).put(any(), anyBoolean());
     verify(entityStore, never()).update(any(), any(), any(), any());
+  }
+
+  /** Explicit imports require audit information. */
+  @Test
+  public void testImportRejectsNullAudit() {
+    Assertions.assertThrows(
+        NullPointerException.class,
+        () ->
+            tableOperationDispatcher.importTable(
+                NameIdentifier.of(metalake, catalog, "schema", "missing"), null));
   }
 
   @Test
