@@ -24,6 +24,9 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -87,6 +90,7 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    checkCommentLength(comment);
     return dispatcher.createSchema(
         normalizeNameIdentifier(ident), comment, properties, secretBindings, secretReferences);
   }
@@ -114,6 +118,11 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private boolean supportsHierarchicalSchema(Namespace namespace) {
     Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
     return capabilities.supportsHierarchicalSchema().supported();
+  }
+
+  private static void checkCommentLength(@Nullable String comment) {
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
