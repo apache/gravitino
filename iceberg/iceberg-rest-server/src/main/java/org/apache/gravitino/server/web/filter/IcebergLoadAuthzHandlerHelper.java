@@ -111,6 +111,18 @@ final class IcebergLoadAuthzHandlerHelper {
     return defaultExpression;
   }
 
+  static boolean isAllowed(Map<EntityType, NameIdentifier> nameIdentifierMap, String expression) {
+    return isAllowed(nameIdentifierMap, expression, new AuthorizationRequestContext());
+  }
+
+  static boolean isAllowed(
+      Map<EntityType, NameIdentifier> nameIdentifierMap,
+      String expression,
+      AuthorizationRequestContext requestContext) {
+    return new AuthorizationExpressionEvaluator(expression)
+        .evaluate(nameIdentifierMap, Collections.emptyMap(), requestContext, Optional.empty());
+  }
+
   static void authorizeLoadEntity(
       Map<EntityType, NameIdentifier> nameIdentifierMap,
       String primaryExpression,
@@ -119,21 +131,12 @@ final class IcebergLoadAuthzHandlerHelper {
       Supplier<RuntimeException> notFoundException,
       String entityType,
       NameIdentifier entityId) {
-    Map<String, Object> emptyPathParams = Collections.emptyMap();
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
-    Optional<String> emptyEntityType = Optional.empty();
-
-    AuthorizationExpressionEvaluator primaryEvaluator =
-        new AuthorizationExpressionEvaluator(primaryExpression);
-    if (primaryEvaluator.evaluate(
-        nameIdentifierMap, emptyPathParams, requestContext, emptyEntityType)) {
+    if (isAllowed(nameIdentifierMap, primaryExpression, requestContext)) {
       return;
     }
 
-    AuthorizationExpressionEvaluator allowExistenceEvaluator =
-        new AuthorizationExpressionEvaluator(allowCheckExistenceExpression);
-    if (allowExistenceEvaluator.evaluate(
-            nameIdentifierMap, emptyPathParams, requestContext, emptyEntityType)
+    if (isAllowed(nameIdentifierMap, allowCheckExistenceExpression, requestContext)
         && !exists.getAsBoolean()) {
       throw notFoundException.get();
     }

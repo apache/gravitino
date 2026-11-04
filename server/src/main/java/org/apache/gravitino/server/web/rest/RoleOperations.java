@@ -156,6 +156,8 @@ public class RoleOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofRole(metalake, request.getName()), Entity.EntityType.ROLE);
             MetalakeManager.checkMetalakeInUse(metalake);
             Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {

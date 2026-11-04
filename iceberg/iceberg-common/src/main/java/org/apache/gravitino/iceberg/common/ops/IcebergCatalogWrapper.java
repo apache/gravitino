@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -38,16 +41,24 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
+import org.apache.iceberg.TableOperations;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
@@ -83,6 +94,11 @@ import org.slf4j.LoggerFactory;
 public class IcebergCatalogWrapper implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
+
+  /** Format versions a table can be created with: the versions the Iceberg table spec defines. */
+  private static final int MIN_FORMAT_VERSION = 1;
+
+  private static final int MAX_FORMAT_VERSION = 3;
 
   private final Object initializationLock = new Object();
   private volatile Catalog catalog;
@@ -124,6 +140,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public IcebergConfig getIcebergConfig() {
     return icebergConfig;
+  }
+
+  /**
+   * Invalidates cached metadata before a subclass changes or removes a table.
+   *
+   * @param tableIdentifier the table whose cached metadata must be invalidated
+   */
+  protected void invalidateTableMetadata(TableIdentifier tableIdentifier) {
+    getMetadataCache().invalidate(tableIdentifier);
   }
 
   private SupportsNamespaces getNamespaceCatalog() {
@@ -208,7 +233,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
-    return CatalogHandlers.registerTable(getCatalog(), namespace, request);
+    try {
+      return CatalogHandlers.registerTable(getCatalog(), namespace, request);
+    } catch (NotFoundException e) {
+      // The metadata location comes from the request, so a file that does not exist is a client
+      // error. 404 is reserved by the REST spec for a namespace that does not exist.
+      throw new BadRequestException(
+          "Cannot register table %s: metadata location %s does not exist",
+          request.name(), request.metadataLocation());
+    }
   }
 
   /**
@@ -224,12 +257,26 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
+    validateTableDefinition(request);
     Catalog loadedCatalog = getCatalog();
-    if (request.stageCreate()) {
-      return CatalogHandlers.stageTableCreate(loadedCatalog, namespace, request);
+    LoadTableResponse loadTableResponse;
+    try {
+      if (request.stageCreate()) {
+        return CatalogHandlers.stageTableCreate(loadedCatalog, namespace, request);
+      }
+      loadTableResponse = CatalogHandlers.createTable(loadedCatalog, namespace, request);
+    } catch (UnsupportedOperationException e) {
+      // Iceberg reports an invalid table definition, such as a transform the column type does
+      // not support, as UnsupportedOperationException. createTable has no 406 response.
+      throw new BadRequestException("Invalid table definition: %s", e.getMessage());
+    } catch (IllegalStateException e) {
+      // With the format version taken from the catalog defaults, a column type that version does
+      // not support is only detected while Iceberg builds the table metadata.
+      if (e.getMessage() != null && e.getMessage().startsWith("Invalid schema for v")) {
+        throw new BadRequestException("%s", e.getMessage());
+      }
+      throw e;
     }
-    LoadTableResponse loadTableResponse =
-        CatalogHandlers.createTable(loadedCatalog, namespace, request);
     if (loadTableResponse != null) {
       TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
@@ -238,13 +285,36 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     CatalogHandlers.dropTable(getCatalog(), tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
-    CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
+    Table table = getCatalog().loadTable(tableIdentifier);
+    if (!(table instanceof HasTableOperations)) {
+      CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
+      return;
+    }
+    // Iceberg drops the catalog entry first and then deletes the files, giving up on the first
+    // file it cannot read (for example a missing manifest list). The request then fails although
+    // the table is gone, and no request is left that could delete the files. Read the metadata
+    // first, drop the entry, then delete every file that can still be reached.
+    TableOperations ops = ((HasTableOperations) table).operations();
+    TableMetadata metadata = ops.current();
+    FileIO io = ops.io();
+    if (!getCatalog().dropTable(tableIdentifier, false)) {
+      throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
+    }
+    try {
+      CatalogUtil.dropTableData(io, metadata);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Purge of {} could not read all table files ({}); deleting the files that can be read",
+          tableIdentifier,
+          e.getMessage());
+      IcebergPurgeUtil.deleteReachableFiles(io, metadata);
+    }
   }
 
   /**
@@ -351,8 +421,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     getMetadataCache().invalidate(tableIdentifier);
-    LoadTableResponse loadTableResponse =
-        CatalogHandlers.updateTable(getCatalog(), tableIdentifier, updateTableRequest);
+    validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
+    LoadTableResponse loadTableResponse;
+    try {
+      loadTableResponse =
+          CatalogHandlers.updateTable(getCatalog(), tableIdentifier, updateTableRequest);
+    } catch (UnsupportedOperationException e) {
+      // As in createTable: an invalid update, not an unsupported operation. updateTable has no 406.
+      throw new BadRequestException("Invalid table update: %s", e.getMessage());
+    }
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
@@ -505,5 +582,97 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         capacity,
         expireMinutes);
     return cache;
+  }
+
+  /**
+   * Rejects a table definition Iceberg would otherwise accept or fail on with a server error: a
+   * format version that is not a number or not a defined version, and column types the format
+   * version does not support.
+   */
+  @VisibleForTesting
+  static void validateTableDefinition(CreateTableRequest request) {
+    Map<String, String> properties = request.properties();
+    String value = properties == null ? null : properties.get(TableProperties.FORMAT_VERSION);
+    if (value == null) {
+      // The catalog's table defaults decide the version; Iceberg checks the schema against it.
+      return;
+    }
+    int formatVersion;
+    try {
+      formatVersion = Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      throw new BadRequestException(
+          "Invalid %s '%s': must be an integer", TableProperties.FORMAT_VERSION, value);
+    }
+    if (formatVersion < MIN_FORMAT_VERSION || formatVersion > MAX_FORMAT_VERSION) {
+      throw new BadRequestException(
+          "Unsupported %s %s: must be between %s and %s",
+          TableProperties.FORMAT_VERSION, formatVersion, MIN_FORMAT_VERSION, MAX_FORMAT_VERSION);
+    }
+    if (request.schema() != null) {
+      try {
+        Schema.checkCompatibility(request.schema(), formatVersion);
+      } catch (IllegalStateException | IllegalArgumentException e) {
+        throw new BadRequestException("%s", e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Rejects set-default-spec and set-default-sort-order updates naming an id the table does not
+   * have; Iceberg applies them unchecked and then fails with a NullPointerException.
+   */
+  private void validateDefaultSpecAndSortOrder(
+      TableIdentifier tableIdentifier, UpdateTableRequest request) {
+    if (request == null || request.updates() == null) {
+      return;
+    }
+    Set<Integer> specIds = new HashSet<>();
+    Set<Integer> sortOrderIds = new HashSet<>();
+    boolean addsSortOrder = false;
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.SetDefaultPartitionSpec) {
+        specIds.add(((MetadataUpdate.SetDefaultPartitionSpec) update).specId());
+      } else if (update instanceof MetadataUpdate.SetDefaultSortOrder) {
+        sortOrderIds.add(((MetadataUpdate.SetDefaultSortOrder) update).sortOrderId());
+      } else if (update instanceof MetadataUpdate.AddSortOrder) {
+        addsSortOrder = true;
+      }
+    }
+    // -1 means "the spec or sort order added last in this request".
+    specIds.remove(-1);
+    sortOrderIds.remove(-1);
+    if (specIds.isEmpty() && sortOrderIds.isEmpty()) {
+      return;
+    }
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddPartitionSpec) {
+        specIds.remove(((MetadataUpdate.AddPartitionSpec) update).spec().specId());
+      }
+    }
+    Table table;
+    try {
+      table = getCatalog().loadTable(tableIdentifier);
+    } catch (NoSuchTableException e) {
+      // A create-table transaction commits to a table that does not exist yet; Iceberg checks its
+      // requirements itself.
+      return;
+    }
+    for (Integer id : specIds) {
+      if (!table.specs().containsKey(id)) {
+        throw new BadRequestException(
+            "Cannot set default partition spec to %s: the table has no spec with that id", id);
+      }
+    }
+    // A sort order added in the same request gets its id when it is applied, so only ids the
+    // table already has can be checked here.
+    if (!addsSortOrder) {
+      for (Integer id : sortOrderIds) {
+        if (!table.sortOrders().containsKey(id)) {
+          throw new BadRequestException(
+              "Cannot set default sort order to %s: the table has no sort order with that id", id);
+        }
+      }
+    }
   }
 }

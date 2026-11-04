@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -744,6 +745,75 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 skipIdent, Catalog.Type.RELATIONAL, provider, "comment", skipProps));
     Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(skipIdent));
+  }
+
+  @Test
+  void testConfigurationValidationOnCreateWithoutBackendVerification() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-create");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "3",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    properties.put("validation-max", "4");
+    // The identifier is reusable after validation rollback. No backend initialization is needed.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+  }
+
+  @Test
+  void testConfigurationValidationOnAlterUsesCompleteProposedProperties() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-alter");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "1",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.setProperty("validation-min", "3")));
+    Assertions.assertEquals(
+        "1", catalogManager.loadCatalog(ident).properties().get("validation-min"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.alterCatalog(
+                ident,
+                CatalogChange.setProperty("validation-min", "3"),
+                CatalogChange.setProperty("validation-max", "4")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.removeProperty("validation-max")));
+    Assertions.assertEquals(
+        "4", catalogManager.loadCatalog(ident).properties().get("validation-max"));
   }
 
   @Test
@@ -2281,6 +2351,37 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testInvalidConfigurationAlterDoesNotMutateSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "invalid_settings_secret");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "original-secret")),
+          Map.of());
+      CatalogEntity original = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urn = original.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setProperty("validation-min", "3"),
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "replacement"))));
+      Assertions.assertEquals("original-secret", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          original.getProperties(),
+          entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class).getProperties());
+    }
+  }
+
+  @Test
   void testConnectionChangesDoNotMutateSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager();
         CatalogManager manager =
@@ -2399,6 +2500,82 @@ public class TestCatalogManager {
                   Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
                   Map.of()));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  void testCreateRejectsMaskedPlaceholderSecretBinding() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_mask_create");
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(
+                          PROPERTY_KEY4,
+                          new SecretBinding("memory", HiddenPropertyMaskUtils.MASKED_VALUE)),
+                      Map.of()));
+      Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
+      Assertions.assertFalse(manager.catalogExists(ident));
+    }
+  }
+
+  @Test
+  void testCatalogManageableWhenSecretMissing() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier broken = NameIdentifier.of("metalake", "secret_missing");
+      NameIdentifier healthy = NameIdentifier.of("metalake", "secret_healthy");
+      manager.createCatalog(
+          broken,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "gone-soon")),
+          Map.of());
+      manager.createCatalog(healthy, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
+
+      String urn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, urn));
+      manager.getCatalogCache().invalidate(broken);
+
+      Catalog[] listed = manager.listCatalogsInfo(broken.namespace());
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(broken.name())));
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(healthy.name())));
+
+      // Re-bind while still in use (alter requires catalog in use).
+      Assertions.assertDoesNotThrow(
+          () ->
+              manager.alterCatalog(
+                  broken,
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "rebound"))));
+      String reboundUrn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertEquals("rebound", secrets.readSecret(SecretUrn.parse(reboundUrn)));
+
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, reboundUrn));
+      manager.getCatalogCache().invalidate(broken);
+      Assertions.assertDoesNotThrow(() -> manager.disableCatalog(broken));
+      Assertions.assertTrue(manager.dropCatalog(broken, true));
+      Assertions.assertTrue(manager.dropCatalog(healthy, true));
     }
   }
 

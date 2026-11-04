@@ -28,6 +28,20 @@ public class TestPostgreSqlColumnDefaultValueConverter {
   private final PostgreSqlColumnDefaultValueConverter converter =
       new PostgreSqlColumnDefaultValueConverter();
 
+  @Test
+  void testNulStringDefaultIsRejectedBeforeDdl() {
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Literals.stringLiteral("before\0after")));
+    Assertions.assertTrue(error.getMessage().contains("default"));
+    Assertions.assertTrue(error.getMessage().contains("U+0000"));
+    Assertions.assertEquals(
+        "'before\\u0000after'",
+        converter.fromGravitino(Literals.stringLiteral("before\\u0000after")));
+    Assertions.assertEquals("NULL", converter.fromGravitino(Literals.NULL));
+  }
+
   /** Verifies long quoted text defaults can be loaded without recursive regex stack growth. */
   @Test
   public void testLongQuotedTextLiteralIsUnescaped() {
@@ -61,5 +75,21 @@ public class TestPostgreSqlColumnDefaultValueConverter {
         new JdbcTypeConverter.JdbcTypeBean(PostgreSqlTypeConverter.BPCHAR);
     Assertions.assertEquals(
         Literals.stringLiteral(""), converter.toGravitino(type, "''::bpchar", false, true));
+  }
+
+  @Test
+  void testUnboundedVarcharDefaultIsString() {
+    for (Integer length : new Integer[] {null, 0, Integer.MAX_VALUE}) {
+      JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("varchar");
+      type.setColumnSize(length);
+      Assertions.assertEquals(
+          Literals.stringLiteral("value"),
+          converter.toGravitino(type, "'value'::character varying", false, true));
+    }
+    JdbcTypeConverter.JdbcTypeBean bounded = new JdbcTypeConverter.JdbcTypeBean("varchar");
+    bounded.setColumnSize(12);
+    Assertions.assertEquals(
+        Literals.varcharLiteral(12, "value"),
+        converter.toGravitino(bounded, "'value'::character varying", false, true));
   }
 }

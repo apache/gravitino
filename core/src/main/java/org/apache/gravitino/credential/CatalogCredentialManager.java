@@ -67,6 +67,17 @@ public class CatalogCredentialManager implements Closeable {
     return Optional.ofNullable(credentialProviders.get(credentialType));
   }
 
+  /**
+   * Returns whether a credential provider of this catalog supports the scheme of the path.
+   *
+   * @param path a storage location
+   * @return true if at least one configured provider supports the path's scheme
+   */
+  public boolean supportsPath(String path) {
+    String scheme = extractScheme(path);
+    return credentialProviders.values().stream().anyMatch(p -> p.supportsScheme(scheme));
+  }
+
   public Optional<Credential> getCredentialByPath(String path, CredentialContext context) {
     String scheme = extractScheme(path);
     String matchedCredentialType = null;

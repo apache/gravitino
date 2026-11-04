@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.longOptionalPropertyEntry;
@@ -32,6 +33,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.utils.MapUtils;
 
 public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -129,7 +131,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.TEST_ON_BORROW.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             longOptionalPropertyEntry(
                 JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
@@ -143,7 +145,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.VERIFY_ON_CREATE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */));
     PROPERTIES_METADATA =
         ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -154,6 +156,19 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  /**
+   * Returns the effective JDBC settings used by validation and operation initialization.
+   *
+   * @param properties the catalog configuration
+   * @return a new map with bypass prefixes removed and canonical JDBC properties taking precedence
+   */
+  public Map<String, String> jdbcProperties(Map<String, String> properties) {
+    Map<String, String> result =
+        Maps.newHashMap(MapUtils.getPrefixMap(properties, CATALOG_BYPASS_PREFIX));
+    result.putAll(transformProperties(properties));
+    return result;
   }
 
   public Map<String, String> transformProperties(Map<String, String> properties) {
