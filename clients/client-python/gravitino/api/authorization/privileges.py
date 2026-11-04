@@ -198,6 +198,9 @@ class Privilege(ABC):
         MODIFY_FUNCTION = (0, 1 << 32)
         """The privilege to alter a function's metadata."""
 
+        PROBE_TABLE_LIKE = (0, 1 << 33)
+        """The privilege to probe whether a table-like object exists."""
+
         VIEW_SECRET_PROVIDERS = (0, 1 << 36)
         """The privilege to list configured secrets providers."""
 
@@ -1666,6 +1669,46 @@ class ModifyFunction(GenericPrivilege):
         return obj_type in Privileges.FUNCTION_SUPPORTED_TYPES
 
 
+class ProbeTableLike(GenericPrivilege):
+    """
+    The privilege to probe whether a table-like object exists.
+    """
+
+    _ALLOW_INSTANCE: Optional[ProbeTableLike] = None
+    _DENY_INSTANCE: Optional[ProbeTableLike] = None
+
+    @staticmethod
+    def allow() -> ProbeTableLike:
+        """
+        Retrieve the instance with allow condition of the privilege.
+
+        Returns:
+            Privilege: The instance with allow condition of the privilege.
+        """
+        if ProbeTableLike._ALLOW_INSTANCE is None:
+            ProbeTableLike._ALLOW_INSTANCE = ProbeTableLike(
+                Privilege.Condition.ALLOW, Privilege.Name.PROBE_TABLE_LIKE
+            )
+        return ProbeTableLike._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ProbeTableLike:
+        """
+        Retrieve the instance with deny condition of the privilege.
+
+        Returns:
+            Privilege: The instance with deny condition of the privilege.
+        """
+        if ProbeTableLike._DENY_INSTANCE is None:
+            ProbeTableLike._DENY_INSTANCE = ProbeTableLike(
+                Privilege.Condition.DENY, Privilege.Name.PROBE_TABLE_LIKE
+            )
+        return ProbeTableLike._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.TABLE_LIKE_SUPPORTED_TYPES
+
+
 class CreateSemanticModel(GenericPrivilege):
     """The privilege to create a Semantic Model."""
 
@@ -1865,6 +1908,7 @@ class Privileges:
         Privilege.Name.REGISTER_FUNCTION: RegisterFunction,
         Privilege.Name.EXECUTE_FUNCTION: ExecuteFunction,
         Privilege.Name.MODIFY_FUNCTION: ModifyFunction,
+        Privilege.Name.PROBE_TABLE_LIKE: ProbeTableLike,
         Privilege.Name.CREATE_SEMANTIC_MODEL: CreateSemanticModel,
         Privilege.Name.USE_SEMANTIC_MODEL: UseSemanticModel,
         Privilege.Name.MODIFY_SEMANTIC_MODEL: ModifySemanticModel,
@@ -1877,6 +1921,13 @@ class Privileges:
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,
         MetadataObject.Type.TABLE,
+    }
+    TABLE_LIKE_SUPPORTED_TYPES = {
+        MetadataObject.Type.METALAKE,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+        MetadataObject.Type.VIEW,
     }
     MODEL_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,
