@@ -190,6 +190,12 @@ public class MetalakeOperations {
 
     LOG.info("Received set request for metalake: {}", metalakeName);
     try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleMetalakeException(OperationType.SET, metalakeName, e);
+    }
+
+    try {
       return Utils.doAs(
           httpRequest,
           () -> {
