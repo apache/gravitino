@@ -26,11 +26,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -800,13 +802,20 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @return the new version id of the Lance dataset after applying the changes
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
+    // Validate the whole request before any dataset mutation. The name preflight below uses
+    // top-level fields, matching the columns Gravitino stores for Lance tables.
+    validateLanceTableChanges(changes);
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
-      for (TableChange change : changes) {
+      List<TableChange> changesToApply =
+          Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)
+              ? validateLanceColumnNames(dataset, changes)
+              : Arrays.asList(changes);
+      for (TableChange change : changesToApply) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
-          dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
+          dataset.dropColumns(List.of(deleteColumn.fieldName()[0]));
         } else if (change instanceof TableChange.AddIndex addIndex) {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
           IndexParams indexParams = getIndexParamsByIndexType(indexType);
@@ -840,6 +849,53 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
+    }
+  }
+
+  private static List<TableChange> validateLanceColumnNames(
+      Dataset dataset, TableChange[] changes) {
+    // Use the dataset schema, including out-of-band changes, and validate the whole ordered
+    // request before applying any changes. A late name conflict must not leave earlier edits.
+    Set<String> columnNames =
+        dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+    List<TableChange> changesToApply = new ArrayList<>(changes.length);
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        String name = deleteColumn.fieldName()[0];
+        boolean exists = columnNames.remove(name);
+        Preconditions.checkArgument(
+            exists || Boolean.TRUE.equals(deleteColumn.getIfExists()),
+            "Column does not exist: %s",
+            name);
+        if (!exists) {
+          // Honor ifExists before reaching Lance, whose dropColumns rejects missing fields.
+          continue;
+        }
+      } else if (change instanceof TableChange.RenameColumn renameColumn) {
+        String oldName = renameColumn.fieldName()[0];
+        String newName = renameColumn.getNewName();
+        Preconditions.checkArgument(
+            columnNames.remove(oldName), "Column does not exist: %s", oldName);
+        Preconditions.checkArgument(columnNames.add(newName), "Column already exists: %s", newName);
+      }
+      changesToApply.add(change);
+    }
+    return changesToApply;
+  }
+
+  private static void validateLanceTableChanges(TableChange[] changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.RenameColumn) {
+        String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports dropping or renaming top-level columns: %s",
+            String.join(".", fieldName));
+      } else if (!(change instanceof TableChange.AddIndex)) {
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
     }
   }
 

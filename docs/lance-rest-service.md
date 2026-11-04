@@ -279,6 +279,23 @@ URL encoded:        lance_catalog%24schema%24table01
 - Namespace deletion is recursive and irreversible
 :::
 
+## Error responses
+
+Malformed requests and backend validation errors return HTTP `400` without generated stack traces
+in `detail`. Details explicitly supplied by a backend Lance exception are preserved. Expected
+backend client errors are logged at INFO; server failures are logged at ERROR with the original
+exception for diagnosis. Unexpected failures return a generic internal-server-error response.
+
+Unrecognized or unimplemented routes under the Lance REST servlet return HTTP `406` with Lance
+error code `0` (`Unsupported`), allowing clients to select a fallback. The error identifies the HTTP
+method and path. Parameter conversion failures remain HTTP `400` (`InvalidInput`); missing tables
+and namespaces reported by operation handlers retain HTTP `404` and their entity-specific codes.
+
+In 1.3, Lance column changes support dropping and renaming top-level columns; adding columns remains
+unsupported. Column-name validation checks the ordered request against the current dataset before
+applying changes. Missing optional deletes are skipped. This prevents partial edits from invalid
+column names, but does not make backend failures or concurrent external changes atomic.
+
 ## Examples
 
 The following examples demonstrate how to interact with Lance REST service using different programming languages and tools.
