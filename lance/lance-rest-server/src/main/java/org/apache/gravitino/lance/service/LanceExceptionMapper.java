@@ -59,7 +59,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
         || ex instanceof NotSupportedException) {
       WebApplicationException routingError = (WebApplicationException) ex;
       InvalidInputException invalidInput =
-          new InvalidInputException(ex.getMessage(), errorDetail(ex), instance);
+          new InvalidInputException(ex.getMessage(), getStackTrace(ex), instance);
       try (Response mapped = handleLanceNamespaceException(invalidInput)) {
         Response.ResponseBuilder response =
             Response.status(routingError.getResponse().getStatus())
