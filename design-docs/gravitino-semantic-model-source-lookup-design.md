@@ -61,10 +61,11 @@ inspect when that source changes.
 
 ### Association Contract
 
-Each dataset has one association to the registered Gravitino source ID and type resolved during the
-latest successful model definition write (create, import, overwrite, or replacement). The model ID
-and exact dataset name identify which dataset an association belongs to. Only tables or Views named
-in `Dataset.source` are indexed; lookup does not follow the dependencies of a referenced View.
+Each dataset has one association to the registered Gravitino source ID and type observed during
+source validation for the latest successful model definition write (create, import, overwrite, or
+replacement). The model ID and exact dataset name identify which dataset an association belongs to.
+Only tables or Views named in `Dataset.source` are indexed; lookup does not follow the dependencies
+of a referenced View.
 
 `Dataset.name` is a case-sensitive alias unique within the model and need not match the table or
 View name in `Dataset.source`.
@@ -248,9 +249,10 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
     `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
     `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
     `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
     PRIMARY KEY (`id`),
-    KEY `idx_smsr_model` (`semantic_model_id`),
-    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`)
+    KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'current semantic model dataset source associations';
 ```
@@ -264,14 +266,20 @@ Use equivalent auto-generated keys, types, and indexes for H2 and PostgreSQL.
   an indexed key. This ID identifies a stored association row and is never returned by public APIs.
   Replacing a model's association set allocates new row IDs; these IDs do not track datasets across
   definition versions.
-- **Model index.** The index on `semantic_model_id` supports replacing or deleting a model's
-  complete association set.
+- **Model index.** The index on `semantic_model_id` and `deleted_at` supports replacing or retiring
+  a model's complete live association set.
+- **Retirement.** `deleted_at = 0` identifies a live association. Replacement or model deletion
+  soft-deletes old rows by recording their retirement time in epoch milliseconds. Only the
+  legacy-timeline garbage collector physically deletes retired rows.
 - **History.** Association rows have no version, audit payload, or copy of the source name. The
-  model's snapshots and audit records retain the definition history, but replacing or deleting
-  associations removes the old rows. Keeping an old model snapshot does not keep its association
-  rows.
+  model's snapshots and audit records retain the definition history. Retired association rows are
+  temporary cleanup state and are excluded from lookup. Snapshot retention neither keeps retired
+  associations nor retires current ones.
 
-The table contains one row per dataset, including separate rows when datasets share a source.
+The table contains one live row per dataset, including separate rows when datasets share a source.
+This is a write-path invariant maintained by dataset-name validation and complete-set replacement
+under the existing model transaction and concurrency checks. The DDL does not define a unique key
+on `(semantic_model_id, dataset_name)`.
 Resolve each distinct source once per definition write, then reuse that result in each dataset's
 row.
 
@@ -280,28 +288,34 @@ row.
 **Writes**
 
 - **Resolve sources.** Source validation already loads each distinct dataset source under the
-  caller. Extend this path to retain the actual resolved object type and ID. Reuse the resolved
-  object for datasets sharing a source.
+  caller. Extend this path to retain the registered `TableEntity` or `ViewEntity` ID and type
+  observed by that validation. These IDs come from internal registered metadata, not the public
+  `Table` or `View` contract. Complete any required source registration before model persistence;
+  association creation must not depend on a later lookup request. Reuse the resolved object for
+  datasets sharing a source.
 - **Build associations.** Pass each dataset's exact name and resolved source ID and type into model
   persistence. Use the existing source lookup path to normalize names and resolve objects. Storage
   must use that lookup result, without guessing TABLE versus VIEW or accepting IDs from public
   requests.
-- **Pass update intent.** Carry an explicit `replace` or `preserve` instruction through the internal
+- **Pass update intent.** Choose one mode for the entire alter request: `replace` if any change is
+  `ReplaceDefinition`, otherwise `preserve`. Carry this explicit instruction through the internal
   dispatcher and storage write path into the model transaction. `replace` carries the complete
-  validated association set; `preserve` carries no replacement set. Do not infer this instruction by
-  comparing old and new definitions. Keep this write context out of public request DTOs and model
-  snapshots.
+  validated association set for the final definition after applying all changes; `preserve` carries
+  no replacement set. Do not infer this instruction by comparing old and new definitions. Keep this
+  write context out of public request DTOs and model snapshots.
 - **Commit together.** Create, import, explicit overwrite, and `replaceDefinition` replace the
   complete dataset association set together with the model metadata, complete snapshot, and
-  current-version pointer. Reuse the existing model transaction and optimistic concurrency checks.
-  This handles dataset addition, removal, rename, reordering, and source changes without separate
-  dataset operations.
+  current-version pointer. Soft-delete the model's previous live association rows and insert the
+  complete new set with `deleted_at = 0` in that transaction. Reuse the existing model transaction
+  and optimistic concurrency checks. This handles dataset addition, removal, rename, reordering,
+  and source changes without separate dataset operations.
 - **Explicit replacement.** Every explicit definition replacement resolves sources again, even if
   only a metric expression changes or the submitted definition is identical. After a source rename
   and reuse of its old name by another object, a successful replacement records the new object's ID
   for unchanged dataset source references.
-- **Metadata updates.** Model rename, comment, and property changes leave association rows unchanged
-  and do not resolve dataset sources again.
+- **Metadata-only updates.** Requests containing only model rename, comment, or property changes
+  preserve association rows and do not resolve dataset sources again. If the same request includes
+  `ReplaceDefinition`, the whole request uses `replace` regardless of the order of metadata changes.
 
 Any write failure rolls back both the model changes and the association changes. Update association
 rows inside the model transaction; do not defer these writes to post-write event listeners.
@@ -309,7 +323,7 @@ rows inside the model transaction; do not defer these writes to post-write event
 **Reads**
 
 - **Source lookup.** Resolve the requested source to its current ID and type, then query
-  `idx_smsr_source` using the metalake ID, source type, and source ID.
+  `idx_smsr_source` using the metalake ID, source type, source ID, and `deleted_at = 0`.
 - **Relation query.** Add `SEMANTIC_MODEL_SOURCE_REL` to `SupportsRelationOperations.Type` and query
   it through `RelationQuery` with a table or View as the anchor. A dedicated relational service and
   mapper serve the read through the existing EntityStore relation query abstraction.
@@ -320,9 +334,11 @@ rows inside the model transaction; do not defer these writes to post-write event
 - **Internal query result.** Use a lightweight model object implementing `Entity` and
   `HasIdentifier`. It contains the model's ID, current identifier, `SEMANTIC_MODEL` type, and the
   matching dataset names.
-- **Result identifiers.** Construct each five-level dataset identifier from the model's current
-  identifier components and the recorded dataset name. No dataset entity type is required. After a
-  model rename, returned dataset namespaces contain the new model name.
+- **Result identifiers.** Deduplicate matches by model ID and exact, case-sensitive dataset name;
+  same-named datasets in different models remain distinct. Construct each five-level dataset
+  identifier from the model's current identifier components and the recorded dataset name. No
+  dataset entity type is required. After a model rename, returned dataset namespaces contain the
+  new model name.
 
 #### Lifecycle Behavior
 
@@ -333,22 +349,36 @@ rows inside the model transaction; do not defer these writes to post-write event
 | Source name reused by a different object     | Lookup resolves the reused name to the new ID and excludes datasets associated with the old ID.         |
 | Definition explicitly replaced               | Resolve sources again and replace the association set atomically.                                       |
 | Dataset renamed                              | Store the new dataset name and return its new identifier; the old identifier does not track the rename. |
-| Dataset removed                              | Remove its row and identifier; other matching dataset results remain.                                   |
+| Dataset removed                              | Retire its row and omit its identifier; other matching dataset results remain.                          |
 | Dataset source changed                       | Store the newly resolved source ID and type; lookup returns this dataset for that source.               |
 | Datasets reordered                           | Replace the association set; order alone does not change the returned identifiers.                      |
-| Model renamed                                | Keep association rows; returned dataset namespaces contain the new model name.                          |
-| Model deleted directly or by parent deletion | Remove its associations in the same model deletion transaction.                                         |
+| Model renamed without definition replacement | Keep association rows; returned dataset namespaces contain the new model name.                          |
+| Model deleted directly                       | Retire its live associations in the same model deletion transaction.                                    |
+| Model deleted by parent deletion             | Retire its live associations in the deleting parent's cascade transaction.                              |
 | Model dropped and recreated                  | Create associations for the new model ID.                                                               |
 
 Source rename or deletion does not rewrite definitions, block the source operation, or grant
 additional privileges. Models remain loadable for inspection and explicit repair through the normal
 model update API, following the [existing Semantic Model design][semantic-design].
 
-Deleting a source must not delete association rows for models that still exist. Those rows remain
-until the model definition is replaced or the model is deleted, including deletion caused by
-dropping its schema, catalog, or metalake. Lookup excludes deleted models and models whose schema,
-catalog, or metalake has been deleted. Do not add a source foreign key that deletes association rows
-when the source is deleted.
+Retire associations in `SemanticModelMetaService.deleteSemanticModelWithVersion` and in the bulk
+deletion transactions in `SchemaMetaService`, `CatalogMetaService`, and `MetalakeMetaService`.
+Parent cascades do not call the direct model-delete method. Identify affected model IDs from the
+models' own schema, catalog, or metalake within the parent deletion transaction, then retire their
+live associations atomically with model deletion. Cleanup follows model ownership, including
+descendant schemas, rather than the source's namespace.
+
+Extend `SemanticModelMetaService.deleteSemanticModelMetasByLegacyTimeline` to purge association
+rows with `0 < deleted_at < legacyTimeline`, using the existing per-table deletion limit. This
+cleanup must depend only on the association's retirement timestamp, so it still works after the
+model or its parents have been physically removed. Snapshot retention must not retire current
+association rows.
+
+Deleting a source, directly or through its parents, must not retire associations for models that
+still exist. Those associations remain live until the model definition is replaced or the model is
+deleted. Lookup excludes deleted models and models whose schema, catalog, or metalake has been
+deleted. Do not add a source foreign key or register source IDs for cleanup through
+`OrphanedMetadataObjectRelationService`.
 
 Update the 2.0.0 schema and 1.3.0-to-2.0.0 upgrade scripts for all supported databases, following the
 existing Semantic Model storage release boundary. Released versions have no Semantic Model data
@@ -387,14 +417,22 @@ are not included in the Development Plan.
    excludes those datasets. Explicitly replacing the definition resolves sources again and updates
    the associations; lookup itself does not change compilation or execution behavior.
 
+   Source deletion or same-name recreation can also occur after source validation but before the
+   model transaction commits. A successful write can retain the previously resolved source ID even
+   if that source has since been deleted or replaced. Model definitions and associations still
+   commit atomically, but the write does not serialize source changes or guarantee that the source
+   remains live through commit. Lookup of a replacement source excludes datasets bound to the old ID.
+
    - **Current scope:** Confirm the intended source before replacing a definition. Replacement can
      change stored source IDs even when the submitted names are unchanged. Do not use replacement
-     merely to check whether source references are outdated.
+     merely to check whether source references are outdated. After concurrent source changes, verify
+     the intended source and explicitly replace the definition again if the binding needs updating.
 
    - **Extension:** Add a server-side check before compilation or use: resolve `Dataset.source`
      again and compare the resolved source ID with the stored source ID. Report mismatches and
      require explicit rebinding (updating the stored source association) rather than silently
-     switching objects.
+     switching objects. Coordinating source changes with model commits requires a separate design
+     if a concrete use case needs that guarantee.
 
 3. **Registered IDs and external source changes.** Associations identify sources by their registered
    Gravitino IDs. A rename preserves an association only if it preserves that ID. How changes made
@@ -496,9 +534,19 @@ are not included in the Development Plan.
    same-name source recreation. Also cover a metric-only replacement after source rename and name
    reuse: unchanged dataset source references bind to the new source if validation succeeds.
    Metadata-only changes must preserve bindings after source rename or deletion.
+   Cover mixed requests with rename, comment, or property changes before and after
+   `ReplaceDefinition`, verifying that associations match the final definition.
+   Cover association retirement in direct and all parent deletion transactions, rollback on
+   retirement failure, and legacy-timeline GC with its deletion limit after parent metadata is
+   purged. Verify that source deletion, including deletion through its parents, and old snapshot
+   retention preserve live associations of models that still exist.
 2. Add the indexed relation query, REST endpoint using `EntityListResponse`, source access checks,
-   and full model load authorization checks. Emit pre-operation, success, and failure events and
-   add dataset lookup to the existing audit operation mapping.
+   and full model load authorization checks. Emit pre-operation, success, and failure events using
+   `LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE`, with the requested source table or View as the subject
+   and its fully qualified identifier as the event and audit identifier. Add this operation to the
+   listener API's `OperationType` and `AuditLog.Operation`, wiring both `CompatibilityUtils` and the
+   legacy `AuditLog.Operation.fromEvent` conversion. Verify the source identifier, operation name,
+   and success/failure audit mappings in implementation tests.
 3. Add `listSemanticModelDatasets` and its Python equivalent to the table/View capability, OpenAPI
    definitions, and usage documentation, with fully qualified five-level dataset identifiers.
 4. Validate cross-catalog lookup, direct View references, model renames, source renames with unchanged
