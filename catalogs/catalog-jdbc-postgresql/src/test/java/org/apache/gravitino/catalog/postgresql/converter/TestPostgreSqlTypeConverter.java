@@ -95,6 +95,9 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ShortType.get(), SMALLSERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.IntegerType.get(), SERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.LongType.get(), BIGSERIAL, null, null, 0);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
   }
