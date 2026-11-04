@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.scheduler.policy;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
 import org.apache.gravitino.EntityStore;
@@ -25,12 +27,14 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.ObjectPolicyResolver.Match;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
- * Picks the effective maintenance policy of a given {@link Policy.BuiltInType} for a table.
+ * Picks the nearest maintenance policy of a given {@link Policy.BuiltInType} for a table.
  *
- * <p>{@link ObjectPolicyResolver} already drops farther same-type maintenance matches. This class
- * selects the unique remaining winner of the requested type.
+ * <p>Matching and effective-tag inheritance come from {@link ObjectPolicyResolver}. This class only
+ * applies maintenance-specific nearest-level and same-level conflict rules over the returned
+ * metadata-object sources.
  */
 public class NearestMaintenancePolicyResolver {
 
@@ -51,32 +55,40 @@ public class NearestMaintenancePolicyResolver {
   }
 
   /**
-   * Resolves the unique effective policy id for {@code policyType}.
+   * Resolves the unique nearest winner policy id for {@code policyType}.
    *
    * @param metalake metalake name
    * @param table table metadata object
    * @param policyType maintenance built-in type
    * @return winner policy id, or empty when none match
-   * @throws IllegalArgumentException when two or more same-type policies remain
+   * @throws IllegalArgumentException when two or more same-type policies share the nearest level
    */
   public Optional<Long> resolveWinnerId(
       String metalake, MetadataObject table, Policy.BuiltInType policyType) {
     Match[] matches = objectPolicyResolver.resolveMatches(metalake, table);
-    TreeSet<Long> winners = new TreeSet<>();
-    for (Match match : matches) {
-      if (match.policy().policyType() != policyType) {
+    List<MetadataObject> chain = new ArrayList<>();
+    chain.add(table);
+    chain.addAll(MetadataObjectUtil.getParentMetadataObjects(table));
+    for (MetadataObject level : chain) {
+      TreeSet<Long> atLevel = new TreeSet<>();
+      for (Match match : matches) {
+        if (match.policy().policyType() != policyType) {
+          continue;
+        }
+        if (match.sources().contains(level)) {
+          atLevel.add(match.policy().id());
+        }
+      }
+      if (atLevel.isEmpty()) {
         continue;
       }
-      winners.add(match.policy().id());
+      if (atLevel.size() > 1) {
+        throw new IllegalArgumentException(
+            String.format(
+                "ambiguous %s policies %s on nearest level %s", policyType, atLevel, level));
+      }
+      return Optional.of(atLevel.first());
     }
-    if (winners.isEmpty()) {
-      return Optional.empty();
-    }
-    if (winners.size() > 1) {
-      throw new IllegalArgumentException(
-          String.format(
-              "ambiguous %s policies %s on metadata object %s", policyType, winners, table));
-    }
-    return Optional.of(winners.first());
+    return Optional.empty();
   }
 }
