@@ -251,8 +251,11 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
       }
 
       deleter.start();
+      // Only the policy lives in this metalake, so the delete reaches its row almost at once and
+      // the lock above is the one thing that can hold it up. Adding other entities here would
+      // slow that down and make this wait too short.
       Thread.sleep(400);
-      Assertions.assertTrue(deleter.isAlive(), "The metalake delete should wait on the policy row");
+      Assertions.assertTrue(deleter.isAlive(), "The metalake delete should not have finished yet");
 
       try (PreparedStatement insert =
           updater.prepareStatement(
