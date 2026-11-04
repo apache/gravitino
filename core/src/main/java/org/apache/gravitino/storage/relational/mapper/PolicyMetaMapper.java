@@ -19,6 +19,8 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
+import org.apache.gravitino.storage.relational.po.NearestPolicyMatchPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -217,4 +219,27 @@ public interface PolicyMetaMapper {
       method = "batchSelectPolicyByIdentifier")
   List<PolicyPO> batchSelectPolicyByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
+
+  /**
+   * Lists enabled policy-tag candidates for nearest-policy resolution over an ancestry chain.
+   *
+   * @param chain table ancestry rows
+   * @param policyType policy type wire value
+   * @return candidate rows (effective-tag / selector / nearest pick applied in the service)
+   */
+  @Results(
+      id = "nearestPolicyMatchPOResultMap",
+      value = {
+        @Result(property = "tableId", column = "tableId"),
+        @Result(property = "lvl", column = "lvl"),
+        @Result(property = "tagName", column = "tagName"),
+        @Result(property = "tagValue", column = "tagValue"),
+        @Result(property = "policyId", column = "policyId"),
+        @Result(property = "selector", column = "selector")
+      })
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "listNearestPolicyMatchCandidates")
+  List<NearestPolicyMatchPO> listNearestPolicyMatchCandidates(
+      @Param("chain") List<NearestPolicyChainPO> chain, @Param("policyType") String policyType);
 }

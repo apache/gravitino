@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -54,6 +53,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -68,9 +68,10 @@ import org.slf4j.LoggerFactory;
  * Finds tables where {@code policy} is the nearest maintenance policy of its type.
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
- * hierarchical child schemas). A table is kept only when {@link NearestMaintenancePolicyResolver}
- * picks this policy and {@link ShouldSkipTable} allows schedule. Stops after {@code limit} accepted
- * tables (skipped cooldown / in-flight tables do not count).
+ * hierarchical child schemas). A table is kept only when {@link
+ * PolicyMetaService#resolveNearestPolicyId} picks this policy and {@link ShouldSkipTable} allows
+ * schedule. Stops after {@code limit} accepted tables (skipped cooldown / in-flight tables do not
+ * count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
  * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
@@ -103,7 +104,7 @@ public final class NearestPolicyTableEnumerator {
   private final TagMetaService tagMetaService;
   private final SchemaMetaService schemaMetaService;
   private final TableMetaService tableMetaService;
-  private final Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier;
+  private final PolicyMetaService policyMetaService;
   @Nullable private final SchemaDispatcher schemaDispatcher;
   @Nullable private final TableDispatcher tableDispatcher;
 
@@ -114,20 +115,20 @@ public final class NearestPolicyTableEnumerator {
    * @param tagMetaService tagged metadata objects
    * @param schemaMetaService schemas already in the entity store
    * @param tableMetaService tables already in the entity store
-   * @param nearestResolverSupplier decides which policy wins for a table
+   * @param policyMetaService decides which policy wins for a table
    */
   public NearestPolicyTableEnumerator(
       PolicyTagRelService policyTagRelService,
       TagMetaService tagMetaService,
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
-      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier) {
+      PolicyMetaService policyMetaService) {
     this(
         policyTagRelService,
         tagMetaService,
         schemaMetaService,
         tableMetaService,
-        nearestResolverSupplier,
+        policyMetaService,
         null,
         null);
   }
@@ -137,7 +138,7 @@ public final class NearestPolicyTableEnumerator {
    * @param tagMetaService tagged metadata objects
    * @param schemaMetaService schemas already in the entity store
    * @param tableMetaService tables already in the entity store
-   * @param nearestResolverSupplier decides which policy wins for a table
+   * @param policyMetaService decides which policy wins for a table
    * @param schemaDispatcher optional live catalog schema list/import
    * @param tableDispatcher optional live catalog table list/import
    */
@@ -146,14 +147,14 @@ public final class NearestPolicyTableEnumerator {
       TagMetaService tagMetaService,
       SchemaMetaService schemaMetaService,
       TableMetaService tableMetaService,
-      Supplier<NearestMaintenancePolicyResolver> nearestResolverSupplier,
+      PolicyMetaService policyMetaService,
       @Nullable SchemaDispatcher schemaDispatcher,
       @Nullable TableDispatcher tableDispatcher) {
     this.policyTagRelService = policyTagRelService;
     this.tagMetaService = tagMetaService;
     this.schemaMetaService = schemaMetaService;
     this.tableMetaService = tableMetaService;
-    this.nearestResolverSupplier = nearestResolverSupplier;
+    this.policyMetaService = Preconditions.checkNotNull(policyMetaService);
     this.schemaDispatcher = schemaDispatcher;
     this.tableDispatcher = tableDispatcher;
   }
@@ -210,7 +211,7 @@ public final class NearestPolicyTableEnumerator {
         new ScanState(
             metalake,
             policy,
-            nearestResolverSupplier.get(),
+            policyMetaService,
             shouldSkip,
             minIntervalMs,
             System.currentTimeMillis(),
@@ -537,7 +538,7 @@ public final class NearestPolicyTableEnumerator {
     Policy.BuiltInType policyType = scan.policy.policyType();
     final Optional<Long> winnerId;
     try {
-      winnerId = scan.nearestResolver.resolveWinnerId(scan.metalake, tableObject, policyType);
+      winnerId = scan.policyMetaService.resolveNearestPolicyId(tableId, policyType);
     } catch (IllegalArgumentException e) {
       LOG.error(
           "Skip table {} for maintenance type {}: {}",
@@ -576,7 +577,7 @@ public final class NearestPolicyTableEnumerator {
   private static final class ScanState {
     private final String metalake;
     private final PolicyEntity policy;
-    private final NearestMaintenancePolicyResolver nearestResolver;
+    private final PolicyMetaService policyMetaService;
     private final ShouldSkipTable shouldSkip;
     private final long minIntervalMs;
     private final long nowMs;
@@ -587,7 +588,7 @@ public final class NearestPolicyTableEnumerator {
     private ScanState(
         String metalake,
         PolicyEntity policy,
-        NearestMaintenancePolicyResolver nearestResolver,
+        PolicyMetaService policyMetaService,
         ShouldSkipTable shouldSkip,
         long minIntervalMs,
         long nowMs,
@@ -596,7 +597,7 @@ public final class NearestPolicyTableEnumerator {
         int limit) {
       this.metalake = metalake;
       this.policy = policy;
-      this.nearestResolver = nearestResolver;
+      this.policyMetaService = policyMetaService;
       this.shouldSkip = shouldSkip;
       this.minIntervalMs = minIntervalMs;
       this.nowMs = nowMs;

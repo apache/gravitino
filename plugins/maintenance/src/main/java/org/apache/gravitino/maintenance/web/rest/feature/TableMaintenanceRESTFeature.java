@@ -33,7 +33,6 @@ import org.apache.gravitino.maintenance.policy.PolicyExpandLifecycleHook;
 import org.apache.gravitino.maintenance.policy.PolicyExpandReconciler;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
-import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolicyResolver;
 import org.apache.gravitino.maintenance.scheduler.policy.NearestPolicyTableEnumerator;
 import org.apache.gravitino.maintenance.scheduler.policy.expand.PolicyExpandClient;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
@@ -108,7 +107,7 @@ public class TableMaintenanceRESTFeature implements Feature {
             TagMetaService.getInstance(),
             SchemaMetaService.getInstance(),
             TableMetaService.getInstance(),
-            () -> new NearestMaintenancePolicyResolver(env.entityStore()),
+            PolicyMetaService.getInstance(),
             env.internalSchemaDispatcher(),
             env.internalTableDispatcher());
 
