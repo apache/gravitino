@@ -120,7 +120,7 @@ Then manually create a PersistentVolume (PV).
 
 Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 
-Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
+If you prefer to initialize the database yourself, you can manually create the necessary tables before deploying Gravitino. This step is optional: the chart now performs schema migration automatically for external databases via a pre-install/pre-upgrade hook Job (see [Automatic Schema Migration for an Existing Database](#automatic-schema-migration-for-an-existing-database) below). Manually running the schema SQL remains harmless, because it uses `CREATE TABLE IF NOT EXISTS`.
 
 ```console
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
@@ -136,6 +136,35 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set entity.jdbcUser="admin" \
   --set entity.jdbcPassword="admin123"
 ```
+
+#### Automatic Schema Migration for an Existing Database
+
+When you deploy Gravitino against an existing MySQL or PostgreSQL database
+(`entity.jdbcUrl` set, and neither `mysql.enabled` nor `postgresql.enabled`),
+the chart renders a Kubernetes `Job` annotated with the Helm
+`pre-install,pre-upgrade` hooks. The Job applies the newest applicable
+`upgrade-*.sql` script (best-effort) followed by the newest applicable
+`schema-*.sql` script matching the Gravitino server version, before any
+Gravitino pod is created or updated. This guarantees the migration runs exactly
+once per install/upgrade and avoids race conditions from concurrent migrations
+during rolling updates.
+
+Schema files use `CREATE TABLE IF NOT EXISTS`, so re-running them is safe. The
+Job connects to the database using `entity.jdbcUser` / `entity.jdbcPassword`
+and the host, port, and database name parsed from `entity.jdbcUrl`.
+
+Migration behavior can be tuned with the `schemaMigration.*` values:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `schemaMigration.enabled` | Enable the migration Job for external databases | `true` |
+| `schemaMigration.backoffLimit` | Retries before the migration Job is considered failed | `4` |
+| `schemaMigration.activeDeadlineSeconds` | Hard cap on the total Job duration in seconds (empty = no cap) | `` |
+| `schemaMigration.ttlSecondsAfterFinished` | TTL in seconds before a finished migration Job is cleaned up (empty = keep) | `` |
+
+> **Note:** When using the bundled in-chart MySQL or PostgreSQL
+> (`mysql.enabled` / `postgresql.enabled`), schema migration keeps running as
+> init containers inside the Gravitino Deployment; no Job is rendered.
 
 _Note: \
 Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
