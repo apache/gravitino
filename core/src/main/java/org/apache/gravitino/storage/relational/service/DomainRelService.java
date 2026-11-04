@@ -507,6 +507,12 @@ public class DomainRelService {
     return lockMetalakeAndDomains(identifier, observedPO, null).getLeft();
   }
 
+  // The parent name is read under the lock on the domain, which every writer of its edge holds.
+  DomainEntity toEntityWithParent(DomainPO domainPO, Namespace namespace) {
+    return DomainPO.fromDomainPO(
+        domainPO, namespace, getParentDomainName(domainPO.domainId()).orElse(null));
+  }
+
   /**
    * Inserts the parent edge of a new sub-domain, in the caller's transaction. The caller holds the
    * shared lock on the parent from {@link #lockAndGetParentOfNewSubDomain(NameIdentifier)}.
@@ -594,12 +600,6 @@ public class DomainRelService {
   private DomainPO selectDomainForShare(Long domainId) {
     return SessionUtils.getWithoutCommit(
         DomainMetaMapper.class, mapper -> mapper.selectDomainMetaByIdForShare(domainId));
-  }
-
-  // The parent name is read under the lock on the domain, which every writer of its edge holds.
-  private DomainEntity toEntityWithParent(DomainPO domainPO, Namespace namespace) {
-    return DomainPO.fromDomainPO(
-        domainPO, namespace, getParentDomainName(domainPO.domainId()).orElse(null));
   }
 
   private List<DomainEntity> listSubDomainsOf(DomainPO domainPO, Namespace namespace) {

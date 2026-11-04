@@ -304,7 +304,8 @@ public class DomainMetaService {
           () -> {
             DomainPO lockedPO =
                 DomainRelService.getInstance().lockAndGetDomainForChange(identifier, observedPO);
-            DomainEntity domain = fromDomainPOWithParent(lockedPO, namespace);
+            DomainEntity domain =
+                DomainRelService.getInstance().toEntityWithParent(lockedPO, namespace);
             TagEntity tag = null;
             List<DomainEntity> bindings = Collections.emptyList();
             if (backingTag != null) {

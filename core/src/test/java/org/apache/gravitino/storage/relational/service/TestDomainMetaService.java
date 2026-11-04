@@ -1072,6 +1072,36 @@ public class TestDomainMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateSubDomainBackingTagPreservesParentInCheck() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService domainMetaService = DomainMetaService.getInstance();
+    TagEntity dept = newTag("dept");
+    backend.insert(dept, false);
+    domainMetaService.insertDomainWithBackingTag(
+        newDomain(METALAKE_NAME, "Finance", null), TagValue.of("dept", "finance"), s -> {});
+    DomainEntity tax =
+        newDomain(METALAKE_NAME, "Tax", null).toBuilder().withParent("Finance").build();
+    domainMetaService.insertDomainWithBackingTag(tax, TagValue.of("dept", "tax"), s -> {});
+
+    // Changing, retaining and removing the binding all expose the current parent to the check.
+    for (TagValue backingTag :
+        new TagValue[] {TagValue.of("dept", "other"), TagValue.of("dept", "other"), null}) {
+      List<LockedDomainState> states = new ArrayList<>();
+      DomainEntity updated =
+          domainMetaService.updateDomainBackingTagAndGet(
+              tax.nameIdentifier(), backingTag, AUDIT_INFO, states::add);
+      Assertions.assertEquals(1, states.size());
+      Assertions.assertEquals("Finance", states.get(0).domain().parent().orElse(null));
+      // The parent entity is not locked or included for a backing tag update.
+      Assertions.assertFalse(states.get(0).parent().isPresent());
+      Assertions.assertEquals("Finance", updated.parent().orElse(null));
+      Assertions.assertEquals(
+          "Finance",
+          domainMetaService.getDomainByIdentifier(tax.nameIdentifier()).parent().orElse(null));
+    }
+  }
+
+  @TestTemplate
   public void testUpdateDomainBackingTag() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     DomainMetaService domainMetaService = DomainMetaService.getInstance();
