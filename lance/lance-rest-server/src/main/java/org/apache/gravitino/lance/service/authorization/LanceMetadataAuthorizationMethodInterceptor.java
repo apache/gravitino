@@ -30,6 +30,7 @@ import javax.ws.rs.QueryParam;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -40,6 +41,7 @@ import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.lance.service.rest.LanceTableOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -71,8 +73,49 @@ public class LanceMetadataAuthorizationMethodInterceptor
 
   @Override
   public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+    Method method = methodInvocation.getMethod();
+    Object[] args = methodInvocation.getArguments();
     return authorizeMethod(
-        methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
+        method, args, () -> invokeWithExistOkRecheck(method, args, methodInvocation::proceed));
+  }
+
+  /**
+   * Invokes the operation and re-authorizes an {@code exist_ok} result before it is returned.
+   *
+   * <p>The authorization that runs before the operation cannot know which object the operation will
+   * resolve: a concurrent request may remove the addressed object and create a different one at the
+   * same name between that check and the load the operation performs. This re-check runs after the
+   * operation has resolved its result and before the result is returned, so the read privilege is
+   * verified against the object the response is actually about to describe. A caller that just
+   * created the object owns it and passes the check.
+   *
+   * @param method invoked protocol method
+   * @param args invoked method arguments
+   * @param invoker the intercepted operation
+   * @return the operation result
+   * @throws Throwable if the operation or the re-check fails
+   */
+  private Object invokeWithExistOkRecheck(Method method, Object[] args, MethodInvoker invoker)
+      throws Throwable {
+    Object result = invoker.proceed();
+    Parameter[] parameters = method.getParameters();
+    if (!isExistOkCreate(parameters, args)) {
+      return result;
+    }
+    AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
+    if (annotation == null) {
+      return result;
+    }
+    AuthorizationTarget target = resolveAuthorizationTarget(method, annotation, parameters, args);
+    Map<Entity.EntityType, NameIdentifier> identifiers = target.nameIdentifiers();
+    Entity.EntityType entityType = deepestEntityType(identifiers);
+    if (objectExists(identifiers)
+        && !evaluateExpression(readExpression(method), identifiers, entityType)) {
+      throw new ForbiddenException(
+          "User '%s' is not authorized to read existing metadata for '%s' in exist_ok mode",
+          PrincipalUtils.getCurrentUserName(), identifiers.get(entityType));
+    }
+    return result;
   }
 
   @Override
@@ -149,14 +192,23 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Returns the handler that authorizes an overwrite of an existing object. The mode of a Lance
-   * create request travels in the request body or in a query parameter rather than in the request
-   * path, so which privileges a create needs cannot be expressed by the method annotation alone.
+   * Returns the handler that authorizes a create request whose mode decides what the request does
+   * to an object that already exists. The mode of a Lance create request travels in the request
+   * body or in a query parameter rather than in the request path, so which privileges a create
+   * needs cannot be expressed by the method annotation alone.
+   *
+   * <p>An {@code exist_ok} request resolves to one of two outcomes the interceptor cannot tell
+   * apart without resolving the addressed object: it answers with the metadata of an object that
+   * exists, or it creates an object that does not. The handler resolves the addressed object first,
+   * mirroring how the Gravitino core server authorizes a load that doubles as an existence probe: a
+   * request that resolves to an existing object is authorized against the read expression of that
+   * object, and a request that resolves to an absent one falls through to the create expression on
+   * the method, which authorizes the creation that follows.
    *
    * @param method invoked protocol method
    * @param parameters invoked method parameters
    * @param args invoked method arguments
-   * @return the overwrite handler for a create request, empty for every other operation
+   * @return the handler for a create request, empty for every other operation
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
@@ -166,7 +218,22 @@ public class LanceMetadataAuthorizationMethodInterceptor
             ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
             : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
     return createMode(parameters, args)
-        .map(mode -> new OverwriteAuthzHandler(mode, overwriteExpression));
+        .map(mode -> new CreateModeAuthzHandler(mode, overwriteExpression, readExpression(method)));
+  }
+
+  /**
+   * Returns the read expression matching the invoked resource. An {@code exist_ok} request that
+   * resolves to an existing object answers with that object's metadata (location, properties,
+   * schema), so the caller must hold the same read privilege a describe of the object would
+   * require.
+   *
+   * @param method invoked protocol method
+   * @return the read expression for the resource the method addresses
+   */
+  private static String readExpression(Method method) {
+    return isTableOperation(method)
+        ? LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION
+        : AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
   }
 
   @Override
@@ -196,71 +263,142 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Authorizes a create request whose mode overwrites an object that already exists.
+   * Authorizes a create request whose mode affects an existing object.
    *
    * <p>An overwrite replaces an existing namespace or table, so it is a modification rather than a
    * creation and is authorized against the modification expression for the invoked resource instead
    * of the create expression on the method. Without this, CREATE_CATALOG, CREATE_SCHEMA, or
    * CREATE_TABLE would escalate into permission to replace an object the caller does not own.
    *
-   * <p>The mode alone decides this, without probing whether the object exists: an existence probe
-   * at authorization time would race with the create that follows it, and the required privilege
-   * would then depend on that race.
+   * <p>An {@code exist_ok} request has two outcomes the interceptor cannot tell apart without
+   * resolving the addressed object. When the object exists, the request answers with the existing
+   * object's metadata (location, properties, schema), which is a read of that object, so it is
+   * authorized here against the read expression, and the create expression on the method must not
+   * additionally deny a caller that only reads. When the object is absent, the request creates it,
+   * so it falls through to the create expression on the method, which requires the create privilege
+   * that the creation needs. A caller that can read but not create is denied exactly when its
+   * request would create, and a caller that can create but not read is denied exactly when its
+   * request would answer with metadata it cannot see, preserving normal creation of absent objects
+   * as #12955 requires.
+   *
+   * <p>Nothing holds a lock across the resolution and the operation that follows it, so a
+   * concurrent request can replace the addressed object between this check and the load the
+   * operation performs. The interceptor therefore re-checks the read privilege after the operation,
+   * before the result is returned; see {@link #invokeWithExistOkRecheck}.
    */
-  private static final class OverwriteAuthzHandler implements AuthorizationHandler {
+  private final class CreateModeAuthzHandler implements AuthorizationHandler {
 
     private static final String OVERWRITE_MODE = "OVERWRITE";
+    private static final String EXIST_OK_MODE = "EXIST_OK";
 
     private final boolean overwrite;
-    private final String authorizationExpression;
+    private final boolean existOk;
+    private final String overwriteExpression;
+    private final String readExpression;
+    private boolean existOkReadAuthorized;
 
-    private OverwriteAuthzHandler(String mode, String authorizationExpression) {
+    private CreateModeAuthzHandler(String mode, String overwriteExpression, String readExpression) {
       // Read the mode through the same normalization the create operation applies, so a token the
-      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
-      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
-      // would not match, and a caller holding only a create privilege could replace an object owned
-      // by somebody else.
-      this.overwrite = OVERWRITE_MODE.equals(CommonUtil.normalizeToken(mode));
-      this.authorizationExpression = authorizationExpression;
+      // operation will act on as an overwrite or exist_ok cannot be authorized as a plain create.
+      String normalized = CommonUtil.normalizeToken(mode);
+      this.overwrite = OVERWRITE_MODE.equals(normalized);
+      this.existOk = EXIST_OK_MODE.equals(normalized);
+      this.overwriteExpression = overwriteExpression;
+      this.readExpression = readExpression;
     }
 
     @Override
     public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-      if (!overwrite) {
-        return;
-      }
-
       Entity.EntityType entityType = deepestEntityType(nameIdentifierMap);
-      boolean authorized =
-          new AuthorizationExpressionEvaluator(authorizationExpression)
-              .evaluate(
-                  nameIdentifierMap,
-                  new HashMap<>(),
-                  new AuthorizationRequestContext(),
-                  Optional.of(entityType.name()));
-      if (!authorized) {
-        throw new ForbiddenException(
-            "User '%s' is not authorized to overwrite '%s'",
-            PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+      if (overwrite) {
+        boolean authorized = evaluateExpression(overwriteExpression, nameIdentifierMap, entityType);
+        if (!authorized) {
+          throw new ForbiddenException(
+              "User '%s' is not authorized to overwrite '%s'",
+              PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+        }
       }
+      if (existOk && objectExists(nameIdentifierMap)) {
+        // The request answers with the existing object's metadata, so the read privilege decides,
+        // and the create expression on the method must not run or a read-only caller could not
+        // read.
+        boolean authorized = evaluateExpression(readExpression, nameIdentifierMap, entityType);
+        if (!authorized) {
+          throw new ForbiddenException(
+              "User '%s' is not authorized to read existing metadata for '%s' in exist_ok mode",
+              PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+        }
+        existOkReadAuthorized = true;
+      }
+      // An exist_ok request for an absent object creates it, so the create expression on the
+      // method must still run to authorize that creation.
     }
 
     @Override
     public boolean authorizationCompleted() {
-      // An overwrite is fully authorized here, so the create expression on the method must not be
-      // evaluated afterwards. A create that does not overwrite falls through to it unchanged.
-      return overwrite;
+      // An overwrite, and an exist_ok request that resolved to an existing object, are fully
+      // authorized here. An exist_ok request for an absent object, and a plain create (neither
+      // flag set), fall through to the create expression on the method unchanged.
+      return overwrite || existOkReadAuthorized;
     }
+  }
 
-    private static Entity.EntityType deepestEntityType(
-        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-      if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
-        return Entity.EntityType.TABLE;
-      }
-      return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
-          ? Entity.EntityType.SCHEMA
-          : Entity.EntityType.CATALOG;
+  /**
+   * Evaluates an authorization expression against the identifiers resolved from a request.
+   *
+   * @param expression the expression to evaluate
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @param entityType the entity type directly addressed by the request
+   * @return {@code true} when the expression authorizes the request
+   */
+  private static boolean evaluateExpression(
+      String expression,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap,
+      Entity.EntityType entityType) {
+    return new AuthorizationExpressionEvaluator(expression)
+        .evaluate(
+            nameIdentifierMap,
+            new HashMap<>(),
+            new AuthorizationRequestContext(),
+            Optional.of(entityType.name()));
+  }
+
+  /**
+   * Returns whether the deepest object addressed by the given identifiers currently exists. The
+   * check runs against the same metadata dispatchers the intercepted operations use, and it is only
+   * reached in auxiliary mode, where metadata authorization is enabled and the dispatchers see the
+   * caller's identity on the current thread.
+   *
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @return {@code true} when the addressed object exists
+   */
+  boolean objectExists(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    switch (deepestEntityType(nameIdentifierMap)) {
+      case TABLE:
+        return GravitinoEnv.getInstance()
+            .tableDispatcher()
+            .tableExists(nameIdentifierMap.get(Entity.EntityType.TABLE));
+      case SCHEMA:
+        return GravitinoEnv.getInstance()
+            .schemaDispatcher()
+            .schemaExists(nameIdentifierMap.get(Entity.EntityType.SCHEMA));
+      case CATALOG:
+        return GravitinoEnv.getInstance()
+            .catalogDispatcher()
+            .catalogExists(nameIdentifierMap.get(Entity.EntityType.CATALOG));
+      default:
+        return false;
     }
+  }
+
+  private static Entity.EntityType deepestEntityType(
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
+      return Entity.EntityType.TABLE;
+    }
+    return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
+        ? Entity.EntityType.SCHEMA
+        : Entity.EntityType.CATALOG;
   }
 
   private Map<Entity.EntityType, NameIdentifier> baseIdentifiers() {
@@ -289,6 +427,20 @@ public class LanceMetadataAuthorizationMethodInterceptor
       }
     }
     return queryArgument(parameters, args, "mode");
+  }
+
+  /**
+   * Returns whether the invoked operation is a create request whose mode is {@code exist_ok},
+   * reading the mode through the same normalization the create operation applies.
+   *
+   * @param parameters invoked method parameters
+   * @param args invoked method arguments
+   * @return {@code true} when the request asks for {@code exist_ok} mode
+   */
+  private static boolean isExistOkCreate(Parameter[] parameters, Object[] args) {
+    return createMode(parameters, args)
+        .map(mode -> "EXIST_OK".equals(CommonUtil.normalizeToken(mode)))
+        .orElse(false);
   }
 
   private static Optional<String> pathArgument(Parameter[] parameters, Object[] args, String name) {
