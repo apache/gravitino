@@ -18,12 +18,14 @@
 import json
 import unittest
 from http.client import HTTPResponse
+from typing import Optional
 from unittest.mock import Mock, patch
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
@@ -35,7 +37,11 @@ from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.rel.view_dto import ViewDTO
-from gravitino.dto.requests.view_update_request import ViewUpdateRequest
+from gravitino.dto.requests.view_update_request import (
+    ViewUpdateRequest,
+    ViewUpdateRequestBase,
+)
+from gravitino.dto.requests.view_updates_request import ViewUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
@@ -43,6 +49,8 @@ from gravitino.dto.responses.view_response import ViewResponse
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import (
     IllegalArgumentException,
+    IllegalNameIdentifierException,
+    IllegalNamespaceException,
     NoSuchSchemaException,
     NoSuchTableException,
     NoSuchViewException,
@@ -58,6 +66,67 @@ from tests.unittests.fixtures.table_fixtures import (
 
 
 class TestRelationalCatalog(unittest.TestCase):
+    @classmethod
+    def _default_columns(cls) -> list[ColumnDTO]:
+        return [
+            ColumnDTO(
+                _name="id",
+                _data_type=Types.IntegerType.get(),
+                _comment="id column",
+                _nullable=False,
+            )
+        ]
+
+    @classmethod
+    def _default_representations(cls) -> list[SQLRepresentationDTO]:
+        return [
+            SQLRepresentationDTO(
+                _dialect=Dialects.TRINO,
+                _sql="SELECT id FROM test_table",
+            )
+        ]
+
+    @classmethod
+    def _default_api_columns(cls) -> list[Column]:
+        return [
+            Column.of(
+                "id",
+                Types.IntegerType.get(),
+                comment="id column",
+                nullable=False,
+            )
+        ]
+
+    @classmethod
+    def _default_api_representations(cls) -> list[Representation]:
+        return [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")]
+
+    @classmethod
+    def _new_view_dto(
+        cls,
+        name: str,
+        comment: str = "test view comment",
+        columns: Optional[list[ColumnDTO]] = None,
+        representations: Optional[list[SQLRepresentationDTO]] = None,
+        properties: Optional[dict[str, str]] = None,
+    ) -> ViewDTO:
+        return ViewDTO(
+            _name=name,
+            _columns=columns if columns is not None else cls._default_columns(),
+            _representations=(
+                representations
+                if representations is not None
+                else cls._default_representations()
+            ),
+            _comment=comment,
+            _default_catalog="test_catalog",
+            _default_schema="test_schema",
+            _properties=properties if properties is not None else {},
+            _audit=AuditDTO(
+                "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
+            ),
+        )
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.metalake_name = "test_metalake"
@@ -79,30 +148,7 @@ class TestRelationalCatalog(unittest.TestCase):
         )
         cls.TABLE_DTO_JSON_STRING = TABLE_DTO_JSON_STRING_WITH_STARTING_DATE_SORT
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
-        cls.view_dto = ViewDTO(
-            _name=cls.view_name,
-            _columns=[
-                ColumnDTO(
-                    _name="id",
-                    _data_type=Types.IntegerType.get(),
-                    _comment="id column",
-                    _nullable=False,
-                )
-            ],
-            _representations=[
-                SQLRepresentationDTO(
-                    _dialect=Dialects.TRINO,
-                    _sql="SELECT id FROM test_table",
-                )
-            ],
-            _comment="test view comment",
-            _default_catalog="test_catalog",
-            _default_schema="test_schema",
-            _properties={"k1": "v1"},
-            _audit=AuditDTO(
-                "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
-            ),
-        )
+        cls.view_dto = cls._new_view_dto(cls.view_name, properties={"k1": "v1"})
 
     def _get_mock_http_resp(self, json_str: str, return_code: int = 200):
         mock_http_resp = Mock(HTTPResponse)
@@ -458,6 +504,42 @@ class TestRelationalCatalog(unittest.TestCase):
                     Namespace.of("invalid_schema")
                 )
 
+    def test_list_views_empty(self):
+        resp_body = EntityListResponse(0, [])
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            views = self.catalog.as_view_catalog().list_views(
+                Namespace.of(self.schema_name)
+            )
+            self.assertEqual(0, len(views))
+
+    def test_list_views_server_internal_error(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=RuntimeError("internal error"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.catalog.as_view_catalog().list_views(
+                    Namespace.of(self.schema_name)
+                )
+
+    def test_list_views_invalid_namespace_length(self):
+        with self.assertRaisesRegex(
+            IllegalNamespaceException,
+            "View namespace must be non-null and have 1 level",
+        ):
+            self.catalog.as_view_catalog().list_views(Namespace.of("s1", "s2"))
+
+        with self.assertRaisesRegex(
+            IllegalNamespaceException,
+            "View namespace must be non-null and have 1 level",
+        ):
+            self.catalog.as_view_catalog().list_views(Namespace.empty())
+
     def test_load_view(self):
         resp_body = ViewResponse(0, self.view_dto)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
@@ -484,6 +566,20 @@ class TestRelationalCatalog(unittest.TestCase):
             with self.assertRaises(NoSuchViewException):
                 self.catalog.as_view_catalog().load_view(self.view_identifier)
 
+    def test_load_view_invalid_identifier(self):
+        with self.assertRaisesRegex(
+            IllegalNameIdentifierException, "NameIdentifier must not be null"
+        ):
+            self.catalog.as_view_catalog().load_view(None)
+
+        with self.assertRaisesRegex(
+            IllegalNamespaceException,
+            "View namespace must be non-null and have 1 level",
+        ):
+            self.catalog.as_view_catalog().load_view(
+                NameIdentifier.of("s1", "s2", "view1")
+            )
+
     def test_create_view(self):
         resp_body = ViewResponse(0, self.view_dto)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
@@ -494,8 +590,8 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             view = self.catalog.as_view_catalog().create_view(
                 self.view_identifier,
-                [Column.of("id", Types.IntegerType.get(), nullable=False)],
-                [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")],
+                self._default_api_columns(),
+                self._default_api_representations(),
                 comment="test view comment",
                 default_catalog="test_catalog",
                 default_schema="test_schema",
@@ -512,47 +608,96 @@ class TestRelationalCatalog(unittest.TestCase):
             with self.assertRaises(ViewAlreadyExistsException):
                 self.catalog.as_view_catalog().create_view(
                     self.view_identifier,
-                    [Column.of("id", Types.IntegerType.get())],
-                    [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")],
+                    self._default_api_columns(),
+                    self._default_api_representations(),
                 )
 
-    def test_alter_view(self):
-        updated_view_dto = ViewDTO(
-            _name="new_view",
-            _columns=[
-                ColumnDTO(
-                    _name="id",
-                    _data_type=Types.IntegerType.get(),
-                    _comment="id column",
-                    _nullable=False,
+    def test_create_view_schema_not_found(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            side_effect=NoSuchSchemaException("Schema not found"),
+        ):
+            with self.assertRaises(NoSuchSchemaException):
+                self.catalog.as_view_catalog().create_view(
+                    self.view_identifier,
+                    self._default_api_columns(),
+                    self._default_api_representations(),
                 )
-            ],
-            _representations=[
-                SQLRepresentationDTO(
-                    _dialect=Dialects.TRINO,
-                    _sql="SELECT id FROM test_table",
-                )
-            ],
-            _comment="test view comment",
-            _default_catalog="test_catalog",
-            _default_schema="test_schema",
-            _properties={"k1": "v1"},
-            _audit=AuditDTO(
-                "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
-            ),
+
+    def test_create_view_rejects_empty_representations(self):
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            '"representations" field is required and cannot be empty',
+        ):
+            self.catalog.as_view_catalog().create_view(
+                self.view_identifier,
+                self._default_api_columns(),
+                [],
+            )
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            '"representations" field is required and cannot be empty',
+        ):
+            self.catalog.as_view_catalog().create_view(
+                self.view_identifier,
+                self._default_api_columns(),
+                None,
+            )
+
+    def test_create_view_invalid_identifier(self):
+        with self.assertRaises(IllegalNamespaceException):
+            self.catalog.as_view_catalog().create_view(
+                NameIdentifier.of("s1", "s2", "v1"),
+                self._default_api_columns(),
+                self._default_api_representations(),
+            )
+
+    def _run_alter_view(
+        self,
+        ident: NameIdentifier,
+        req: ViewUpdateRequestBase,
+        updated: ViewDTO,
+        change: ViewChange,
+    ):
+        full_namespace = Namespace.of(
+            self.metalake_name, self.catalog_name, ident.namespace().level(0)
         )
-        resp_body = ViewResponse(0, updated_view_dto)
+        # pylint: disable=protected-access
+        view_path = (
+            f"{self.catalog._format_view_request_path(full_namespace)}/{ident.name()}"
+        )
+        updates_request = ViewUpdatesRequest(_updates=[req])
+        resp_body = ViewResponse(0, updated)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
 
         with patch(
             "gravitino.utils.http_client.HTTPClient.put",
             return_value=mock_resp,
-        ):
-            view = self.catalog.as_view_catalog().alter_view(
-                self.view_identifier,
-                ViewChange.rename("new_view"),
+        ) as mock_put:
+            altered = self.catalog.as_view_catalog().alter_view(ident, change)
+            self.assertEqual(mock_put.call_args[0][0], view_path)
+            self.assertEqual(mock_put.call_args[1]["json"], updates_request)
+            self.assertEqual(updated.name(), altered.name())
+            self.assertEqual(updated.comment(), altered.comment())
+            self.assertEqual(updated.properties(), altered.properties())
+            self.assertEqual(
+                len(updated.representations()), len(altered.representations())
             )
-            self.assertEqual("new_view", view.name())
+            return altered
+
+    def test_alter_view_rename(self):
+        ident = NameIdentifier.of(self.schema_name, "view1")
+        updated = self._new_view_dto(
+            "view2",
+            "comment",
+            self._default_columns(),
+            self._default_representations(),
+        )
+        req = ViewUpdateRequest.RenameViewRequest(_new_name="view2")
+        self._run_alter_view(ident, req, updated, ViewChange.rename("view2"))
+
+    test_alter_view = test_alter_view_rename
 
     def test_alter_view_not_exists(self):
         with patch(
@@ -564,6 +709,72 @@ class TestRelationalCatalog(unittest.TestCase):
                     self.view_identifier,
                     ViewChange.rename("new_view"),
                 )
+
+    def test_alter_view_set_property(self):
+        ident = NameIdentifier.of(self.schema_name, "view1")
+        updated = self._new_view_dto(
+            "view1",
+            "comment",
+            self._default_columns(),
+            self._default_representations(),
+            properties={"k1": "v1"},
+        )
+        req = ViewUpdateRequest.SetViewPropertyRequest(_property="k1", _value="v1")
+        self._run_alter_view(ident, req, updated, ViewChange.set_property("k1", "v1"))
+
+    def test_alter_view_remove_property(self):
+        ident = NameIdentifier.of(self.schema_name, "view1")
+        updated = self._new_view_dto(
+            "view1",
+            "comment",
+            self._default_columns(),
+            self._default_representations(),
+        )
+        req = ViewUpdateRequest.RemoveViewPropertyRequest(_property="k1")
+        self._run_alter_view(ident, req, updated, ViewChange.remove_property("k1"))
+
+    def test_alter_view_replace(self):
+        ident = NameIdentifier.of(self.schema_name, "view1")
+        new_rep = SQLRepresentationDTO(
+            _dialect=Dialects.TRINO,
+            _sql="SELECT 3",
+        )
+        new_columns = self._default_columns()
+        new_reps = [new_rep]
+        updated = self._new_view_dto(
+            "view1",
+            "new comment",
+            new_columns,
+            new_reps,
+        )
+
+        req = ViewUpdateRequest.ReplaceViewRequest(
+            _columns=new_columns,
+            _representations=new_reps,
+            _default_catalog=None,
+            _default_schema=None,
+            _comment="new comment",
+        )
+        new_rep_api = SQLRepresentation(Dialects.TRINO, "SELECT 3")
+        self._run_alter_view(
+            ident,
+            req,
+            updated,
+            ViewChange.replace_view(
+                self._default_api_columns(),
+                [new_rep_api],
+                None,
+                None,
+                "new comment",
+            ),
+        )
+
+    def test_alter_view_invalid_identifier(self):
+        with self.assertRaises(IllegalNamespaceException):
+            self.catalog.as_view_catalog().alter_view(
+                NameIdentifier.of("s1", "s2", "v1"),
+                ViewChange.rename("new_name"),
+            )
 
     def test_drop_view(self):
         resp_body = DropResponse(0, True)
@@ -586,6 +797,38 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             is_dropped = self.catalog.as_view_catalog().drop_view(self.view_identifier)
             self.assertFalse(is_dropped)
+
+    def test_drop_view_server_internal_error(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            side_effect=RuntimeError("internal error"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.catalog.as_view_catalog().drop_view(self.view_identifier)
+
+    def test_drop_view_invalid_identifier(self):
+        with self.assertRaises(IllegalNamespaceException):
+            self.catalog.as_view_catalog().drop_view(
+                NameIdentifier.of("s1", "s2", "v1")
+            )
+
+    def test_format_table_request_path_invalid_namespace(self):
+        with self.assertRaisesRegex(
+            IllegalNamespaceException,
+            "Table full namespace must be non-null and have 3 levels in the format",
+        ):
+            self.catalog._format_table_request_path(  # pylint: disable=protected-access
+                Namespace.of("schema1")
+            )
+
+    def test_format_view_request_path_invalid_namespace(self):
+        with self.assertRaisesRegex(
+            IllegalNamespaceException,
+            "View full namespace must be non-null and have 3 levels in the format",
+        ):
+            self.catalog._format_view_request_path(  # pylint: disable=protected-access
+                Namespace.of("schema1")
+            )
 
     def test_to_view_update_request(self):
         to_request = (

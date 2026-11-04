@@ -54,6 +54,13 @@ extras.
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+4. [Manage view metadata using Gravitino Python API](./manage-view-metadata-using-gravitino.md?language=python)
+
+### View Operations
+
+Use `as_view_catalog()` on a loaded relational catalog to manage views. The
+[View guide](./manage-view-metadata-using-gravitino.md?language=python) includes Python examples for view
+creation, list/load, alteration (rename, set/remove property, and replace), and drop operations.
 
 ### HTTP Error Handling
 
