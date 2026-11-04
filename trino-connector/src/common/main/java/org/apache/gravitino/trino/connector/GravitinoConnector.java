@@ -251,9 +251,14 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public void rollback(ConnectorTransactionHandle transactionHandle) {
-    // Not forwarded to the internal connector (the SPI default is a no-op); only releases this
-    // transaction's client leases.
-    releaseLeases((GravitinoTransactionHandle) transactionHandle);
+    GravitinoTransactionHandle gravitinoTransactionHandle =
+        (GravitinoTransactionHandle) transactionHandle;
+    try {
+      Connector internalConnector = catalogConnectorContext.getInternalConnector();
+      internalConnector.rollback(gravitinoTransactionHandle.getInternalHandle());
+    } finally {
+      releaseLeases(gravitinoTransactionHandle);
+    }
   }
 
   @Override
