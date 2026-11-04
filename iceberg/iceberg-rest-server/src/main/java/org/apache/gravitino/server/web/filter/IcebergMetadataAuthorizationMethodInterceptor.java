@@ -149,7 +149,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
@@ -168,6 +171,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case REGISTER_TABLE:
+            return Optional.of(new RegisterTableAuthzHandler(parameters, args, nameIdentifierMap));
           default:
             break;
         }
