@@ -425,6 +425,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
     ResolvedCatalogBaseTable<?> resolvedTable = (ResolvedCatalogBaseTable<?>) table;
+    rejectUnsupportedSchemaElements(resolvedTable);
     Column[] columns =
         resolvedTable.getResolvedSchema().getColumns().stream()
             .map(this::toGravitinoColumn)
@@ -888,6 +889,77 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return Optional.of(primaryKeyFieldList);
   }
 
+  /**
+   * Returns whether this catalog family supports Flink generic tables, which serialize the full
+   * Flink schema - including computed columns and watermark specs - into {@code flink.*} properties
+   * and round-trip it. Only the Hive catalog family has such a path; for every other catalog the
+   * only remediation is computing the element in the query.
+   *
+   * @return true if generic tables are supported, false by default
+   */
+  protected boolean supportsGenericTables() {
+    return false;
+  }
+
+  /**
+   * Fails fast when the table schema uses features the Gravitino column model cannot represent.
+   *
+   * <p>Gravitino's {@link Column} has no generation-expression support, so a Flink computed column
+   * ({@code b AS a+1}) or metadata column, or a watermark spec, cannot round-trip: the column would
+   * be silently stored as a plain physical column that reads back as NULL and the watermark would
+   * be discarded. Generic tables (Hive generic path) serialize these into flink.* properties and
+   * round-trip correctly, but this base path is also inherited by the Paimon/Iceberg/JDBC catalogs
+   * where the loss is silent data corruption - so reject the create instead of mis-storing the
+   * schema.
+   *
+   * @param resolvedTable the resolved create-table request
+   */
+  private void rejectUnsupportedSchemaElements(ResolvedCatalogBaseTable<?> resolvedTable) {
+    if (!(resolvedTable instanceof CatalogTable)) {
+      return; // views do not reach this path with computed columns/watermarks
+    }
+    for (org.apache.flink.table.catalog.Column column :
+        resolvedTable.getResolvedSchema().getColumns()) {
+      rejectUnsupportedColumn(column);
+    }
+    if (!resolvedTable.getResolvedSchema().getWatermarkSpecs().isEmpty()) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Watermark specifications cannot be stored in the Gravitino catalog '%s'.%s",
+              getName(), watermarkAdvice()));
+    }
+  }
+
+  /**
+   * Fails fast when the column is a computed or metadata column: the Gravitino column model has no
+   * generation-expression support, so storing it would silently flatten it into a plain physical
+   * column that reads back as NULL. Shared by the createTable and alterTable paths.
+   *
+   * @param column the column to validate
+   */
+  private void rejectUnsupportedColumn(org.apache.flink.table.catalog.Column column) {
+    if (column instanceof org.apache.flink.table.catalog.Column.ComputedColumn
+        || column instanceof org.apache.flink.table.catalog.Column.MetadataColumn) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Column '%s' is a computed or metadata column, which the Gravitino catalog cannot"
+                  + " store for catalog '%s'.%s",
+              column.getName(), getName(), columnAdvice()));
+    }
+  }
+
+  private String columnAdvice() {
+    return supportsGenericTables()
+        ? " Use a generic table or compute the column in the query instead."
+        : " Compute the column in the query instead.";
+  }
+
+  private String watermarkAdvice() {
+    return supportsGenericTables()
+        ? " Use a generic table or define the watermark in the query instead."
+        : " Define the watermark in the query instead.";
+  }
+
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
     return Column.of(
         column.getName(),
@@ -915,6 +987,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private void addColumn(
       org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
+    // TableChange.add(Column.computed(...)) is a public factory on every supported Flink version;
+    // without this check the alter path would flatten the column exactly like createTable did.
+    rejectUnsupportedColumn(change.getColumn());
     changes.add(
         TableChange.addColumn(
             new String[] {change.getColumn().getName()},
