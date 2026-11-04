@@ -127,24 +127,25 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
       String instance, WebApplicationException exception) {
     int status = exception.getResponse().getStatus();
     String message = exception.getMessage();
+    boolean routeMiss = isRouteMiss(exception);
     if (exception instanceof ParamException parameterException) {
       // Jersey can use 404 for parameter conversion failures, but these are invalid input.
       status = Response.Status.BAD_REQUEST.getStatusCode();
       message = "Invalid value for parameter '" + parameterException.getParameterName() + "'";
-    } else if (isRouteMiss(exception)) {
+    } else if (routeMiss) {
       // Unmatched routes include unimplemented Namespace operations. Code 0 / HTTP 406 lets
       // Lance clients recognize Unsupported and fall back; domain not-found errors stay 404.
       status = Response.Status.NOT_ACCEPTABLE.getStatusCode();
       message = "Unsupported Lance REST operation" + (instance.isEmpty() ? "" : ": " + instance);
     }
     LanceNamespaceException error;
-    if (status >= 400 && status < 500) {
+    if (routeMiss) {
+      error = new org.lance.namespace.errors.UnsupportedOperationException(message, "", instance);
+    } else if (status >= 400 && status < 500) {
       error =
           switch (status) {
             case 401 -> new UnauthenticatedException(message, "", instance);
             case 403 -> new PermissionDeniedException(message, "", instance);
-            case 405, 406, 415 -> new org.lance.namespace.errors.UnsupportedOperationException(
-                message, "", instance);
             case 409 -> new ConcurrentModificationException(message, "", instance);
             case 429 -> new ThrottlingException(message, "", instance);
             default -> new InvalidInputException(message, "", instance);

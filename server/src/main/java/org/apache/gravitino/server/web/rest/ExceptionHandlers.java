@@ -289,6 +289,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 
@@ -816,7 +819,8 @@ public class ExceptionHandlers {
     @Override
     public Response handle(OperationType op, String secret, String parent, Exception e) {
       String reason = e instanceof ServiceUnavailableException ? e.getMessage() : getErrorMsg(e);
-      String errorMsg = getSecretErrorMsg(parent, reason);
+      // metadataObjectName is passed as {@code secret}; parent is unused for this handler.
+      String errorMsg = getSecretErrorMsg(secret, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
