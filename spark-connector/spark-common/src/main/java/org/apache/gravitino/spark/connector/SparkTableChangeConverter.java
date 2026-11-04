@@ -19,7 +19,13 @@
 package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.spark.connector.utils.SparkPartitionUtils;
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.catalyst.expressions.Literal;
+import org.apache.spark.sql.catalyst.expressions.UnaryMinus;
+import org.apache.spark.sql.catalyst.parser.CatalystSqlParser$;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter {
@@ -93,10 +99,34 @@ public class SparkTableChangeConverter {
           (TableChange.UpdateColumnDefaultValue) change;
       return org.apache.gravitino.rel.TableChange.updateColumnDefaultValue(
           updateColumnDefaultValue.fieldNames(),
-          Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
+          convertDefaultValue(updateColumnDefaultValue.newDefaultValue()));
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));
+    }
+  }
+
+  private Expression convertDefaultValue(String sql) {
+    // Spark uses an empty SQL string for DROP DEFAULT; a string literal containing no characters
+    // is represented by two quote characters instead.
+    if (sql.isEmpty()) {
+      return Column.DEFAULT_VALUE_NOT_SET;
+    }
+    try {
+      org.apache.spark.sql.catalyst.expressions.Expression parsed =
+          CatalystSqlParser$.MODULE$.parseExpression(sql);
+      boolean literal =
+          parsed instanceof Literal
+              || (parsed instanceof UnaryMinus && ((UnaryMinus) parsed).child() instanceof Literal);
+      Preconditions.checkArgument(
+          literal && parsed.resolved() && parsed.foldable(),
+          "Only literal column defaults are supported: %s",
+          sql);
+      Object value = parsed.eval(null);
+      return SparkPartitionUtils.toGravitinoLiteral(
+          new GenericInternalRow(new Object[] {value}), 0, parsed.dataType());
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Unsupported column default SQL: " + sql, e);
     }
   }
 

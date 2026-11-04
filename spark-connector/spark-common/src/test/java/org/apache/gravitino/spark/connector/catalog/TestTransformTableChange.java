@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -48,7 +51,7 @@ public class TestTransformTableChange {
   @Test
   void testTransformUpdateColumnDefaultValue() {
     String[] fieldNames = new String[] {"col"};
-    String defaultValue = "col_default_value";
+    String defaultValue = "'col_default_value'";
     TableChange.UpdateColumnDefaultValue sparkChange =
         (TableChange.UpdateColumnDefaultValue)
             TableChange.updateColumnDefaultValue(fieldNames, defaultValue);
@@ -61,7 +64,38 @@ public class TestTransformTableChange {
     org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
         (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) gravitinoChange;
     Assertions.assertArrayEquals(sparkChange.fieldNames(), converted.fieldName());
-    Assertions.assertEquals(Literals.stringLiteral(defaultValue), converted.getNewDefaultValue());
+    Assertions.assertEquals(
+        Literals.stringLiteral("col_default_value"), converted.getNewDefaultValue());
+  }
+
+  @Test
+  void testDefaultSqlIsConvertedToTypedLiterals() {
+    assertDefault("42", Literals.integerLiteral(42));
+    assertDefault("-42", Literals.integerLiteral(-42));
+    assertDefault("12.34", Literals.decimalLiteral(Decimal.of("12.34", 4, 2)));
+    assertDefault("true", Literals.booleanLiteral(true));
+    assertDefault("NULL", Literals.NULL);
+    assertDefault("''", Literals.stringLiteral(""));
+    assertDefault("DATE '2026-11-04'", Literals.dateLiteral("2026-11-04"));
+    assertDefault("", Column.DEFAULT_VALUE_NOT_SET);
+    for (String expression :
+        new String[] {
+          "1 + 1", "current_timestamp()", "upper('abc')", "not valid SQL!", "column_name"
+        }) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              sparkTableChangeConverter.toGravitinoTableChange(
+                  TableChange.updateColumnDefaultValue(new String[] {"col"}, expression)));
+    }
+  }
+
+  private void assertDefault(String sql, Expression expected) {
+    org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
+        (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
+            sparkTableChangeConverter.toGravitinoTableChange(
+                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql));
+    Assertions.assertEquals(expected, converted.getNewDefaultValue());
   }
 
   @Test
