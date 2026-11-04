@@ -270,9 +270,6 @@ public class GravitinoInterceptionService implements InterceptionService {
                   viewIdent.name(),
                   NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
                   exception);
-            } catch (BadRequestException exception) {
-              LOG.warn("Invalid authorization request", exception);
-              return Utils.illegalArguments(exception.getMessage(), exception);
             }
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
@@ -295,6 +292,9 @@ public class GravitinoInterceptionService implements InterceptionService {
           scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
+      } catch (BadRequestException ex) {
+        LOG.warn("Invalid authorization request", ex);
+        return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (IllegalMetadataObjectException ex) {
         LOG.warn("Invalid metadata object type during authorization", ex);
         return Utils.illegalArguments(
