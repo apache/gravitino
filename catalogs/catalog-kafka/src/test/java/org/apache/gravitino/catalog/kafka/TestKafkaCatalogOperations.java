@@ -53,6 +53,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -64,9 +66,15 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.dto.requests.TopicCreateRequest;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -75,6 +83,11 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.server.web.rest.TopicOperations;
+>>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
@@ -442,6 +455,113 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  void testCreateTopicNameCollisionReturnsBadRequest() throws IllegalAccessException {
+    NameIdentifier existingTopic =
+        NameIdentifier.of(
+            METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, "test.topic.name.collision");
+    String collidingName = "test_topic_name_collision";
+    Map<String, String> properties = ImmutableMap.of(PARTITION_COUNT, "1", REPLICATION_FACTOR, "1");
+
+    // Create the dotted name directly in Kafka, bypassing Gravitino's name validation.
+    kafkaCatalogOperations.createTopic(existingTopic, null, null, properties);
+    try {
+      CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+      when(catalogManager.doWithCatalog(Mockito.any(), Mockito.any()))
+          .thenReturn(new KafkaCatalogCapability());
+      TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+      when(dispatcher.createTopic(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+          .thenAnswer(
+              invocation ->
+                  kafkaCatalogOperations.createTopic(
+                      invocation.getArgument(0),
+                      invocation.getArgument(1),
+                      invocation.getArgument(2),
+                      invocation.getArgument(3)));
+      TopicOperations operations =
+          new TopicOperations(new TopicNormalizeDispatcher(dispatcher, catalogManager));
+      FieldUtils.writeField(
+          operations, "httpRequest", Mockito.mock(HttpServletRequest.class), true);
+
+      TopicCreateRequest request = new TopicCreateRequest(collidingName, null, properties);
+      try (Response response =
+          operations.createTopic(METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, request)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("Invalid topic name"));
+        Assertions.assertTrue(error.getMessage().contains(collidingName));
+        Assertions.assertTrue(error.getMessage().contains("collides with existing topics"));
+        Assertions.assertTrue(error.getMessage().contains(existingTopic.name()));
+      }
+    } finally {
+      kafkaCatalogOperations.dropTopic(existingTopic);
+    }
+  }
+
+  @Test
+  void testCreateTopicWithInvalidPartitionCount() {
+    for (String partitionCount : new String[] {"0", "-2"}) {
+      NameIdentifier ident =
+          NameIdentifier.of(
+              METALAKE_NAME,
+              CATALOG_NAME,
+              DEFAULT_SCHEMA_NAME,
+              "test_create_topic_invalid_partitions_" + partitionCount);
+      Map<String, String> properties =
+          ImmutableMap.of(PARTITION_COUNT, partitionCount, REPLICATION_FACTOR, "1");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> kafkaCatalogOperations.createTopic(ident, null, null, properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Invalid partition count for topic " + ident),
+          exception.getMessage());
+      Throwable cause = exception.getCause().getCause();
+      Assertions.assertInstanceOf(InvalidPartitionsException.class, cause);
+      Assertions.assertTrue(exception.getMessage().contains(cause.getMessage()));
+    }
+  }
+
+  @Test
+  void testCreateTopicWithDefaultPartitionCount() {
+    NameIdentifier defaultIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_default_partitions");
+    Topic defaultTopic =
+        kafkaCatalogOperations.createTopic(
+            defaultIdent, null, null, ImmutableMap.of(REPLICATION_FACTOR, "1"));
+
+    NameIdentifier negativeOneIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_negative_one_partitions");
+    Topic negativeOneTopic =
+        kafkaCatalogOperations.createTopic(
+            negativeOneIdent,
+            null,
+            null,
+            ImmutableMap.of(PARTITION_COUNT, "-1", REPLICATION_FACTOR, "1"));
+
+    String defaultPartitionCount = defaultTopic.properties().get(PARTITION_COUNT);
+    Assertions.assertTrue(Integer.parseInt(defaultPartitionCount) > 0);
+    Assertions.assertEquals(
+        defaultPartitionCount, negativeOneTopic.properties().get(PARTITION_COUNT));
+    Assertions.assertEquals(
+        defaultPartitionCount,
+        kafkaCatalogOperations.loadTopic(negativeOneIdent).properties().get(PARTITION_COUNT));
+  }
+
+  @Test
+>>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
   public void testLoadTopic() {
     Topic topic =
         kafkaCatalogOperations.loadTopic(
