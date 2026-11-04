@@ -478,6 +478,15 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
               + ", ordinary int DEFAULT 42, label varchar DEFAULT 'value')");
       try {
         statement.executeUpdate("INSERT INTO " + qualifiedSource + " DEFAULT VALUES");
+        if (declaration.contains("GENERATED ALWAYS")) {
+          SQLException error =
+              Assertions.assertThrows(
+                  SQLException.class,
+                  () ->
+                      statement.executeUpdate(
+                          "INSERT INTO " + qualifiedSource + " (id) VALUES (1000)"));
+          Assertions.assertEquals("428C9", error.getSQLState());
+        }
         JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, source);
         Column id = loaded.columns()[0];
         Assertions.assertTrue(id.autoIncrement());
@@ -503,6 +512,20 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 false,
                 true,
                 id.defaultValue()));
+        // Recreation preserves basic generation through BY DEFAULT, including for an ALWAYS
+        // source. Explicit values remain accepted by both the copied and added identity columns.
+        try (ResultSet rows =
+            statement.executeQuery(
+                "INSERT INTO "
+                    + TEST_DB_NAME
+                    + "."
+                    + target
+                    + " (id, added_id) VALUES (1000, 2000) RETURNING id, added_id")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(1000, rows.getLong("id"));
+          Assertions.assertEquals(2000, rows.getLong("added_id"));
+          Assertions.assertFalse(rows.next());
+        }
         for (int expected = 1; expected <= 3; expected++) {
           if (expected == 3) {
             // Dropping the original table must not remove either generator on the new table.
