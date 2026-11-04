@@ -28,8 +28,42 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcUrlUtils {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/db?user=u&password=hidden",
+        "jdbc:postgresql://host/db?%70assword=hidden",
+        "jdbc:sqlserver://host;databaseName=db;PASSWORD={hidden;value}",
+        "jdbc:mysql://user:hidden@host/db",
+        "jdbc:mysql://(host=host,user=u,password=hidden)/db",
+        "jdbc:oracle:oci:user/hidden@service",
+        "jdbc:oracle:thin:user/hidden@host:1521/db",
+        "jdbc:postgresql://host/db?sslpassword=hidden",
+        "jdbc:sqlserver://host;accessToken=hidden",
+        "jdbc:postgresql://host/db?password=",
+        "jdbc:postgresql://host/db?%2570assword=hidden#%zz"
+      })
+  void testCredentialsAreDetected(String url) {
+    Assertions.assertTrue(JdbcUrlUtils.containsCredentials(url));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/password?user=reader&sslmode=require",
+        "jdbc:sqlserver://host;databaseName=db;encrypt=true",
+        "jdbc:oracle:thin:@host:1521/service",
+        "jdbc:sqlite::memory:",
+        "jdbc:mysql://host/db?useSSL=true"
+      })
+  void testPublicConnectionOptionsRemainVisible(String url) {
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(url));
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(null));
+  }
 
   @Test
   public void whenMalformedUrlGiven_ShouldFallBackToLastDecodedForm() {

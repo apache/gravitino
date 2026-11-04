@@ -32,6 +32,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
@@ -42,6 +45,23 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
  * safe to use.
  */
 public class JdbcUrlUtils {
+
+  private static final Pattern URL_PARAMETER = Pattern.compile("(?:[?;&,(]|^)([^=?;&,()]+)=");
+  private static final List<String> CREDENTIAL_PARAMETER_KEYWORDS =
+      Arrays.asList("password", "passwd", "pwd", "secret", "token", "credential");
+  private static final Pattern USER_INFO =
+      Pattern.compile("(?i)(?://[^/?#]*@|jdbc:oracle:(?:thin|oci|oci8):[^/@]+/[^@]*@)");
+
+  /**
+   * Detects credentials embedded in JDBC URLs, including encoded parameter names.
+   *
+   * @param url the JDBC URL, or null
+   * @return whether the URL must not be exposed as a public catalog property
+   */
+  public static boolean containsCredentials(@Nullable String url) {
+    return url != null
+        && decodedFormsForScan(url).stream().anyMatch(JdbcUrlUtils::containsCredentialParameters);
+  }
 
   // The DBCP2 connection-pool property whose value is a list of connection properties forwarded
   // verbatim to the JDBC driver. Unsafe parameters smuggled here would otherwise evade a check
@@ -151,6 +171,20 @@ public class JdbcUrlUtils {
             "Unsafe %s parameter '%s' detected in JDBC configuration", dbType, param);
       }
     }
+  }
+
+  private static boolean containsCredentialParameters(String url) {
+    if (USER_INFO.matcher(url).find()) {
+      return true;
+    }
+    Matcher parameters = URL_PARAMETER.matcher(url);
+    while (parameters.find()) {
+      String key = parameters.group(1);
+      if (CREDENTIAL_PARAMETER_KEYWORDS.stream().anyMatch(key::contains)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String recursiveDecode(String url) {

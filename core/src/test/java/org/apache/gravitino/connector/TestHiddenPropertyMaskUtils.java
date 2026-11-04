@@ -28,15 +28,35 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.utils.ClassLoaderKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestHiddenPropertyMaskUtils {
 
   @AfterEach
   void resetAdditionalMatcher() {
     SecretPropertyUtils.configureSensitiveKeyKeywords(new Config(false) {});
+  }
+
+  @Test
+  void testLegacyJdbcUrlIsMaskedEvenWhenDeclaredPublic() {
+    PropertiesMetadata metadata = Mockito.mock(PropertiesMetadata.class);
+    Mockito.when(metadata.containsProperty("jdbc-url")).thenReturn(true);
+    Map<String, String> values = Map.of("jdbc-url", "jdbc:postgresql://host/db?password=hidden");
+    MaskAndOmitKeys keys = HiddenPropertyMaskUtils.classifyHiddenProperties(values, metadata);
+    Assertions.assertTrue(keys.keysToMask().contains("jdbc-url"));
+
+    ClassLoaderKey key =
+        new ClassLoaderKey(
+            "jdbc-postgresql", Map.of("jdbc-url", "jdbc:postgresql://host/db?password=hidden"));
+    Assertions.assertFalse(key.toString().contains("password=hidden"));
+    Assertions.assertEquals(
+        key,
+        new ClassLoaderKey(
+            "jdbc-postgresql", Map.of("jdbc-url", "jdbc:postgresql://host/db?password=hidden")));
   }
 
   @Test

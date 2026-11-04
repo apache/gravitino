@@ -143,31 +143,18 @@ The inferred provider list is returned as the catalog's `credential-providers` p
 
 Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
 
-### Static providers and `getCredentials` privilege risk
+### Static providers and `getCredentials` privileges
 
-Static providers such as `s3-secret-key`, `oss-secret-key`, `cos-secret-key`, `azure-account-key`,
-`jdbc-user-password`, `aws-secret-key`, and `dlf-secret-key` return the configured long-lived
-plaintext keys from `getCredentials` / `GET .../credentials`. That endpoint does **not** require a
-dedicated privilege beyond being able to load the metadata object (unlike `getSecrets`, which
-requires `USE_SECRETS`, with cloud access-key pairs gated by `INCLUDE_CREDENTIAL_SECRETS`).
+Static providers return the configured source account's long-lived credentials. Catalog-level
+`getCredentials` requires metadata access plus both `USE_SECRETS` and
+`INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Grant these privileges only to trusted
+connectors/operators: the credentials carry all source-account permissions and do not enforce
+Gravitino table-level grants or denies when used directly against the source.
 
-**Risk:** any principal that can load a catalog (or fileset) configured with these static providers
-can retrieve the same static AK/SK or JDBC password that Gravitino uses server-side.
-
-**Temporary mitigation** until provider-level authorization is tightened:
-
-- Prefer short-lived token providers (`s3-token`, `oss-token`, `adls-token`, `gcs-token`,
-  `cos-token`, `aws-irsa`) over static `*-secret-key` / `azure-account-key` / `jdbc-user-password`
-  whenever possible. These providers are only accepted on
-  Fileset and Iceberg catalogs.
-- When static providers are unavoidable, grant load / use privileges only to trusted principals
-  (connectors and operators that must recover credentials).
-- Do not treat `getCredentials` as a secrets-protected API for static keys; use `USE_SECRETS` /
-  `INCLUDE_CREDENTIAL_SECRETS` and `getSecrets` when you need privilege-gated plaintext access.
-
-A follow-up should track a lasting fix (for example privilege checks specific to static
-credentials, or refusing to vend static secret-key credentials through `getCredentials` when
-authorization is enabled).
+Fileset credential authorization remains path-based. Static fileset credentials may still
+have broader source access than the requested path, so prefer short-lived scoped providers
+(`s3-token`, `oss-token`, `adls-token`, `gcs-token`, `cos-token`, `aws-irsa`) when available.
+Do not grant fileset access backed by unrestricted static accounts to untrusted principals.
 
 ## S3
 
@@ -525,3 +512,17 @@ gravitino.catalog.credential.backfillToProperties = true
 ```
 
 The Gravitino server then re-includes the hidden properties in its catalog GET responses. Turn it off once all clients use the Gravitino credential endpoint, since it exposes credentials in plaintext.
+
+### Catalog credential access
+
+With authorization enabled, catalog-level credential vending requires both `USE_SECRETS`
+and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership, in addition to metadata access.
+`USE_CATALOG` alone does not allow retrieving the source account. Engine users that need
+catalog credentials must receive these privileges explicitly. Catalog credentials are
+unscoped: they carry the source account's privileges, including access beyond a single
+Gravitino table. Fileset path-based credential authorization is unchanged.
+
+JDBC URLs must not contain passwords, tokens, or inline user information. Put JDBC login
+credentials in `jdbc-user` and `jdbc-password` (or secret references). Legacy URLs containing
+credentials are masked in catalog responses and rejected when used; update those catalog
+configurations before reconnecting. Class-loader diagnostics show property names only.
