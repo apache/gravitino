@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import { clickHouseEngineGroups } from '@/config'
+
 export const checkCatalogIcon = ({ type, provider }) => {
   switch (type) {
     case 'relational':
@@ -222,6 +224,41 @@ export const tableDefaultProps = {
       defaultValue: 'lance',
       select: ['lance', 'delta'],
       description: 'The format of the table'
+    }
+  ],
+  'jdbc-clickhouse': [
+    {
+      key: 'engine',
+      defaultValue: 'MergeTree',
+      selectGroups: clickHouseEngineGroups
+    },
+    {
+      key: 'cluster-name',
+      defaultValue: '',
+      parentField: 'engine',
+      show: ['Distributed'],
+      description: 'The cluster name for DDL operations'
+    },
+    {
+      key: 'cluster-remote-database',
+      defaultValue: '',
+      parentField: 'engine',
+      show: ['Distributed'],
+      description: 'The remote database name for ClickHouse distributed tables'
+    },
+    {
+      key: 'cluster-remote-table',
+      defaultValue: '',
+      parentField: 'engine',
+      show: ['Distributed'],
+      description: 'The remote table name for ClickHouse distributed tables'
+    },
+    {
+      key: 'cluster-sharding-key',
+      defaultValue: '',
+      parentField: 'engine',
+      show: ['Distributed'],
+      description: 'The sharding key for ClickHouse distributed tables'
     }
   ]
 }
