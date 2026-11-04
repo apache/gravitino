@@ -836,6 +836,8 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     Set<String> serialColumns = new HashSet<>();
     // Match only a bare nextval call and verify its dependency on the owned sequence. Ownership
     // alone would also match custom defaults such as nextval(owned_sequence) + 1.
+    // Resolve ownership by OID: pg_get_serial_sequence would resolve the table name and require
+    // schema USAGE even when JDBC and catalog metadata are readable without that privilege.
     String sql =
         "SELECT a.attname, a.atttypmod = -1 AND a.atttypid IN "
             + "('pg_catalog.varchar'::pg_catalog.regtype, 'pg_catalog.bpchar'::pg_catalog.regtype, "
@@ -848,9 +850,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
             + "AND EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep "
             + "WHERE dep.classid = 'pg_catalog.pg_attrdef'::pg_catalog.regclass "
             + "AND dep.objid = d.oid AND dep.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass "
-            + "AND dep.refobjid = pg_catalog.pg_get_serial_sequence("
-            + "pg_catalog.format('%I.%I', n.nspname, c.relname), a.attname)::pg_catalog.regclass "
-            + "AND dep.deptype = 'n') AS owned_serial "
+            + "AND dep.deptype = 'n' "
+            + "AND EXISTS (SELECT 1 FROM pg_catalog.pg_depend owned "
+            + "JOIN pg_catalog.pg_class seq ON seq.oid = owned.objid AND seq.relkind = 'S' "
+            + "WHERE owned.classid = 'pg_catalog.pg_class'::pg_catalog.regclass "
+            + "AND owned.objid = dep.refobjid AND owned.objsubid = 0 "
+            + "AND owned.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass "
+            + "AND owned.refobjid = a.attrelid AND owned.refobjsubid = a.attnum "
+            + "AND owned.deptype IN ('a', 'i'))) AS owned_serial "
             + "FROM pg_catalog.pg_attribute a "
             + "JOIN pg_catalog.pg_class c ON a.attrelid = c.oid "
             + "JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid "

@@ -204,6 +204,83 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+  void testLoadMetadataWithoutSchemaUsage() throws SQLException {
+    String role = RandomNameUtils.genRandomName("metadata_reader");
+    String schema = RandomNameUtils.genRandomName("metadata_schema");
+    String table = RandomNameUtils.genRandomName("metadata_table");
+    try (Connection admin = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          admin, "CREATE ROLE " + role + " LOGIN PASSWORD 'test-only-password'");
+      try {
+        JdbcConnectorUtils.executeUpdate(admin, "CREATE SCHEMA " + schema);
+        JdbcConnectorUtils.executeUpdate(admin, "REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
+        JdbcConnectorUtils.executeUpdate(
+            admin,
+            "CREATE TABLE "
+                + schema
+                + "."
+                + table
+                + " (id serial, label varchar, tags varchar(12)[])");
+        JdbcConnectorUtils.executeUpdate(
+            admin, "GRANT SELECT ON " + schema + "." + table + " TO " + role);
+        Map<String, String> properties = new HashMap<>();
+        properties.put("jdbc-driver", CONTAINER.getDriverClassName());
+        properties.put("jdbc-url", CONTAINER.getJdbcUrl());
+        properties.put("jdbc-database", admin.getCatalog());
+        properties.put("jdbc-user", role);
+        properties.put("jdbc-password", "test-only-password");
+        properties.put("jdbc.pool.max-size", "1");
+        properties.put("jdbc.pool.min-size", "1");
+        try (BasicDataSource limitedSource =
+            (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+          PostgreSqlTableOperations limited = new PostgreSqlTableOperations();
+          limited.initialize(
+              limitedSource,
+              JDBC_EXCEPTION_CONVERTER,
+              new PostgreSqlTypeConverter(),
+              new PostgreSqlColumnDefaultValueConverter(),
+              properties);
+          try (Connection connection = limitedSource.getConnection();
+              Statement statement = connection.createStatement()) {
+            try (ResultSet privileges =
+                statement.executeQuery(
+                    "SELECT pg_catalog.has_schema_privilege(current_user, '"
+                        + schema
+                        + "', 'USAGE')")) {
+              Assertions.assertTrue(privileges.next());
+              Assertions.assertFalse(privileges.getBoolean(1));
+            }
+            try (ResultSet columns =
+                connection.getMetaData().getColumns(connection.getCatalog(), schema, table, null)) {
+              int count = 0;
+              while (columns.next()) {
+                count++;
+              }
+              Assertions.assertEquals(3, count);
+            }
+            SQLException denied =
+                Assertions.assertThrows(
+                    SQLException.class,
+                    () -> statement.executeQuery("SELECT * FROM " + schema + "." + table));
+            Assertions.assertEquals("42501", denied.getSQLState());
+          }
+          JdbcTable loaded = limited.load(schema, table);
+          Assertions.assertEquals(3, loaded.columns().length);
+          Assertions.assertEquals(Types.IntegerType.get(), loaded.columns()[0].dataType());
+          Assertions.assertTrue(loaded.columns()[0].autoIncrement());
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, loaded.columns()[0].defaultValue());
+          Assertions.assertEquals(Types.StringType.get(), loaded.columns()[1].dataType());
+          Assertions.assertEquals(
+              Types.ListType.nullable(Types.VarCharType.of(12)), loaded.columns()[2].dataType());
+        }
+      } finally {
+        JdbcConnectorUtils.executeUpdate(admin, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(admin, "DROP ROLE " + role);
+      }
+    }
+  }
+
+  @Test
   void testLeastPrivilegeCreateDistinguishesMissingSchemaFromForbidden() throws SQLException {
     String role = RandomNameUtils.genRandomName("limited_role");
     String schema = RandomNameUtils.genRandomName("restricted_schema");
