@@ -103,7 +103,13 @@ public class JdbcColumnDefaultValueConverter {
         }
         return binaryLiteral(value);
       } else if (type instanceof Types.TimestampType) {
-        String value = literal.value().toString().replace("T", " ");
+        // java.time omits seconds for whole-minute values, but MySQL requires them.
+        String value =
+            literal
+                .value()
+                .toString()
+                .replace("T", " ")
+                .replaceFirst("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})(?=$|Z|[+-])", "$1:00");
         if (((Types.TimestampType) type).hasTimeZone() && value.endsWith("Z")) {
           // MySQL accepts numeric offsets but rejects the equivalent ISO UTC suffix.
           value = value.substring(0, value.length() - 1) + "+00:00";

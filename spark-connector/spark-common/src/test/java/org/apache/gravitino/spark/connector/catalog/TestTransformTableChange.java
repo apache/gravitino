@@ -29,6 +29,7 @@ import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.requests.TableUpdateRequest.UpdateTableColumnDefaultValueRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -38,6 +39,9 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.spark.sql.catalyst.expressions.Cast;
+import org.apache.spark.sql.catalyst.parser.CatalystSqlParser$;
+import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
@@ -132,7 +136,12 @@ public class TestTransformTableChange {
         "TIMESTAMP_LTZ",
         () -> {
           for (String text :
-              new String[] {"2026-11-04T12:34:56.123456", "1969-12-31T23:59:59.999999"}) {
+              new String[] {
+                "2026-11-04T12:34:56.123456",
+                "1969-12-31T23:59:59.999999",
+                "2026-11-04T12:34:00",
+                "2026-11-04T00:00:00"
+              }) {
             Expression expected =
                 Literals.of(
                     LocalDateTime.parse(text)
@@ -148,6 +157,7 @@ public class TestTransformTableChange {
                         .toString()
                         .replace("T", " ")
                         .replace("Z", "+00:00")
+                        .replaceFirst("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})(?=[+-])", "$1:00")
                     + "'";
             Assertions.assertEquals(
                 expectedSql,
@@ -171,12 +181,102 @@ public class TestTransformTableChange {
         "TIMESTAMP_NTZ",
         () -> {
           for (String text :
-              new String[] {"2026-11-04T12:34:56.123456", "1969-12-31T23:59:59.999999"}) {
+              new String[] {
+                "2026-11-04T12:34:56.123456",
+                "1969-12-31T23:59:59.999999",
+                "2026-11-04T12:34:00",
+                "2026-11-04T00:00:00"
+              }) {
             Expression expected = Literals.timestampLiteral(text);
             assertDefault("TIMESTAMP_NTZ '" + text + "'", expected);
             assertDefault("TIMESTAMP '" + text + "'", expected);
           }
         });
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"UTC", "Asia/Shanghai", "America/Los_Angeles"})
+  void testTimestampDefaultsAreCoercedToTargetColumn(String timeZone) {
+    for (String timestampType : new String[] {"TIMESTAMP_LTZ", "TIMESTAMP_NTZ"}) {
+      withSessionConfig(
+          timeZone,
+          timestampType,
+          () -> {
+            String text = "2026-11-04T12:34:56.123456";
+            assertDefault("TIMESTAMP_LTZ '" + text + "'", Literals.timestampLiteral(text));
+            try {
+              Cast cast =
+                  (Cast)
+                      CatalystSqlParser$.MODULE$.parseExpression(
+                          "CAST(TIMESTAMP_LTZ '" + text + "' AS TIMESTAMP_NTZ)");
+              Assertions.assertEquals(
+                  LocalDateTime.parse(text),
+                  DateTimeUtils.microsToLocalDateTime(
+                      (long) ((Cast) cast.withTimeZone(timeZone)).eval(null)));
+            } catch (Exception e) {
+              throw new AssertionError(e);
+            }
+            assertDefault(
+                "TIMESTAMP_NTZ '" + text + "'",
+                Literals.of(
+                    LocalDateTime.parse(text)
+                        .atZone(ZoneId.of(timeZone))
+                        .toInstant()
+                        .atOffset(ZoneOffset.UTC),
+                    Types.TimestampType.withTimeZone()));
+            assertDefault(
+                "TIMESTAMP_LTZ '2026-11-04 12:34:56.123456+02:00'",
+                Literals.timestampLiteral(
+                    LocalDateTime.parse(text)
+                        .atOffset(ZoneOffset.ofHours(2))
+                        .toInstant()
+                        .atZone(ZoneId.of(timeZone))
+                        .toLocalDateTime()));
+          });
+    }
+  }
+
+  @Test
+  void testNestedTimestampTargetAndInvalidColumnPaths() {
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "parent",
+              Types.StructType.of(
+                  Types.StructType.Field.nullableField(
+                      "ts", Types.TimestampType.withoutTimeZone())),
+              null)
+        };
+    org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
+        (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
+            sparkTableChangeConverter.toGravitinoTableChange(
+                TableChange.updateColumnDefaultValue(
+                    new String[] {"parent", "ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+                () -> columns);
+    Assertions.assertEquals(
+        Literals.timestampLiteral("2026-11-04T12:34:00"), converted.getNewDefaultValue());
+    for (String[] path :
+        new String[][] {{"missing"}, {"parent", "missing"}, {"parent", "ts", "child"}}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              sparkTableChangeConverter.toGravitinoTableChange(
+                  TableChange.updateColumnDefaultValue(path, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+                  () -> columns));
+    }
+  }
+
+  @Test
+  void testTimestampDefaultRequiresTargetSchema() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            sparkTableChangeConverter.toGravitinoTableChange(
+                TableChange.updateColumnDefaultValue(
+                    new String[] {"col"}, "TIMESTAMP '2026-11-04 12:34:56'")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> assertDefault("TIMESTAMP '2026-11-04 12:34:56'", Literals.stringLiteral("unused")));
   }
 
   @ParameterizedTest
@@ -429,7 +529,8 @@ public class TestTransformTableChange {
     org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
         (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
             sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql));
+                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql),
+                () -> new Column[] {Column.of("col", ((Literal<?>) expected).dataType(), null)});
     Assertions.assertEquals(expected, converted.getNewDefaultValue());
     return converted.getNewDefaultValue();
   }

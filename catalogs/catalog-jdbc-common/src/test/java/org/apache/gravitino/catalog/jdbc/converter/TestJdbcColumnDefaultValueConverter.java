@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.converter;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.io.BaseEncoding;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -50,6 +51,31 @@ public class TestJdbcColumnDefaultValueConverter {
     Assertions.assertEquals(
         "'2026-11-04 12:34:56.123456'",
         converter.fromGravitino(Literals.timestampLiteral("2026-11-04T12:34:56.123456")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"12:34:00", "00:00:00"})
+  void testWholeMinuteTimestampDefaultsIncludeSeconds(String time) {
+    String text = "2026-11-04T" + time;
+    for (String offset : new String[] {"Z", "+08:00", "-07:00"}) {
+      String expected = "'2026-11-04 " + time + (offset.equals("Z") ? "+00:00" : offset) + "'";
+      OffsetDateTime value = OffsetDateTime.parse(text + offset);
+      Assertions.assertEquals(
+          expected,
+          converter.fromGravitino(Literals.of(value, Types.TimestampType.withTimeZone())));
+      Assertions.assertEquals(
+          expected,
+          converter.fromGravitino(
+              Literals.of(value.toString(), Types.TimestampType.withTimeZone())));
+    }
+    Assertions.assertEquals(
+        "'2026-11-04 " + time + "'",
+        converter.fromGravitino(Literals.timestampLiteral(LocalDateTime.parse(text))));
+    Assertions.assertEquals(
+        "'2026-11-04 " + time + "'",
+        converter.fromGravitino(
+            Literals.of(
+                LocalDateTime.parse(text).toString(), Types.TimestampType.withoutTimeZone())));
   }
 
   @ParameterizedTest

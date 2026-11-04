@@ -56,6 +56,14 @@ string starting with `0x` must contain valid hexadecimal pairs; it is treated as
 Sending encoded binary defaults requires the server-side JDBC default converters described here;
 older servers do not decode this representation.
 
+Spark timestamp defaults are converted to the target column type in the Spark session time zone.
+An LTZ literal assigned to an NTZ column keeps the local fields produced by Spark's timestamp cast;
+an NTZ literal assigned to an LTZ column is interpreted in the Spark session zone before it is sent
+as an instant. These updates load the current table schema once through Gravitino and require table
+load permission. Batches combining timestamp defaults with column additions, deletions, renames, or
+type changes are rejected before writing because they require sequential schema evolution.
+
+JDBC timestamp defaults include seconds even for whole-minute and midnight values.
 Zoned timestamp defaults use numeric UTC offsets in JDBC SQL. MySQL requires 8.0.19 or later
 for [datetime literals with offsets](https://dev.mysql.com/doc/refman/8.0/en/datetime.html);
 MySQL 5.7 and older 8.0 releases cannot use these zoned defaults. Spark `DROP DEFAULT` is not

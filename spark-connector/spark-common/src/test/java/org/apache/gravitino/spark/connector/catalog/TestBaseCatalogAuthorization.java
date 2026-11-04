@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Catalog;
@@ -34,21 +35,31 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.internal.SQLConf;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestBaseCatalogAuthorization {
@@ -70,12 +81,15 @@ public class TestBaseCatalogAuthorization {
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     gravitinoCatalog = mock(Catalog.class);
     gravitinoTableCatalog = mock(TableCatalog.class);
     sparkCatalog = mock(org.apache.spark.sql.connector.catalog.TableCatalog.class);
     when(gravitinoCatalog.asTableCatalog()).thenReturn(gravitinoTableCatalog);
     catalog = new TestCatalog(gravitinoCatalog, sparkCatalog);
+    Field converter = BaseCatalog.class.getDeclaredField("sparkTableChangeConverter");
+    converter.setAccessible(true);
+    converter.set(catalog, new SparkTableChangeConverter(new SparkTypeConverter()));
   }
 
   @AfterEach
@@ -133,6 +147,101 @@ public class TestBaseCatalogAuthorization {
 
     verify(gravitinoTableCatalog)
         .loadTable(gravitinoIdentifier, ImmutableSet.of(Privilege.Name.MODIFY_TABLE));
+  }
+
+  @Test
+  void testAlterTimestampDefaultLoadsTargetSchemaBeforeWriting() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withoutTimeZone(6), null)});
+    Table sparkTable = mock(Table.class);
+    when(sparkCatalog.loadTable(identifier)).thenReturn(sparkTable);
+    SQLConf conf = new SQLConf();
+    conf.setConfString("spark.sql.session.timeZone", "Asia/Shanghai");
+    SQLConf.withExistingConf(
+        conf,
+        () -> {
+          Assertions.assertDoesNotThrow(
+              () ->
+                  catalog.alterTable(
+                      identifier,
+                      TableChange.updateColumnDefaultValue(
+                          new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:56.123456'")));
+          return null;
+        });
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(gravitinoTableCatalog).alterTable(eq(gravitinoIdentifier), change.capture());
+    Assertions.assertEquals(
+        Literals.timestampLiteral("2026-11-04T12:34:56.123456"),
+        ((org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) change.getValue())
+            .getNewDefaultValue());
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testTimestampDefaultRejectsSchemaChangingBatchBeforeWriting() {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    TableChange.updateColumnDefaultValue(
+                        new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:00'"),
+                    TableChange.updateColumnType(new String[] {"ts"}, DataTypes.TimestampNTZType)));
+    Assertions.assertTrue(error.getMessage().contains("cannot be combined"));
+    Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
+  }
+
+  @Test
+  void testTimestampSchemaReadFailurePreventsWritingAndPreservesCause() {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    ForbiddenException denied = new ForbiddenException("denied schema read");
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenThrow(denied);
+    Assertions.assertSame(
+        denied,
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    TableChange.updateColumnDefaultValue(
+                        new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:00'"))));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  @Test
+  void testNonTimestampDefaultDoesNotReadSchema() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    catalog.alterTable(identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, "42"));
+    verify(gravitinoTableCatalog, Mockito.never()).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testTimestampDefaultsShareOneSchemaRead() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withoutTimeZone(), null)});
+    catalog.alterTable(
+        identifier,
+        TableChange.updateColumnDefaultValue(
+            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
+        TableChange.updateColumnDefaultValue(
+            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    verify(table).columns();
   }
 
   private static class TestCatalog extends BaseCatalog {
