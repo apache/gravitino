@@ -511,6 +511,7 @@ class BaseGVFSOperations(ABC):
         self,
         fileset_ident: NameIdentifier,
         actual_location: str,
+        fileset: Optional[Fileset] = None,
     ) -> Dict[str, str]:
         """Merge properties from catalog, schema, fileset, options, and configs.
 
@@ -522,22 +523,41 @@ class BaseGVFSOperations(ABC):
 
         :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
+        :param fileset: Optional pre-loaded fileset instance
         :return: Merged properties dictionary
         """
-        catalog_name = fileset_ident.namespace().level(1)
-        schema_name = fileset_ident.namespace().level(2)
-        catalog = self._get_gravitino_client().load_catalog(catalog_name)
-        schema = catalog.as_schemas().load_schema(schema_name)
-        fileset = catalog.as_fileset_catalog().load_fileset(
-            NameIdentifier.of(schema_name, fileset_ident.name())
+        catalog_ident = NameIdentifier.of(
+            fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
+        )
+        schema_ident = NameIdentifier.of(
+            fileset_ident.namespace().level(0),
+            fileset_ident.namespace().level(1),
+            fileset_ident.namespace().level(2),
+        )
+        catalog = self._get_fileset_catalog(catalog_ident)
+        schema = (
+            self._get_fileset_schema(schema_ident)
+            if self._enable_fileset_metadata_cache
+            else catalog.as_schemas().load_schema(schema_ident.name())
+        )
+        resolved_fileset = (
+            fileset
+            if fileset is not None
+            else (
+                self._get_fileset(fileset_ident)
+                if self._enable_fileset_metadata_cache
+                else catalog.as_fileset_catalog().load_fileset(
+                    NameIdentifier.of(schema_ident.name(), fileset_ident.name())
+                )
+            )
         )
         fileset_props = dict(catalog.properties() or {})
         fileset_props.update(catalog.get_secrets())
         self._merge_static_catalog_credentials(fileset_props, catalog)
         fileset_props.update(schema.properties() or {})
         fileset_props.update(schema.get_secrets())
-        fileset_props.update(fileset.properties() or {})
-        fileset_props.update(fileset.get_secrets())
+        fileset_props.update(resolved_fileset.properties() or {})
+        fileset_props.update(resolved_fileset.get_secrets())
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location
@@ -635,7 +655,9 @@ class BaseGVFSOperations(ABC):
                 f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
             )
 
-        fileset_props = self._merge_fileset_properties(fileset_ident, actual_location)
+        fileset_props = self._merge_fileset_properties(
+            fileset_ident, actual_location, fileset
+        )
 
         # Set caller context for credential vending
         if location_name:
