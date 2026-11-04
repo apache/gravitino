@@ -176,15 +176,15 @@ public class ObjectPolicyResolver {
   }
 
   /**
-   * Rejects same-level maintenance conflicts for a projected set of direct tag assignments on
-   * {@code metadataObject}, without writing those associations.
+   * Ensures projected direct tags on {@code metadataObject} would not yield two Iceberg maintenance
+   * policies of the same type at that object level.
    *
    * @param metalake metalake name
    * @param metadataObject object the tags would be assigned to
    * @param directTags projected direct tags with {@code source == metadataObject}
    * @throws IllegalArgumentException when a same-level same-type conflict would exist
    */
-  public void requireNoSameLevelConflict(
+  public void checkMaintenanceTypeUniqueness(
       String metalake, MetadataObject metadataObject, ResolvedTag[] directTags) {
     if (directTags.length == 0) {
       return;
@@ -220,17 +220,17 @@ public class ObjectPolicyResolver {
   }
 
   /**
-   * Rejects adding {@code policy} to a tag when that would create a same-level maintenance conflict
-   * on {@code metadataObject}, given the tag's current assignment on that object.
+   * Ensures {@code policy} would not share an Iceberg maintenance type with another policy already
+   * effective on {@code metadataObject} through the given tag assignment and selector.
    *
    * @param metalake metalake name
    * @param metadataObject object that already has the tag
    * @param assignment current tag assignment on the object
-   * @param policy policy that would be linked to the tag
+   * @param policy policy that would become effective
    * @param selector policy-to-tag selector
    * @throws IllegalArgumentException when a same-level same-type conflict would exist
    */
-  public void requireNoSameLevelConflictAddingPolicy(
+  public void checkMaintenanceTypeUniqueness(
       String metalake,
       MetadataObject metadataObject,
       TagAssignment assignment,

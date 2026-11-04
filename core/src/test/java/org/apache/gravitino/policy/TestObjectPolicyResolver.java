@@ -337,7 +337,7 @@ public class TestObjectPolicyResolver {
   }
 
   @Test
-  public void testRequireNoSameLevelConflict() throws Exception {
+  public void testCheckMaintenanceTypeUniqueness() throws Exception {
     TagEntity hot = tag(1L, "hot", TagAssignment.noValue()).copyWithInherited(false);
     TagEntity strict = tag(2L, "maint", TagAssignment.ofValues("strict")).copyWithInherited(false);
     PolicyEntity hotPolicy = compaction(10L, "compact_hot");
@@ -358,7 +358,7 @@ public class TestObjectPolicyResolver {
     IllegalArgumentException thrown =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> resolver.requireNoSameLevelConflict(METALAKE, OBJECT, directTags));
+            () -> resolver.checkMaintenanceTypeUniqueness(METALAKE, OBJECT, directTags));
     Assertions.assertTrue(thrown.getMessage().contains("compact_hot"));
     Assertions.assertTrue(thrown.getMessage().contains("compact_strict"));
   }
