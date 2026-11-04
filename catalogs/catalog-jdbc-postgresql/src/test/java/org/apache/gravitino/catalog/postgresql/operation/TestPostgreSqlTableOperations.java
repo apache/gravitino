@@ -23,6 +23,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,6 +48,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -68,6 +70,318 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
+
+  @Test
+  void testDdlFragmentsAreRejectedOnCreateAndAlter() {
+    String table = RandomNameUtils.genRandomName("ddl_guard_");
+    JdbcColumn id = JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build();
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        new JdbcColumn[] {id},
+        null,
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try {
+      for (String fragment :
+          new String[] {
+            "integer, injected_col integer",
+            "integer DEFAULT 42",
+            "integer); CREATE TABLE injected_marker(id int); CREATE TABLE continuation(id int"
+          }) {
+        JdbcColumn bad =
+            JdbcColumn.builder()
+                .withName("id")
+                .withType(Types.ExternalType.of(fragment))
+                .withNullable(true)
+                .build();
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.create(
+                    TEST_DB_NAME,
+                    table + "_bad",
+                    new JdbcColumn[] {bad},
+                    null,
+                    Map.of(),
+                    null,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.alterTable(
+                    TEST_DB_NAME,
+                    table,
+                    TableChange.addColumn(new String[] {"bad"}, bad.dataType())));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                TABLE_OPERATIONS.alterTable(
+                    TEST_DB_NAME,
+                    table,
+                    TableChange.updateColumnType(new String[] {"id"}, bad.dataType())));
+      }
+      FunctionExpression badDefault =
+          FunctionExpression.of(
+              "abs(1))); CREATE TABLE injected_marker(id int); CREATE TABLE continuation(id timestamptz DEFAULT (now");
+      JdbcColumn bad =
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(INT)
+              .withDefaultValue(badDefault)
+              .withNullable(true)
+              .build();
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TABLE_OPERATIONS.create(
+                  TEST_DB_NAME,
+                  table + "_bad",
+                  new JdbcColumn[] {bad},
+                  null,
+                  Map.of(),
+                  null,
+                  Distributions.NONE,
+                  Indexes.EMPTY_INDEXES));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TABLE_OPERATIONS.alterTable(
+                  TEST_DB_NAME,
+                  table,
+                  TableChange.updateColumnDefaultValue(new String[] {"id"}, badDefault)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TABLE_OPERATIONS.alterTable(
+                  TEST_DB_NAME,
+                  table,
+                  TableChange.addColumn(
+                      new String[] {"bad"},
+                      INT,
+                      null,
+                      TableChange.ColumnPosition.defaultPos(),
+                      true,
+                      false,
+                      badDefault)));
+      List<String> names = TABLE_OPERATIONS.listTables(TEST_DB_NAME);
+      Assertions.assertFalse(names.contains("injected_marker"));
+      Assertions.assertFalse(names.contains("continuation"));
+      Assertions.assertFalse(names.contains(table + "_bad"));
+      Assertions.assertEquals(1, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns().length);
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table + "_bad");
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, "injected_marker");
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, "continuation");
+    }
+  }
+
+  @Test
+  void testQuotedNativeTypesAndModifiersStillExecute() throws SQLException {
+    String table = RandomNameUtils.genRandomName("native_type_");
+    String domain = RandomNameUtils.genRandomName("domain_") + ";quoted";
+    String type = "\"" + TEST_DB_NAME + "\".\"" + domain + "\"";
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute("CREATE DOMAIN " + type + " AS integer");
+      try {
+        TABLE_OPERATIONS.create(
+            TEST_DB_NAME,
+            table,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName("id")
+                  .withType(Types.ExternalType.of(type))
+                  .withNullable(true)
+                  .build(),
+              JdbcColumn.builder()
+                  .withName("n")
+                  .withType(Types.ExternalType.of("numeric(39,0)[]"))
+                  .withNullable(true)
+                  .build(),
+              JdbcColumn.builder()
+                  .withName("iv")
+                  .withType(Types.ExternalType.of("interval day to second(6)"))
+                  .withNullable(true)
+                  .build()
+            },
+            null,
+            Map.of(),
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + table
+                + " VALUES(7, ARRAY[123456789012345678901234567890123456789], INTERVAL '1 day')");
+        try (ResultSet result =
+            statement.executeQuery("SELECT id, n[1]::text FROM " + TEST_DB_NAME + "." + table)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(7, result.getInt(1));
+          Assertions.assertEquals("123456789012345678901234567890123456789", result.getString(2));
+        }
+        Assertions.assertEquals(3, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns().length);
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+        statement.execute("DROP DOMAIN " + type);
+      }
+    }
+  }
+
+  @Test
+  void testFunctionDefaultsWithArgumentsOnCreateAndAlter() throws SQLException {
+    String table = RandomNameUtils.genRandomName("function_default_");
+    String value = "O'Brien; CREATE TABLE injected_marker(id int); --";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("n")
+          .withType(INT)
+          .withNullable(true)
+          .withDefaultValue(FunctionExpression.of("pg_catalog.abs", Literals.integerLiteral(-3)))
+          .build(),
+      JdbcColumn.builder()
+          .withName("s")
+          .withType(VARCHAR)
+          .withNullable(true)
+          .withDefaultValue(
+              FunctionExpression.of(
+                  "concat", Literals.stringLiteral(value), Literals.stringLiteral("!")))
+          .build(),
+      JdbcColumn.builder()
+          .withName("ts")
+          .withType(Types.TimestampType.withoutTimeZone())
+          .withNullable(true)
+          .withDefaultValue(
+              FunctionExpression.of(
+                  "date_trunc", Literals.stringLiteral("day"), FunctionExpression.of("now")))
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        columns,
+        null,
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("INSERT INTO " + TEST_DB_NAME + "." + table + " DEFAULT VALUES");
+      try (ResultSet result =
+          statement.executeQuery("SELECT n,s,ts FROM " + TEST_DB_NAME + "." + table)) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(3, result.getInt(1));
+        Assertions.assertEquals(value + "!", result.getString(2));
+        Assertions.assertEquals(
+            LocalTime.MIDNIGHT, result.getTimestamp(3).toLocalDateTime().toLocalTime());
+      }
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.addColumn(
+              new String[] {"added"},
+              INT,
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              FunctionExpression.of("abs", Literals.integerLiteral(-5))));
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"added"}, FunctionExpression.of("abs", Literals.integerLiteral(-9))));
+      statement.executeUpdate("INSERT INTO " + TEST_DB_NAME + "." + table + " DEFAULT VALUES");
+      try (ResultSet result =
+          statement.executeQuery(
+              "SELECT added FROM " + TEST_DB_NAME + "." + table + " ORDER BY added")) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(5, result.getInt(1));
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(9, result.getInt(1));
+      }
+      Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("injected_marker"));
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
+
+  @Test
+  void testSqlTokensInIndexNamesStayIdentifiers() throws SQLException {
+    String table = RandomNameUtils.genRandomName("index_tokens_");
+    String primary = "pk\"; CREATE TABLE marker(id int);--";
+    String unique = "uq\"; CREATE TABLE marker(id int);--";
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build()
+        },
+        null,
+        Map.of(),
+        null,
+        Distributions.NONE,
+        new Index[] {Indexes.primary(primary, new String[][] {{"id"}})});
+    try {
+      Assertions.assertTrue(
+          Arrays.stream(TABLE_OPERATIONS.load(TEST_DB_NAME, table).index())
+              .anyMatch(i -> primary.equals(i.name())));
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.addIndex(IndexType.UNIQUE_KEY, unique, new String[][] {{"id"}}));
+      Assertions.assertTrue(
+          Arrays.stream(TABLE_OPERATIONS.load(TEST_DB_NAME, table).index())
+              .anyMatch(i -> unique.equals(i.name())));
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.deleteIndex(unique, false),
+          TableChange.deleteIndex(primary, false));
+      Assertions.assertEquals(0, TABLE_OPERATIONS.load(TEST_DB_NAME, table).index().length);
+      Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("marker"));
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, "marker");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"on", "off"})
+  void testStringFunctionArgumentsAreEscapedForAnyStringSetting(String setting)
+      throws SQLException {
+    PostgreSqlColumnDefaultValueConverter converter = new PostgreSqlColumnDefaultValueConverter();
+    String[] values = {
+      "back\\slash O'Brien; --",
+      "\\'); CREATE TABLE " + TEST_DB_NAME + ".function_argument_marker(id int); SELECT ('safe"
+    };
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      try {
+        statement.execute("SET standard_conforming_strings = " + setting);
+        for (String value : values) {
+          String expression =
+              converter.fromGravitino(
+                  FunctionExpression.of("concat", Literals.stringLiteral(value)));
+          try (ResultSet result = statement.executeQuery("SELECT " + expression)) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(value, result.getString(1));
+          }
+        }
+        Assertions.assertFalse(
+            TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains("function_argument_marker"));
+      } finally {
+        statement.execute("RESET standard_conforming_strings");
+      }
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"quoted\";CREATE TABLE injected_marker (id int);--"})

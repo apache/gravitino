@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.postgresql.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,14 @@ public class TestPostgreSqlColumnDefaultValueConverter {
       new PostgreSqlColumnDefaultValueConverter();
 
   @Test
+  void testOtherEscapeStringSyntaxIsPreservedAsExpression() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
+    String sql = "E'line\\n'::text";
+    Assertions.assertEquals(
+        UnparsedExpression.of(sql), converter.toGravitino(type, sql, false, true));
+  }
+
+  @Test
   void testNulStringDefaultIsRejectedBeforeDdl() {
     IllegalArgumentException error =
         Assertions.assertThrows(
@@ -37,7 +46,7 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertTrue(error.getMessage().contains("default"));
     Assertions.assertTrue(error.getMessage().contains("U+0000"));
     Assertions.assertEquals(
-        "'before\\u0000after'",
+        "E'before\\\\u0000after'",
         converter.fromGravitino(Literals.stringLiteral("before\\u0000after")));
     Assertions.assertEquals("NULL", converter.fromGravitino(Literals.NULL));
   }
@@ -56,7 +65,7 @@ public class TestPostgreSqlColumnDefaultValueConverter {
   @Test
   public void testStringLiteralDoublesQuotesOnly() {
     Assertions.assertEquals(
-        "'O''Brien \\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
+        "E'O''Brien \\\\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
   }
 
   @Test

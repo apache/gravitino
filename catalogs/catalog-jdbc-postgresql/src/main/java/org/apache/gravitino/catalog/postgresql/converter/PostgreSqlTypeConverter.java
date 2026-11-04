@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.postgresql.converter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -47,6 +48,30 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
   private static final int MAX_NUMERIC_PRECISION = 1000;
+
+  // Match a type declaration, not an arbitrary SQL fragment. Quoted identifiers may contain SQL
+  // punctuation safely; modifiers are numeric and array suffixes cannot introduce DDL clauses.
+  private static final String TYPE_IDENTIFIER =
+      "(?:[\\p{L}_][\\p{L}\\p{N}_$]*|\"(?:[^\"]|\"\")++\")";
+  private static final String TYPE_MODIFIERS =
+      "(?:\\s*\\(\\s*[+-]?\\d++(?:\\s*,\\s*[+-]?\\d++)?\\s*\\))?";
+  private static final Pattern EXTERNAL_TYPE_DECLARATION =
+      Pattern.compile(
+          "(?:"
+              + TYPE_IDENTIFIER
+              + "(?:\\s*\\.\\s*"
+              + TYPE_IDENTIFIER
+              + ")?"
+              + TYPE_MODIFIERS
+              + "|(?:double\\s+precision|(?:character|char|bit|national\\s+(?:character|char))\\s+varying)"
+              + TYPE_MODIFIERS
+              + "|(?:timestamp|time)"
+              + TYPE_MODIFIERS
+              + "\\s+(?:with|without)\\s+time\\s+zone"
+              + "|interval\\s+(?:year|month|day|hour|minute|second)(?:\\s+to\\s+(?:month|day|hour|minute|second))?"
+              + TYPE_MODIFIERS
+              + ")(?:\\s*\\[\\s*\\d*+\\s*\\])*+",
+          Pattern.CASE_INSENSITIVE);
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -177,7 +202,14 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {
-      return ((Types.ExternalType) type).catalogString();
+      String declaration = ((Types.ExternalType) type).catalogString();
+      Preconditions.checkArgument(
+          declaration != null
+              && declaration.indexOf('\0') < 0
+              && EXTERNAL_TYPE_DECLARATION.matcher(declaration.trim()).matches(),
+          "PostgreSQL external type must be a single type declaration without DDL clauses: %s",
+          declaration);
+      return declaration;
     }
     throw new IllegalArgumentException(
         String.format(

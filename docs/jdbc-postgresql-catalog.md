@@ -232,3 +232,20 @@ You can't submit the `RenameTable` operation at the same time as other operation
 PostgreSQL doesn't support the `UpdateColumnPosition` operation, so you can only use `ColumnPosition.defaultPosition()` when `AddColumn`.
 If you update a nullability column to non nullability, there may be compatibility issues.
 :::
+
+### Native type declarations and column defaults
+
+`ExternalType` on CREATE or ALTER accepts a single PostgreSQL type declaration: an unquoted
+or double-quoted type name, optionally schema-qualified, with numeric type modifiers and
+array suffixes. Standard multiword types such as `double precision`, `character varying`,
+`timestamp with time zone`, and interval field declarations are also accepted. Quote type
+names containing spaces or punctuation. Extra column definitions, constraints, defaults,
+comments, and statements are rejected before DDL execution. Unsupported declaration syntax
+must be expressed using one of the supported forms; arbitrary SQL fragments are not accepted.
+The native type read path remains unchanged.
+
+Function defaults accept an unquoted function identifier, optionally qualified, with literal
+or nested-function arguments. Arguments are rendered as SQL values rather than Java object
+strings. `CURRENT_TIMESTAMP` remains a no-argument keyword default. Raw SQL expressions and
+SQL syntax in function names are rejected. String values containing backslashes use explicit
+PostgreSQL escape literals so that `standard_conforming_strings` does not change their meaning.

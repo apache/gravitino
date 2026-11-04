@@ -85,20 +85,36 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
     return sql;
   }
 
-  /**
-   * Doubles single quotes only. With {@code standard_conforming_strings} on, the default since
-   * PostgreSQL 9.1, a backslash in a string literal is an ordinary character.
-   */
+  /** Uses explicit escape strings for backslashes, independently of the server string setting. */
   @Override
   protected String quoteStringLiteral(String value) {
-    return "'" + value.replace("'", "''") + "'";
+    String escaped = value.replace("'", "''");
+    return value.indexOf('\\') >= 0
+        ? "E'" + escaped.replace("\\", "\\\\") + "'"
+        : "'" + escaped + "'";
   }
 
   private Expression parseLiteral(JdbcTypeConverter.JdbcTypeBean type, String columnDefaultValue) {
     Matcher matcher = VALUE_WITH_TYPE.matcher(columnDefaultValue);
     if (matcher.find()) {
       // String literals in the catalog are shown with embedded single quotes doubled.
-      columnDefaultValue = matcher.group(1).replace("''", "'");
+      String content = matcher.group(1).replace("''", "'");
+      if (columnDefaultValue.startsWith("E'") || columnDefaultValue.startsWith("e'")) {
+        StringBuilder decoded = new StringBuilder();
+        for (int i = 0; i < content.length(); i++) {
+          char character = content.charAt(i);
+          if (character == '\\') {
+            // Our renderer and PostgreSQL's catalog printer double literal backslashes. Preserve
+            // other escape syntaxes as expressions instead of guessing their decoded value.
+            if (++i >= content.length() || content.charAt(i) != '\\') {
+              return UnparsedExpression.of(columnDefaultValue);
+            }
+          }
+          decoded.append(character);
+        }
+        content = decoded.toString();
+      }
+      columnDefaultValue = content;
     }
 
     if (columnDefaultValue.startsWith(NULL_PREFIX)) {
