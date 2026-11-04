@@ -86,6 +86,7 @@ import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
@@ -293,15 +294,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       if (e.getCause() instanceof TopicExistsException) {
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
 
-<<<<<<< HEAD
-=======
       } else if (e.getCause() instanceof InvalidPartitionsException) {
         throw ExceptionMessages.illegalArgument("Invalid partition count for topic " + ident, e);
 
       } else if (e.getCause() instanceof InvalidTopicException) {
         throw ExceptionMessages.illegalArgument("Invalid topic name " + ident, e);
 
->>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
         throw ExceptionMessages.illegalArgument("Invalid replication factor for topic " + ident, e);
 

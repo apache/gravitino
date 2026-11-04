@@ -48,8 +48,6 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
-<<<<<<< HEAD
-=======
 ### Topic Naming Rules
 
 When creating a topic through Gravitino, its name must contain 1 to 128 characters and use only
@@ -64,14 +62,6 @@ can still be rejected by Kafka, for example when `a_b` collides with an existing
 ZooKeeper-mode Kafka. These broker-side name rejections also return HTTP `400 Bad Request`, with
 Kafka's rejection reason included in the error message.
 
-::::caution Topic names containing dots
-When authorization is enabled, topic names containing dots are unsupported, and one such topic can
-cause the entire topic list request to fail. See
-[Names containing dots](./security/access-control.md#names-containing-dots) for details and the
-workaround.
-::::
-
->>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
 ### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required |

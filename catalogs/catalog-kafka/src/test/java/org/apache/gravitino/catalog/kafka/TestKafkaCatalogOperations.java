@@ -83,11 +83,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.server.web.rest.TopicOperations;
->>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
@@ -97,6 +93,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -455,8 +452,6 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   void testCreateTopicNameCollisionReturnsBadRequest() throws IllegalAccessException {
     NameIdentifier existingTopic =
         NameIdentifier.of(
@@ -561,7 +556,6 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
->>>>>>> 948964abb ([#14574] fix(kafka): validate topic names and map invalid topic errors (#14575))
   public void testLoadTopic() {
     Topic topic =
         kafkaCatalogOperations.loadTopic(
