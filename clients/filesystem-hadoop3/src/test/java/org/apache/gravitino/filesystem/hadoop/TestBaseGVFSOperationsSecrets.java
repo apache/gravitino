@@ -21,6 +21,8 @@ package org.apache.gravitino.filesystem.hadoop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -333,6 +335,63 @@ public class TestBaseGVFSOperationsSecrets {
     when(fileset.properties()).thenReturn(Map.of());
     when(fileset.supportsSecrets()).thenReturn(null);
     return catalog;
+  }
+
+  @Test
+  public void testMetadataCacheAvoidsRepeatedMetadataLoads() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+    conf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, true);
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets schemaSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets filesetSecrets = mock(SupportsSecrets.class);
+
+    when(catalog.properties()).thenReturn(Map.of("c-vis", "1"));
+    when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
+    when(catalogSecrets.getSecrets()).thenReturn(Map.of("c-secret", "cs"));
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of("s-vis", "2"));
+    when(schema.supportsSecrets()).thenReturn(schemaSecrets);
+    when(schemaSecrets.getSecrets()).thenReturn(Map.of("s-secret", "ss"));
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of("f-vis", "3"));
+    when(fileset.supportsSecrets()).thenReturn(filesetSecrets);
+    when(filesetSecrets.getSecrets()).thenReturn(Map.of("f-secret", "fs"));
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    try {
+      NameIdentifier filesetIdent = NameIdentifier.of("ml", "catalog", "schema", "fs");
+      Map<String, String> first = ops.getAllProperties(filesetIdent);
+      Map<String, String> second = ops.getAllProperties(filesetIdent);
+
+      assertEquals("fs", first.get("f-secret"));
+      assertEquals(first, second);
+      // The second resolution must come from the metadata cache: no repeated loads.
+      verify(client, times(1)).loadCatalog("catalog");
+      verify(schemas, times(1)).loadSchema("schema");
+      verify(filesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+      // Secrets are fetched on every call so credential rotation is honored.
+      verify(catalogSecrets, times(2)).getSecrets();
+      verify(schemaSecrets, times(2)).getSecrets();
+      verify(filesetSecrets, times(2)).getSecrets();
+    } finally {
+      ops.close();
+    }
   }
 
   private static final class TestOps extends BaseGVFSOperations {
