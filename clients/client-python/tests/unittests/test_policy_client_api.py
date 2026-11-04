@@ -18,7 +18,10 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from http.client import HTTPResponse
+from io import BytesIO
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 
 from gravitino import GravitinoClient
 from gravitino.api.authorization.privileges import Privilege
@@ -34,7 +37,6 @@ from gravitino.dto.policy_dto import (
     TagForPolicyAssociationDTO,
 )
 from gravitino.dto.requests.policy_set_request import PolicySetRequest
-from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.policy_response import (
     PolicyForTagAssociationListResponse,
@@ -47,6 +49,8 @@ from gravitino.dto.responses.policy_response import (
 from gravitino.dto.responses.tag_response import TagResponse
 from gravitino.exceptions.base import (
     IllegalArgumentException,
+    NoSuchPolicyException,
+    PolicyAlreadyAssociatedException,
     UnsupportedOperationException,
 )
 from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
@@ -70,6 +74,29 @@ class TestPolicyClientAPI(unittest.TestCase):
         self.assertEqual(expected.policy_type(), actual.policy_type())
         self.assertEqual(expected.comment(), actual.comment())
         self.assertEqual(expected.enabled(), actual.enabled())
+
+    @staticmethod
+    def _opener_returning(status_code: int, body: bytes) -> Mock:
+        """An opener whose response carries the given status and raw body,
+        so requests run through the real HTTPClient."""
+        mock_http_resp = Mock(HTTPResponse)
+        mock_http_resp.getcode.return_value = status_code
+        mock_http_resp.read.return_value = body
+        mock_http_resp.info.return_value = None
+        mock_http_resp.url = None
+        opener = Mock()
+        opener.open.return_value = mock_http_resp
+        return opener
+
+    @staticmethod
+    def _opener_raising(status_code: int, body: bytes) -> Mock:
+        """An opener that fails the request with an HTTPError carrying the
+        given error response body, like a real server error."""
+        opener = Mock()
+        opener.open.side_effect = HTTPError(
+            "http://localhost:8090", status_code, "error", None, BytesIO(body)
+        )
+        return opener
 
     # Client delegation tests, backed by the mock policy repo.
 
@@ -422,19 +449,84 @@ class TestPolicyClientAPI(unittest.TestCase):
             self.assertEqual("ALL_VALUES", kwargs["json"].selector_dto.type())
 
     def test_gravitino_remove_policy_from_tag(self, *mock_method) -> None:
-        resp = BaseResponse(0)
+        client = self._client()
+
+        # The server answers a successful removal with HTTP 204 and no body;
+        # run through the real HTTPClient so the empty body is exercised.
+        with patch(
+            "gravitino.utils.http_client.build_opener",
+            return_value=self._opener_returning(204, b""),
+        ) as mock_build_opener:
+            self.assertIsNone(client.remove_policy_from_tag("tagA", "policyA"))
+            request = mock_build_opener.return_value.open.call_args.args[0]
+            self.assertEqual("DELETE", request.get_method())
+            self.assertEqual(
+                "http://localhost:9090/api/metalakes/metalake_demo/tags/tagA"
+                "/policies/policyA",
+                request.full_url,
+            )
+
+    def test_gravitino_add_policy_for_tag_no_such_policy(self, *mock_method) -> None:
+        error_body = (
+            b'{"code":1003,"type":"NoSuchPolicyException",'
+            b'"message":"Policy does not exist","stack":null}'
+        )
         client = self._client()
 
         with patch(
-            "gravitino.utils.http_client.HTTPClient.delete",
-            return_value=mock_base.mock_http_response(resp.to_json()),
-        ) as mock_delete:
-            self.assertIsNone(client.remove_policy_from_tag("tagA", "policyA"))
-            args, kwargs = mock_delete.call_args
-            self.assertEqual(
-                "api/metalakes/metalake_demo/tags/tagA/policies/policyA", args[0]
-            )
-            self.assertEqual(TAG_ERROR_HANDLER, kwargs["error_handler"])
+            "gravitino.utils.http_client.build_opener",
+            return_value=self._opener_raising(404, error_body),
+        ):
+            with self.assertRaises(NoSuchPolicyException):
+                client.add_policy_for_tag("tagA", "policyA")
+
+    def test_gravitino_add_policy_for_tag_already_associated(
+        self, *mock_method
+    ) -> None:
+        error_body = (
+            b'{"code":1004,"type":"PolicyAlreadyAssociatedException",'
+            b'"message":"Policy is already associated with the tag","stack":null}'
+        )
+        client = self._client()
+
+        with patch(
+            "gravitino.utils.http_client.build_opener",
+            return_value=self._opener_raising(409, error_body),
+        ):
+            with self.assertRaises(PolicyAlreadyAssociatedException):
+                client.add_policy_for_tag("tagA", "policyA")
+
+    def test_gravitino_remove_policy_from_tag_no_such_policy(
+        self, *mock_method
+    ) -> None:
+        error_body = (
+            b'{"code":1003,"type":"NoSuchPolicyException",'
+            b'"message":"Policy does not exist","stack":null}'
+        )
+        client = self._client()
+
+        with patch(
+            "gravitino.utils.http_client.build_opener",
+            return_value=self._opener_raising(404, error_body),
+        ):
+            with self.assertRaises(NoSuchPolicyException):
+                client.remove_policy_from_tag("tagA", "policyA")
+
+    def test_gravitino_remove_policy_from_tag_already_associated(
+        self, *mock_method
+    ) -> None:
+        error_body = (
+            b'{"code":1004,"type":"PolicyAlreadyAssociatedException",'
+            b'"message":"Policy is already associated with the tag","stack":null}'
+        )
+        client = self._client()
+
+        with patch(
+            "gravitino.utils.http_client.build_opener",
+            return_value=self._opener_raising(409, error_body),
+        ):
+            with self.assertRaises(PolicyAlreadyAssociatedException):
+                client.remove_policy_from_tag("tagA", "policyA")
 
 
 if __name__ == "__main__":

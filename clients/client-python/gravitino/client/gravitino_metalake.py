@@ -983,12 +983,12 @@ class GravitinoMetalake(
             encode_string(tag_name),
             encode_string(policy_name),
         )
-        response = self.rest_client.delete(
+        # The server returns HTTP 204 with no body on success, so the
+        # response body must not be parsed here.
+        self.rest_client.delete(
             url,
             error_handler=TAG_ERROR_HANDLER,
         )
-        resp = BaseResponse.from_json(response.body, infer_missing=True)
-        resp.validate()
 
     #########
     # Policy operations
