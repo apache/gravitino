@@ -233,8 +233,8 @@ public interface PolicyMetaMapper {
       id = "nearestPolicyIdPOResultMap",
       value = {
         @Result(property = "tableId", column = "tableId"),
-        @Result(property = "minPolicyId", column = "minPolicyId"),
-        @Result(property = "maxPolicyId", column = "maxPolicyId")
+        @Result(property = "policyCount", column = "policyCount"),
+        @Result(property = "policyId", column = "policyId")
       })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listNearestPolicyIds")
   List<NearestPolicyIdPO> listNearestPolicyIds(
