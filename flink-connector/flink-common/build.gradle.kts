@@ -59,6 +59,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
   compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
   compileOnly(libs.flinkjdbc119)
+  compileOnly(libs.lance.namespace.apache.client)
 
   compileOnly(libs.hive2.exec) {
     artifact {
@@ -103,6 +104,7 @@ dependencies {
   testImplementation(libs.metrics.core)
   testImplementation(libs.flinkjdbc119)
   testImplementation(libs.minikdc)
+  testImplementation(libs.lance.namespace.apache.client)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
