@@ -58,7 +58,6 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,9 +160,7 @@ public class PolicyMetaService {
     List<NearestPolicyIdPO> rows =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
-            mapper ->
-                mapper.listNearestPolicyIds(
-                    tableIds, policyType.policyType(), HierarchicalSchemaUtil.physicalSeparator()));
+            mapper -> mapper.listNearestPolicyIds(tableIds, policyType.policyType()));
     for (NearestPolicyIdPO row : rows) {
       Preconditions.checkArgument(
           row.getPolicyCount() == 1,

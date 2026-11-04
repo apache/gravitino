@@ -290,13 +290,10 @@ public class PolicyMetaBaseSQLProvider {
    * @param tableIds table ids
    * @param policyType {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()} wire
    *     value
-   * @param schemaSeparator physical hierarchical schema separator
    * @return SQL
    */
   public String listNearestPolicyIds(
-      @Param("tableIds") List<Long> tableIds,
-      @Param("policyType") String policyType,
-      @Param("schemaSeparator") String schemaSeparator) {
+      @Param("tableIds") List<Long> tableIds, @Param("policyType") String policyType) {
     String matches = nearestPolicyMatches();
     return "<script>"
         + "SELECT m.table_id AS tableId,"
@@ -316,7 +313,7 @@ public class PolicyMetaBaseSQLProvider {
   /**
    * Enabled policies matched through each table's effective tags: table_id, distance, policy_id.
    */
-  private static String nearestPolicyMatches() {
+  private String nearestPolicyMatches() {
     String assignments = ancestorTagAssignments();
     return "SELECT a.table_id, a.distance, pm.policy_id"
         + " FROM ("
@@ -344,7 +341,7 @@ public class PolicyMetaBaseSQLProvider {
   }
 
   /** Tag assignments on each table and its ancestors: table_id, distance, tag_id, tag_value. */
-  private static String ancestorTagAssignments() {
+  private String ancestorTagAssignments() {
     return "SELECT lv.table_id, lv.distance, tr.tag_id, tr.tag_value"
         + " FROM ("
         + tableAncestors()
@@ -363,7 +360,7 @@ public class PolicyMetaBaseSQLProvider {
    * plus how much shorter its name is than the table's schema, and the catalog is farther than any
    * schema.
    */
-  private static String tableAncestors() {
+  private String tableAncestors() {
     String requestedTables =
         " WHERE tm.deleted_at = 0 AND tm.table_id IN ("
             + "<foreach collection='tableIds' item='tableId' separator=','>#{tableId}</foreach>)";
@@ -389,8 +386,9 @@ public class PolicyMetaBaseSQLProvider {
         + " AND (anc.schema_id = leaf.schema_id"
         + " OR (CHAR_LENGTH(leaf.schema_name) > CHAR_LENGTH(anc.schema_name)"
         + " AND LEFT(leaf.schema_name, CHAR_LENGTH(anc.schema_name)) = anc.schema_name"
-        + " AND SUBSTRING(leaf.schema_name, CHAR_LENGTH(anc.schema_name) + 1, 1)"
-        + " = #{schemaSeparator}))"
+        + " AND SUBSTRING(leaf.schema_name, CHAR_LENGTH(anc.schema_name) + 1, 1) = "
+        + schemaSeparatorLiteral()
+        + "))"
         + requestedTables
         + " UNION ALL"
         + " SELECT tm.table_id, 'CATALOG', tm.catalog_id, 1 + CHAR_LENGTH(leaf.schema_name)"
@@ -399,5 +397,15 @@ public class PolicyMetaBaseSQLProvider {
         + " tm"
         + leafSchema
         + requestedTables;
+  }
+
+  /**
+   * Returns a SQL expression for the physical hierarchical schema separator, ASCII 1, which {@link
+   * org.apache.gravitino.utils.HierarchicalSchemaUtil#physicalSeparator()} also defines.
+   *
+   * @return SQL expression yielding the one-character separator
+   */
+  protected String schemaSeparatorLiteral() {
+    return "CHAR(1)";
   }
 }

@@ -226,7 +226,6 @@ public interface PolicyMetaMapper {
    *
    * @param tableIds table ids
    * @param policyType policy type wire value
-   * @param schemaSeparator physical hierarchical schema separator
    * @return one row per table with a matching policy
    */
   @Results(
@@ -238,7 +237,5 @@ public interface PolicyMetaMapper {
       })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listNearestPolicyIds")
   List<NearestPolicyIdPO> listNearestPolicyIds(
-      @Param("tableIds") List<Long> tableIds,
-      @Param("policyType") String policyType,
-      @Param("schemaSeparator") String schemaSeparator);
+      @Param("tableIds") List<Long> tableIds, @Param("policyType") String policyType);
 }
