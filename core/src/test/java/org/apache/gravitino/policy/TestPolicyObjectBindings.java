@@ -21,11 +21,21 @@ package org.apache.gravitino.policy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -103,6 +113,61 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
     assertEquals(0, count("tag_meta"));
     assertEquals(0, count("policy_tag_relation_meta"));
     assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** Concurrent first bindings both succeed after observing the missing policy-tag relation. */
+  @TestTemplate
+  public void testConcurrentFirstBindings() throws Exception {
+    SessionUtils.rollbackTransaction();
+    CatalogEntity second = createAndInsertCatalog(METALAKE, "second_catalog");
+    TagEntity tag = HiddenPolicyTag.create(policy, 100L);
+    store.put(tag, false);
+    RelationalEntityStore concurrentStore =
+        spy(new RelationalEntityStore(backend, new Config(false) {}));
+    CountDownLatch bothReadMissing = new CountDownLatch(2);
+    doAnswer(
+            invocation -> {
+              List<?> result = (List<?>) invocation.callRealMethod();
+              if (result.isEmpty()) {
+                bothReadMissing.countDown();
+                assertTrue(bothReadMissing.await(15, TimeUnit.SECONDS));
+              }
+              return result;
+            })
+        .when(concurrentStore)
+        .batchListEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.POLICY_TAG_REL), any(), eq(Entity.EntityType.TAG));
+    PolicyManager concurrentManager =
+        new PolicyManager(RandomIdGenerator.INSTANCE, concurrentStore);
+    ExecutorService writers = Executors.newFixedThreadPool(2);
+    try {
+      Future<Long> firstBinding =
+          writers.submit(
+              () ->
+                  concurrentManager.addPolicyToObject(
+                      METALAKE,
+                      policy.name(),
+                      MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
+                      AUDIT_INFO));
+      Future<Long> secondBinding =
+          writers.submit(
+              () ->
+                  concurrentManager.addPolicyToObject(
+                      METALAKE,
+                      policy.name(),
+                      MetadataObjects.parse(second.name(), MetadataObject.Type.CATALOG),
+                      AUDIT_INFO));
+      assertEquals(tag.id(), firstBinding.get(30, TimeUnit.SECONDS));
+      assertEquals(tag.id(), secondBinding.get(30, TimeUnit.SECONDS));
+      SessionUtils.beginTransaction();
+      connection = SqlSessions.currentConnection();
+      assertEquals(1, count("tag_meta"));
+      assertEquals(1, count("policy_tag_relation_meta"));
+      assertEquals(2, count("tag_relation_meta"));
+    } finally {
+      writers.shutdownNow();
+      assertTrue(writers.awaitTermination(15, TimeUnit.SECONDS));
+    }
   }
 
   /** Policy-created tags are reused and remain when only the new assignment rolls back. */

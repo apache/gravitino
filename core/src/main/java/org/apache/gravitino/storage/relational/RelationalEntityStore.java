@@ -58,13 +58,16 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -337,6 +340,10 @@ public class RelationalEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
+    if (entityType == Entity.EntityType.POLICY) {
+      return deleteAndGet(ident, entityType, PolicyEntity.class, EntityStore.noPostDeleteAction())
+          .isPresent();
+    }
     try {
       boolean deleted = backend.delete(ident, entityType, cascade);
       return deleted;
@@ -356,12 +363,21 @@ public class RelationalEntityStore
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
+    Optional<E> deleted = Optional.empty();
     try {
-      return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+      deleted = backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+      return deleted;
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
+      if (entityType == Entity.EntityType.POLICY && deleted.isPresent()) {
+        PolicyEntity policy = (PolicyEntity) deleted.get();
+        invalidateCache(
+            NameIdentifierUtil.ofTag(
+                policy.namespace().level(0), HiddenPolicyTag.name(policy.id())),
+            Entity.EntityType.TAG);
+      }
     }
   }
 

@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ServiceUnavailableException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -131,6 +132,22 @@ public class TestExceptionHandlers {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResponse.getCode());
     Assertions.assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  /** A hidden-tag collision during policy creation remains a named tag conflict. */
+  @Test
+  public void testPolicyTagCollisionReturnsConflict() {
+    try (Response response =
+        ExceptionHandlers.handlePolicyException(
+            OperationType.CREATE,
+            "policy",
+            "metalake",
+            new TagAlreadyExistsException("Reserved tag reserved_123 already exists"))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(TagAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains("reserved_123"));
+    }
   }
 
   @Test

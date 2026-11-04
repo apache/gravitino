@@ -155,14 +155,12 @@ public class TagManager implements TagDispatcher {
   }
 
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
-    HiddenPolicyTag.checkVisible(name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return loadTagEntity(metalake, name);
   }
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException {
-    HiddenPolicyTag.checkVisible(name);
     for (TagChange change : changes) {
       if (change instanceof TagChange.RenameTag) {
         HiddenPolicyTag.checkVisible(((TagChange.RenameTag) change).getNewName());
@@ -204,7 +202,6 @@ public class TagManager implements TagDispatcher {
   }
 
   public boolean deleteTag(String metalake, String name) {
-    HiddenPolicyTag.checkVisible(name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     checkVisibleTagIfExists(metalake, name);
     try {
@@ -229,7 +226,6 @@ public class TagManager implements TagDispatcher {
 
   @Override
   public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
-    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     loadTagEntity(metalake, name);
@@ -251,7 +247,6 @@ public class TagManager implements TagDispatcher {
   @Override
   public void addPolicyForTag(
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
-    HiddenPolicyTag.checkVisible(tagName);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
@@ -286,7 +281,6 @@ public class TagManager implements TagDispatcher {
 
   @Override
   public void removePolicyFromTag(String metalake, String tagName, String policyName) {
-    HiddenPolicyTag.checkVisible(tagName);
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
@@ -316,7 +310,6 @@ public class TagManager implements TagDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForTag(
       String metalake, String name, @Nullable String value) throws NoSuchTagException {
-    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     try {
@@ -374,7 +367,6 @@ public class TagManager implements TagDispatcher {
       throws NoSuchMetadataObjectException {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-    HiddenPolicyTag.checkVisible(name);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
 
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
@@ -541,7 +533,6 @@ public class TagManager implements TagDispatcher {
     Map<String, Boolean> valuedByTagName = Maps.newHashMap();
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to add must not be null");
-      HiddenPolicyTag.checkVisible(tagValue.name());
       boolean valued = tagValue.value().isPresent();
       Boolean previous = valuedByTagName.putIfAbsent(tagValue.name(), valued);
       Preconditions.checkArgument(
@@ -558,7 +549,6 @@ public class TagManager implements TagDispatcher {
 
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to remove must not be null");
-      HiddenPolicyTag.checkVisible(tagValue.name());
     }
   }
 

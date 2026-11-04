@@ -903,7 +903,8 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
-      } else if (e instanceof PolicyAlreadyExistsException) {
+      } else if (e instanceof PolicyAlreadyExistsException
+          || e instanceof TagAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
       } else if (e instanceof PolicyAlreadyAssociatedException) {

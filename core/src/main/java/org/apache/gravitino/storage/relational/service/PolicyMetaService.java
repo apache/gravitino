@@ -39,6 +39,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -46,6 +47,7 @@ import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -59,9 +61,11 @@ import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,17 +192,30 @@ public class PolicyMetaService {
     return updatedPolicyEntity;
   }
 
+  public boolean deletePolicy(NameIdentifier ident) {
+    return deletePolicyAndGet(ident) != null;
+  }
+
+  /**
+   * Deletes a policy and returns the snapshot whose version was deleted.
+   *
+   * @param ident The policy identifier.
+   * @return The deleted policy, or null if it no longer exists.
+   */
+  @Nullable
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deletePolicy")
-  public boolean deletePolicy(NameIdentifier ident) {
+  public PolicyEntity deletePolicyAndGet(NameIdentifier ident) {
     PolicyPO policyPO;
     try {
       policyPO = getPolicyPOByMetalakeAndName(ident.namespace().level(0), ident.name());
     } catch (NoSuchEntityException e) {
-      return false;
+      return null;
     }
-    return deletePolicy(ident, policyPO);
+    return deletePolicy(ident, policyPO)
+        ? POConverters.fromPolicyPO(policyPO, ident.namespace())
+        : null;
   }
 
   /**
@@ -219,7 +236,7 @@ public class PolicyMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> beforeRemove(policyId),
           () -> deletePolicyWithVersion(ident, policyPO),
-          () -> deleteHiddenTagWithoutCommit(policyPO),
+          () -> deleteHiddenTagWithoutCommit(policyPO, ident.namespace().level(0)),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyVersionMapper.class,
@@ -450,6 +467,11 @@ public class PolicyMetaService {
     TagEntity tag = HiddenPolicyTag.create(policy, RandomIdGenerator.INSTANCE.nextId());
     try {
       TagMetaService.getInstance().insertTag(tag, false);
+    } catch (EntityAlreadyExistsException e) {
+      // Do not let the enclosing policy write remap the SQL cause into a policy conflict.
+      throw new TagAlreadyExistsException(
+          "Reserved tag name %s already exists in metalake %s; cannot create policy %s",
+          tag.name(), policy.namespace().level(0), policy.name());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -535,24 +557,33 @@ public class PolicyMetaService {
         () -> policyWriteFailure(identifier, oldPolicyPO));
   }
 
-  private void deleteHiddenTagWithoutCommit(PolicyPO policy) {
+  private void deleteHiddenTagWithoutCommit(PolicyPO policy, String metalake) {
     TagPO tag =
         SessionUtils.getWithoutCommit(
             TagMetaMapper.class,
             mapper ->
                 mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
                     policy.getMetalakeId(), HiddenPolicyTag.name(policy.getPolicyId())));
-    if (tag == null
-        || !tag.isHidden()
-        || !HiddenPolicyTag.properties(policy.getPolicyId()).equals(tag.getProperties())) {
+    if (tag == null || !tag.isHidden()) {
       return;
     }
-    SessionUtils.doWithoutCommit(
-        TagMetaMapper.class,
-        mapper -> mapper.softDeleteTagMetaByIdAndVersion(tag.getTagId(), tag.getCurrentVersion()));
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper ->
+                mapper.softDeleteTagMetaByIdAndVersion(tag.getTagId(), tag.getCurrentVersion()));
+    Preconditions.checkState(
+        deleted == 1,
+        "Failed to delete hidden tag %s for policy %s",
+        tag.getTagName(),
+        policy.getPolicyId());
     SessionUtils.doWithoutCommit(
         TagMetadataObjectRelMapper.class,
         mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tag.getTagId()));
+    EntityChangeLogWriter.append(
+        NameIdentifierUtil.ofTag(metalake, tag.getTagName()),
+        Entity.EntityType.TAG,
+        OperateType.DROP);
   }
 
   private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {

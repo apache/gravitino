@@ -391,7 +391,15 @@ a policy does not apply it to any object. Renaming or updating the policy preser
 deleting the policy removes it and its assignments in the same transaction.
 Hidden tags participate in policy resolution but do not appear in ordinary tag listings and
 cannot be changed with tag APIs. The `reserved_` tag name prefix is reserved for internal use,
-including alternate casing. Ordinary tags have `hidden=false`; existing tags retain that default.
+including alternate casing, for new tags and rename targets. Ordinary tags have `hidden=false`;
+existing tags retain that default and remain accessible even if their names use the reserved prefix.
+Existing policies without hidden tags receive them when first bound through the internal binding
+operation; updating or overwriting a policy does not backfill its hidden tag.
+
+Hidden tags require all servers to understand the `hidden` field. Stop all old servers before
+upgrading the metadata schema. Complete any required offline policy binding migration, then start
+only upgraded servers. Do not run old and new server versions together after hidden tags have been
+created, whether by policy creation or migration: old servers can expose and modify these tags.
 For existing direct object policy associations, see [Migration Guide](./migration-guide.md).
 
 To add or remove an association, a user must own the metalake or have the required access to both

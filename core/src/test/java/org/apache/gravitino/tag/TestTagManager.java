@@ -1247,6 +1247,54 @@ public class TestTagManager {
         () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
   }
 
+  /** Pre-upgrade tags keep working even when their names now use the reserved prefix. */
+  @Test
+  public void testLegacyReservedTagsRemainAccessible() throws Exception {
+    MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
+    for (String name : new String[] {"reserved_legacy", "Reserved_legacy"}) {
+      TagEntity legacy =
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(Namespace.of(METALAKE))
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+      entityStore.put(legacy, false);
+      Assertions.assertTrue(Arrays.asList(tagManager.listTags(METALAKE)).contains(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertEquals(
+          "updated",
+          tagManager.alterTag(METALAKE, name, TagChange.updateComment("updated")).comment());
+      tagManager.associateTagsForMetadataObject(METALAKE, object, new String[] {name}, null);
+      Assertions.assertEquals(
+          name, tagManager.getTagForMetadataObject(METALAKE, object, name).name());
+      Assertions.assertArrayEquals(
+          new MetadataObject[] {object}, tagManager.listMetadataObjectsForTag(METALAKE, name));
+      Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, name).length);
+      tagManager.associateTagsForMetadataObject(METALAKE, object, null, new String[] {name});
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+
+      entityStore.put(
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(legacy.namespace())
+              .withAuditInfo(legacy.auditInfo())
+              .build(),
+          false);
+      String newName = "legacy_" + name;
+      tagManager.alterTag(METALAKE, name, TagChange.rename(newName));
+      Assertions.assertEquals(newName, tagManager.getTag(METALAKE, newName).name());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> tagManager.alterTag(METALAKE, newName, TagChange.rename(name)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tagManager.createTag(METALAKE, name, null, null));
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, newName));
+    }
+  }
+
   /** Visibility comes from the persisted flag even when a tag has an ordinary name. */
   @Test
   public void testHiddenFieldControlsVisibility() throws Exception {

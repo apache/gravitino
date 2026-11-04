@@ -137,19 +137,33 @@ public class PolicyManager implements PolicyDispatcher {
                 Collections.singletonList(tagIdent),
                 Entity.EntityType.TAG);
     if (policies.isEmpty()) {
-      entityStore
-          .relationOperations()
-          .updateEntityRelations(
-              RelationUpdate.of(
-                      SupportsRelationOperations.Type.POLICY_TAG_REL,
-                      tagIdent,
-                      Entity.EntityType.TAG,
-                      new RelationEdgeTarget[] {
-                        RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
-                      },
-                      null)
-                  .withAuditInfo(auditInfo));
-    } else {
+      try {
+        entityStore
+            .relationOperations()
+            .updateEntityRelations(
+                RelationUpdate.of(
+                        SupportsRelationOperations.Type.POLICY_TAG_REL,
+                        tagIdent,
+                        Entity.EntityType.TAG,
+                        new RelationEdgeTarget[] {
+                          RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
+                        },
+                        null)
+                    .withAuditInfo(auditInfo));
+      } catch (EntityAlreadyExistsException concurrentCreate) {
+        policies =
+            entityStore
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    Collections.singletonList(tagIdent),
+                    Entity.EntityType.TAG);
+        if (policies.isEmpty()) {
+          throw concurrentCreate;
+        }
+      }
+    }
+    if (!policies.isEmpty()) {
       Preconditions.checkArgument(
           policies.size() == 1
               && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
