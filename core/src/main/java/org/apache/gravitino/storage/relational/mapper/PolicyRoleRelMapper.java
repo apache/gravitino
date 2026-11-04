@@ -61,13 +61,19 @@ public interface PolicyRoleRelMapper {
   int insert(@Param("relation") PolicyRoleRelPO relation);
 
   /**
-   * Soft-deletes one active reference and advances its optimistic-concurrency version.
+   * Removes one active reference the content no longer names, guarded by its observed version.
+   *
+   * <p>The row is deleted rather than soft-deleted. A superseded reference has no reader: the
+   * record is derived, carries no audit info, and the content of every policy version is kept in
+   * the policy version table. Leaving no tombstone also keeps the table's uniqueness over (policy,
+   * role, deleted_at) free of the deletion timestamp, which two removals of one role can otherwise
+   * share.
    *
    * @param relation The observed reference and version.
-   * @return The number of updated rows.
+   * @return The number of deleted rows.
    */
-  @UpdateProvider(type = PolicyRoleRelSQLProviderFactory.class, method = "softDeleteByIdAndVersion")
-  int softDeleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation);
+  @DeleteProvider(type = PolicyRoleRelSQLProviderFactory.class, method = "deleteByIdAndVersion")
+  int deleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation);
 
   /**
    * Soft-deletes every active reference of a policy.

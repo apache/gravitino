@@ -64,9 +64,9 @@ public class PolicyRoleRelSQLProviderFactory {
     return getProvider().insert(relation);
   }
 
-  /** Delegates a reference soft delete. */
-  public static String softDeleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation) {
-    return getProvider().softDeleteByIdAndVersion(relation);
+  /** Delegates the removal of a superseded reference. */
+  public static String deleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation) {
+    return getProvider().deleteByIdAndVersion(relation);
   }
 
   /** Delegates policy deletion cleanup. */

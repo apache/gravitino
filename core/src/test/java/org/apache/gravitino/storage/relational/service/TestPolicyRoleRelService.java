@@ -32,8 +32,12 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -128,6 +132,36 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
     backend.insert(policy, false);
 
     Assertions.assertEquals(Collections.singletonList("analyst"), rolesOf(policy.id()));
+  }
+
+  @TestTemplate
+  public void testReferenceEqualityFollowsTheRoleTable() throws IOException, SQLException {
+    createAndInsertMakeLake(METALAKE);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE, "policy_role_equality_catalog");
+
+    // Ask the authoritative table whether these two names are one role or two, rather than
+    // assuming: MySQL compares role names ignoring trailing spaces, PostgreSQL and H2 do not.
+    backend.insert(role(catalog, "analyst"), false);
+    boolean roleTableSeesTwoRoles;
+    try {
+      backend.insert(role(catalog, "analyst "), false);
+      roleTableSeesTwoRoles = true;
+    } catch (EntityAlreadyExistsException sameRoleTwice) {
+      roleTableSeesTwoRoles = false;
+    }
+
+    PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "analyst "));
+    if (roleTableSeesTwoRoles) {
+      backend.insert(policy, false);
+      Assertions.assertEquals(Arrays.asList("analyst", "analyst "), rolesOf(policy.id()));
+    } else {
+      // One role named twice. The write fails against the role that collided, not the policy name.
+      IllegalArgumentException failure =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> backend.insert(policy, false));
+      Assertions.assertTrue(failure.getMessage().contains("analyst"), failure.getMessage());
+      Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
+    }
   }
 
   @TestTemplate
@@ -238,22 +272,102 @@ public class TestPolicyRoleRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testLegacyCleanupRemovesSupersededReferences() throws IOException, SQLException {
+  public void testNonCascadeMetalakeDeleteClearsReferencesOfAnInFlightPolicyUpdate()
+      throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    PolicyEntity policy = accessControlPolicy("reader", Collections.singletonList("analyst"));
+    backend.insert(policy, false);
+
+    AtomicReference<Throwable> deleteFailure = new AtomicReference<>();
+
+    // The updater callback runs before the write transaction opens, so finishing the delete here
+    // stands in for an update that read the policy before the metalake went away and commits
+    // after. The delete soft-deletes the policy row before the references, so this update can no
+    // longer write one: its own policy row is gone by the time it reaches the reference writes.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            backend.update(
+                policy.nameIdentifier(),
+                Entity.EntityType.POLICY,
+                entity -> {
+                  deleteMetalakeWithoutCascade(deleteFailure);
+                  return withRoles(policy, Arrays.asList("analyst", "auditor"));
+                }));
+
+    Assertions.assertNull(deleteFailure.get());
+    Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
+  }
+
+  @TestTemplate
+  public void testSupersededReferencesLeaveNoTombstone() throws IOException, SQLException {
     createAndInsertMakeLake(METALAKE);
     PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
     backend.insert(policy, false);
 
-    backend.update(
-        policy.nameIdentifier(),
-        Entity.EntityType.POLICY,
-        entity -> withRoles(policy, Collections.singletonList("auditor")));
-    Assertions.assertEquals(1L, softDeletedReferenceCount());
+    // Remove a role, name it again, and remove it once more. Each removal takes the row out
+    // rather than stamping it, so neither leaves a tombstone the next one could collide with,
+    // whatever the database clock reads.
+    for (List<String> roles :
+        Arrays.asList(
+            Collections.singletonList("auditor"),
+            Arrays.asList("analyst", "auditor"),
+            Collections.singletonList("auditor"))) {
+      backend.update(
+          policy.nameIdentifier(), Entity.EntityType.POLICY, entity -> withRoles(policy, roles));
+      Assertions.assertEquals(0L, softDeletedReferenceCount());
+    }
+
+    Assertions.assertEquals(Collections.singletonList("auditor"), rolesOf(policy.id()));
+  }
+
+  @TestTemplate
+  public void testLegacyCleanupRemovesReferencesOfADeletedPolicy()
+      throws IOException, SQLException {
+    createAndInsertMakeLake(METALAKE);
+    PolicyEntity policy = accessControlPolicy("reader", Arrays.asList("analyst", "auditor"));
+    backend.insert(policy, false);
+
+    // A policy delete still soft-deletes its references, so legacy cleanup has rows to collect.
+    backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false);
+    Assertions.assertEquals(2L, softDeletedReferenceCount());
 
     PolicyMetaService.getInstance()
         .deletePolicyAndVersionMetasByLegacyTimeline(System.currentTimeMillis() + 1000L, 10);
 
     Assertions.assertEquals(0L, softDeletedReferenceCount());
-    Assertions.assertEquals(Collections.singletonList("auditor"), rolesOf(policy.id()));
+    Assertions.assertEquals(0L, activeReferenceCount(policy.id()));
+  }
+
+  /** Deletes the metalake without cascade on another thread and waits for that thread to end. */
+  private void deleteMetalakeWithoutCascade(AtomicReference<Throwable> failure) {
+    Thread deleter =
+        new Thread(
+            () -> {
+              try {
+                backend.delete(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, false);
+              } catch (Throwable t) {
+                failure.set(t);
+              }
+            });
+    deleter.start();
+    try {
+      deleter.join(30_000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while waiting for the metalake delete", e);
+    }
+    Assertions.assertFalse(
+        deleter.isAlive(), "The metalake delete should not block on the paused update");
+  }
+
+  private RoleEntity role(CatalogEntity catalog, String name) {
+    return createRoleEntity(
+        RandomIdGenerator.INSTANCE.nextId(),
+        AuthorizationUtils.ofRoleNamespace(METALAKE),
+        name,
+        AUDIT_INFO,
+        catalog.name());
   }
 
   private PolicyEntity accessControlPolicy(String name, List<String> roles) {

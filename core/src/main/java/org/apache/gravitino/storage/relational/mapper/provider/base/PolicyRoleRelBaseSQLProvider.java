@@ -60,16 +60,10 @@ public class PolicyRoleRelBaseSQLProvider {
         + " #{relation.currentVersion}, #{relation.lastVersion}, #{relation.deletedAt})";
   }
 
-  /** Returns SQL for soft-deleting one reference with a version CAS. */
-  public String softDeleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation) {
-    return "UPDATE "
+  /** Returns SQL for deleting one superseded reference with a version CAS. */
+  public String deleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation) {
+    return "DELETE FROM "
         + POLICY_ROLE_RELATION_TABLE_NAME
-        // Assign last_version first so MySQL computes both columns from the version observed
-        // before this update.
-        + " SET last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
-        + " deleted_at = "
-        + deletedAtNowExpression()
         + " WHERE id = #{relation.id} AND current_version = #{relation.currentVersion}"
         + " AND deleted_at = 0";
   }

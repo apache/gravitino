@@ -443,10 +443,13 @@ public class PolicyMetaService {
    * <p>The references are written only here and never by a caller, so {@code content} stays the one
    * authority on which roles a policy names.
    *
-   * <p>Only the difference is written: a reference the content still names keeps its row. A policy
-   * edit that leaves {@code applicableRoles} alone therefore writes no reference rows at all, and
-   * two edits landing in the same millisecond cannot collide on the table's uniqueness over
-   * (policy, role, deleted_at).
+   * <p>Only the difference is written: a reference the content still names keeps its row, so a
+   * policy edit that leaves {@code applicableRoles} alone writes no reference rows at all.
+   *
+   * <p>A reference the content drops is deleted rather than soft-deleted, so no edit leaves a
+   * tombstone behind. Removing a role, naming it again, and removing it once more therefore cannot
+   * collide on the table's uniqueness over (policy, role, deleted_at), which the two removals would
+   * otherwise share whenever they read the same millisecond from the database clock.
    */
   private void updateRoleRelationsWithoutCommit(long policyId, PolicyEntity policyEntity) {
     List<PolicyRoleRelPO> desired = POConverters.initializePolicyRoleRelPOs(policyId, policyEntity);
@@ -463,16 +466,33 @@ public class PolicyMetaService {
       if (desiredRoles.contains(superseded.getRoleName())) {
         continue;
       }
-      // A zero-row update means the reference is already gone, which is the intended end state.
+      // A zero-row delete means the reference is already gone, which is the intended end state.
       SessionUtils.doWithoutCommit(
-          PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(superseded));
+          PolicyRoleRelMapper.class, mapper -> mapper.deleteByIdAndVersion(superseded));
     }
 
     for (PolicyRoleRelPO added : desired) {
       if (currentRoles.contains(added.getRoleName())) {
         continue;
       }
-      SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
+      try {
+        SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
+      } catch (RuntimeException re) {
+        // This table names roles exactly as the role table does, so a duplicate here is content
+        // naming one role twice under the backend's own equality: MySQL ignores trailing spaces,
+        // PostgreSQL does not, and each matches how that backend identifies a role. Report the
+        // role that collided instead of letting the caller's handler blame the policy name. The
+        // SQL failure is deliberately not chained: the handlers upstream look for a duplicate key
+        // through the cause chain and would rewrite this back into an already-existing policy.
+        if (ExceptionUtils.isDuplicateKey(re)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "The content of policy %s names the role %s more than once; on this backend"
+                      + " those names identify the same role",
+                  policyEntity.name(), added.getRoleName()));
+        }
+        throw re;
+      }
     }
   }
 
