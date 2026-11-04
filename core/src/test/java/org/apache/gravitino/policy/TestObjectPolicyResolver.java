@@ -336,6 +336,92 @@ public class TestObjectPolicyResolver {
         .copyWithAssignment(assignment);
   }
 
+  @Test
+  public void testSameTypeNearerLevelOverridesFarther() throws Exception {
+    TagEntity tableTag = tag(1L, "hot", TagAssignment.noValue()).copyWithInherited(false);
+    TagEntity catalogTag =
+        tag(2L, "maint", TagAssignment.ofValues("standard")).copyWithInherited(true);
+    PolicyEntity tablePolicy = compaction(10L, "compact_hot");
+    PolicyEntity catalogPolicy = compaction(20L, "compact_standard");
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(
+            new ResolvedTag[] {
+              new ResolvedTag(tableTag, OBJECT), new ResolvedTag(catalogTag, CATALOG)
+            });
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Arrays.asList(
+                NameIdentifierUtil.ofTag(METALAKE, "hot"),
+                NameIdentifierUtil.ofTag(METALAKE, "maint")),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            Arrays.asList(
+                relation(tableTag, tablePolicy, AllValuesSelector.get()),
+                relation(catalogTag, catalogPolicy, TagValueSelector.of("standard"))));
+
+    ObjectPolicyResolver.Match[] matches = resolver.resolveMatches(METALAKE, OBJECT);
+
+    Assertions.assertEquals(1, matches.length);
+    Assertions.assertEquals("compact_hot", matches[0].policy().name());
+    Assertions.assertFalse(matches[0].policy().inherited().orElseThrow());
+  }
+
+  @Test
+  public void testCustomPoliciesAccumulateAcrossLevels() throws Exception {
+    TagEntity tableTag = tag(1L, "a", TagAssignment.noValue()).copyWithInherited(false);
+    TagEntity catalogTag = tag(2L, "b", TagAssignment.noValue()).copyWithInherited(true);
+    PolicyEntity tablePolicy = policy(10L, "custom_table", true);
+    PolicyEntity catalogPolicy = policy(20L, "custom_catalog", true);
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(
+            new ResolvedTag[] {
+              new ResolvedTag(tableTag, OBJECT), new ResolvedTag(catalogTag, CATALOG)
+            });
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Arrays.asList(
+                NameIdentifierUtil.ofTag(METALAKE, "a"), NameIdentifierUtil.ofTag(METALAKE, "b")),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            Arrays.asList(
+                relation(tableTag, tablePolicy, AllValuesSelector.get()),
+                relation(catalogTag, catalogPolicy, AllValuesSelector.get())));
+
+    ObjectPolicyResolver.Match[] matches = resolver.resolveMatches(METALAKE, OBJECT);
+
+    Assertions.assertEquals(2, matches.length);
+    Assertions.assertEquals("custom_table", matches[0].policy().name());
+    Assertions.assertEquals("custom_catalog", matches[1].policy().name());
+  }
+
+  @Test
+  public void testRequireNoSameLevelConflict() throws Exception {
+    TagEntity hot = tag(1L, "hot", TagAssignment.noValue()).copyWithInherited(false);
+    TagEntity strict = tag(2L, "maint", TagAssignment.ofValues("strict")).copyWithInherited(false);
+    PolicyEntity hotPolicy = compaction(10L, "compact_hot");
+    PolicyEntity strictPolicy = compaction(20L, "compact_strict");
+    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
+        .thenReturn(
+            new ResolvedTag[] {new ResolvedTag(hot, OBJECT), new ResolvedTag(strict, OBJECT)});
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Arrays.asList(
+                NameIdentifierUtil.ofTag(METALAKE, "hot"),
+                NameIdentifierUtil.ofTag(METALAKE, "maint")),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            Arrays.asList(
+                relation(hot, hotPolicy, AllValuesSelector.get()),
+                relation(strict, strictPolicy, TagValueSelector.of("strict"))));
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> resolver.requireNoSameLevelConflict(METALAKE, OBJECT));
+    Assertions.assertTrue(thrown.getMessage().contains("compact_hot"));
+    Assertions.assertTrue(thrown.getMessage().contains("compact_strict"));
+  }
+
   private static PolicyEntity policy(long id, String name, boolean enabled) {
     return PolicyEntity.builder()
         .withId(id)
@@ -346,6 +432,18 @@ public class TestObjectPolicyResolver {
         .withContent(
             PolicyContents.custom(
                 ImmutableMap.of("rule", "value"), ImmutableSet.of(MetadataObject.Type.TABLE), null))
+        .withAuditInfo(audit())
+        .build();
+  }
+
+  private static PolicyEntity compaction(long id, String name) {
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+        .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+        .withEnabled(true)
+        .withContent(PolicyContents.icebergDataCompaction())
         .withAuditInfo(audit())
         .build();
   }

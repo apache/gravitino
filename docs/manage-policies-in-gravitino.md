@@ -342,7 +342,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v2+json" \
 The response includes policies derived from effective tags assigned to the object or its ancestors.
 With `details=true`, the response returns full policy objects instead of policy names.
 Each policy includes an `inherited` field, which is `true` when it matches only through a tag
-assigned to an ancestor of the object. Disabled policies do not appear in this result.
+assigned to an ancestor of the object. For Iceberg maintenance policy types (compaction,
+orphan-file removal, rewrite manifests, snapshot expiration), a nearer metadata-object source
+wins over a farther one and only the winner is returned. Assigning a tag or linking a policy that
+would put two maintenance policies of the same type on the same object level is rejected.
+Disabled policies do not appear in this result.
 Both response modes include `hasInaccessiblePolicies`. Gravitino resolves policies from direct and
 inherited tag assignments before authorization filtering, so the flag also covers policies omitted
 from inherited associations. The flag reveals only that at least one policy was omitted; it does not

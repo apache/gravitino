@@ -44,6 +44,12 @@ existing deployments. For database backup, schema scripts, and rollback commands
   A policy matching through multiple tags appears once. With `details=true`, `inherited` is
   true only if the matching tag assignments are inherited. Disabled policies remain associated
   with tags but do not appear in object policy results.
+- For each Iceberg maintenance `policyType` (compaction, orphan-file removal, rewrite
+  manifests, snapshot expiration), an object has at most one effective policy. A nearer
+  metadata-object source wins over a farther one, and only the winner appears in object policy
+  lookup. Assigning a second same-type maintenance policy through tags at the same object level
+  is rejected. Before upgrading, inventory objects that resolve to multiple maintenance policies
+  of the same type at one level and remove or relocate the extra associations.
 - In Gravitino 1.3, disabling a policy was advisory and did not change what consumers received.
   Object policy lookup now excludes disabled policies. Before upgrading, inventory disabled
   policies and re-enable any that consumers must continue to receive.
