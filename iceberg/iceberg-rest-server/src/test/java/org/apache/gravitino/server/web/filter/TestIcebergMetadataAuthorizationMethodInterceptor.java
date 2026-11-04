@@ -286,7 +286,10 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Method method, Parameter[] parameters, Object[] args) {
+              Method method,
+              Parameter[] parameters,
+              Object[] args,
+              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -298,6 +301,11 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
                   @Override
                   public boolean authorizationCompleted() {
                     return false;
+                  }
+
+                  @Override
+                  public Entity.EntityType entityType() {
+                    return Entity.EntityType.TABLE;
                   }
                 });
           }
@@ -411,7 +419,10 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Method method, Parameter[] parameters, Object[] args) {
+              Method method,
+              Parameter[] parameters,
+              Object[] args,
+              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -423,6 +434,11 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
                   @Override
                   public boolean authorizationCompleted() {
                     return false;
+                  }
+
+                  @Override
+                  public Entity.EntityType entityType() {
+                    return Entity.EntityType.TABLE;
                   }
                 });
           }
@@ -489,7 +505,10 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Method method, Parameter[] parameters, Object[] args) {
+              Method method,
+              Parameter[] parameters,
+              Object[] args,
+              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
             throw new RuntimeException("test");
           }
         };

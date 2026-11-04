@@ -70,16 +70,31 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
 
   private final Parameter[] parameters;
   private final Object[] args;
+  private final EntityType accessEntityType;
 
   /**
    * Creates a handler for the register-table request arguments.
    *
    * @param parameters invoked method parameters
    * @param args invoked method arguments
+   * @param nameIdentifierMap path identifiers; the destination TABLE id is bound here for denial
+   *     attribution before {@link #process}
    */
-  public RegisterTableAuthzHandler(Parameter[] parameters, Object[] args) {
+  public RegisterTableAuthzHandler(
+      Parameter[] parameters, Object[] args, Map<EntityType, NameIdentifier> nameIdentifierMap) {
     this.parameters = parameters;
     this.args = args;
+    RegisterTableRequest request = registerTableRequest();
+    this.accessEntityType = request.overwrite() ? EntityType.TABLE : EntityType.SCHEMA;
+    NameIdentifier metalakeIdent = nameIdentifierMap.get(EntityType.METALAKE);
+    NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
+    NameIdentifier schemaIdent = nameIdentifierMap.get(EntityType.SCHEMA);
+    if (metalakeIdent != null && catalogIdent != null && schemaIdent != null) {
+      nameIdentifierMap.put(
+          EntityType.TABLE,
+          NameIdentifierUtil.ofTable(
+              metalakeIdent.name(), catalogIdent.name(), schemaIdent.name(), request.name()));
+    }
   }
 
   @Override
@@ -109,6 +124,11 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
   public boolean authorizationCompleted() {
     // Destination create/overwrite and any source checks are finished in process().
     return true;
+  }
+
+  @Override
+  public EntityType entityType() {
+    return accessEntityType;
   }
 
   private static void requireCanAccessDestination(
