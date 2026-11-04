@@ -54,59 +54,13 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceExceptionMapper.class);
 
-<<<<<<< HEAD
-  public static Response toRESTResponse(String instance, Throwable ex) {
-    ServerHealth.getInstance().recordFailure(ex);
-    if (ex instanceof NotAllowedException
-        || ex instanceof NotAcceptableException
-        || ex instanceof NotSupportedException) {
-      WebApplicationException routingError = (WebApplicationException) ex;
-      InvalidInputException invalidInput =
-          new InvalidInputException(ex.getMessage(), getStackTrace(ex), instance);
-      try (Response mapped = handleLanceNamespaceException(invalidInput)) {
-        Response.ResponseBuilder response =
-            Response.status(routingError.getResponse().getStatus())
-                .entity(mapped.getEntity())
-                .type(MediaType.APPLICATION_JSON_TYPE);
-        if (ex instanceof NotAllowedException) {
-          response.allow(routingError.getResponse().getAllowedMethods());
-        }
-        return response.build();
-      }
-=======
-  // Set once at service startup. Only Lance REST reads this flag, and its classes are packaged
-  // outside the main server's classpath, so each service loads its own copy.
-  private static volatile boolean includeErrorStackTrace =
-      JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
-
   @Context private UriInfo uriInfo;
   @Context private Request request;
-
-  /**
-   * Sets whether error details built by {@link #errorDetail(Throwable)} include the exception's
-   * stack trace. Called once when the service starts.
-   *
-   * @param include whether to include stack traces
-   */
-  public static void setIncludeErrorStackTrace(boolean include) {
-    includeErrorStackTrace = include;
-  }
-
-  /**
-   * Returns the error detail for a Lance error response.
-   *
-   * @param ex the failure to describe
-   * @return the stack trace of {@code ex}, or an empty string when stack traces are disabled
-   */
-  public static String errorDetail(Throwable ex) {
-    return includeErrorStackTrace ? getStackTrace(ex) : "";
-  }
 
   public static Response toRESTResponse(String instance, Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
     if (ex instanceof WebApplicationException webException) {
       return handleWebApplicationException(instance, webException);
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
     }
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
@@ -199,12 +153,8 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
       return new NamespaceNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
 
     } else if (ex instanceof IllegalArgumentException) {
-<<<<<<< HEAD
-      return new InvalidInputException(ex.getMessage(), getStackTrace(ex), instance);
-=======
-      // Validation failures never expose generated stacks, independent of the diagnostic setting.
+      // Validation failures never expose generated stacks in the client response.
       return new InvalidInputException(ex.getMessage(), "", instance);
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
 
     } else if (ex instanceof org.apache.gravitino.exceptions.TableAlreadyExistsException) {
       return new TableAlreadyExistsException(ex.getMessage(), getStackTrace(ex), instance);
@@ -214,12 +164,7 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
           ex.getMessage(), getStackTrace(ex), instance);
 
     } else {
-<<<<<<< HEAD
-      LOG.warn("Lance REST server unexpected exception:", ex);
-      return new InternalException(ex.getMessage(), getStackTrace(ex), instance);
-=======
       return new InternalException("Internal server error", "", instance);
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
     }
   }
 

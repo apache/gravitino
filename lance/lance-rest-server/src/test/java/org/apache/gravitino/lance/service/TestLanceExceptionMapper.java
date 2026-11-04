@@ -34,15 +34,10 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-<<<<<<< HEAD
+import javax.ws.rs.ext.ReaderInterceptorContext;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ServerHealth;
-=======
-import javax.ws.rs.ext.ReaderInterceptorContext;
-import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.rest.RESTUtils;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -51,17 +46,12 @@ import org.apache.logging.log4j.core.appender.AbstractAppender;
 import org.apache.logging.log4j.core.config.AbstractConfiguration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.config.Property;
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-<<<<<<< HEAD
-import org.lance.namespace.model.ErrorResponse;
-import org.mockito.MockedStatic;
-=======
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.namespace.errors.ErrorCode;
@@ -74,7 +64,7 @@ import org.lance.namespace.errors.ThrottlingException;
 import org.lance.namespace.errors.UnsupportedOperationException;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.ErrorResponse;
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Tests for {@link LanceExceptionMapper}. */
@@ -244,24 +234,10 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(
           Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
       ErrorResponse entity = response.readEntity(ErrorResponse.class);
-      Assertions.assertEquals("assertion failure", entity.getError());
+      Assertions.assertEquals("Internal server error", entity.getError());
       Assertions.assertEquals("", entity.getInstance());
-<<<<<<< HEAD
-=======
       Assertions.assertEquals("", entity.getDetail());
     }
-  }
-
-  /** Verifies backend authorization failures use the Lance forbidden response. */
-  @Test
-  public void testBackendForbidden() {
-    assertAuthenticationError(new ForbiddenException("Access denied"), 403);
-  }
-
-  /** Verifies backend authentication failures use the Lance unauthenticated response. */
-  @Test
-  public void testBackendUnauthorized() {
-    assertAuthenticationError(new UnauthorizedException("Invalid credentials"), 401);
   }
 
   /** Verifies unexpected exceptions do not expose internal details in the response. */
@@ -412,23 +388,17 @@ public class TestLanceExceptionMapper extends JerseyTest {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testValidationErrorsNeverIncludeStackTraces(boolean includeStackTrace) {
+  @Test
+  void testValidationErrorsNeverIncludeStackTraces() {
     IllegalArgumentException failure =
         new IllegalArgumentException(
             "Invalid column name", new IllegalStateException("private-backend-detail"));
-    try {
-      LanceExceptionMapper.setIncludeErrorStackTrace(includeStackTrace);
-      try (Response response = LanceExceptionMapper.toRESTResponse("table", failure)) {
-        Assertions.assertEquals(400, response.getStatus());
-        ErrorResponse error = (ErrorResponse) response.getEntity();
-        Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
-        Assertions.assertEquals("Invalid column name", error.getError());
-        Assertions.assertEquals("", error.getDetail());
-      }
-    } finally {
-      LanceExceptionMapper.setIncludeErrorStackTrace(true);
+    try (Response response = LanceExceptionMapper.toRESTResponse("table", failure)) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertEquals("Invalid column name", error.getError());
+      Assertions.assertEquals("", error.getDetail());
     }
   }
 
@@ -541,29 +511,6 @@ public class TestLanceExceptionMapper extends JerseyTest {
       Assertions.assertEquals(500, backend.getStatus());
       Assertions.assertEquals(
           "Internal server error", ((ErrorResponse) backend.getEntity()).getError());
-    }
-  }
-
-  private void assertAuthenticationError(Exception exception, int status) {
-    try (Response response = LanceExceptionMapper.toRESTResponse("catalog", exception)) {
-      Assertions.assertEquals(status, response.getStatus());
-      ErrorResponse error = (ErrorResponse) response.getEntity();
-      Assertions.assertEquals(exception.getMessage(), error.getError());
-      Assertions.assertEquals("", error.getDetail());
-      Assertions.assertEquals("catalog", error.getInstance());
-    }
-  }
-
-  /** Verifies that the error detail omits the stack trace when disabled. */
-  @Test
-  public void testErrorDetailFollowsSetting() {
-    IllegalArgumentException failure = new IllegalArgumentException("failure");
-    try {
->>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
-      Assertions.assertTrue(
-          entity.getDetail().contains("java.lang.AssertionError: assertion failure"));
-      Assertions.assertTrue(
-          entity.getDetail().contains("Caused by: java.lang.IllegalStateException: root cause"));
     }
   }
 
