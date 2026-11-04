@@ -40,22 +40,30 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String BPCHAR = "bpchar";
   static final String BYTEA = "bytea";
   static final String UUID = "uuid";
+  static final String SERIAL = "serial";
+  static final String SMALLSERIAL = "smallserial";
+  static final String BIGSERIAL = "bigserial";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
+
+  private static final int MAX_NUMERIC_PRECISION = 1000;
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
     if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
-      return toGravitinoArrayType(typeName);
+      return toGravitinoArrayType(typeName, typeBean);
     }
     switch (typeName) {
       case BOOL:
         return Types.BooleanType.get();
+      case SMALLSERIAL:
       case INT_2:
         return Types.ShortType.get();
+      case SERIAL:
       case INT_4:
         return Types.IntegerType.get();
+      case BIGSERIAL:
       case INT_8:
         return Types.LongType.get();
       case FLOAT_4:
@@ -101,11 +109,19 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         }
         return Types.DecimalType.of(columnSize, numericScale);
       case VARCHAR:
+        // Table metadata normalizes unbounded declarations to zero. Also accept pgjdbc's default
+        // sentinel for callers supplying driver metadata directly.
         return typeBean.getColumnSize() == null
+                || typeBean.getColumnSize() <= 0
+                || typeBean.getColumnSize() == Integer.MAX_VALUE
             ? Types.StringType.get()
             : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
-        return Types.FixedCharType.of(typeBean.getColumnSize());
+        // An unbounded bpchar ignores trailing spaces and is not equivalent to String.
+        Integer length = typeBean.getColumnSize();
+        return length == null || length <= 0 || length == Integer.MAX_VALUE
+            ? Types.ExternalType.of(BPCHAR)
+            : Types.FixedCharType.of(length);
       case TEXT:
         return Types.StringType.get();
       case BYTEA:
@@ -186,9 +202,25 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     return elementTypeString + ARRAY_TOKEN;
   }
 
-  private ListType toGravitinoArrayType(String typeName) {
+  private ListType toGravitinoArrayType(String typeName, JdbcTypeBean columnBean) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
+    // PostgreSQL has no dedicated element metadata for array columns: the driver reports the
+    // element's type information (length, scale, precision) on the array column itself, encoded
+    // through atttypmod. Propagate it to the element bean so constrained character, numeric and
+    // temporal element types keep the same metadata as their scalar counterparts.
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
+    Integer columnSize = columnBean.getColumnSize();
+    // pgjdbc getColumns substitutes the display width (131089) when an unconstrained NUMERIC
+    // array's precision is zero, because its JDBC type is ARRAY rather than NUMERIC. That width
+    // is not a declared precision: PostgreSQL only allows explicit precision up to 1000.
+    if (NUMERIC.equals(elementTypeName)
+        && columnSize != null
+        && columnSize > MAX_NUMERIC_PRECISION) {
+      columnSize = 0;
+    }
+    bean.setColumnSize(columnSize);
+    bean.setScale(columnBean.getScale());
+    bean.setDatetimePrecision(columnBean.getDatetimePrecision());
     return ListType.nullable(toGravitino(bean));
   }
 }

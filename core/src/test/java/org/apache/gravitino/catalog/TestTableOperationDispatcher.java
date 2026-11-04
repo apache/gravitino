@@ -1728,6 +1728,68 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         TableOperationDispatcher.alignNameChangesWithStoredColumns(exactAndAmbiguous, ambiguous));
   }
 
+  @Test
+  public void testAlignNameChangesWithCatalogColumns() {
+    Column[] folded = {catalogColumn("customerid"), catalogColumn("cust"), catalogColumn("amount")};
+
+    // A rename target that differs in case from a catalog column is mapped to it.
+    Map<String, String> changes = new HashMap<>();
+    changes.put("cust_id", "CustomerId");
+    changes.put("cust2", "CUST");
+    changes.put("amount2", "amount");
+    changes.put("dropped", null);
+    Map<String, String> expected = new HashMap<>();
+    expected.put("cust_id", "customerid");
+    expected.put("cust2", "cust");
+    expected.put("amount2", "amount");
+    expected.put("dropped", null);
+    Assertions.assertEquals(
+        expected, TableOperationDispatcher.alignNameChangesWithCatalogColumns(changes, folded));
+
+    // A column is not taken from a rename that names it exactly, and several matches are ambiguous.
+    Map<String, String> claimed = ImmutableMap.of("a", "x", "b", "X");
+    Assertions.assertEquals(
+        claimed,
+        TableOperationDispatcher.alignNameChangesWithCatalogColumns(
+            claimed, new Column[] {catalogColumn("x")}));
+    Map<String, String> ambiguous = ImmutableMap.of("a", "Xy");
+    Assertions.assertEquals(
+        ambiguous,
+        TableOperationDispatcher.alignNameChangesWithCatalogColumns(
+            ambiguous, new Column[] {catalogColumn("xy"), catalogColumn("XY")}));
+
+    // A catalog that reports no columns leaves the changes as they are.
+    Assertions.assertEquals(
+        ambiguous, TableOperationDispatcher.alignNameChangesWithCatalogColumns(ambiguous, null));
+  }
+
+  @Test
+  public void testWithCatalogColumnNames() {
+    Column requested = Column.of("UserId", Types.LongType.get(), "the user", false, false, null);
+    Column other = catalogColumn("Other");
+
+    Column[] named =
+        TableOperationDispatcher.withCatalogColumnNames(
+            new Column[] {requested, other},
+            new Column[] {catalogColumn("userid"), catalogColumn("different")});
+    Assertions.assertEquals("userid", named[0].name());
+    Assertions.assertEquals(Types.LongType.get(), named[0].dataType());
+    Assertions.assertEquals("the user", named[0].comment());
+    Assertions.assertFalse(named[0].nullable());
+    Assertions.assertEquals("Other", named[1].name());
+
+    // Columns that do not line up with the request keep the requested names.
+    Column[] mismatched = {requested};
+    Assertions.assertArrayEquals(
+        mismatched,
+        TableOperationDispatcher.withCatalogColumnNames(
+            mismatched, new Column[] {catalogColumn("userid"), catalogColumn("extra")}));
+  }
+
+  private static Column catalogColumn(String name) {
+    return Column.of(name, Types.IntegerType.get());
+  }
+
   private static ColumnEntity storedColumn(String name) {
     return ColumnEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())

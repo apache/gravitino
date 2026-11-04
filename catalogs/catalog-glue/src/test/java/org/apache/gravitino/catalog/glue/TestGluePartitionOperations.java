@@ -182,6 +182,42 @@ class TestGluePartitionOperations {
   }
 
   @Test
+  void testPartitionWithEmptyValueIsAddressableByItsListedName() {
+    software.amazon.awssdk.services.glue.model.Partition gluePartition =
+        software.amazon.awssdk.services.glue.model.Partition.builder()
+            .values("2024-01-01", "")
+            .build();
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(GetPartitionsResponse.builder().partitions(gluePartition).build());
+    when(mockClient.getPartition(any(GetPartitionRequest.class)))
+        .thenReturn(GetPartitionResponse.builder().partition(gluePartition).build());
+
+    String name = ops.listPartitionNames()[0];
+    assertEquals("dt=2024-01-01/region=", name);
+
+    ops.getPartition(name);
+    ArgumentCaptor<GetPartitionRequest> captor = ArgumentCaptor.forClass(GetPartitionRequest.class);
+    verify(mockClient).getPartition(captor.capture());
+    assertEquals(List.of("2024-01-01", ""), captor.getValue().partitionValues());
+  }
+
+  @Test
+  void testPartitionNameUsesLowerCaseKeys() {
+    GlueTableOperations upperCaseOps =
+        new GlueTableOperations(mockClient, null, "mydb", "mytable", new String[] {"DT"});
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(
+            GetPartitionsResponse.builder()
+                .partitions(
+                    software.amazon.awssdk.services.glue.model.Partition.builder()
+                        .values("2024-01-01")
+                        .build())
+                .build());
+
+    assertEquals("dt=2024-01-01", upperCaseOps.listPartitionNames()[0]);
+  }
+
+  @Test
   void testGetPartitionNotFound() {
     when(mockClient.getPartition(any(GetPartitionRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());

@@ -127,6 +127,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GlueConstants.SERDE_LIB,
           GlueConstants.SERDE_NAME);
 
+  /** Storage formats whose files can only be read by the SerDe of the same format. */
+  private static final Set<StorageFormat> SERDE_BOUND_FORMATS =
+      ImmutableSet.of(StorageFormat.ORC, StorageFormat.PARQUET, StorageFormat.AVRO);
+
   @VisibleForTesting GlueClient glueClient;
 
   /** Nullable — when null, Glue uses the caller's AWS account ID. */
@@ -334,7 +338,25 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     LOG.info("Altered Glue schema (database) {}", ident.name());
-    return loadSchema(ident);
+
+    // The change is committed at this point, so a failed read falls back to the definition that
+    // was sent rather than reporting the alter as failed.
+    try {
+      return loadSchema(ident);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Altered schema {}, but failed to read it back; returning the submitted definition",
+          ident.name(),
+          e);
+      return GlueSchema.fromGlueDatabase(
+          Database.builder()
+              .name(input.name())
+              .description(input.description())
+              .locationUri(input.locationUri())
+              .parameters(input.parameters())
+              .createTime(current.createTime())
+              .build());
+    }
   }
 
   private Database getDatabase(String name) {
@@ -548,7 +570,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     TableInput input =
         buildTableInput(
-            dbName, ident.name(), comment, columns, props, partitions, distribution, sortOrders);
+            dbName,
+            ident.name(),
+            comment,
+            toLowerCaseColumns(columns),
+            props,
+            partitions,
+            distribution,
+            sortOrders);
 
     CreateTableRequest.Builder req =
         CreateTableRequest.builder().databaseName(dbName).tableInput(input);
@@ -556,14 +585,20 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     executeCreateTable(dbName, ident, req);
     LOG.info("Created Glue table {}.{}", dbName, ident.name());
 
-    // Read back what Glue stored, so the response carries the derived location and storage
-    // classes, as a later load does. The table exists at this point, so a failed read falls back
-    // to the definition that was sent rather than reporting the create as failed.
+    return loadAfterWrite(ident, dbName, input);
+  }
+
+  /**
+   * Reads back what Glue stored, so the response carries the derived location and storage classes,
+   * as a later load does. The write is committed at this point, so a failed read falls back to the
+   * definition that was sent rather than reporting the operation as failed.
+   */
+  private GlueTable loadAfterWrite(NameIdentifier ident, String dbName, TableInput input) {
     try {
       return loadTable(ident);
     } catch (RuntimeException e) {
       LOG.warn(
-          "Created table {}.{}, but failed to read it back; returning the submitted definition",
+          "Wrote table {}.{}, but failed to read it back; returning the submitted definition",
           dbName,
           ident.name(),
           e);
@@ -655,6 +690,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         // Storage properties map to storage descriptor fields, the rest to table parameters.
         TableChange.SetProperty sp = (TableChange.SetProperty) change;
         String property = sp.getProperty();
+        // A table parameter of the same name would show again once the storage value is removed.
+        if (isStorageProperty(property)) {
+          params.remove(property);
+        }
         if (GlueConstants.LOCATION.equals(property)) {
           location = sp.getValue();
           storageChanged = true;
@@ -738,7 +777,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             .tableInput(input)
             .versionId(raw.versionId()));
     LOG.info("Altered Glue table {}.{}", dbName, ident.name());
-    return loadTable(ident);
+    return loadAfterWrite(ident, dbName, input);
   }
 
   private static boolean isStorageProperty(String property) {
@@ -762,7 +801,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   /**
    * The column lists of a Hive-format table as Glue holds them, edited in place by column changes.
-   * Glue column names are compared without regard to case, as Glue folds them to lower case.
+   * Glue column names are compared without regard to case, and new names are folded to lower case,
+   * as Glue stores them.
    */
   private final class HiveColumns {
     private final List<software.amazon.awssdk.services.glue.model.Column> dataCols;
@@ -810,7 +850,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             name);
         software.amazon.awssdk.services.glue.model.Column column =
             software.amazon.awssdk.services.glue.model.Column.builder()
-                .name(name)
+                .name(name.toLowerCase(Locale.ROOT))
                 .type(toGlueType(name, add.getDataType()))
                 .comment(add.getComment())
                 .build();
@@ -854,7 +894,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       int index = requireColumn(dataCols, name);
       software.amazon.awssdk.services.glue.model.Column old = dataCols.get(index);
       if (change instanceof TableChange.RenameColumn) {
-        String newName = ((TableChange.RenameColumn) change).getNewName();
+        String newName = ((TableChange.RenameColumn) change).getNewName().toLowerCase(Locale.ROOT);
         Preconditions.checkArgument(
             (indexOf(dataCols, newName) < 0 || name.equalsIgnoreCase(newName))
                 && indexOf(partCols, newName) < 0,
@@ -1204,7 +1244,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return GlueConstants.VIRTUAL_VIEW_TABLE_TYPE.equalsIgnoreCase(table.tableType());
   }
 
-  /** Rejects a Glue object that is a view, so that it is not acted on through the table API. */
   /**
    * Glue accepts a table whose columns share a name (Glue folds names to lower case), but such a
    * table cannot be represented in Gravitino.
@@ -1219,6 +1258,21 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           table.name(),
           column.name());
     }
+  }
+
+  /** Returns the columns under the lower-case names Glue stores for a Hive-format table. */
+  private static Column[] toLowerCaseColumns(Column[] columns) {
+    return Arrays.stream(columns)
+        .map(
+            column ->
+                Column.of(
+                    column.name().toLowerCase(Locale.ROOT),
+                    column.dataType(),
+                    column.comment(),
+                    column.nullable(),
+                    column.autoIncrement(),
+                    column.defaultValue()))
+        .toArray(Column[]::new);
   }
 
   /** Checks the column options Glue cannot store and the names Glue would fold together. */
@@ -1322,6 +1376,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /** Rejects a Glue object that is a view, so that it is not acted on through the table API. */
   private static void rejectIfView(Table table, NameIdentifier ident, String dbName) {
     if (isView(table)) {
       throw new NoSuchTableException(
@@ -1456,6 +1511,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           Arrays.stream(distribution.expressions())
               .filter(e -> e instanceof NamedReference.FieldReference)
               .map(e -> String.join(".", ((NamedReference.FieldReference) e).fieldName()))
+              .map(column -> column.toLowerCase(Locale.ROOT))
               .collect(Collectors.toList());
     }
 
@@ -1464,7 +1520,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       for (SortOrder so : sortOrders) {
         if (so.expression() instanceof NamedReference.FieldReference) {
           String colName =
-              String.join(".", ((NamedReference.FieldReference) so.expression()).fieldName());
+              String.join(".", ((NamedReference.FieldReference) so.expression()).fieldName())
+                  .toLowerCase(Locale.ROOT);
           int order = so.direction() == SortDirection.ASCENDING ? 1 : 0;
           glueSortCols.add(Order.builder().column(colName).sortOrder(order).build());
         }
@@ -1546,6 +1603,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB,
           GlueConstants.FORMAT);
+      // A custom class is taken as given, but these formats are read only by their own SerDe.
+      Preconditions.checkArgument(
+          !isBuiltInInputFormat(inputFormat)
+              || !isBuiltInSerde(serdeLib)
+              || SERDE_BOUND_FORMATS.stream()
+                  .allMatch(
+                      f -> f.getInputFormat().equals(inputFormat) == f.getSerde().equals(serdeLib)),
+          "'%s' %s and '%s' %s belong to different storage formats",
+          GlueConstants.INPUT_FORMAT_CLASS,
+          inputFormat,
+          GlueConstants.SERDE_LIB,
+          serdeLib);
       return null;
     }
 
@@ -1570,6 +1639,10 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private static boolean isBuiltInOutputFormat(String outputFormat) {
     return Arrays.stream(StorageFormat.values())
         .anyMatch(f -> f.getOutputFormat().equals(outputFormat));
+  }
+
+  private static boolean isBuiltInSerde(String serdeLib) {
+    return Arrays.stream(StorageFormat.values()).anyMatch(f -> f.getSerde().equals(serdeLib));
   }
 
   private static void checkFormatClass(

@@ -34,6 +34,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -118,6 +119,67 @@ public class TestIcebergCatalogWrapperManagerForREST {
         exception
             .getMessage()
             .contains("gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testServiceAccountAuthorizationValidatedByWrapper(boolean authorizationEnabled)
+      throws Exception {
+    IcebergConfigProvider provider = Mockito.mock(DynamicIcebergConfigProvider.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                "service-account"));
+    Mockito.when(provider.getIcebergCatalogConfig("remote")).thenReturn(Optional.of(config));
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(ImmutableMap.of(), provider, false, "metalake")) {
+      IcebergRESTServerContext.create(provider, authorizationEnabled, true, true, manager);
+      if (authorizationEnabled) {
+        Assertions.assertInstanceOf(
+            FederatedCatalogWrapper.class, manager.getCatalogWrapper("remote"));
+      } else {
+        IllegalArgumentException failure =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> manager.getCatalogWrapper("remote"));
+        Assertions.assertTrue(
+            failure.getMessage().contains("requires authorization to be enabled"));
+      }
+    }
+  }
+
+  @Test
+  void testRejectedWrapperIsClosedAndNotCached() throws Exception {
+    IcebergConfigProvider provider = Mockito.mock(IcebergConfigProvider.class);
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Mockito.when(provider.getIcebergCatalogConfig("test")).thenReturn(Optional.of(config));
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    Mockito.when(wrapper.getIcebergConfig()).thenReturn(config);
+    IllegalArgumentException failure = new IllegalArgumentException("invalid server configuration");
+    try (IcebergCatalogWrapperManager manager =
+        Mockito.spy(
+            new IcebergCatalogWrapperManager(ImmutableMap.of(), provider, false, "metalake"))) {
+      Mockito.doReturn(wrapper)
+          .when(manager)
+          .createCatalogWrapper(Mockito.eq("test"), Mockito.any());
+      IcebergRESTServerContext context =
+          IcebergRESTServerContext.create(provider, false, false, true, manager);
+      Mockito.doThrow(failure).when(wrapper).validateServerContext(context);
+
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> manager.getCatalogWrapper("test")));
+      Mockito.verify(wrapper).close();
+      Mockito.verify(wrapper, Mockito.never()).reloadHadoopConf();
+
+      Mockito.doNothing().when(wrapper).validateServerContext(context);
+      Assertions.assertSame(wrapper, manager.getCatalogWrapper("test"));
+      Mockito.verify(wrapper, Mockito.times(2)).validateServerContext(context);
+      Mockito.verify(wrapper).reloadHadoopConf();
+    }
   }
 
   @Test
