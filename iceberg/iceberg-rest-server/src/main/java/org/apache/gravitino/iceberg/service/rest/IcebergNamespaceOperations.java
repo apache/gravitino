@@ -46,7 +46,6 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -352,9 +351,6 @@ public class IcebergNamespaceOperations {
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
-    } finally {
-      // Auth may be off, so the interceptor is not always in the path.
-      IcebergCatalogWrapper.clearCachedTableMetadataFromLocation();
     }
   }
 
