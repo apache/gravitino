@@ -240,19 +240,18 @@ public abstract class RangerAuthorizationPlugin
             ownerPrivilege -> {
               // Each owner's privilege will create one RangerPolicyItemAccess in the policy
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem
-                  .getAccesses()
-                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.addAccess(
+                  new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
               if (newOwner != null) {
                 if (newOwner.type() == Owner.Type.USER) {
-                  policyItem.getUsers().add(newOwner.name());
+                  policyItem.addUser(newOwner.name());
                 } else {
-                  policyItem.getGroups().add(newOwner.name());
+                  policyItem.addGroup(newOwner.name());
                 }
                 // mark the policy item is created by Gravitino
-                policyItem.getRoles().add(RangerHelper.GRAVITINO_OWNER_ROLE);
+                policyItem.addRole(RangerHelper.GRAVITINO_OWNER_ROLE);
               }
-              policy.getPolicyItems().add(policyItem);
+              policy.addPolicyItem(policyItem);
             });
     return policy;
   }
@@ -266,11 +265,10 @@ public abstract class RangerAuthorizationPlugin
             ownerPrivilege -> {
               // Each owner's privilege will create one RangerPolicyItemAccess in the policy
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem
-                  .getAccesses()
-                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-              policyItem.getRoles().add(rangerHelper.generateGravitinoRoleName(ownerRoleName));
-              policy.getPolicyItems().add(policyItem);
+              policyItem.addAccess(
+                  new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.addRole(rangerHelper.generateGravitinoRoleName(ownerRoleName));
+              policy.addPolicyItem(policyItem);
             });
     return policy;
   }
