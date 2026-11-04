@@ -30,6 +30,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.exceptions.BadRequestException;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 
 /**
  * Metadata object authorization for {@link
@@ -68,11 +69,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
         request instanceof PoliciesAssociateRequest,
         "Only policy can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
     PoliciesAssociateRequest policiesAssociateRequest = (PoliciesAssociateRequest) request;
-    try {
-      policiesAssociateRequest.validate();
-    } catch (IllegalArgumentException e) {
-      throw new BadRequestException(e, "%s", e.getMessage());
-    }
+    RequestValidation.validate(policiesAssociateRequest::validate);
     // Authorize both 'policiesToAdd' and 'policiesToRemove' fields.
     return authorizePolicy(policiesAssociateRequest.getPoliciesToAdd(), context, targetType)
         && authorizePolicy(policiesAssociateRequest.getPoliciesToRemove(), context, targetType);
