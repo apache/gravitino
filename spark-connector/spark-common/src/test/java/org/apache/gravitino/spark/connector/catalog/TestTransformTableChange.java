@@ -29,9 +29,9 @@ import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.requests.TableUpdateRequest.UpdateTableColumnDefaultValueRequest;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
@@ -91,7 +91,13 @@ public class TestTransformTableChange {
     assertDefault("NULL", Literals.NULL);
     assertDefault("''", Literals.stringLiteral(""));
     assertDefault("DATE '2026-11-04'", Literals.dateLiteral("2026-11-04"));
-    assertDefault("", Column.DEFAULT_VALUE_NOT_SET);
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                sparkTableChangeConverter.toGravitinoTableChange(
+                    TableChange.updateColumnDefaultValue(new String[] {"col"}, "")));
+    Assertions.assertEquals("DROP DEFAULT is not supported by Gravitino", exception.getMessage());
     for (String expression :
         new String[] {
           "1 + 1",
@@ -134,7 +140,19 @@ public class TestTransformTableChange {
                         .toInstant()
                         .atOffset(ZoneOffset.UTC),
                     Types.TimestampType.withTimeZone());
-            assertDefault("TIMESTAMP '" + text + "'", expected);
+            Expression converted = assertDefault("TIMESTAMP '" + text + "'", expected);
+            String expectedSql =
+                "'"
+                    + ((Literal<?>) expected)
+                        .value()
+                        .toString()
+                        .replace("T", " ")
+                        .replace("Z", "+00:00")
+                    + "'";
+            Assertions.assertEquals(
+                expectedSql,
+                new JdbcColumnDefaultValueConverter()
+                    .fromGravitino(DTOConverters.toFunctionArg(converted)));
             assertDefault("TIMESTAMP_LTZ '" + text + "'", expected);
           }
           assertDefault(

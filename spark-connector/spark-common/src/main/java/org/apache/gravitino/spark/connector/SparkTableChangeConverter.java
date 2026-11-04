@@ -20,7 +20,6 @@ package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
 import java.time.ZoneOffset;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -118,7 +117,7 @@ public class SparkTableChangeConverter {
     // Spark uses an empty SQL string for DROP DEFAULT; a string literal containing no characters
     // is represented by two quote characters instead.
     if (sql.isEmpty()) {
-      return Column.DEFAULT_VALUE_NOT_SET;
+      throw new UnsupportedOperationException("DROP DEFAULT is not supported by Gravitino");
     }
     try {
       org.apache.spark.sql.catalyst.expressions.Expression parsed =

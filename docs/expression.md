@@ -56,6 +56,12 @@ string starting with `0x` must contain valid hexadecimal pairs; it is treated as
 Sending encoded binary defaults requires the server-side JDBC default converters described here;
 older servers do not decode this representation.
 
+Zoned timestamp defaults use numeric UTC offsets in JDBC SQL. MySQL requires 8.0.19 or later
+for [datetime literals with offsets](https://dev.mysql.com/doc/refman/8.0/en/datetime.html);
+MySQL 5.7 and older 8.0 releases cannot use these zoned defaults. Spark `DROP DEFAULT` is not
+supported by the current Gravitino update request and is rejected explicitly; `SET DEFAULT NULL`
+and `SET DEFAULT ''` remain distinct supported literal values.
+
 When writing table or function defaults, partition values, partitioning, distribution, or sort
 expressions, each literal must declare a recognized Gravitino type or an explicit
 [external type](./tables-and-views.md#external-type) with a nonblank `catalogString`.

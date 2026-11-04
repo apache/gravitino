@@ -22,8 +22,10 @@ import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MY
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -39,6 +42,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -60,6 +64,68 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestMysqlTableOperations extends TestMysql {
   private static final Type VARCHAR = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"+00:00", "+08:00", "-07:00"})
+  void testZonedTimestampDefaultsPreserveInstantOnCreateAndAlter(String timeZone) throws Exception {
+    String table = RandomNameUtils.genRandomName("timestamp_defaults");
+    OffsetDateTime value = OffsetDateTime.parse("2026-11-04T12:34:56.123456Z");
+    try (BasicDataSource dataSource =
+        (BasicDataSource) DataSourceUtils.createDataSource(getMySQLCatalogProperties())) {
+      dataSource.setConnectionInitSqls(List.of("SET time_zone = '" + timeZone + "'"));
+      MysqlTableOperations operations = new MysqlTableOperations();
+      operations.initialize(
+          dataSource,
+          JDBC_EXCEPTION_CONVERTER,
+          new MysqlTypeConverter(),
+          new MysqlColumnDefaultValueConverter(),
+          Collections.emptyMap());
+      operations.create(
+          TEST_DB_NAME.toString(),
+          table,
+          new JdbcColumn[] {
+            JdbcColumn.builder()
+                .withName("ts")
+                .withType(Types.TimestampType.withTimeZone(6))
+                .withNullable(true)
+                .withDefaultValue(Literals.of(value, Types.TimestampType.withTimeZone()))
+                .build()
+          },
+          null,
+          Collections.emptyMap(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement()) {
+        String qualified = "`" + TEST_DB_NAME + "`.`" + table + "`";
+        for (int iteration = 0; iteration < 2; iteration++) {
+          if (iteration == 1) {
+            statement.executeUpdate("DELETE FROM " + qualified);
+            value = value.plusDays(1);
+            operations.alterTable(
+                TEST_DB_NAME.toString(),
+                table,
+                TableChange.updateColumnDefaultValue(
+                    new String[] {"ts"},
+                    DTOConverters.toFunctionArg(
+                        Literals.of(value, Types.TimestampType.withTimeZone()))));
+          }
+          statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+          try (ResultSet result =
+              statement.executeQuery(
+                  "SELECT UNIX_TIMESTAMP(ts), @@session.time_zone FROM " + qualified)) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(
+                value.toEpochSecond() + ".123456", result.getBigDecimal(1).toPlainString());
+            Assertions.assertEquals(timeZone, result.getString(2));
+          }
+        }
+      } finally {
+        operations.drop(TEST_DB_NAME.toString(), table);
+      }
+    }
+  }
 
   @Test
   public void testOperationTable() {

@@ -23,7 +23,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.io.BaseEncoding;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -92,18 +91,24 @@ public class JdbcColumnDefaultValueConverter {
       } else if (type instanceof Types.BinaryType
           && literal.value() instanceof String
           && ((String) literal.value()).startsWith("0x")) {
-        return binaryLiteral(
-            BaseEncoding.base16()
-                .lowerCase()
-                .decode(((String) literal.value()).substring(2).toLowerCase(Locale.ROOT)));
-      } else if (type instanceof Types.TimestampType) {
-        /**
-         * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
-         */
-        if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
-          return quoteStringLiteral(literal.value().toString().replace("T", " "));
+        byte[] value;
+        try {
+          value =
+              BaseEncoding.base16()
+                  .lowerCase()
+                  .decode(((String) literal.value()).substring(2).toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(
+              "Invalid binary column default value: use 0x followed by hexadecimal byte pairs", e);
         }
-        return quoteStringLiteral(String.valueOf(literal.value()));
+        return binaryLiteral(value);
+      } else if (type instanceof Types.TimestampType) {
+        String value = literal.value().toString().replace("T", " ");
+        if (((Types.TimestampType) type).hasTimeZone() && value.endsWith("Z")) {
+          // MySQL accepts numeric offsets but rejects the equivalent ISO UTC suffix.
+          value = value.substring(0, value.length() - 1) + "+00:00";
+        }
+        return quoteStringLiteral(value);
       } else {
         return quoteStringLiteral(String.valueOf(literal.value()));
       }
