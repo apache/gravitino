@@ -79,12 +79,9 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** The service class for schema metadata. It provides the basic database operations for schema. */
 public class SchemaMetaService {
-  private static final Logger LOG = LoggerFactory.getLogger(SchemaMetaService.class);
   private static final SchemaMetaService INSTANCE = new SchemaMetaService();
   private BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops;
 
@@ -140,6 +137,15 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
+  /**
+   * Registers a schema without replacing another active identity at the same name.
+   *
+   * @param schemaEntity the schema to register
+   * @param overwrite whether to update or revive the same schema ID; active cross-catalog IDs and
+   *     different active IDs at the same name are rejected even when true
+   * @throws EntityAlreadyExistsException if the name or identity conflicts with a registration
+   * @throws IOException if the store operation fails
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertSchema")
@@ -181,7 +187,7 @@ public class SchemaMetaService {
       // Everything below runs in one transaction, and it starts by locking the parent catalog row.
       // That lock is what stops a catalog drop from running at the same time as this insert. A
       // plain insert can use a shared lock; nested ancestors or an overwrite need an exclusive
-      // lock because replacement can retire a stale schema and its descendants.
+      // lock to serialize the name/identity checks with other registrations and schema drops.
       SessionUtils.doMultipleWithCommit(
           () -> lockCatalogForSchemaCreate(catalogPO, rowsToInsert.size() > 1 || overwrite),
           () ->
@@ -511,16 +517,13 @@ public class SchemaMetaService {
             .findFirst()
             .orElse(null);
     if (stored != null && !stored.getSchemaId().equals(incoming.getSchemaId())) {
-      LOG.warn(
-          "Replacing stale registration of schema {} with ID {} by schema with ID {}",
-          identifier,
-          stored.getSchemaId(),
-          incoming.getSchemaId());
-      // The catalog is exclusively locked. Nested SqlSessions retain this outer transaction;
-      // cascade, insert, related metadata cleanup and change-log writes commit or roll back
-      // together. Do not inherit stale children, owners, tags or privileges. Do not delete
-      // external secrets here: a renamed source object may still reference the old URNs.
-      deleteSchemaAndGet(identifier, true, false);
+      // A different ID at this name does not prove that the old source object was deleted: it
+      // may have been renamed externally. The store cannot resolve source identities, so preserve
+      // its children and governance metadata until the caller explicitly reconciles the conflict.
+      throw new EntityAlreadyExistsException(
+          "Schema %s is already registered with a different identifier. Reconcile the existing "
+              + "registration before replacing it; its source object may have been renamed.",
+          identifier);
     }
     return registeredId != null;
   }
@@ -546,8 +549,8 @@ public class SchemaMetaService {
    * the missing ancestors, and two requests can both find the same ancestor missing and both insert
    * it. A shared lock does not stop that, so the ancestor case takes an exclusive lock and
    * serializes every other schema create under the catalog until it finishes. An overwrite also
-   * takes the exclusive lock: it may cascade away a stale schema before inserting its fresh
-   * identity, and must not upgrade a shared lock after discovering the stale registration.
+   * takes the exclusive lock to keep its name/identity checks stable against registrations and
+   * drops. This deliberately avoids a shared-lock upgrade or a transaction retry on conflicts.
    *
    * <p>The name and the metalake are compared again because the caller looked the catalog up by
    * name: if the row now has another name, the catalog named in the request no longer exists.

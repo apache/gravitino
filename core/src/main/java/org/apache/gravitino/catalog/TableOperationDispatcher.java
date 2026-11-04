@@ -161,6 +161,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to load.
    * @return The loaded {@link Table} object representing the requested table.
    * @throws NoSuchTableException If the specified table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
@@ -183,12 +184,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      try {
-        schemaDispatcher.loadSchema(schemaIdent);
-      } catch (NoSuchSchemaException e) {
-        throw new NoSuchTableException(
-            e, "Table %s does not exist because its schema is missing", ident);
-      }
+      schemaDispatcher.loadSchema(schemaIdent);
 
       // Import under the table lock: the source snapshot and store write exclude local changes
       // to this table, while sibling tables remain available. Ancestor READ locks still exclude
@@ -232,8 +228,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
-   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; inspect
-   *     external state and resolve the entity-store error before retrying.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadTable to import it.
    */
   @Override
   public Table createTable(
@@ -802,7 +798,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw new GravitinoRuntimeException(
           e,
           "Table %s was created in the external catalog, but its registration in Gravitino "
-              + "failed. Resolve the entity-store error and verify external state before retrying.",
+              + "failed. Resolve the entity-store error, verify the source identity, and use "
+              + "loadTable to import it. Do not repeat createTable; it will report already exists.",
           ident);
     }
 

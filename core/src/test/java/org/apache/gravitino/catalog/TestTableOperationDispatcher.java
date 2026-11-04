@@ -82,6 +82,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -218,7 +219,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertSame(registrationFailure, error.getCause());
     Assertions.assertTrue(error.getMessage().contains(tableIdent2.toString()));
     Assertions.assertTrue(error.getMessage().contains("created in the external catalog"));
-    Assertions.assertTrue(error.getMessage().contains("verify external state before retrying"));
+    Assertions.assertTrue(error.getMessage().contains("use loadTable to import it"));
+    Assertions.assertTrue(error.getMessage().contains("Do not repeat createTable"));
     Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
     catalogManager.doWithCatalog(
         NameIdentifier.of(metalake, catalog),
@@ -228,6 +230,15 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals("comment", created.comment());
           return null;
         });
+    reset(entityStore);
+    Assertions.assertThrows(
+        TableAlreadyExistsException.class,
+        () ->
+            tableOperationDispatcher.createTable(
+                tableIdent2, columns, "comment", props, new Transform[0]));
+    Assertions.assertFalse(entityStore.exists(tableIdent2, TABLE));
+    tableOperationDispatcher.loadTable(tableIdent2);
+    Assertions.assertTrue(entityStore.exists(tableIdent2, TABLE));
   }
 
   @Test
@@ -348,16 +359,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         exception.getMessage());
   }
 
-  /** Verifies a cold table lookup preserves the missing-table signal when its schema is absent. */
+  /** Verifies a cold table lookup preserves the missing-schema signal. */
   @Test
-  public void testColdLoadWithMissingSchemaStillReportsMissingTable() {
+  public void testColdLoadWithMissingSchemaPreservesSchemaError() {
     NameIdentifier ident =
         NameIdentifier.of(metalake, catalog, "schema_missing_import", "missing_table");
-    NoSuchTableException error =
+    NoSuchSchemaException error =
         Assertions.assertThrows(
-            NoSuchTableException.class, () -> tableOperationDispatcher.loadTable(ident));
-    Assertions.assertTrue(error.getMessage().contains(ident.toString()));
-    Assertions.assertInstanceOf(NoSuchSchemaException.class, error.getCause());
+            NoSuchSchemaException.class, () -> tableOperationDispatcher.loadTable(ident));
+    Assertions.assertTrue(error.getMessage().contains("schema_missing_import"));
+    Assertions.assertFalse(tableOperationDispatcher.tableExists(ident));
   }
 
   /**

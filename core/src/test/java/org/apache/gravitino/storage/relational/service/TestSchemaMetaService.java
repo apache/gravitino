@@ -100,7 +100,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   private final String catalogName = "catalog_for_catalog_test";
 
   @TestTemplate
-  void testOverwriteDifferentSchemaIdRetiresStaleHierarchy() throws Exception {
+  void testOverwriteDifferentSchemaIdPreservesRegisteredHierarchy() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     SchemaEntity stale = createAndInsertSchema(metalakeName, catalogName, "stale_schema");
@@ -118,12 +118,18 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SchemaEntity replacement =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(), stale.namespace(), stale.name(), AUDIT_INFO);
-    backend.insert(replacement, true);
+    EntityAlreadyExistsException conflict =
+        assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(replacement, true));
+    assertTrue(conflict.getMessage().contains(stale.nameIdentifier().toString()));
+    assertTrue(conflict.getMessage().contains("Reconcile the existing registration"));
     Assertions.assertEquals(
-        replacement.id(),
+        stale.id(),
         backend.<SchemaEntity>get(stale.nameIdentifier(), Entity.EntityType.SCHEMA).id());
-    assertFalse(backend.exists(child.nameIdentifier(), Entity.EntityType.TABLE));
-    assertFalse(backend.exists(nested.nameIdentifier(), Entity.EntityType.SCHEMA));
+    Assertions.assertEquals(
+        child.id(), backend.<TableEntity>get(child.nameIdentifier(), Entity.EntityType.TABLE).id());
+    Assertions.assertEquals(
+        nested.id(),
+        backend.<SchemaEntity>get(nested.nameIdentifier(), Entity.EntityType.SCHEMA).id());
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = session.getConnection();
@@ -134,7 +140,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                     + stale.id()
                     + " AND deleted_at = 0")) {
       assertTrue(rows.next());
-      Assertions.assertEquals(0, rows.getLong(1));
+      Assertions.assertEquals(1, rows.getLong(1));
     }
   }
 
@@ -267,7 +273,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         createAndInsertSchema(metalakeName, catalogName, "schema_losing_registration");
     long sharedId = RandomIdGenerator.INSTANCE.nextId();
     SchemaEntity losing =
-        createSchemaEntity(sharedId, original.namespace(), original.name(), AUDIT_INFO);
+        createSchemaEntity(sharedId, original.namespace(), "unregistered_schema", AUDIT_INFO);
     SchemaEntity winner =
         createSchemaEntity(
             sharedId, Namespace.of(metalakeName, "winning_catalog"), "winning_schema", AUDIT_INFO);
@@ -303,6 +309,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
     }
     assertTrue(insertedWinner.get());
+    assertFalse(backend.exists(losing.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertEquals(
         original.id(),
         backend.<SchemaEntity>get(original.nameIdentifier(), Entity.EntityType.SCHEMA).id());
@@ -312,7 +319,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testStaleSchemaReplacementRollsBackCleanupIfInsertFails() throws Exception {
+  void testSameIdentityOverwriteRollsBackIfWriteFails() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     SchemaEntity original =
@@ -321,8 +328,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         createAndInsertTableEntity(
             Namespace.of(metalakeName, catalogName, original.name()), "retained_table");
     SchemaEntity replacement =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(), original.namespace(), original.name(), AUDIT_INFO);
+        createSchemaEntity(original.id(), original.namespace(), original.name(), AUDIT_INFO);
     SchemaMetaService service = SchemaMetaService.getInstance();
     BasePOStorageOps<SchemaPO, SchemaMetaMapper> originalOps = service.ops();
     BasePOStorageOps<SchemaPO, SchemaMetaMapper> failingOps = Mockito.spy(originalOps);

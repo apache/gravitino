@@ -129,4 +129,10 @@ work or clean up driver-owned global threads.
 
 Each attempt and its late connection cleanup use the submitting caller's access-control
 context and JAAS subject. Shared workers are created without inheriting the first caller's
-subject, so reusing a worker does not reuse that caller's authentication context.
+subject, so reusing a worker does not reuse that caller's JAAS subject.
+
+This guarantee covers access-control contexts and JAAS subjects, not arbitrary `ThreadLocal`
+or `InheritableThreadLocal` state. Drivers using the shared workers must clean up their own
+thread-local state and must not depend on inherited thread locals for caller authentication.
+Drivers that cannot meet these requirements must not opt into this adapter. Isolating workers
+by catalog alone would not isolate different users of the same catalog.

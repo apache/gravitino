@@ -229,6 +229,58 @@ class TestBoundedConnectionDriver {
   }
 
   @Test
+  void testNullPropertiesArePassedAsEmptyProperties() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection connection = mock(Connection.class);
+    AtomicReference<Properties> received = new AtomicReference<>();
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              received.set(invocation.getArgument(1));
+              return connection;
+            });
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 5000, workers);
+    assertSame(connection, bounded.connect("jdbc:test", null));
+    assertNotNull(received.get());
+    assertTrue(received.get().isEmpty());
+  }
+
+  @Test
+  void testLateCloseRunsWithoutCancellationInterrupt() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicReference<Boolean> closed = new AtomicReference<>(false);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              entered.countDown();
+              awaitIgnoringInterrupts(release);
+              return late;
+            });
+    doAnswer(
+            invocation -> {
+              if (Thread.currentThread().isInterrupted()) {
+                throw new SQLException("Cleanup interrupted before closing the connection");
+              }
+              closed.set(true);
+              return null;
+            })
+        .when(late)
+        .close();
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertTrue(closed.get(), "The physical connection must close despite cancellation");
+  }
+
+  @Test
   void testSqlFailurePreservesCauseAndState() throws Exception {
     Driver driver = mock(Driver.class);
     SQLException failure = new SQLException("backend refused", "28000", 17);

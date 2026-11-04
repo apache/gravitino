@@ -102,8 +102,9 @@ public interface SupportsSchemas {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically
-   * replayed.
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
@@ -126,8 +127,9 @@ public interface SupportsSchemas {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically
-   * replayed.
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.

@@ -64,8 +64,9 @@ public interface SchemaDispatcher extends SupportsSchemas {
    *
    * <p>A failure does not guarantee that the underlying catalog object was not created. In
    * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
-   * reported error and verify catalog state before retrying; creation is not automatically
-   * replayed.
+   * reported error, verify the source identity, and call {@link #loadSchema(NameIdentifier)} to
+   * import it instead of repeating creation. Reconcile an existing registration before creating the
+   * same name; an external rename does not make its metadata safe to delete.
    *
    * @param ident The name identifier of the schema.
    * @param comment The comment of the schema.

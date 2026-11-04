@@ -109,10 +109,56 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
               });
           return null;
         });
+    SchemaAlreadyExistsException conflict =
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () ->
+                dispatcher.createSchema(
+                    original, "replacement", ImmutableMap.of("k1", "v1", "k2", "v2")));
+    Assertions.assertTrue(conflict.getMessage().contains(original.toString()));
+    Assertions.assertTrue(conflict.getMessage().contains("loadSchema under its new name"));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          boolean originalExists = c.doWithSchemaOps(ops -> ops.schemaExists(original));
+          boolean renamedExists = c.doWithSchemaOps(ops -> ops.schemaExists(renamed));
+          Assertions.assertFalse(originalExists);
+          Assertions.assertTrue(renamedExists);
+          return null;
+        });
     Assertions.assertEquals(renamed.name(), dispatcher.loadSchema(renamed).name());
     Assertions.assertEquals(
         originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
     Assertions.assertFalse(entityStore.exists(original, SCHEMA));
+    dispatcher.createSchema(original, "replacement", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Assertions.assertNotEquals(
+        originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
+  }
+
+  @Test
+  void testCreateSchemaStopsBeforeSourceWhenRegistrationLookupFails() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_preflight_failure");
+    IOException failure = new IOException("registration lookup failed");
+    doThrow(failure).when(entityStore).exists(ident, SCHEMA);
+    GravitinoRuntimeException error =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> dispatcher.createSchema(ident, "", ImmutableMap.of("k1", "v1", "k2", "v2")));
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(ident.toString()));
+    Assertions.assertTrue(error.getMessage().contains("source creation has not been attempted"));
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          boolean sourceExists = c.doWithSchemaOps(ops -> ops.schemaExists(ident));
+          Assertions.assertFalse(sourceExists);
+          return null;
+        });
+    verify(entityStore, never()).put(any(SchemaEntity.class), anyBoolean());
   }
 
   @Test
@@ -199,7 +245,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertSame(registrationFailure, error.getCause());
     Assertions.assertTrue(error.getMessage().contains(schemaIdent2.toString()));
     Assertions.assertTrue(error.getMessage().contains("created in the external catalog"));
-    Assertions.assertTrue(error.getMessage().contains("verify external state before retrying"));
+    Assertions.assertTrue(error.getMessage().contains("use loadSchema to import it"));
+    Assertions.assertTrue(error.getMessage().contains("Do not repeat createSchema"));
     Assertions.assertFalse(entityStore.exists(schemaIdent2, SCHEMA));
     Schema created =
         catalogManager
@@ -207,6 +254,13 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
             .doWithSchemaOps(ops -> ops.loadSchema(schemaIdent2));
     Assertions.assertEquals("schema2", created.name());
     Assertions.assertEquals("comment", created.comment());
+    reset(entityStore);
+    Assertions.assertThrows(
+        SchemaAlreadyExistsException.class,
+        () -> dispatcher.createSchema(schemaIdent2, "comment", props));
+    Assertions.assertFalse(entityStore.exists(schemaIdent2, SCHEMA));
+    dispatcher.loadSchema(schemaIdent2);
+    Assertions.assertTrue(entityStore.exists(schemaIdent2, SCHEMA));
   }
 
   @Test
@@ -643,6 +697,21 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                 .doWithSchemaOps(ops -> ops.loadSchema(ident));
         SecretUrn urn = SecretUrn.parse(created.properties().get("k2"));
         Assertions.assertEquals("retained-secret", secrets.readSecret(urn));
+        reset(entityStore);
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1", "k2", "v2")));
+        Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+        Schema imported = d.loadSchema(ident);
+        Assertions.assertEquals(
+            HiddenPropertyMaskUtils.MASKED_VALUE, imported.properties().get("k2"));
+        Assertions.assertFalse(imported.properties().containsKey(ID_KEY));
+        Assertions.assertEquals(
+            urn.toString(),
+            entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("retained-secret", secrets.readSecret(urn));
+        Assertions.assertTrue(d.dropSchema(ident, false));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       } finally {
         reset(entityStore);
       }

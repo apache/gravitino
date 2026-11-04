@@ -54,7 +54,10 @@ import org.slf4j.LoggerFactory;
  * excess attempts fail with {@link SQLTransientConnectionException}. Workers are daemon threads and
  * release their catalog context class loader after each attempt. Each attempt, including late
  * connection cleanup, runs with the submitting caller's access-control context and JAAS subject;
- * shared workers do not inherit the identity of the request that creates them.
+ * shared workers do not inherit the creating request's JAAS subject. This does not isolate
+ * arbitrary {@link ThreadLocal} or {@link InheritableThreadLocal} state. Delegates must clean up
+ * such state and must not rely on it to carry a caller's identity. Drivers that cannot meet this
+ * requirement must not use this adapter's shared workers.
  *
  * <p>After a timeout, further attempts through this instance fail immediately until the abandoned
  * attempt finishes cleanup. This prevents a lazy pool's initialization lock from serializing a
@@ -120,7 +123,7 @@ public final class BoundedConnectionDriver implements Driver {
    *     through this driver is still running
    */
   @Override
-  public Connection connect(String url, Properties info) throws SQLException {
+  public Connection connect(String url, @Nullable Properties info) throws SQLException {
     if (abandonedAttempts.get() != 0) {
       throw new SQLTransientConnectionException(
           "A previous timed-out JDBC connection attempt is still running. Try again after it finishes.",
@@ -129,7 +132,7 @@ public final class BoundedConnectionDriver implements Driver {
     Attempt attempt = new Attempt();
     ClassLoader context = Thread.currentThread().getContextClassLoader();
     AccessControlContext callerContext = AccessController.getContext();
-    Properties properties = (Properties) info.clone();
+    Properties properties = info == null ? new Properties() : (Properties) info.clone();
     try {
       workers.execute(
           () ->
@@ -242,6 +245,7 @@ public final class BoundedConnectionDriver implements Driver {
       ClassLoader previous = current.getContextClassLoader();
       current.setContextClassLoader(context);
       Connection connection = null;
+      boolean interrupted = false;
       try {
         synchronized (this) {
           runner = current;
@@ -251,7 +255,6 @@ public final class BoundedConnectionDriver implements Driver {
         }
         connection = delegate.connect(url, properties);
         result.complete(connection);
-        boolean interrupted = false;
         while (true) {
           try {
             decision.await();
@@ -261,12 +264,12 @@ public final class BoundedConnectionDriver implements Driver {
             interrupted = true;
           }
         }
-        if (interrupted) {
-          current.interrupt();
-        }
       } catch (Throwable e) {
         result.completeExceptionally(e);
       } finally {
+        // Cancellation must not make an interrupt-sensitive close fail before releasing the
+        // physical connection. Restore the signal only after cleanup, including delegate signals.
+        interrupted |= Thread.interrupted();
         boolean delivered;
         synchronized (this) {
           delivered = accepted;
@@ -288,6 +291,9 @@ public final class BoundedConnectionDriver implements Driver {
             }
           }
           current.setContextClassLoader(previous);
+          if (interrupted) {
+            current.interrupt();
+          }
         }
       }
     }
