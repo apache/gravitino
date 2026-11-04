@@ -166,6 +166,33 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testTrueRowFilterOmitsReadRestrictions() throws Exception {
+    String tableName = "true_row_filter";
+    createTable(SCHEMA_NAME, tableName);
+    grantTablePrivileges(tableName, Privileges.SelectTable.allow());
+
+    String tag = createPolicyTag(Policy.BuiltInType.ROW_FILTER, "() RETURNS BOOLEAN -> TRUE");
+    loadTable(tableName).supportsTags().associateTags(new String[] {tag}, null);
+
+    JsonNode response = loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER);
+    Assertions.assertTrue(response.path("read-restrictions").isMissingNode(), response::toString);
+  }
+
+  @Test
+  void testIdentityMaskOmitsReadRestrictions() throws Exception {
+    String tableName = "identity_column_mask";
+    createTable(SCHEMA_NAME, tableName);
+    grantTablePrivileges(tableName, Privileges.SelectTable.allow());
+
+    String tag =
+        createPolicyTag(Policy.BuiltInType.COLUMN_MASK, "(value INTEGER) RETURNS INTEGER -> value");
+    loadTable(tableName).columns()[1].supportsTags().associateTags(new String[] {tag}, null);
+
+    JsonNode response = loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER);
+    Assertions.assertTrue(response.path("read-restrictions").isMissingNode(), response::toString);
+  }
+
+  @Test
   void testRowFilterFollowsPolicyAndTagChanges() throws Exception {
     String tableName = "row_filter_lifecycle";
     createTable(SCHEMA_NAME, tableName);
@@ -351,12 +378,11 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     String tag = createPolicyTag(Policy.BuiltInType.ROW_FILTER, expression);
     loadTable(tableName).supportsTags().associateTags(new String[] {tag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
   }
 
   @Test
-  void testDuplicateRowFilterIsAppliedOnce() {
+  void testDuplicateRowFilterPreservesEffectiveRestrictions() throws Exception {
     String tableName = "duplicate_row_filter";
     createTable(SCHEMA_NAME, tableName);
     grantTablePrivileges(tableName, Privileges.SelectTable.allow(), Privileges.ModifyTable.allow());
@@ -372,7 +398,15 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     metalakeClientWithAllPrivilege.createTag(secondTag, null, new HashMap<>());
     String policy = policyTag.policyName;
     metalakeClientWithAllPrivilege.addPolicyForTag(secondTag, policy);
-    loadTable(tableName).supportsTags().associateTags(new String[] {firstTag, secondTag}, null);
+    Table table = loadTable(tableName);
+    table.supportsTags().associateTags(new String[] {firstTag}, null);
+    JsonNode singleTagRestrictions =
+        new ObjectMapper().readTree(loadRestrictionsAs(tableName, NORMAL_USER));
+
+    table.supportsTags().associateTags(new String[] {secondTag}, null);
+    JsonNode duplicateTagRestrictions =
+        new ObjectMapper().readTree(loadRestrictionsAs(tableName, NORMAL_USER));
+    Assertions.assertEquals(singleTagRestrictions, duplicateTagRestrictions);
 
     assertRows(tableName, new Object[] {1, 10});
   }
@@ -413,8 +447,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     String tag = createPolicyTag(Policy.BuiltInType.ROW_FILTER, expression);
     loadTable(tableName).supportsTags().associateTags(new String[] {tag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
   }
 
   @Test
@@ -435,8 +468,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     Table table = loadTable(tableName);
     table.supportsTags().associateTags(new String[] {firstTag, secondTag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
 
     table.supportsTags().associateTags(null, new String[] {secondTag});
     assertRows(tableName, new Object[] {1, 10});
@@ -593,8 +625,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     Table table = loadTable(tableName);
     table.columns()[1].supportsTags().associateTags(new String[] {nullTag, fixedTag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
   }
 
   @Test
@@ -670,13 +701,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
 
     List<Object[]> rows = sql("SELECT id, account, note FROM %s", tableName);
     Assertions.assertEquals(1, rows.size());
-    Assertions.assertEquals(1, rows.get(0)[0]);
-    String account = (String) rows.get(0)[1];
-    String note = (String) rows.get(0)[2];
-    Assertions.assertNotEquals("12345678", account);
-    Assertions.assertNotEquals("abcdefgh", note);
-    Assertions.assertTrue(account.endsWith("5678"));
-    Assertions.assertTrue(note.startsWith("abcd"));
+    Assertions.assertArrayEquals(new Object[] {1, "nnnn5678", "abcdxxxx"}, rows.get(0));
   }
 
   @ParameterizedTest
@@ -758,8 +783,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     Assertions.assertFalse(table.columns()[1].nullable());
     table.columns()[1].supportsTags().associateTags(new String[] {tag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
   }
 
   @Test
@@ -778,8 +802,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
                 + "THEN mask_to_fixed_value(value) ELSE value END");
     loadTable(tableName).columns()[1].supportsTags().associateTags(new String[] {tag}, null);
 
-    Assertions.assertThrows(
-        RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    assertReadRestrictionLoadFails(tableName);
   }
 
   private static Stream<Arguments> sqlNullPredicates() {
@@ -832,6 +855,19 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     for (int index = 0; index < expectedRows.length; index++) {
       Assertions.assertArrayEquals(expectedRows[index], rows.get(index));
     }
+  }
+
+  private void assertReadRestrictionLoadFails(String tableName) {
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> sql("SELECT col_1, col_2 FROM %s", tableName));
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause.getMessage() != null
+          && cause.getMessage().contains("Unable to resolve read restrictions")) {
+        return;
+      }
+    }
+    Assertions.fail("Expected a read-restriction loader failure in the cause chain", failure);
   }
 
   private String loadRestrictionsAs(String tableName, String userName) throws Exception {
