@@ -29,6 +29,9 @@ from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partitions import Partitions
+from gravitino.api.stats.supports_partition_statistics import (
+    SupportsPartitionStatistics,
+)
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_column import GenericColumn
@@ -225,3 +228,19 @@ class TestRelationalTable(unittest.TestCase):
                 for method in expected_methods
             )
         )
+
+    def test_public_partition_statistics_entry_and_delegation(self):
+        with patch(
+            "gravitino.client.relational_table.MetadataObjectPartitionStatisticsOperations",
+            autospec=True,
+        ) as factory:
+            table = RelationalTable(self.namespace, self.table_dto, self.rest_client)
+        operations = table.supports_partition_statistics()
+        self.assertIs(table, operations)
+        self.assertIsInstance(operations, SupportsPartitionStatistics)
+        delegate = factory.return_value.list_partition_statistics
+        argument = object()
+        self.assertIs(
+            delegate.return_value, operations.list_partition_statistics(argument)
+        )
+        delegate.assert_called_once_with(argument)
