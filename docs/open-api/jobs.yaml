@@ -293,6 +293,8 @@ paths:
               examples:
                 JobResponse:
                   $ref: "#/components/examples/JobResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
           description: Not Found - The specified job does not exist in the specified metalake
           content:
