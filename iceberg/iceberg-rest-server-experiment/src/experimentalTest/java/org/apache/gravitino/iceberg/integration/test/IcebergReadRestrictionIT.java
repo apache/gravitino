@@ -66,6 +66,8 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
   private static final String EXPERIMENTAL_SERVER_DIRECTORY = "iceberg-rest-server-experiment";
   private static final String SCHEMA_NAME = "schema";
 
+  private final HttpClient httpClient = HttpClient.newHttpClient();
+
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
@@ -125,10 +127,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     List<Object[]> unrestrictedRows = sql("SELECT col_1, col_2 FROM %s ORDER BY col_1", tableName);
     Assertions.assertEquals(2, unrestrictedRows.size());
 
-    Assertions.assertTrue(
-        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
-            .path("read-restrictions")
-            .isMissingNode());
+    assertNoReadRestrictions(SCHEMA_NAME, tableName);
 
     String suffix = UUID.randomUUID().toString().replace("-", "");
     String rowFilterTag = "row_filter_tag_" + suffix;
@@ -174,8 +173,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     String tag = createPolicyTag(Policy.BuiltInType.ROW_FILTER, "() RETURNS BOOLEAN -> TRUE");
     loadTable(tableName).supportsTags().associateTags(new String[] {tag}, null);
 
-    JsonNode response = loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER);
-    Assertions.assertTrue(response.path("read-restrictions").isMissingNode(), response::toString);
+    assertNoReadRestrictions(SCHEMA_NAME, tableName);
   }
 
   @Test
@@ -188,8 +186,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         createPolicyTag(Policy.BuiltInType.COLUMN_MASK, "(value INTEGER) RETURNS INTEGER -> value");
     loadTable(tableName).columns()[1].supportsTags().associateTags(new String[] {tag}, null);
 
-    JsonNode response = loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER);
-    Assertions.assertTrue(response.path("read-restrictions").isMissingNode(), response::toString);
+    assertNoReadRestrictions(SCHEMA_NAME, tableName);
   }
 
   @Test
@@ -218,18 +215,12 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
 
     table.supportsTags().associateTags(null, new String[] {tag});
     assertRows(tableName, new Object[] {1, 10}, new Object[] {2, 20});
-    Assertions.assertTrue(
-        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
-            .path("read-restrictions")
-            .isMissingNode());
+    assertNoReadRestrictions(SCHEMA_NAME, tableName);
     table.supportsTags().associateTags(new String[] {tag}, null);
     assertRows(tableName, new Object[] {1, 10});
     Assertions.assertTrue(metalakeClientWithAllPrivilege.deleteTag(tag));
     assertRows(tableName, new Object[] {1, 10}, new Object[] {2, 20});
-    Assertions.assertTrue(
-        loadTableResponseAs(SCHEMA_NAME, tableName, NORMAL_USER)
-            .path("read-restrictions")
-            .isMissingNode());
+    assertNoReadRestrictions(SCHEMA_NAME, tableName);
   }
 
   @Test
@@ -516,10 +507,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         .associateTags(new TagValue[] {TagValue.of(tag, "risk")}, null);
 
     Assertions.assertFalse(loadRestrictionsAs(schemaName, inheritedTable, NORMAL_USER).isEmpty());
-    Assertions.assertTrue(
-        loadTableResponseAs(schemaName, overriddenTable, NORMAL_USER)
-            .path("read-restrictions")
-            .isMissingNode());
+    assertNoReadRestrictions(schemaName, overriddenTable);
     assertRows(inheritedTable, new Object[] {1, 10});
     assertRows(overriddenTable, new Object[] {1, 10}, new Object[] {2, 20});
 
@@ -857,6 +845,11 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
     }
   }
 
+  private void assertNoReadRestrictions(String schemaName, String tableName) throws Exception {
+    JsonNode response = loadTableResponseAs(schemaName, tableName, NORMAL_USER);
+    Assertions.assertTrue(response.path("read-restrictions").isMissingNode(), response::toString);
+  }
+
   private void assertReadRestrictionLoadFails(String tableName) {
     RuntimeException failure =
         Assertions.assertThrows(
@@ -900,8 +893,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
             .header("Authorization", authorization)
             .GET()
             .build();
-    HttpResponse<String> response =
-        HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     Assertions.assertEquals(200, response.statusCode(), response.body());
     return new ObjectMapper().readTree(response.body());
   }

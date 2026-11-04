@@ -34,8 +34,8 @@ val experimentalSparkMajorVersion: String = experimentalSparkVersion.substringBe
 val datastratoIcebergGitCommit: String = libs.versions.experimental.iceberg.git.commit.get()
 val jerseyVersion: String = libs.versions.jersey.get()
 val javaxWsRsVersion: String = libs.versions.javax.ws.rs.api.get()
-val hk2Version = "2.6.1"
-val jakartaValidationVersion = "2.0.2"
+val hk2Version: String = libs.versions.hk2.get()
+val jakartaValidationVersion: String = libs.versions.jakarta.validation.get()
 
 configurations.configureEach {
   resolutionStrategy {
@@ -80,6 +80,7 @@ listOf(
 ).forEach { configurationName ->
   configurations.named(configurationName) {
     resolutionStrategy {
+      // The configureEach block above must apply the default Jackson pins before this override.
       // Only Spark ITs use Spark's matching Jackson modules.
       setForcedModules(
         *forcedModules.filterNot { it.group.startsWith("com.fasterxml.jackson.") }.toTypedArray()
@@ -229,14 +230,6 @@ val experimentalTest by tasks.registering(Test::class) {
       "**/IcebergReadRestrictionIT.class"
     )
   )
-  filter {
-    includeTestsMatching(
-      "org.apache.gravitino.iceberg.integration.test.IcebergExperimentalAuthorizationIT"
-    )
-    includeTestsMatching(
-      "org.apache.gravitino.iceberg.integration.test.IcebergReadRestrictionIT"
-    )
-  }
   mustRunAfter(tasks.test, ":iceberg:iceberg-rest-server:test")
   dependsOn(
     tasks.named(experimentalTestSources.classesTaskName),

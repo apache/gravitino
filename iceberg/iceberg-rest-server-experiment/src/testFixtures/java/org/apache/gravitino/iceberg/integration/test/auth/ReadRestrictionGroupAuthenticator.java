@@ -60,6 +60,8 @@ public class ReadRestrictionGroupAuthenticator implements Authenticator {
       if (userName.isEmpty()) {
         return ANONYMOUS_PRINCIPAL;
       }
+      // Keep "normal" in sync with IcebergAuthorizationIT.NORMAL_USER; this fixture JAR is
+      // separate.
       List<UserGroup> groups =
           "normal".equals(userName)
               ? Collections.singletonList(new UserGroup(Optional.empty(), AUDITORS_GROUP))
