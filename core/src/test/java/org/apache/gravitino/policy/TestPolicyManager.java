@@ -813,6 +813,41 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testEnablePolicyRejectsSameLevelMaintenanceConflict() {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    PolicyEntity enabled =
+        policyManager.createPolicy(
+            METALAKE,
+            "compact_enabled_" + UUID.randomUUID().toString().replace("-", ""),
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            PolicyContents.icebergDataCompaction());
+    PolicyEntity disabled =
+        policyManager.createPolicy(
+            METALAKE,
+            "compact_disabled_" + UUID.randomUUID().toString().replace("-", ""),
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            false,
+            PolicyContents.icebergDataCompaction());
+
+    associatePolicyThroughTag(enabled, tableObject);
+    associatePolicyThroughTag(disabled, tableObject);
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> policyManager.enablePolicy(METALAKE, disabled.name()));
+    Assertions.assertTrue(thrown.getMessage().contains(enabled.name()));
+    Assertions.assertTrue(thrown.getMessage().contains(disabled.name()));
+    Assertions.assertFalse(policyManager.getPolicy(METALAKE, disabled.name()).enabled());
+  }
+
+  @Test
   public void testChildTagValueOverridesParentPolicySelector() {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     PolicyEntity policy =

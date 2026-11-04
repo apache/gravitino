@@ -46,9 +46,9 @@ existing deployments. For database backup, schema scripts, and rollback commands
   with tags but do not appear in object policy results.
 - For each Iceberg maintenance `policyType` (compaction, orphan-file removal, rewrite
   manifests, snapshot expiration), assigning a second same-type policy through tags at the same
-  object level is rejected. Before upgrading, inventory objects that already have multiple
-  maintenance policies of the same type at one level and remove or relocate the extra
-  associations.
+  object level is rejected, including enabling a disabled policy that would create that conflict.
+  Before upgrading, inventory objects that already have multiple maintenance policies of the same
+  type at one level and remove or relocate the extra associations.
 - In Gravitino 1.3, disabling a policy was advisory and did not change what consumers received.
   Object policy lookup now excludes disabled policies. Before upgrading, inventory disabled
   policies and re-enable any that consumers must continue to receive.
