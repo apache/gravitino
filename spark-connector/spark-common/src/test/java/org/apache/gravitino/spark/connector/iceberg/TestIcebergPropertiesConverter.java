@@ -223,6 +223,25 @@ public class TestIcebergPropertiesConverter {
   }
 
   @Test
+  void testIcebergRestPropertiesCarriesS3ProxyEndpoint() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            "s3://bucket/warehouse",
+            "s3-proxy-endpoint",
+            "http://proxy:8080");
+
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+
+    Assertions.assertEquals(
+        "http://proxy:8080", properties.get(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT));
+  }
+
+  @Test
   void testIcebergRestPropertiesDerivesNativeFileIoPerScheme() {
     Assertions.assertEquals(
         "org.apache.iceberg.gcp.gcs.GCSFileIO", fileIoForWarehouse("gs://bucket/warehouse"));

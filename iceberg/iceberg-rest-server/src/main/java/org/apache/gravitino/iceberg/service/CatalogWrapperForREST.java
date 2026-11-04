@@ -107,6 +107,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+          IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT,
           IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
   @SuppressWarnings("deprecation")
