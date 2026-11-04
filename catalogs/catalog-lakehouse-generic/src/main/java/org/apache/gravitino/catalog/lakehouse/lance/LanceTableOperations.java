@@ -26,11 +26,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -804,9 +806,27 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
+<<<<<<< HEAD
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
+=======
+      List<TableChange> changesToApply =
+          Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)
+              ? validateLanceColumnNames(dataset, changes)
+              : Arrays.asList(changes);
+      for (TableChange change : changesToApply) {
+        if (change instanceof TableChange.AddColumn addColumn) {
+          String columnName = addColumn.fieldName()[0];
+
+          Field field =
+              LanceDataTypeConverter.CONVERTER.toArrowField(
+                  columnName, addColumn.getDataType(), true);
+          LanceDataTypeConverter.checkFileFormatVersion(field, dataset.getLanceFileFormatVersion());
+          dataset.addColumns(List.of(field));
+        } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
+          dataset.dropColumns(List.of(deleteColumn.fieldName()[0]));
+>>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
         } else if (change instanceof TableChange.AddIndex addIndex) {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
           IndexParams indexParams = getIndexParamsByIndexType(indexType);
@@ -843,6 +863,89 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
+<<<<<<< HEAD
+=======
+  private static List<TableChange> validateLanceColumnNames(
+      Dataset dataset, TableChange[] changes) {
+    // Use the dataset schema, including out-of-band changes, and validate the whole ordered
+    // request before applying any changes. A late name conflict must not leave earlier edits.
+    Set<String> columnNames =
+        dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+    List<TableChange> changesToApply = new ArrayList<>(changes.length);
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String name = addColumn.fieldName()[0];
+        Preconditions.checkArgument(columnNames.add(name), "Column already exists: %s", name);
+      } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        String name = deleteColumn.fieldName()[0];
+        boolean exists = columnNames.remove(name);
+        Preconditions.checkArgument(
+            exists || Boolean.TRUE.equals(deleteColumn.getIfExists()),
+            "Column does not exist: %s",
+            name);
+        if (!exists) {
+          // Honor ifExists before reaching Lance, whose dropColumns rejects missing fields.
+          continue;
+        }
+      } else if (change instanceof TableChange.RenameColumn renameColumn) {
+        String oldName = renameColumn.fieldName()[0];
+        String newName = renameColumn.getNewName();
+        Preconditions.checkArgument(
+            columnNames.remove(oldName), "Column does not exist: %s", oldName);
+        Preconditions.checkArgument(columnNames.add(newName), "Column already exists: %s", newName);
+      }
+      changesToApply.add(change);
+    }
+    return changesToApply;
+  }
+
+  private static void validateLanceTableChanges(TableChange[] changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String[] fieldName = addColumn.fieldName();
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", fieldName));
+        String columnName = fieldName[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+      } else if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.RenameColumn) {
+        String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+        // Gravitino stores a Lance table's columns as top-level columns only, so a nested change
+        // applied to the dataset could not be recorded in the metadata.
+        Preconditions.checkArgument(
+            fieldName.length == 1,
+            "Lance only supports dropping or renaming top-level columns: %s",
+            String.join(".", fieldName));
+      } else if (!(change instanceof TableChange.AddIndex)) {
+        // Currently, only column add/drop/rename and index addition are supported.
+        // TODO: Support change column type once we have a clear knowledge about the means of
+        // castTo in Lance.
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
+    }
+  }
+
+>>>>>>> 5f4a64e77 ([#14419][#14425][#14426] fix: classify Iceberg and Lance client errors (#14556))
   Dataset openDataset(String location) {
     return openDataset(location, Map.of());
   }
