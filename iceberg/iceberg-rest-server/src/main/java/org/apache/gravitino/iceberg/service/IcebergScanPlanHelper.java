@@ -34,6 +34,7 @@ import org.apache.iceberg.BaseFileScanTask;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionData;
@@ -45,11 +46,14 @@ import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.expressions.And;
 import org.apache.iceberg.expressions.BoundPredicate;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.expressions.Not;
+import org.apache.iceberg.expressions.Or;
 import org.apache.iceberg.expressions.ResidualEvaluator;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.expressions.UnboundTerm;
@@ -92,8 +96,8 @@ final class IcebergScanPlanHelper {
    * schema. Names are resolved on the current schema first, so a name that only the snapshot schema
    * has, or that a later column reuses, never binds to the snapshot's field. Columns added after
    * the snapshot are dropped from select/stats; filters on them are rewritten conservatively for
-   * planning (never under-prune under OR/NOT) and the full original filter is reattached as a
-   * residual by the caller.
+   * planning with polarity-aware placeholders (never under-prune) and the full original filter is
+   * reattached as a residual by the caller.
    */
   static PlanTableScanRequest rewriteForSnapshot(
       PlanTableScanRequest request, Schema current, Schema snapshot) {
@@ -292,6 +296,14 @@ final class IcebergScanPlanHelper {
       boolean needsSpecRewrite =
           spec != null && partitionTypeHasUnknown(spec.partitionType()) && compatibleSpec != null;
       if (needsSpecRewrite) {
+        if (!canProjectPartition(task.spec(), compatibleSpec)) {
+          // Inventing NULL for missing target fields makes residuals evaluate wrong.
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot rewrite file %s from spec %d to client-compatible spec %d: "
+                      + "target partition fields are missing from the source file",
+                  task.file().location(), task.spec().specId(), compatibleSpec.specId()));
+        }
         prepared.add(
             withCompatibleSpec(
                 task, compatibleSpec, residual, residualTargetSchema, caseSensitive));
@@ -350,61 +362,98 @@ final class IcebergScanPlanHelper {
     return changed ? Collections.unmodifiableMap(sanitized) : specsById;
   }
 
+  /**
+   * Rewrites filter names onto the snapshot schema for planning.
+   *
+   * <p>Columns added after the snapshot are replaced conservatively with polarity awareness: under
+   * a positive context they become {@code true} (never under-prune); under {@code NOT} they become
+   * {@code false} so {@code NOT(old AND new)} stays weak instead of collapsing to {@code NOT(old)}.
+   * The caller still ANDs the full original filter onto the response residual.
+   */
   @VisibleForTesting
   static Expression rewriteFilterNames(
       Expression filter, Schema current, Schema snapshot, boolean caseSensitive) {
-    return ExpressionVisitors.visit(
-        filter,
-        new ExpressionVisitors.ExpressionVisitor<Expression>() {
-          @Override
-          public Expression alwaysTrue() {
-            return Expressions.alwaysTrue();
-          }
+    return rewriteFilterNames(filter, current, snapshot, caseSensitive, true);
+  }
 
-          @Override
-          public Expression alwaysFalse() {
+  private static Expression rewriteFilterNames(
+      Expression filter, Schema current, Schema snapshot, boolean caseSensitive, boolean positive) {
+    switch (filter.op()) {
+      case TRUE:
+        return Expressions.alwaysTrue();
+      case FALSE:
+        return Expressions.alwaysFalse();
+      case NOT:
+        Expression child =
+            rewriteFilterNames(((Not) filter).child(), current, snapshot, caseSensitive, !positive);
+        if (child.op() == Expression.Operation.TRUE) {
+          return Expressions.alwaysFalse();
+        }
+        if (child.op() == Expression.Operation.FALSE) {
+          return Expressions.alwaysTrue();
+        }
+        return Expressions.not(child);
+      case AND:
+        {
+          And and = (And) filter;
+          Expression left =
+              rewriteFilterNames(and.left(), current, snapshot, caseSensitive, positive);
+          Expression right =
+              rewriteFilterNames(and.right(), current, snapshot, caseSensitive, positive);
+          if (left.op() == Expression.Operation.FALSE || right.op() == Expression.Operation.FALSE) {
             return Expressions.alwaysFalse();
           }
-
-          @Override
-          public Expression not(Expression result) {
-            // Post-snapshot predicates become always-true for planning. Negating that would yield
-            // always-false and incorrectly prune every file (NOT(new_col = 1) on historical rows
-            // is typically true). Keep planning conservative: do not under-include.
-            if (result.op() == Expression.Operation.TRUE) {
-              return Expressions.alwaysTrue();
-            }
-            if (result.op() == Expression.Operation.FALSE) {
-              return Expressions.alwaysFalse();
-            }
-            return Expressions.not(result);
+          if (left.op() == Expression.Operation.TRUE) {
+            return right;
           }
-
-          @Override
-          public Expression and(Expression left, Expression right) {
-            return Expressions.and(left, right);
+          if (right.op() == Expression.Operation.TRUE) {
+            return left;
           }
-
-          @Override
-          public Expression or(Expression left, Expression right) {
-            return Expressions.or(left, right);
+          return Expressions.and(left, right);
+        }
+      case OR:
+        {
+          Or or = (Or) filter;
+          Expression left =
+              rewriteFilterNames(or.left(), current, snapshot, caseSensitive, positive);
+          Expression right =
+              rewriteFilterNames(or.right(), current, snapshot, caseSensitive, positive);
+          if (left.op() == Expression.Operation.TRUE || right.op() == Expression.Operation.TRUE) {
+            return Expressions.alwaysTrue();
           }
-
-          @Override
-          public <T> Expression predicate(UnboundPredicate<T> pred) {
-            String name = pred.ref().name();
-            String snapshotName = toSnapshotName(name, current, snapshot, caseSensitive);
-            if (snapshotName == null) {
-              // Column was added after the snapshot. Do not prune files here; the caller ANDs the
-              // full original filter onto the response residual.
-              return Expressions.alwaysTrue();
-            }
-            if (snapshotName.equals(name)) {
-              return pred;
-            }
-            return unboundWithName(pred, snapshotName);
+          if (left.op() == Expression.Operation.FALSE) {
+            return right;
           }
-        });
+          if (right.op() == Expression.Operation.FALSE) {
+            return left;
+          }
+          return Expressions.or(left, right);
+        }
+      default:
+        if (!(filter instanceof UnboundPredicate)) {
+          throw new IllegalArgumentException("Unsupported filter expression: " + filter);
+        }
+        return rewriteFilterPredicate(
+            (UnboundPredicate<?>) filter, current, snapshot, caseSensitive, positive);
+    }
+  }
+
+  private static <T> Expression rewriteFilterPredicate(
+      UnboundPredicate<T> pred,
+      Schema current,
+      Schema snapshot,
+      boolean caseSensitive,
+      boolean positive) {
+    String name = pred.ref().name();
+    String snapshotName = toSnapshotName(name, current, snapshot, caseSensitive);
+    if (snapshotName == null) {
+      // Post-snapshot column: weaken the planning filter (over-include). Polarity flips under NOT.
+      return positive ? Expressions.alwaysTrue() : Expressions.alwaysFalse();
+    }
+    if (snapshotName.equals(name)) {
+      return pred;
+    }
+    return unboundWithName(pred, snapshotName);
   }
 
   @VisibleForTesting
@@ -642,9 +691,13 @@ final class IcebergScanPlanHelper {
       builder.withEncryptionKeyMetadata(file.keyMetadata());
     }
     StructLike projected = projectPartition(file.partition(), fromSpec, targetSpec);
-    if (projected != null) {
-      builder.withPartition(projected);
+    if (projected == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot project data file %s partition from spec %d onto spec %d",
+              file.location(), fromSpec.specId(), targetSpec.specId()));
     }
+    builder.withPartition(projected);
     return builder.build();
   }
 
@@ -663,7 +716,9 @@ final class IcebergScanPlanHelper {
   private static DeleteFile rewriteDeleteFile(
       DeleteFile delete, PartitionSpec fromSpec, PartitionSpec targetSpec) {
     if (targetSpec.isUnpartitioned() || fromSpec.specId() == targetSpec.specId()) {
+      // Iceberg 1.11 FileMetadata.copy does not copy equalityFieldIds; restore them explicitly.
       FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(targetSpec).copy(delete);
+      restoreEqualityFieldIds(builder, delete);
       return builder.build();
     }
     FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(targetSpec);
@@ -672,12 +727,7 @@ final class IcebergScanPlanHelper {
         builder.ofPositionDeletes();
         break;
       case EQUALITY_DELETES:
-        List<Integer> equalityFieldIds = delete.equalityFieldIds();
-        int[] eqIds =
-            equalityFieldIds == null
-                ? new int[0]
-                : equalityFieldIds.stream().mapToInt(Integer::intValue).toArray();
-        builder.ofEqualityDeletes(eqIds);
+        restoreEqualityFieldIds(builder, delete);
         break;
       default:
         throw new IllegalArgumentException("Unsupported delete content: " + delete.content());
@@ -697,10 +747,51 @@ final class IcebergScanPlanHelper {
       builder.withContentSizeInBytes(delete.contentSizeInBytes());
     }
     StructLike projected = projectPartition(delete.partition(), fromSpec, targetSpec);
-    if (projected != null) {
-      builder.withPartition(projected);
+    if (projected == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot project delete file %s partition from spec %d onto spec %d",
+              delete.location(), fromSpec.specId(), targetSpec.specId()));
     }
+    builder.withPartition(projected);
     return builder.build();
+  }
+
+  private static void restoreEqualityFieldIds(FileMetadata.Builder builder, DeleteFile delete) {
+    if (delete.content() != FileContent.EQUALITY_DELETES) {
+      return;
+    }
+    List<Integer> equalityFieldIds = delete.equalityFieldIds();
+    int[] eqIds =
+        equalityFieldIds == null
+            ? new int[0]
+            : equalityFieldIds.stream().mapToInt(Integer::intValue).toArray();
+    builder.ofEqualityDeletes(eqIds);
+  }
+
+  /**
+   * True when every field of {@code toSpec} can be copied from {@code fromSpec} by matching source
+   * id and transform. Unpartitioned targets are always projectable.
+   */
+  private static boolean canProjectPartition(PartitionSpec fromSpec, PartitionSpec toSpec) {
+    if (toSpec.isUnpartitioned()) {
+      return true;
+    }
+    List<PartitionField> fromFields = fromSpec.fields();
+    for (PartitionField toField : toSpec.fields()) {
+      boolean found = false;
+      for (PartitionField fromField : fromFields) {
+        if (fromField.sourceId() == toField.sourceId()
+            && fromField.transform().toString().equals(toField.transform().toString())) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Nullable
@@ -709,22 +800,21 @@ final class IcebergScanPlanHelper {
     if (toSpec.isUnpartitioned() || partition == null) {
       return null;
     }
+    if (!canProjectPartition(fromSpec, toSpec)) {
+      return null;
+    }
     PartitionData out = new PartitionData(toSpec.partitionType());
     List<PartitionField> fromFields = fromSpec.fields();
     List<PartitionField> toFields = toSpec.fields();
     for (int toPos = 0; toPos < toFields.size(); toPos++) {
       PartitionField toField = toFields.get(toPos);
-      int fromPos = -1;
       for (int i = 0; i < fromFields.size(); i++) {
         PartitionField fromField = fromFields.get(i);
         if (fromField.sourceId() == toField.sourceId()
             && fromField.transform().toString().equals(toField.transform().toString())) {
-          fromPos = i;
+          out.set(toPos, partition.get(i, Object.class));
           break;
         }
-      }
-      if (fromPos >= 0) {
-        out.set(toPos, partition.get(fromPos, Object.class));
       }
     }
     return out;
