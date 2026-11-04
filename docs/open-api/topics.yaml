@@ -54,6 +54,8 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/TopicResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "409":
           description: Conflict - The target topic already exists
           content:
