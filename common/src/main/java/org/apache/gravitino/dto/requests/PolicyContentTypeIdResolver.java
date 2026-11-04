@@ -70,6 +70,12 @@ public class PolicyContentTypeIdResolver extends TypeIdResolverBase {
 
   @Override
   public String idFromValueAndType(Object value, Class<?> suggestedType) {
+    if (suggestedType == Void.class) {
+      // Jackson asks for the id of the Void defaultImpl when policyType is absent. A null id fails
+      // deserialization, so return one that resolves to no content class: the content then binds
+      // as null and request validation reports the missing policyType.
+      return "";
+    }
     for (Map.Entry<Policy.BuiltInType, Class<? extends PolicyContentDTO>> entry :
         CONTENT_CLASSES.entrySet()) {
       if (entry.getValue().isAssignableFrom(suggestedType)) {

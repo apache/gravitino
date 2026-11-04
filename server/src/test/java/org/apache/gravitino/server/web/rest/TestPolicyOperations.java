@@ -558,6 +558,15 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testCreatePolicyMissingTypeNamedInError(String content) {
+    assertCreatePolicyTypeNamedInError(
+        "{\"name\":\"p\",\"content\":" + content + "}",
+        "\\\"policyType\\\" is required and cannot be empty");
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"SYSTEM_ICEBERG_COMPACTION", "System_Iceberg_Compaction"})
   public void testCreatePolicyAcceptsMisCasedKnownType(String policyType) {
     PolicyContent content = PolicyContents.icebergDataCompaction();
@@ -785,6 +794,24 @@ public class TestPolicyOperations extends BaseOperationsTest {
                     MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testAlterPolicyContentMissingTypeNamedInError(String content) {
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_missing")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\",\"newContent\":" + content + "}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String msg = resp.readEntity(String.class);
+    Assertions.assertTrue(msg.contains("\\\"policyType\\\" must not be null"), msg);
   }
 
   @Test

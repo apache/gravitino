@@ -117,6 +117,16 @@ public class TestPolicyUpdatesRequest {
         "Unknown built-in policy type: system_iceberg_bogus");
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testUpdatePolicyContentDeserializeReportsMissingPolicyType(String content)
+      throws JsonProcessingException {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"newContent\":" + content + "}",
+        "\"policyType\" must not be null");
+  }
+
   private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage)
       throws JsonProcessingException {
     PolicyUpdateRequest.UpdatePolicyContentRequest request =

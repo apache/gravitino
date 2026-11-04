@@ -131,6 +131,16 @@ public class TestPolicyCreateRequest {
         "Unknown policy type: not_a_policy, it should start with 'system_' or be 'custom'");
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testDeserializeReportsMissingPolicyType(String content)
+      throws JsonProcessingException {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"name\":\"p\",\"content\":" + content + "}",
+        "\"policyType\" is required and cannot be empty");
+  }
+
   @Test
   public void testDeserializeRejectsMalformedEnabled() {
     String content = "\"content\":{\"customRules\":{},\"supportedObjectTypes\":[\"table\"]}}";
