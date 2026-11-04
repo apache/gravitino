@@ -169,6 +169,9 @@ public class JobOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofJobTemplate(metalake, request.getJobTemplate().name()),
+                Entity.EntityType.JOB_TEMPLATE);
 
             jobOperationDispatcher.registerJobTemplate(
                 metalake, toEntity(metalake, request.getJobTemplate()));
@@ -279,6 +282,14 @@ public class JobOperations {
                 request.getUpdates().stream()
                     .map(JobTemplateUpdateRequest::jobTemplateChange)
                     .toArray(JobTemplateChange[]::new);
+            for (JobTemplateChange change : changes) {
+              if (change instanceof JobTemplateChange.RenameJobTemplate) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofJobTemplate(
+                        metalake, ((JobTemplateChange.RenameJobTemplate) change).getNewName()),
+                    Entity.EntityType.JOB_TEMPLATE);
+              }
+            }
 
             JobTemplateEntity updatedEntity =
                 jobOperationDispatcher.alterJobTemplate(metalake, jobTemplateName, changes);
