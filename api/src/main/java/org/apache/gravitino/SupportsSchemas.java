@@ -95,6 +95,11 @@ public interface SupportsSchemas {
    * need the schema with default values applied, use the {@link #loadSchema(String)} method after
    * creation.
    *
+   * <p>Source creation can succeed before Gravitino registration fails. Resolve the reported error,
+   * verify the source identity, and call {@link #loadSchema(String)} to import it instead of
+   * repeating creation. Reconcile an existing registration first; a renamed source object does not
+   * make its old registration safe to delete.
+   *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.

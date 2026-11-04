@@ -292,6 +292,29 @@ schema = catalog.as_schemas().create_schema(
 
 ### Load a Schema
 
+If schema creation reports that the source object was created but Gravitino registration failed,
+resolve the entity-store error and verify the source object's identity. Use `loadSchema` (or the
+load-schema REST API below) to import the existing object. Repeating `createSchema` returns an
+already-exists error; creation is not automatically replayed. Import retains the source properties
+available from the source, including any inline sensitive values. The existing client-facing
+property filtering remains in place; source properties retained in the entity store are not encrypted
+by this change. Subsequent schema alters retain the current source properties.
+
+Creating an external schema with an existing Gravitino registration is rejected before source
+creation. External schema creation now checks the entity store before calling the source; a failed
+registration lookup stops creation without issuing source DDL. Managed schema creation does not
+perform this additional lookup.
+A different source identifier does not prove that the old object was deleted: it may have been
+renamed. For an external rename that preserves the Gravitino identifier, load the new name first
+to move the registration before creating the old name again. If the old source identity was
+actually deleted, verify that fact before explicitly removing its stale registration. Conflicting
+registrations are never automatically cascade-deleted by an overwrite; children and governance
+metadata remain intact. On the 1.3 branch, schema registration transactions lock the parent catalog
+row before reading schema identities, serializing registrations within that catalog. Retired schema
+IDs are locked and rechecked before revival so a concurrent registration cannot steal an active ID.
+A concurrent registration after the preflight can still cause a partial
+create failure, since source creation and the entity-store write are not one transaction.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 

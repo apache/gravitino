@@ -137,3 +137,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';
+
+-- Expand top-level table column names to match the current 1.3 entity limit.
+ALTER TABLE `table_column_version_info` MODIFY COLUMN `column_name` VARCHAR(300) NOT NULL COMMENT 'column name';

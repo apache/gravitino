@@ -119,3 +119,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
 ) COMMENT='async Iceberg table cleanup jobs';
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
+
+-- Expand top-level table column names to match the current 1.3 entity limit.
+ALTER TABLE `table_column_version_info` ALTER COLUMN `column_name` VARCHAR(300) NOT NULL;

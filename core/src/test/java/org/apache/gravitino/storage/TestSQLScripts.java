@@ -170,4 +170,79 @@ public class TestSQLScripts extends TestJDBCBackend {
       connection.createStatement().execute("DROP TABLE " + table);
     }
   }
+  /**
+   * Verifies the 1.3 migration expands column names and preserves data on retry.
+   *
+   * @throws SQLException if the migrated database cannot be queried
+   * @throws IOException if the scripts cannot be read
+   */
+  @TestTemplate
+  public void testUpgradeToOneThreeSupportsLongColumnNames() throws SQLException, IOException {
+    Path scriptDir = Path.of(System.getenv("GRAVITINO_HOME"), "scripts", backendType.toLowerCase());
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    File upgrade = scriptDir.resolve("upgrade-1.2.0-to-1.3.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.2.0" + suffix).toFile());
+    String insert =
+        "INSERT INTO table_column_version_info "
+            + "(metalake_id, catalog_id, schema_id, table_id, table_version, column_id, column_name, "
+            + "column_position, column_type, column_op_type, audit_info) "
+            + "VALUES (1, 2, 3, 4, 1, %d, '%s', 0, 'string', 0, '{}')";
+    String oldName = "c".repeat(128);
+    executeStatements(List.of(String.format(insert, 1, oldName)), "existing 1.2 column");
+    executeScript(upgrade);
+    String longName = "c".repeat(300);
+    executeStatements(List.of(String.format(insert, 2, longName)), "new long column");
+    executeStatements(
+        List.of(capacityAlter(scriptDir, suffix)), "repeat column capacity expansion");
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rows =
+            statement.executeQuery(
+                "SELECT column_name FROM table_column_version_info ORDER BY column_id")) {
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(oldName, rows.getString(1));
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(longName, rows.getString(1));
+      Assertions.assertFalse(rows.next());
+    }
+  }
+
+  private void executeScript(File scriptFile) throws IOException, SQLException {
+    List<String> ddls = extractStatements(scriptFile.toPath());
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String ddl : ddls) {
+        Assertions.assertDoesNotThrow(
+            () -> statement.execute(ddl),
+            "Failed to execute DDL in file " + scriptFile.getName() + " ddl: " + ddl);
+      }
+    }
+  }
+
+  private void executeStatements(List<String> statements, String context) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String sql : statements) {
+        Assertions.assertDoesNotThrow(() -> statement.execute(sql), context + ", sql: " + sql);
+      }
+    }
+  }
+
+  private String capacityAlter(Path scriptDir, String suffix) throws IOException {
+    return extractStatements(scriptDir.resolve("upgrade-1.2.0-to-1.3.0" + suffix)).stream()
+        .filter(
+            sql ->
+                sql.contains("ALTER TABLE")
+                    && sql.contains("table_column_version_info")
+                    && sql.contains("300"))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("Missing column capacity migration"));
+  }
 }

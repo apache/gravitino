@@ -89,6 +89,12 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName);
   }
 
+  /** Returns SQL that selects and locks a schema by ID, including a retired row. */
+  public static String selectSchemaMetaByIdIncludingDeletedForUpdate(
+      @Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdIncludingDeletedForUpdate(schemaId);
+  }
+
   public static String selectSchemaMetaById(@Param("schemaId") Long schemaId) {
     return getProvider().selectSchemaMetaById(schemaId);
   }

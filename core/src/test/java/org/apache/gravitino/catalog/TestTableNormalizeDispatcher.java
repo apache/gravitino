@@ -34,6 +34,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -49,12 +50,15 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
+
   private static TableNormalizeDispatcher tableNormalizeDispatcher;
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
 
@@ -67,6 +71,58 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
             TestTableOperationDispatcher.schemaOperationDispatcher, catalogManager);
+  }
+
+  @Test
+  void testAlterChangesAreNormalizedOnlyOnceBeforeReachingCatalog() throws Exception {
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Capability capability = Mockito.mock(Capability.class);
+    Mockito.when(capability.caseSensitiveOnName(Mockito.any()))
+        .thenReturn(CapabilityResult.unsupported("case insensitive"));
+    Mockito.when(capability.specificationOnName(Mockito.any(), Mockito.anyString()))
+        .thenReturn(CapabilityResult.SUPPORTED);
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(wrapper.capabilities()).thenReturn(capability);
+    Mockito.when(wrapper.doWithCatalog(Mockito.any())).thenReturn(true);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogManager.CatalogWrapper, Object> operation =
+                  invocation.getArgument(1);
+              return operation.apply(wrapper);
+            })
+        .when(manager)
+        .doWithCatalogWrapper(Mockito.any(), Mockito.any());
+    TableCatalog tables = Mockito.mock(TableCatalog.class);
+    IllegalArgumentException stop =
+        new IllegalArgumentException("Stop after observing provider changes");
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<TableCatalog, Object> operation = invocation.getArgument(0);
+              return operation.apply(tables);
+            })
+        .when(wrapper)
+        .doWithTableOps(Mockito.any());
+    Mockito.when(tables.alterTable(Mockito.any(), Mockito.<TableChange[]>any())).thenThrow(stop);
+    TableNormalizeDispatcher dispatcher =
+        new TableNormalizeDispatcher(
+            new TableOperationDispatcher(manager, entityStore, idGenerator), manager);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableChange[] requests = {TableChange.renameColumn(new String[] {"MixedOld"}, "MixedNew")};
+    Assertions.assertSame(
+        stop,
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> dispatcher.alterTable(ident, requests)));
+    ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+    Mockito.verify(tables).alterTable(Mockito.any(), captor.capture());
+    TableChange[] actual = captor.getValue();
+    Assertions.assertEquals("mixedold", ((TableChange.RenameColumn) actual[0]).fieldName()[0]);
+    Assertions.assertEquals("mixednew", ((TableChange.RenameColumn) actual[0]).getNewName());
+    // One rename pass makes three capability probes in 1.3. A second operation-dispatcher pass
+    // would double those probes even though lowercasing itself is idempotent on this branch.
+    Mockito.verify(capability, Mockito.times(3)).caseSensitiveOnName(Capability.Scope.COLUMN);
   }
 
   @Test
