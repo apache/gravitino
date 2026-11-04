@@ -58,19 +58,20 @@ class TestNearestMaintenancePolicyResolver {
   }
 
   @Test
-  void testResolveWinnerIdPicksUniqueAndEmpty() {
-    // ObjectPolicyResolver already dropped the farther catalog match.
+  void testResolveWinnerIdNearestFallbackAndEmpty() {
+    PolicyEntity tablePolicy = policy(10L, "table-compaction");
+    PolicyEntity catalogPolicy = policy(20L, "catalog-compaction");
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(new Match[] {new Match(policy(10L, "table-compaction"), List.of(TABLE))});
+        .thenReturn(
+            new Match[] {
+              new Match(tablePolicy, List.of(TABLE)), new Match(catalogPolicy, List.of(CATALOG))
+            });
     Assertions.assertEquals(
         Optional.of(10L),
         resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
 
     when(objectPolicyResolver.resolveMatches(METALAKE, TABLE))
-        .thenReturn(
-            new Match[] {
-              new Match(policy(20L, "catalog-compaction").copyWithInherited(true), List.of(CATALOG))
-            });
+        .thenReturn(new Match[] {new Match(catalogPolicy, List.of(CATALOG))});
     Assertions.assertEquals(
         Optional.of(20L),
         resolver.resolveWinnerId(METALAKE, TABLE, Policy.BuiltInType.ICEBERG_COMPACTION));
