@@ -30,6 +30,15 @@ public class TestSparkJdbcTypeConverter {
   private final SparkJdbcTypeConverter sparkJdbcTypeConverter = new SparkJdbcTypeConverter();
 
   @Test
+  void testPostgreSqlAndOracleUseWallClockTimestamps() {
+    SparkJdbcTypeConverter converter = new SparkJdbcTypeConverter(true);
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType, converter.toSparkType(Types.TimestampType.withTimeZone()));
+  }
+
+  @Test
   void testConvertTimestampTypesToSparkTimestamp() {
     Assertions.assertEquals(
         DataTypes.TimestampType,
