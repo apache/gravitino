@@ -229,3 +229,15 @@ ALTER TABLE `policy_meta`
 
 -- Role deletion soft-deletes relation rows by role_id.
 CREATE INDEX IF NOT EXISTS `group_role_rel_idx_role_id` ON `group_role_rel` (`role_id`);
+
+CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    dataset_name CLOB NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_id BIGINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);

@@ -768,3 +768,17 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     KEY `idx_tsm_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
     KEY `idx_tsm_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table snapshot metrics metadata';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL,
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL,
+    `dataset_name` MEDIUMTEXT NOT NULL,
+    `source_type` VARCHAR(64) NOT NULL,
+    `source_id` BIGINT(20) UNSIGNED NOT NULL,
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'current semantic model dataset source associations';

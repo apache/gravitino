@@ -781,3 +781,15 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
 ) COMMENT='table snapshot metrics metadata';
 CREATE INDEX IF NOT EXISTS `idx_tsm_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    dataset_name CLOB NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_id BIGINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);
