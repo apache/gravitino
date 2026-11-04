@@ -97,6 +97,8 @@ import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTableOperationDispatcher extends TestOperationDispatcher {
   static TableOperationDispatcher tableOperationDispatcher;
@@ -2035,6 +2037,14 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     return schemaOperationDispatcher;
   }
 
+  /**
+   * Verifies native column names at the old and new limits survive import and repeated loads.
+   *
+   * @param length the native column name length
+   * @throws IOException if the test store cannot be accessed
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {128, 129, 300})
   public void testImportNativeTableWithLongColumnName(int length) throws IOException {
     Namespace ns = Namespace.of(metalake, catalog, "schema_native_long_column_" + length);
     schemaOperationDispatcher.createSchema(
