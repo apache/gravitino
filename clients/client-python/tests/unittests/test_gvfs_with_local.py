@@ -48,6 +48,9 @@ from tests.unittests.auth.mock_base import (
     mock_authentication_with_error_authentication_type,
     mock_authentication_invalid_grant_error,
 )
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 
 # pylint: disable=protected-access,too-many-lines,too-many-locals
 
@@ -1482,3 +1485,38 @@ class TestLocalFilesystem(unittest.TestCase):
             fs_default._operations._auto_create_location,
             "auto_create_location should default to True",
         )
+
+    def test_oauth2_client_authentication_method(self, *mock_methods):
+        options = {
+            GVFSConfig.AUTH_TYPE: GVFSConfig.OAUTH2_AUTH_TYPE,
+            GVFSConfig.OAUTH2_SERVER_URI: "http://127.0.0.1:1082",
+            GVFSConfig.OAUTH2_CREDENTIAL: "client_id:client_secret",
+            GVFSConfig.OAUTH2_SCOPE: "test",
+            GVFSConfig.OAUTH2_PATH: "token/test",
+            GVFSConfig.OAUTH2_CLIENT_AUTHENTICATION_METHOD: (
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC.value
+            ),
+        }
+
+        mocked_jwt = mock_jwt(
+            sub="gravitino", exp=GENERATED_TIME + 10000, aud="service1"
+        )
+
+        with patch(
+            "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._fetch_token",
+            return_value=mocked_jwt,
+        ):
+            fs = gvfs.GravitinoVirtualFileSystem(
+                server_uri=self._server_uri,
+                metalake_name=self._metalake_name,
+                options=options,
+                skip_instance_cache=True,
+            )
+
+            client = fs._operations._get_gravitino_client()
+            provider = client._rest_client.auth_data_provider
+
+            self.assertEqual(
+                OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
+                provider._authentication_method,
+            )
