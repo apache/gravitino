@@ -2466,6 +2466,74 @@ public class TestFilesetCatalogOperations {
     Assertions.assertTrue(fs.exists(filesetPath));
   }
 
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testCreateFilesetWithTooLongLocationName(Fileset.Type type) throws IOException {
+    String schemaName = "schema" + generateTestId();
+    String name = "fileset" + generateTestId();
+    createSchema(schemaName, "comment", null, null);
+    Path filesetPath = new Path(TEST_ROOT_PATH + "/" + schemaName, name);
+    String locationName = StringUtils.repeat("a", 257);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createMultiLocationFileset(
+                    name,
+                    schemaName,
+                    "comment",
+                    type,
+                    ImmutableMap.of(),
+                    ImmutableMap.of(locationName, filesetPath.toString()),
+                    ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, locationName)));
+    Assertions.assertEquals(
+        "The storage location name of the fileset must not exceed 256 characters",
+        exception.getMessage());
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(filesetPath));
+    Assertions.assertFalse(
+        store.exists(NameIdentifier.of("m1", "c1", schemaName, name), Entity.EntityType.FILESET));
+  }
+
+  @Test
+  void testCreateFilesetWithTooLongInheritedLocationName() throws IOException {
+    String schemaName = "schema" + generateTestId();
+    String name = "fileset" + generateTestId();
+    String locationName = StringUtils.repeat("a", 257);
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createMultiLocationSchema(
+        schemaName,
+        "comment",
+        ImmutableMap.of(),
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + locationName,
+            schemaPath,
+            PROPERTY_DEFAULT_LOCATION_NAME,
+            locationName));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createMultiLocationFileset(
+                    name,
+                    schemaName,
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    ImmutableMap.of(),
+                    ImmutableMap.of(),
+                    ImmutableMap.of()));
+    Assertions.assertEquals(
+        "The storage location name of the fileset must not exceed 256 characters",
+        exception.getMessage());
+    Path filesetPath = new Path(schemaPath, name);
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(filesetPath));
+    Assertions.assertFalse(
+        store.exists(NameIdentifier.of("m1", "c1", schemaName, name), Entity.EntityType.FILESET));
+  }
+
   @Test
   public void testUpdateFilesetCommentTooLong() throws IOException {
     final long testId = generateTestId();

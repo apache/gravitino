@@ -997,9 +997,8 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             "/tmp-v1");
     FilesetMetaService.getInstance().insertFileset(original, false);
     FilesetPO initialPO = getFilesetPO(original.id());
-    // fileset_meta carries no storage location, so an over-long storage location name passes the
-    // metadata update and only fails once the version snapshot is written. The comment can't be
-    // used for this since the entity validation rejects an over-long comment before any write.
+    // Bypass entity validation so the over-long location name still reaches the version insert
+    // after the metadata update, preserving coverage of a database failure and its rollback.
     String tooLongLocationName = StringUtils.repeat("l", 300);
 
     // The value-too-long error of every backend is converted to an IllegalArgumentException
@@ -1013,16 +1012,22 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                         original.nameIdentifier(),
                         entity -> {
                           FilesetEntity current = (FilesetEntity) entity;
-                          return FilesetEntity.builder()
-                              .withId(current.id())
-                              .withName(current.name())
-                              .withNamespace(current.namespace())
-                              .withFilesetType(current.filesetType())
-                              .withStorageLocations(ImmutableMap.of(tooLongLocationName, "/tmp-v2"))
-                              .withComment("new comment")
-                              .withProperties(current.properties())
-                              .withAuditInfo(current.auditInfo())
-                              .build();
+                          FilesetEntity updated =
+                              Mockito.spy(
+                                  FilesetEntity.builder()
+                                      .withId(current.id())
+                                      .withName(current.name())
+                                      .withNamespace(current.namespace())
+                                      .withFilesetType(current.filesetType())
+                                      .withStorageLocations(current.storageLocations())
+                                      .withComment("new comment")
+                                      .withProperties(current.properties())
+                                      .withAuditInfo(current.auditInfo())
+                                      .build());
+                          Mockito.doReturn(ImmutableMap.of(tooLongLocationName, "/tmp-v2"))
+                              .when(updated)
+                              .storageLocations();
+                          return updated;
                         }));
     Assertions.assertEquals(
         "The fileset entity has a value that exceeds the maximum length of its column.",

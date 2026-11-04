@@ -86,6 +86,26 @@ public class TestEntityFieldLimits {
   }
 
   @Test
+  void testFilesetStorageLocationNameLength() {
+    assertLengthLimit(
+        TestEntityFieldLimits::filesetBuilder, "storage location name", "fileset", 256);
+  }
+
+  @Test
+  void testFilesetStorageLocationNameCountsCodePoints() {
+    String emoji = new String(Character.toChars(0x1F600));
+    String maxLengthName = StringUtils.repeat(emoji, 256);
+    Assertions.assertDoesNotThrow(() -> filesetBuilder(maxLengthName));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> filesetBuilder(maxLengthName + emoji));
+    Assertions.assertEquals(
+        "The storage location name of the fileset must not exceed 256 characters",
+        exception.getMessage());
+  }
+
+  @Test
   public void testLengthCountsCodePoints() {
     // An emoji is two UTF-16 chars but one character for MySQL (utf8mb4) and PostgreSQL, where a
     // name of 128 emojis fits the column and must still pass validation when it is read back. H2
@@ -273,6 +293,18 @@ public class TestEntityFieldLimits {
         .withName(name)
         .withNamespace(NAMESPACE)
         .withComment(comment)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  private static FilesetEntity filesetBuilder(String locationName) {
+    return FilesetEntity.builder()
+        .withId(1L)
+        .withName("fileset")
+        .withFilesetType(Fileset.Type.MANAGED)
+        .withStorageLocations(
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN, "file:///tmp/default", locationName, "file:///tmp/other"))
         .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
