@@ -264,7 +264,7 @@ public class TagManager implements TagDispatcher {
           continue;
         }
         try {
-          objectPolicyResolver.requireNoSameLevelConflictAddingPolicy(
+          objectPolicyResolver.checkMaintenanceTypeUniqueness(
               metalake,
               object,
               tagOnObject.assignment().orElseGet(TagAssignment::noValue),
@@ -546,7 +546,7 @@ public class TagManager implements TagDispatcher {
                 : TagAssignment.noValue();
         projected.add(new ResolvedTag(tagEntity.copyWithAssignment(assignment), metadataObject));
       }
-      objectPolicyResolver.requireNoSameLevelConflict(
+      objectPolicyResolver.checkMaintenanceTypeUniqueness(
           metalake, metadataObject, projected.toArray(new ResolvedTag[0]));
     }
 

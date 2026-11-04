@@ -320,7 +320,7 @@ public class PolicyManager implements PolicyDispatcher {
               throw new RuntimeException(e);
             }
             try {
-              objectPolicyResolver.requireNoSameLevelConflictAddingPolicy(
+              objectPolicyResolver.checkMaintenanceTypeUniqueness(
                   metalake, object, assignment, policy, selector);
             } catch (IllegalArgumentException e) {
               conflicting.add(object.toString());
