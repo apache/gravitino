@@ -260,6 +260,42 @@ IRC1 must also configure S3 configurations if the client side requests credentia
 If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-rest-authz=true` can leave operations unprotected. Set it to `false` to enforce authorization in IRC1.
 :::
 
+##### Service account connection
+
+By default IRC1 forwards each user's access token to IRC2, so IRC2 must trust the same identity provider and authorize every user itself. To federate a catalog that cannot do that, such as a managed catalog that accepts only its own API token, connect IRC1 to IRC2 as a service account. IRC1 then presents one configured credential on every request to IRC2 and authorizes each user against Gravitino's own grants before anything is proxied. A catalog connected as a service account always enforces authorization in IRC1, whatever `disable-rest-authz` is set to, and IRC1 refuses to serve it when authorization is disabled. Because IRC2 vends storage credentials for the service account rather than for the calling user, such a catalog also always issues storage credentials through Gravitino, as described below.
+
+| Configuration item                                    | Description                                                                                                                                         | Default value | Required                                    |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------------------------|
+| `gravitino.iceberg-rest.rest-backend-auth-type`       | How IRC1 authenticates to IRC2. `user-token` forwards the calling user's access token. `service-account` connects with the credential below.        | `user-token`  | No                                          |
+| `gravitino.iceberg-rest.rest-backend-token`           | Static bearer token the service account presents to IRC2.                                                                                          | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-credential`      | OAuth2 client credential (`client_id:client_secret`) the service account exchanges for a token.                                                    | (none)        | One of token or credential with `service-account` |
+| `gravitino.iceberg-rest.rest-backend-oauth2-server-uri` | OAuth2 token endpoint for the client credential. Defaults to IRC2's own token endpoint.                                                          | (none)        | No                                          |
+| `gravitino.iceberg-rest.rest-backend-scope`           | OAuth2 scope requested with the client credential.                                                                                                 | (none)        | No                                          |
+
+##### Gravitino-issued storage credentials
+
+By default IRC1 passes through the storage credentials IRC2 vends. Some catalogs vend broad, long-lived credentials, for example the catalog token's own storage keys scoped to the whole bucket. Set `rest-backend-storage-credential-source` to `local` and IRC1 stops asking IRC2 for credentials. It issues them through its own `credential-providers` instead, scoped to the table location, read-only unless the caller holds write privileges on the table, exactly as for a local catalog. Credentials IRC2 returns unasked are dropped. Here `local` means credentials issued by IRC1; `remote` means credentials issued by IRC2. This setting controls storage credentials, independently of the credentials IRC1 uses to authenticate to IRC2.
+
+| Configuration item                                      | Description                                                                                                                                       | Default value | Required |
+|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.rest-backend-storage-credential-source` | Who issues storage credentials for tables of the federated catalog. `remote` passes through IRC2's credentials. `local` uses IRC1's `credential-providers`. A `service-account` catalog always uses `local`, regardless of this setting. | `remote`      | No       |
+
+IRC1 configuration example federating a catalog that accepts only a static API token, with Gravitino issuing the storage credentials:
+
+```text
+gravitino.iceberg-rest.catalog-backend = rest
+gravitino.iceberg-rest.uri = https://catalog.example.com/v1
+gravitino.iceberg-rest.warehouse = example_warehouse
+gravitino.iceberg-rest.rest-backend-auth-type = service-account
+gravitino.iceberg-rest.rest-backend-token = xx
+gravitino.iceberg-rest.rest-backend-storage-credential-source = local
+gravitino.iceberg-rest.credential-providers = s3-token
+gravitino.iceberg-rest.s3-access-key-id = xx
+gravitino.iceberg-rest.s3-secret-access-key = xx
+gravitino.iceberg-rest.s3-region = xx
+gravitino.iceberg-rest.s3-role-arn = xx
+```
+
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).

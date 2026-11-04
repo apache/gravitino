@@ -79,6 +79,9 @@ public interface Policy extends Auditable {
     /**
      * Get the built-in policy type from the policy type string.
      *
+     * <p>Matching is case-insensitive. Callers should persist and return {@link #policyType()} so
+     * responses use the canonical lowercase wire value.
+     *
      * @param policyType the policy type string
      * @return the matched built-in policy type
      * @throws IllegalArgumentException if the policy type is unknown or blank
