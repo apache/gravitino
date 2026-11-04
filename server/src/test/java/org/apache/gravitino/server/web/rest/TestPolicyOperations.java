@@ -83,6 +83,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestPolicyOperations extends BaseOperationsTest {
@@ -556,8 +557,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
         "Unknown built-in policy type: system_iceberg_bogus");
   }
 
-  @Test
-  public void testCreatePolicyAcceptsMisCasedKnownType() {
+  @ParameterizedTest
+  @ValueSource(strings = {"SYSTEM_ICEBERG_COMPACTION", "System_Iceberg_Compaction"})
+  public void testCreatePolicyAcceptsMisCasedKnownType(String policyType) {
     PolicyContent content = PolicyContents.icebergDataCompaction();
     PolicyEntity policy =
         PolicyEntity.builder()
@@ -582,8 +584,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(
                 Entity.entity(
-                    "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
-                        + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
+                    "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\""
+                        + policyType
+                        + "\",\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
                     MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
@@ -705,8 +708,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
     }
   }
 
-  @Test
-  public void testAlterPolicyContentAcceptsMisCasedKnownType() {
+  @ParameterizedTest
+  @ValueSource(strings = {"SYSTEM_ICEBERG_COMPACTION", "System_Iceberg_Compaction"})
+  public void testAlterPolicyContentAcceptsMisCasedKnownType(String policyType) {
     PolicyContent content = PolicyContents.icebergDataCompaction();
     PolicyEntity policy =
         PolicyEntity.builder()
@@ -734,8 +738,9 @@ public class TestPolicyOperations extends BaseOperationsTest {
             .put(
                 Entity.entity(
                     "{\"updates\":[{\"@type\":\"updateContent\","
-                        + "\"policyType\":\"SYSTEM_ICEBERG_COMPACTION\","
-                        + "\"newContent\":{\"maxPartitionNum\":5}}]}",
+                        + "\"policyType\":\""
+                        + policyType
+                        + "\",\"newContent\":{\"maxPartitionNum\":5}}]}",
                     MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(
         Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
