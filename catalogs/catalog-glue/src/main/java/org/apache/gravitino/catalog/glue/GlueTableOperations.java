@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.TableOperations;
@@ -184,8 +185,8 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       Preconditions.checkArgument(
           values[column] == null, "Partition column %s is given twice", partitionColNames[column]);
       Object value = ip.values()[i].value();
-      // Glue limits partition values to 1024 characters. Null and empty values are rejected because
-      // a Hive-style partition name cannot represent them.
+      // Glue limits partition values to 1024 characters. Null and empty values are rejected, as
+      // Hive stores them under its default partition name rather than by value.
       Preconditions.checkArgument(
           value != null && !value.toString().isEmpty(),
           "Value of partition column %s must not be null or empty",
@@ -277,7 +278,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < partitionColNames.length && i < values.size(); i++) {
       if (i > 0) sb.append('/');
-      sb.append(escapePathName(partitionColNames[i]))
+      sb.append(escapePathName(partitionColNames[i].toLowerCase(Locale.ROOT)))
           .append('=')
           .append(escapePathName(values.get(i)));
     }
@@ -286,7 +287,9 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
 
   /**
    * Parses a Hive-style partition name (e.g. {@code dt=2024-01-01/country=us}) into an ordered list
-   * of unescaped values, validating that the keys match the table's partition columns in order.
+   * of unescaped values, validating that the keys match the table's partition columns in order. The
+   * name must be in the escaped form that listing and adding partitions return, because an
+   * unescaped {@code /} in a value cannot be told from a segment separator.
    */
   private List<String> parsePartitionName(String partitionName) {
     String[] parts = partitionName.split("/");

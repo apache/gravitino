@@ -53,11 +53,12 @@ public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            stringOptionalPropertyEntry(
+            stringImmutablePropertyEntry(
                 TABLE_FORMAT,
                 "Table format stored in Table.parameters(). Common values: ICEBERG, HIVE.",
                 false,
                 null,
+                false,
                 false),
             stringOptionalPropertyEntry(
                 METADATA_LOCATION,

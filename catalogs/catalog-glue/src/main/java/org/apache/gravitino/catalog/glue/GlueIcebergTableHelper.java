@@ -477,9 +477,7 @@ final class GlueIcebergTableHelper {
     }
 
     if (hasSchemaChange) {
-      // Gravitino folds column names in requests to lower case, as Glue does, so look up existing
-      // Iceberg columns without regard to case; Iceberg keeps their original case.
-      UpdateSchema update = table.updateSchema().caseSensitive(false);
+      UpdateSchema update = table.updateSchema();
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn) {
           TableChange.AddColumn add = (TableChange.AddColumn) change;

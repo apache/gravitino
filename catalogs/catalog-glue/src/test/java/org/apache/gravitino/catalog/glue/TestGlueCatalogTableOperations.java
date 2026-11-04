@@ -1379,6 +1379,104 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateHiveTableFoldsColumnNames() {
+    useFakeGlueTable(null);
+    Column[] columns = {col("UserId", Types.LongType.get()), col("Region", Types.StringType.get())};
+    createHive(
+        columns,
+        Collections.emptyMap(),
+        new Transform[] {Transforms.identity("Region")},
+        Distributions.of(Strategy.HASH, 4, NamedReference.field("UserId")),
+        new SortOrder[] {SortOrders.of(NamedReference.field("UserId"), SortDirection.ASCENDING)});
+
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockClient).createTable(captor.capture());
+    TableInput input = captor.getValue().tableInput();
+    assertEquals("userid", input.storageDescriptor().columns().get(0).name());
+    assertEquals("region", input.partitionKeys().get(0).name());
+    assertEquals(List.of("userid"), input.storageDescriptor().bucketColumns());
+    assertEquals("userid", input.storageDescriptor().sortColumns().get(0).column());
+  }
+
+  @Test
+  void testAlterFoldsNewHiveColumnNames() {
+    UpdateTableRequest req =
+        alterAndCapture(
+            TableChange.renameColumn(new String[] {"k"}, "KeyCol"),
+            TableChange.addColumn(new String[] {"NewCol"}, Types.StringType.get()));
+
+    StorageDescriptor sd = req.tableInput().storageDescriptor();
+    assertEquals(
+        List.of("id", "s", "keycol", "newcol"), sd.columns().stream().map(c -> c.name()).toList());
+    assertEquals(List.of("keycol"), sd.bucketColumns());
+    assertEquals("keycol", sd.sortColumns().get(0).column());
+  }
+
+  @Test
+  void testAlterReturnsSubmittedDefinitionWhenReadBackFails() {
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(nativeTable()).build())
+        .thenThrow(ThrottlingException.builder().message("slow down").build());
+
+    GlueTable table = ops.alterTable(ALTER_IDENT, TableChange.setProperty("k1", "v1"));
+
+    verify(mockClient).updateTable(any(UpdateTableRequest.class));
+    assertEquals("v1", table.properties().get("k1"));
+    assertEquals("id", table.columns()[0].name());
+  }
+
+  @Test
+  void testSetStoragePropertyRemovesTableParameterOfSameName() {
+    useFakeGlueTable(
+        nativeTable().toBuilder().parameters(Map.of(GlueConstants.SERDE_NAME, "old")).build());
+
+    ops.alterTable(ALTER_IDENT, TableChange.setProperty(GlueConstants.SERDE_NAME, "new"));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    TableInput input = captor.getValue().tableInput();
+    assertEquals("new", input.storageDescriptor().serdeInfo().name());
+    assertFalse(input.parameters().containsKey(GlueConstants.SERDE_NAME));
+  }
+
+  @Test
+  void testCreateRefusesSerDeOfAnotherBuiltInFormat() {
+    assertCreateRefused(
+        "belong to different storage formats",
+        ABC,
+        Map.of(
+            GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.ORC_INPUT_FORMAT_CLASS,
+            GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS,
+            GlueConstants.SERDE_LIB, HiveStorageConstants.PARQUET_SERDE_CLASS),
+        new Transform[0],
+        Distributions.NONE,
+        SortOrders.NONE);
+    assertCreateRefused(
+        "belong to different storage formats",
+        ABC,
+        Map.of(
+            GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+            GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+            GlueConstants.SERDE_LIB, HiveStorageConstants.ORC_SERDE_CLASS),
+        new Transform[0],
+        Distributions.NONE,
+        SortOrders.NONE);
+
+    // A custom SerDe is taken as given, even over a format with its own SerDe.
+    useFakeGlueTable(null);
+    createHive(
+        ABC,
+        Map.of(
+            GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.ORC_INPUT_FORMAT_CLASS,
+            GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS,
+            GlueConstants.SERDE_LIB, "com.example.CustomSerDe"),
+        new Transform[0],
+        Distributions.NONE,
+        SortOrders.NONE);
+    verify(mockClient).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
   void testAlterMatchesColumnNamesWithoutCase() {
     UpdateTableRequest req =
         alterAndCapture(TableChange.updateColumnComment(new String[] {"ID"}, "the id"));

@@ -30,7 +30,9 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -355,7 +357,7 @@ class TestGlueIcebergTableHelper {
   }
 
   @Test
-  void testAlterTableFindsMixedCaseColumnsByLowerCaseName() throws IOException {
+  void testAlterTableKeepsTheCaseOfColumnNames() throws IOException {
     try (InMemoryCatalog catalog = new InMemoryCatalog()) {
       catalog.initialize("test", new HashMap<>());
       catalog.createNamespace(Namespace.of("db"));
@@ -365,17 +367,28 @@ class TestGlueIcebergTableHelper {
               NestedField.optional(1, "UserId", LongType.get()),
               NestedField.optional(2, "EventTime", TimestampType.withoutZone())));
 
-      // Gravitino folds column names in requests to lower case before they reach the catalog.
       GlueIcebergTableHelper.alterTable(
           catalog,
           "db",
           "events",
-          TableChange.deleteColumn(new String[] {"userid"}, false),
-          TableChange.renameColumn(new String[] {"eventtime"}, "event_time"));
+          TableChange.deleteColumn(new String[] {"UserId"}, false),
+          TableChange.renameColumn(new String[] {"EventTime"}, "eventAt"),
+          TableChange.addColumn(new String[] {"newCol"}, Types.StringType.get()));
 
       Schema schema = catalog.loadTable(TableIdentifier.of("db", "events")).schema();
-      assertEquals(1, schema.columns().size());
-      assertEquals("event_time", schema.columns().get(0).name());
+      assertEquals(
+          List.of("eventAt", "newCol"),
+          schema.columns().stream().map(NestedField::name).collect(Collectors.toList()));
+
+      // Column names match exactly, so a name in another case is not found.
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GlueIcebergTableHelper.alterTable(
+                  catalog,
+                  "db",
+                  "events",
+                  TableChange.deleteColumn(new String[] {"eventat"}, false)));
     }
   }
 }
