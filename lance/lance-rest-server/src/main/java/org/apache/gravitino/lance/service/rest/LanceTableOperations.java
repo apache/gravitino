@@ -333,9 +333,9 @@ public class LanceTableOperations {
     // No specific fields to validate for now
   }
 
-  private void validateRegisterTableRequest(
-      @SuppressWarnings("unused") RegisterTableRequest request) {
-    // No specific fields to validate for now
+  private void validateRegisterTableRequest(RegisterTableRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    Preconditions.checkArgument(request.getLocation() != null, "location must not be null");
   }
 
   private void validateDeregisterTableRequest(

@@ -162,6 +162,8 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofPolicy(metalake, request.getName()), Entity.EntityType.POLICY);
             validateCreatePolicyType(request.getPolicyType());
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
@@ -231,11 +233,18 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
-
             PolicyChange[] changes =
                 request.getUpdates().stream()
                     .map(PolicyUpdateRequest::policyChange)
                     .toArray(PolicyChange[]::new);
+            for (PolicyChange change : changes) {
+              if (change instanceof PolicyChange.RenamePolicy) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofPolicy(
+                        metalake, ((PolicyChange.RenamePolicy) change).getNewName()),
+                    Entity.EntityType.POLICY);
+              }
+            }
             PolicyEntity policy = policyDispatcher.alterPolicy(metalake, name, changes);
 
             LOG.info("Altered policy: {} under metalake: {}", name, metalake);

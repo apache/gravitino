@@ -98,6 +98,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -495,6 +496,65 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     } finally {
       kafkaCatalogOperations.dropTopic(existingTopic);
     }
+  }
+
+  @Test
+  void testCreateTopicWithInvalidPartitionCount() {
+    for (String partitionCount : new String[] {"0", "-2"}) {
+      NameIdentifier ident =
+          NameIdentifier.of(
+              METALAKE_NAME,
+              CATALOG_NAME,
+              DEFAULT_SCHEMA_NAME,
+              "test_create_topic_invalid_partitions_" + partitionCount);
+      Map<String, String> properties =
+          ImmutableMap.of(PARTITION_COUNT, partitionCount, REPLICATION_FACTOR, "1");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> kafkaCatalogOperations.createTopic(ident, null, null, properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Invalid partition count for topic " + ident),
+          exception.getMessage());
+      Throwable cause = exception.getCause().getCause();
+      Assertions.assertInstanceOf(InvalidPartitionsException.class, cause);
+      Assertions.assertTrue(exception.getMessage().contains(cause.getMessage()));
+    }
+  }
+
+  @Test
+  void testCreateTopicWithDefaultPartitionCount() {
+    NameIdentifier defaultIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_default_partitions");
+    Topic defaultTopic =
+        kafkaCatalogOperations.createTopic(
+            defaultIdent, null, null, ImmutableMap.of(REPLICATION_FACTOR, "1"));
+
+    NameIdentifier negativeOneIdent =
+        NameIdentifier.of(
+            METALAKE_NAME,
+            CATALOG_NAME,
+            DEFAULT_SCHEMA_NAME,
+            "test_create_topic_negative_one_partitions");
+    Topic negativeOneTopic =
+        kafkaCatalogOperations.createTopic(
+            negativeOneIdent,
+            null,
+            null,
+            ImmutableMap.of(PARTITION_COUNT, "-1", REPLICATION_FACTOR, "1"));
+
+    String defaultPartitionCount = defaultTopic.properties().get(PARTITION_COUNT);
+    Assertions.assertTrue(Integer.parseInt(defaultPartitionCount) > 0);
+    Assertions.assertEquals(
+        defaultPartitionCount, negativeOneTopic.properties().get(PARTITION_COUNT));
+    Assertions.assertEquals(
+        defaultPartitionCount,
+        kafkaCatalogOperations.loadTopic(negativeOneIdent).properties().get(PARTITION_COUNT));
   }
 
   @Test

@@ -86,6 +86,7 @@ import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
@@ -292,6 +293,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (ExecutionException e) {
       if (e.getCause() instanceof TopicExistsException) {
         throw new TopicAlreadyExistsException(e, "Topic %s already exists", ident);
+
+      } else if (e.getCause() instanceof InvalidPartitionsException) {
+        throw ExceptionMessages.illegalArgument("Invalid partition count for topic " + ident, e);
 
       } else if (e.getCause() instanceof InvalidTopicException) {
         throw ExceptionMessages.illegalArgument("Invalid topic name " + ident, e);

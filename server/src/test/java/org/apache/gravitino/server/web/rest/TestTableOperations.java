@@ -197,6 +197,7 @@ public class TestTableOperations extends BaseOperationsTest {
   @Test
   public void testRejectNullTableInputsBeforeDispatch() {
     String[][] invalidRequests = {
+      {"{\"name\":\"t\"}", "columns"},
       {"{\"name\":\"t\",\"columns\":null}", "columns"},
       {"{\"name\":\"t\",\"columns\":[null]}", "columns[0]"},
       {
