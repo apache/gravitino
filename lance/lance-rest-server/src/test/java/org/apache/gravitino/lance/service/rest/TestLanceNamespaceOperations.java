@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -48,6 +49,7 @@ import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.lance.service.LanceRequestBodyReaderInterceptor;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -57,6 +59,9 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
@@ -123,6 +128,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     provider.setMapper(mapper);
     resourceConfig.register(provider);
     resourceConfig.register(LanceExceptionMapper.class);
+    resourceConfig.register(LanceRequestBodyReaderInterceptor.class);
     resourceConfig.register(LanceNamespaceOperations.class);
     resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableOperations.class);
     resourceConfig.register(
@@ -167,6 +173,35 @@ public class TestLanceNamespaceOperations extends JerseyTest {
       Assertions.assertEquals("", error.getDetail());
       Assertions.assertNotEquals(18, error.getCode());
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("nullRequestInputs")
+  void testNullRequestInputsReturn400(String path, String json, String expectedMessage) {
+    Mockito.clearInvocations(namespaceWrapper, namespaceOps, tableOps);
+    try (Response response = target(path).request().post(Entity.json(json))) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertTrue(error.getError().contains(expectedMessage), error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+    Mockito.verifyNoInteractions(namespaceWrapper, namespaceOps, tableOps);
+  }
+
+  private static Stream<Arguments> nullRequestInputs() {
+    String namespace = "/v1/namespace/catalog$schema/";
+    String table = "/v1/table/catalog$schema$table/";
+    return Stream.of(
+        Arguments.of(namespace + "create", "null", "Request body"),
+        Arguments.of(namespace + "drop", "null", "Request body"),
+        Arguments.of(table + "declare", "null", "Request body"),
+        Arguments.of(table + "drop_columns", "null", "Request body"),
+        Arguments.of(table + "alter_columns", "null", "Request body"),
+        Arguments.of(table + "drop_columns", "{\"columns\":null}", "columns"),
+        Arguments.of(table + "alter_columns", "{\"alterations\":null}", "alterations"),
+        Arguments.of(table + "alter_columns", "{\"alterations\":[null]}", "alterations[0]"),
+        Arguments.of(table + "drop_columns", "{\"columns\":[null]}", "cannot be blank"));
   }
 
   @Test
