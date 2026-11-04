@@ -174,7 +174,7 @@ public class GravitinoCatalogManager {
     Catalog catalog = metalake.loadCatalog(name);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
-    LOG.info("Load catalog {} from Gravitino successfully.", name);
+    LOG.debug("Load catalog {} from Gravitino successfully.", name);
     return catalog;
   }
 

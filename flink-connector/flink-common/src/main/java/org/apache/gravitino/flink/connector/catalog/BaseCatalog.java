@@ -115,6 +115,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   private final PartitionConverter partitionConverter;
   private final Map<String, String> catalogOptions;
 
+  private volatile Catalog gravitinoCatalog;
+
   protected BaseCatalog(
       String catalogName,
       Map<String, String> catalogOptions,
@@ -1216,7 +1218,21 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   protected Catalog catalog() {
-    return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+    // The Gravitino client has no catalog cache, and Flink consults the catalog on every
+    // table resolution, so fetching per call doubled the REST traffic of each query. Each
+    // catalog instance is pinned by Flink for the session, so memoizing here keeps one
+    // handle per instance; entity operations on the handle are still served fresh per call.
+    Catalog catalog = gravitinoCatalog;
+    if (catalog == null) {
+      synchronized (this) {
+        catalog = gravitinoCatalog;
+        if (catalog == null) {
+          catalog = GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+          gravitinoCatalog = catalog;
+        }
+      }
+    }
+    return catalog;
   }
 
   protected String catalogName() {

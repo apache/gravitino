@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -60,6 +61,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /**
@@ -544,6 +546,56 @@ public abstract class TestBaseCatalog {
     catalog.alterTable(new ObjectPath("db", "tbl"), newTable, false);
 
     Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  /**
+   * The Gravitino catalog handle must be fetched once per catalog instance: the client has no
+   * catalog cache and Flink consults catalog() on every table resolution, so a per-call fetch
+   * doubled the REST traffic of each query. On the unfixed tree this failed with 3 fetches.
+   */
+  @Test
+  void testCatalogHandleFetchedOncePerInstance() {
+    AtomicInteger loadCalls = new AtomicInteger();
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.doAnswer(
+            inv -> {
+              loadCalls.incrementAndGet();
+              return info;
+            })
+        .when(manager)
+        .getGravitinoCatalogInfo(Mockito.anyString());
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+
+      // Deliberately does NOT override catalog(): the memoization under test lives in
+      // BaseCatalog.catalog() itself.
+      BaseCatalog catalog =
+          new BaseCatalog(
+              "test",
+              Collections.emptyMap(),
+              "default",
+              Mockito.mock(SchemaAndTablePropertiesConverter.class),
+              Mockito.mock(PartitionConverter.class)) {
+            @Override
+            protected AbstractCatalog realCatalog() {
+              return null;
+            }
+
+            @Override
+            protected CatalogCompat catalogCompat() {
+              return TestBaseCatalog.this.catalogCompat();
+            }
+          };
+
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Assertions.assertEquals(1, loadCalls.get(), "catalog handle must be fetched exactly once");
+    }
   }
 
   private class TestableBaseCatalog extends BaseCatalog {
