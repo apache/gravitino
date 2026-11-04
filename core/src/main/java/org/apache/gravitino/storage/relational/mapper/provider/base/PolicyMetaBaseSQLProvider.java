@@ -19,11 +19,15 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper.POLICY_TAG_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -270,5 +274,65 @@ public class PolicyMetaBaseSQLProvider {
         + "#{policyId}"
         + "</foreach>"
         + ")";
+  }
+
+  /**
+   * Lists enabled policy-tag assignment candidates for ancestry chain rows of one policy type.
+   *
+   * <p>Java applies effective-tag override, selector matching, and nearest-level uniqueness. The
+   * SQL only joins active tag assignments to enabled policies of {@code policyType}.
+   *
+   * @param chain table ancestry rows ({@code tableId}, object id/type, {@code lvl})
+   * @param policyType {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()} wire
+   *     value
+   * @return SQL
+   */
+  public String listNearestPolicyMatchCandidates(
+      @Param("chain") List<NearestPolicyChainPO> chain, @Param("policyType") String policyType) {
+    return "<script>"
+        + "SELECT c.table_id AS tableId,"
+        + " c.lvl AS lvl,"
+        + " tg.tag_name AS tagName,"
+        + " tr.tag_value AS tagValue,"
+        + " pm.policy_id AS policyId,"
+        + " ptr.selector AS selector"
+        + " FROM ("
+        + "<foreach collection='chain' item='c' separator=' UNION ALL '>"
+        + nearestPolicyChainSelect()
+        + "</foreach>"
+        + " ) c"
+        + " JOIN "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " tr ON tr.metadata_object_id = c.object_id"
+        + "  AND tr.metadata_object_type = c.object_type"
+        + "  AND tr.deleted_at = 0"
+        + " JOIN "
+        + TAG_TABLE_NAME
+        + " tg ON tg.tag_id = tr.tag_id AND tg.deleted_at = 0"
+        + " JOIN "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " ptr ON ptr.tag_id = tr.tag_id AND ptr.deleted_at = 0"
+        + " JOIN "
+        + POLICY_META_TABLE_NAME
+        + " pm ON pm.policy_id = ptr.policy_id AND pm.deleted_at = 0"
+        + " JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pvi ON pvi.policy_id = pm.policy_id"
+        + "  AND pvi.version = pm.current_version"
+        + "  AND pvi.deleted_at = 0"
+        + " WHERE pm.policy_type = #{policyType}"
+        + "  AND pvi.enabled = 1"
+        + "</script>";
+  }
+
+  /**
+   * Returns one ancestry-chain {@code SELECT} branch. Dialects that cannot infer unbound parameter
+   * types (notably H2) override this with explicit {@code CAST}s.
+   *
+   * @return SQL fragment for one chain row
+   */
+  protected String nearestPolicyChainSelect() {
+    return " SELECT #{c.tableId} AS table_id, #{c.objectId} AS object_id,"
+        + " #{c.objectType} AS object_type, #{c.lvl} AS lvl";
   }
 }
