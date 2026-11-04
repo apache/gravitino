@@ -29,6 +29,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -56,6 +58,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -83,6 +86,7 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.EntityCacheChangeLogListener;
 import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
@@ -150,6 +154,67 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     Assertions.assertNull(relation.getSelector());
     assertEquals(1L, relation.getCurrentVersion());
     assertEquals(1L, relation.getLastVersion());
+  }
+
+  /** New policy identities and their tags share the server generator; overwrites reuse tag IDs. */
+  @TestTemplate
+  public void testHiddenTagUsesServerIdGenerator() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    IdGenerator original = GravitinoEnv.getInstance().idGenerator();
+    IdGenerator generator = mock(IdGenerator.class);
+    when(generator.nextId()).thenReturn(1000L, 1001L, 1002L, 1003L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", generator, true);
+    try {
+      PolicyMetaService service = PolicyMetaService.getInstance();
+      int generated = 0;
+      for (boolean overwritten : new boolean[] {false, true}) {
+        PolicyEntity policy =
+            createPolicy(
+                generator.nextId(),
+                NamespaceUtil.ofPolicy(METALAKE_NAME),
+                "generated_tag_" + overwritten,
+                AUDIT_INFO);
+        service.insertPolicy(policy, overwritten);
+        NameIdentifier tagIdent =
+            NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+        TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdent);
+        assertEquals(policy.id() + 1, tag.id().longValue());
+        generated += 2;
+        verify(generator, times(generated)).nextId();
+
+        PolicyEntity replacement =
+            createPolicy(2000L, policy.namespace(), policy.name(), AUDIT_INFO);
+        service.insertPolicy(replacement, true);
+        assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdent));
+        verify(generator, times(generated)).nextId();
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", original, true);
+    }
+  }
+
+  /** An uninitialized generator cannot commit a policy without its hidden tag. */
+  @TestTemplate
+  public void testMissingServerIdGeneratorRollsBackPolicy() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(1000L, NamespaceUtil.ofPolicy(METALAKE_NAME), "missing_generator", AUDIT_INFO);
+    IdGenerator original = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", null, true);
+    try {
+      IllegalStateException failure =
+          assertThrows(
+              IllegalStateException.class,
+              () -> PolicyMetaService.getInstance().insertPolicy(policy, false));
+      assertTrue(failure.getMessage().contains("ID generator is not initialized"));
+      assertFalse(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+      assertEquals(0, countActiveRows("policy_version_info", "policy_id = " + policy.id()));
+      assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+      assertEquals(
+          0, countActiveRows("tag_meta", "tag_name = '" + HiddenPolicyTag.name(policy.id()) + "'"));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", original, true);
+    }
   }
 
   /** An overwrite inserts a hidden tag only when it actually creates a policy identity. */

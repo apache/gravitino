@@ -58,6 +58,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -168,11 +169,15 @@ public class TestTagManager {
 
   private static IdGenerator idGenerator;
 
+  @Nullable private static IdGenerator previousIdGenerator;
+
   private static TagManager tagManager;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
     idGenerator = new RandomIdGenerator();
+    previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
 
     File dbDir = new File(DB_DIR);
     dbDir.mkdirs();
@@ -332,13 +337,17 @@ public class TestTagManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
-    }
+  public static void tearDown() throws IOException, IllegalAccessException {
+    try {
+      if (entityStore != null) {
+        entityStore.close();
+        entityStore = null;
+      }
 
-    FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+      FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+    }
   }
 
   @AfterEach

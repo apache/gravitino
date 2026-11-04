@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -145,9 +146,13 @@ public class TestPolicyManager {
   private static PolicyManager policyManager;
   private static TagManager tagManager;
 
+  @Nullable private static IdGenerator previousIdGenerator;
+
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
     IdGenerator idGenerator = new RandomIdGenerator();
+    previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
     Config config = mockConfig();
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
@@ -294,12 +299,16 @@ public class TestPolicyManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
+  public static void tearDown() throws IOException, IllegalAccessException {
+    try {
+      if (entityStore != null) {
+        entityStore.close();
+        entityStore = null;
+      }
+      FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
     }
-    FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
   }
 
   @AfterEach

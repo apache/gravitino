@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -46,7 +47,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
-import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -464,7 +465,9 @@ public class PolicyMetaService {
   }
 
   private void createHiddenTagWithoutCommit(PolicyEntity policy, PolicyPO policyPO) {
-    TagEntity tag = HiddenPolicyTag.create(policy, RandomIdGenerator.INSTANCE.nextId());
+    IdGenerator idGenerator = GravitinoEnv.getInstance().idGenerator();
+    Preconditions.checkState(idGenerator != null, "Policy tag ID generator is not initialized");
+    TagEntity tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
     try {
       TagMetaService.getInstance().insertTag(tag, false);
     } catch (EntityAlreadyExistsException e) {
