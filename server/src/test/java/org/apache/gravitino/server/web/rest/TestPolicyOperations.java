@@ -606,6 +606,47 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreatePolicyRejectsDottedName() {
+    PolicyContent content =
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    PolicyCreateRequest request =
+        new PolicyCreateRequest("a.b", "custom", null, false, toDTO(content));
+
+    try (Response response =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(policyManager, Mockito.never())
+        .createPolicy(any(), any(), any(), any(), anyBoolean(), any());
+  }
+
+  @Test
+  public void testRenamePolicyRejectsDottedName() {
+    PolicyUpdatesRequest request =
+        new PolicyUpdatesRequest(
+            Collections.singletonList(new PolicyUpdateRequest.RenamePolicyRequest("a.b")));
+
+    try (Response response =
+        target(policyPath(metalake) + "/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(policyManager, Mockito.never()).alterPolicy(any(), any(), any());
+  }
+
+  @Test
   public void testGetPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =

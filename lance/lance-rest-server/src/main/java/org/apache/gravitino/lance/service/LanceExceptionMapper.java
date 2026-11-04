@@ -20,6 +20,11 @@ package org.apache.gravitino.lance.service;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
+import javax.ws.rs.NotAcceptableException;
+import javax.ws.rs.NotAllowedException;
+import javax.ws.rs.NotSupportedException;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
@@ -77,6 +82,24 @@ public class LanceExceptionMapper implements ExceptionMapper<Throwable> {
 
   public static Response toRESTResponse(String instance, Throwable ex) {
     ServerHealth.getInstance().recordFailure(ex);
+    if (ex instanceof NotAllowedException
+        || ex instanceof NotAcceptableException
+        || ex instanceof NotSupportedException) {
+      WebApplicationException routingError = (WebApplicationException) ex;
+      InvalidInputException invalidInput =
+          new InvalidInputException(ex.getMessage(), errorDetail(ex), instance);
+      try (Response mapped = handleLanceNamespaceException(invalidInput)) {
+        Response.ResponseBuilder response =
+            Response.status(routingError.getResponse().getStatus())
+                .entity(mapped.getEntity())
+                .type(MediaType.APPLICATION_JSON_TYPE);
+        if (ex instanceof NotAllowedException) {
+          response.allow(routingError.getResponse().getAllowedMethods());
+        }
+        return response.build();
+      }
+    }
+
     LanceNamespaceException lanceException =
         ex instanceof LanceNamespaceException
             ? (LanceNamespaceException) ex

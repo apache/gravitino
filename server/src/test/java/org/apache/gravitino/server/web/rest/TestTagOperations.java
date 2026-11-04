@@ -399,6 +399,23 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTagRejectsDottedName() {
+    TagCreateRequest request = new TagCreateRequest("a.b", "comment", null);
+
+    try (Response response =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any(), any());
+  }
+
+  @Test
   public void testCreateTag() {
     TagEntity tag1 =
         TagEntity.builder()
@@ -537,6 +554,26 @@ public class TestTagOperations extends BaseOperationsTest {
             .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRenameTagRejectsDottedName() {
+    TagUpdatesRequest request =
+        new TagUpdatesRequest(
+            Collections.singletonList(new TagUpdateRequest.RenameTagRequest("a.b")));
+
+    try (Response response =
+        target(tagPath(metalake))
+            .path("tag1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).alterTag(any(), any(), any());
   }
 
   @Test
