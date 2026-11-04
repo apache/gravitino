@@ -72,6 +72,27 @@ import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
 
+  @ParameterizedTest
+  @ValueSource(strings = {"user-token", "service-account"})
+  void testForwardsUserToken(String authType) throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                authType));
+    try (IcebergCatalogWrapper wrapper = Mockito.spy(new IcebergCatalogWrapper(config))) {
+      Mockito.doReturn(Mockito.mock(RESTCatalog.class)).when(wrapper).getCatalog();
+      Assertions.assertEquals("user-token".equals(authType), wrapper.forwardsUserToken());
+    }
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(
+            new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory")))) {
+      Assertions.assertFalse(wrapper.forwardsUserToken());
+    }
+  }
+
   @Test
   void testLoadViewReportsMissingAfterNativeRename(@TempDir Path warehouseDir) throws Exception {
     Namespace namespace = Namespace.of("views");

@@ -264,25 +264,28 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   /**
    * Who issues storage credentials for tables of a federated REST catalog. {@code remote} passes
-   * through what the remote catalog vends; {@code gravitino} issues credentials through this
-   * catalog's credential providers, scoped to the table and to the caller's privilege.
+   * through what the remote catalog vends; {@code local} issues credentials through this catalog's
+   * credential providers, scoped to the table and to the caller's privilege. Service-account
+   * connections always use local credentials.
    */
-  public static final ConfigEntry<String> REST_BACKEND_CREDENTIAL_VENDING =
-      new ConfigBuilder(IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING)
+  public static final ConfigEntry<String> REST_BACKEND_STORAGE_CREDENTIAL_SOURCE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE)
           .doc(
               "Who issues storage credentials for tables of a federated REST catalog. `remote`"
-                  + " passes through the credentials the remote catalog vends. `gravitino` does not"
+                  + " passes through the credentials the remote catalog vends. `local` does not"
                   + " request credentials from the remote catalog and issues them through this"
                   + " catalog's `credential-providers`, scoped to the table location and to the"
-                  + " caller's privilege on the table.")
+                  + " caller's privilege on the table. Service-account connections always use local"
+                  + " credentials.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(
               value ->
-                  IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE.equals(value)
-                      || IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO.equals(value),
-              "The value must be `remote` or `gravitino`")
-          .createWithDefault(IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE);
+                  IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE.equals(value)
+                      || IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                          value),
+              "The value must be `local` or `remote`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE);
 
   /** HTTP connection timeout in milliseconds for the REST catalog backend. */
   public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
@@ -487,14 +490,18 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   }
 
   /**
-   * Returns whether Gravitino, rather than the remote catalog, issues storage credentials for
-   * tables of a federated REST catalog.
+   * Returns whether this catalog issues storage credentials through its local providers.
    *
-   * @return {@code true} if {@code rest-backend-credential-vending} is {@code gravitino}
+   * <p>Service-account connections always use local credentials, since the remote catalog's
+   * credentials reflect the service account's privileges rather than the caller's.
+   *
+   * @return {@code true} if {@code rest-backend-storage-credential-source} is {@code local} or the
+   *     connection uses a service account
    */
-  public boolean isRestBackendGravitinoCredentialVending() {
-    return IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO.equals(
-        get(REST_BACKEND_CREDENTIAL_VENDING));
+  public boolean useLocalStorageCredentials() {
+    return IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+            get(REST_BACKEND_STORAGE_CREDENTIAL_SOURCE))
+        || isRestBackendServiceAccount();
   }
 
   @Override

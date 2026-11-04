@@ -161,7 +161,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
         IcebergCatalogBackend.valueOf(
             enrichedConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
     if (backend == IcebergCatalogBackend.REST && enrichedConfig.isRestBackendServiceAccount()) {
-      checkServiceAccountIsAuthorized(catalogName);
+      checkServiceAccountAuthorizationEnabled(catalogName);
     }
     CatalogWrapperForREST rest =
         backend == IcebergCatalogBackend.REST
@@ -260,7 +260,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    * this server can authorize its users. Refuse to serve it when authorization is disabled, where
    * every caller would act as the service account.
    */
-  private static void checkServiceAccountIsAuthorized(String catalogName) {
+  private static void checkServiceAccountAuthorizationEnabled(String catalogName) {
     boolean authorizationEnabled;
     try {
       authorizationEnabled = IcebergRESTServerContext.getInstance().isAuthorizationEnabled();

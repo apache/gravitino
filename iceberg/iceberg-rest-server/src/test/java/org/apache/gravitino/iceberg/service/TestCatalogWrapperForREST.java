@@ -22,14 +22,17 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -46,6 +49,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.BaseTable;
@@ -93,10 +98,69 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 
 public class TestCatalogWrapperForREST {
 
   private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFederatedPurgeForwardsToRemoteCatalog(boolean tableExists) throws Exception {
+    TableIdentifier identifier = TableIdentifier.of("db", "table");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    when(catalog.dropTable(identifier, true)).thenReturn(tableExists);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+                ""));
+    TableMetadataCache cache = mock(TableMetadataCache.class);
+
+    try (CatalogWrapperForREST wrapper =
+        new StaticCatalogWrapperForREST("remote", config, catalog)) {
+      Field cacheField = IcebergCatalogWrapper.class.getDeclaredField("metadataCache");
+      cacheField.setAccessible(true);
+      cacheField.set(wrapper, cache);
+
+      if (tableExists) {
+        wrapper.purgeTable(identifier);
+      } else {
+        Assertions.assertThrows(NoSuchTableException.class, () -> wrapper.purgeTable(identifier));
+      }
+
+      InOrder order = inOrder(cache, catalog);
+      order.verify(cache).invalidate(identifier);
+      order.verify(catalog).dropTable(identifier, true);
+      verifyNoMoreInteractions(catalog);
+    }
+  }
+
+  @Test
+  void testFederatedPurgePropagatesRemoteFailure() throws Exception {
+    TableIdentifier identifier = TableIdentifier.of("db", "table");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    ForbiddenException failure = new ForbiddenException("Remote purge denied");
+    when(catalog.dropTable(identifier, true)).thenThrow(failure);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+                ""));
+
+    try (CatalogWrapperForREST wrapper =
+        new StaticCatalogWrapperForREST("remote", config, catalog)) {
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(ForbiddenException.class, () -> wrapper.purgeTable(identifier)));
+      verify(catalog).dropTable(identifier, true);
+      verifyNoMoreInteractions(catalog);
+    }
+  }
 
   @Test
   void testCheckPropertiesForCompatibility() {
@@ -837,8 +901,8 @@ public class TestCatalogWrapperForREST {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"gravitino-vending", "service-account"})
-  void testFederatedLoadTableWithGravitinoCredentialVending(String mode) throws Exception {
+  @ValueSource(strings = {"local", "service-account"})
+  void testFederatedLoadTableWithLocalStorageCredentials(String mode) throws Exception {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     TableMetadata metadata =
         TableMetadataParser.fromJson(
@@ -852,7 +916,7 @@ public class TestCatalogWrapperForREST {
                     Collections.emptyMap())));
     // The remote returns broad credentials even when none are requested. With Gravitino
     // credential vending they must not reach the client.
-    org.apache.iceberg.rest.credentials.Credential upstreamCredential =
+    Credential upstreamCredential =
         IcebergRESTUtils.toRESTCredential(
             "s3://bucket/",
             ImmutableMap.of(
@@ -907,10 +971,10 @@ public class TestCatalogWrapperForREST {
                   // credential vending is left at its default.
                   mode.equals("service-account")
                       ? IcebergConstants.REST_BACKEND_AUTH_TYPE
-                      : IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING,
+                      : IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
                   mode.equals("service-account")
                       ? IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT
-                      : IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_GRAVITINO));
+                      : IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL));
       CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
 
       LoadTableResponse response = wrapper.loadTable(table, true, CredentialPrivilege.READ);

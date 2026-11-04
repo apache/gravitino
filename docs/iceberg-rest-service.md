@@ -274,11 +274,11 @@ By default IRC1 forwards each user's access token to IRC2, so IRC2 must trust th
 
 ##### Gravitino-issued storage credentials
 
-By default IRC1 passes through the storage credentials IRC2 vends. Some catalogs vend broad, long-lived credentials, for example the catalog token's own storage keys scoped to the whole bucket. Set `rest-backend-credential-vending` to `gravitino` and IRC1 stops asking IRC2 for credentials. It issues them through its own `credential-providers` instead, scoped to the table location, read-only unless the caller holds write privileges on the table, exactly as for a local catalog. Credentials IRC2 returns unasked are dropped.
+By default IRC1 passes through the storage credentials IRC2 vends. Some catalogs vend broad, long-lived credentials, for example the catalog token's own storage keys scoped to the whole bucket. Set `rest-backend-storage-credential-source` to `local` and IRC1 stops asking IRC2 for credentials. It issues them through its own `credential-providers` instead, scoped to the table location, read-only unless the caller holds write privileges on the table, exactly as for a local catalog. Credentials IRC2 returns unasked are dropped. Here `local` means credentials issued by IRC1; `remote` means credentials issued by IRC2. This setting controls storage credentials, independently of the credentials IRC1 uses to authenticate to IRC2.
 
 | Configuration item                                      | Description                                                                                                                                       | Default value | Required |
 |---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.iceberg-rest.rest-backend-credential-vending` | Who issues storage credentials for tables of the federated catalog. `remote` passes through IRC2's credentials. `gravitino` uses `credential-providers`. A `service-account` catalog always uses `gravitino`. | `remote`      | No       |
+| `gravitino.iceberg-rest.rest-backend-storage-credential-source` | Who issues storage credentials for tables of the federated catalog. `remote` passes through IRC2's credentials. `local` uses IRC1's `credential-providers`. A `service-account` catalog always uses `local`, regardless of this setting. | `remote`      | No       |
 
 IRC1 configuration example federating a catalog that accepts only a static API token, with Gravitino issuing the storage credentials:
 
@@ -288,15 +288,13 @@ gravitino.iceberg-rest.uri = https://catalog.example.com/v1
 gravitino.iceberg-rest.warehouse = example_warehouse
 gravitino.iceberg-rest.rest-backend-auth-type = service-account
 gravitino.iceberg-rest.rest-backend-token = xx
-gravitino.iceberg-rest.rest-backend-credential-vending = gravitino
+gravitino.iceberg-rest.rest-backend-storage-credential-source = local
 gravitino.iceberg-rest.credential-providers = s3-token
 gravitino.iceberg-rest.s3-access-key-id = xx
 gravitino.iceberg-rest.s3-secret-access-key = xx
 gravitino.iceberg-rest.s3-region = xx
 gravitino.iceberg-rest.s3-role-arn = xx
 ```
-
-When a table is dropped in IRC2 and another table is created under the same name, Gravitino recognizes the new table by its Iceberg table UUID. Grants, tags, policies and the owner of the dropped table do not carry over to the new one.
 
 `data-access` is returned in `/v1/config` defaults for REST clients:
 

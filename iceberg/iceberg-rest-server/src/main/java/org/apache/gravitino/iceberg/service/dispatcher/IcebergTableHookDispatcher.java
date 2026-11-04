@@ -22,15 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.UUID;
-import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -39,9 +35,6 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataUpdate;
@@ -64,10 +57,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableHookDispatcher implements IcebergTableOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableHookDispatcher.class);
-
-  /** The expression a load of the table must satisfy. */
-  private static final String LOAD_TABLE_EXPRESSION =
-      AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 
   private final IcebergTableOperationDispatcher dispatcher;
   private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
@@ -145,14 +134,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    LoadTableResponse response = dispatcher.loadTable(context, tableIdentifier);
-    String currentUuid = response.tableMetadata() == null ? null : response.tableMetadata().uuid();
-    if (reconcileReplacedTable(context, tableIdentifier, currentUuid, LOAD_TABLE_EXPRESSION)) {
-      // The response was authorized, and its credentials scoped, against the previous table's
-      // registration. Load again so both follow the new registration.
-      response = dispatcher.loadTable(context, tableIdentifier);
-    }
-    return response;
+    return dispatcher.loadTable(context, tableIdentifier);
   }
 
   @Override
@@ -189,7 +171,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
                     .withName(tableDest.name())
                     .withNamespace(tableDest.namespace())
                     .withColumns(tableEntity.columns())
-                    .withProperties(tableEntity.properties())
                     .withAuditInfo(
                         AuditInfo.builder()
                             .withCreator(tableEntity.auditInfo().creator())
@@ -215,7 +196,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    reconcileReplacedTable(context, tableIdentifier, LOAD_TABLE_EXPRESSION);
     return dispatcher.getTableCredentials(context, tableIdentifier);
   }
 
@@ -237,7 +217,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
-    reconcileReplacedTable(context, tableIdentifier, LOAD_TABLE_EXPRESSION);
     return dispatcher.planTableScan(context, tableIdentifier, scanRequest);
   }
 
@@ -337,98 +316,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
           tableIdentifier,
           e);
     }
-  }
-
-  /**
-   * Reconciles the registration of a table that may have been dropped and recreated outside
-   * Gravitino, for requests that do not load the table metadata themselves. The remote table is
-   * loaded only when the registration records an external table identifier.
-   */
-  private void reconcileReplacedTable(
-      IcebergRequestContext context, TableIdentifier tableIdentifier, String expression) {
-    NameIdentifier ident = toGravitinoIdentifier(context, tableIdentifier);
-    if (registeredTableUuid(ident) == null) {
-      return;
-    }
-    UUID currentUuid =
-        IcebergRESTServerContext.getInstance()
-            .catalogWrapperManager()
-            .getCatalogWrapper(context.catalogName())
-            .getCatalog()
-            .loadTable(tableIdentifier)
-            .uuid();
-    reconcileReplacedTable(
-        context, tableIdentifier, currentUuid == null ? null : currentUuid.toString(), expression);
-  }
-
-  /**
-   * Detects that the table under this name is no longer the one Gravitino registered, by comparing
-   * the Iceberg table UUID with the one recorded at registration. When it differs, the stale
-   * registration, with its grants, tags, policies and owner, is replaced through the Gravitino
-   * table dispatcher, and the caller is authorized again against the new registration, because the
-   * request was authorized against the old one.
-   *
-   * @param context the request context
-   * @param tableIdentifier the Iceberg table identifier
-   * @param currentUuid the UUID of the table the backend now reports
-   * @param expression the authorization expression the request must satisfy
-   * @return {@code true} if the registration was replaced
-   */
-  @VisibleForTesting
-  boolean reconcileReplacedTable(
-      IcebergRequestContext context,
-      TableIdentifier tableIdentifier,
-      String currentUuid,
-      String expression) {
-    if (currentUuid == null) {
-      return false;
-    }
-    NameIdentifier ident = toGravitinoIdentifier(context, tableIdentifier);
-    String registeredUuid = registeredTableUuid(ident);
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
-    if (registeredUuid == null
-        || currentUuid == null
-        || registeredUuid.equals(currentUuid)
-        || tableDispatcher == null) {
-      return false;
-    }
-
-    LOG.info(
-        "Table {} was replaced outside Gravitino; replacing its registration before serving it",
-        ident);
-    tableDispatcher.loadTable(ident);
-    if (!MetadataAuthzHelper.checkAccess(ident, Entity.EntityType.TABLE, expression)) {
-      throw new ForbiddenException(
-          "User '%s' is not authorized to access table %s, which was replaced outside Gravitino",
-          context.userName(), ident);
-    }
-    return true;
-  }
-
-  @Nullable
-  private static String registeredTableUuid(NameIdentifier ident) {
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-    if (store == null) {
-      return null;
-    }
-    try {
-      TableEntity entity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      String uuid =
-          entity == null || entity.properties() == null
-              ? null
-              : entity.properties().get(Table.PROPERTY_TABLE_UUID);
-      return StringUtils.isBlank(uuid) ? null : uuid;
-    } catch (NoSuchEntityException e) {
-      return null;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to read the registration of table " + ident, e);
-    }
-  }
-
-  private NameIdentifier toGravitinoIdentifier(
-      IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    return IcebergIdentifierUtils.toGravitinoTableIdentifier(
-        metalake, context.catalogName(), tableIdentifier, HierarchicalSchemaUtil.schemaSeparator());
   }
 
   private void deleteTableEntity(String catalogName, TableIdentifier tableIdentifier) {

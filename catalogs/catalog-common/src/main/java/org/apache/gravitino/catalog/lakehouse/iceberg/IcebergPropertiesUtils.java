@@ -122,8 +122,8 @@ public class IcebergPropertiesUtils {
         IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI);
     map.put(IcebergConstants.REST_BACKEND_SCOPE, IcebergConstants.REST_BACKEND_SCOPE);
     map.put(
-        IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING,
-        IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING);
+        IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
+        IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE);
 
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 

@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
@@ -73,16 +72,6 @@ public final class EntityCombinedTable implements Table {
 
   public static EntityCombinedTable of(Table table) {
     return new EntityCombinedTable(table, null);
-  }
-
-  /**
-   * Returns the stored entity this table was combined with.
-   *
-   * @return the stored table entity, or {@code null} if the table is not registered
-   */
-  @Nullable
-  TableEntity tableEntity() {
-    return tableEntity;
   }
 
   public EntityCombinedTable withHiddenProperties(MaskAndOmitKeys keys) {

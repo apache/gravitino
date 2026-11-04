@@ -142,6 +142,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return icebergConfig;
   }
 
+  /**
+   * Invalidates cached metadata before a subclass changes or removes a table.
+   *
+   * @param tableIdentifier the table whose cached metadata must be invalidated
+   */
+  protected void invalidateTableMetadata(TableIdentifier tableIdentifier) {
+    getMetadataCache().invalidate(tableIdentifier);
+  }
+
   private SupportsNamespaces getNamespaceCatalog() {
     SupportsNamespaces namespaceCatalog = asNamespaceCatalog;
     if (namespaceCatalog != null) {
@@ -276,12 +285,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     CatalogHandlers.dropTable(getCatalog(), tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     if (isRESTCatalog()) {
       // A remote REST catalog owns its table files and the storage access to them. Forward the
       // purge so the remote deletes the files, rather than deleting them from this server.
@@ -540,14 +549,14 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   /**
-   * Returns whether authorization for this catalog may be left to the remote catalog. That holds
-   * only for a REST catalog backend that forwards the calling user's token, so the remote catalog
-   * sees and authorizes the real user. A REST backend connected as a service account presents one
-   * identity for every user, so Gravitino must authorize each request itself.
+   * Returns whether the REST backend forwards the calling user's access token.
    *
-   * @return {@code true} if the remote catalog authorizes each user's requests
+   * <p>Only this mode allows authorization to be delegated to the remote catalog. A service-account
+   * connection presents one identity for every user, so Gravitino must authorize each request.
+   *
+   * @return {@code true} if the REST backend forwards the calling user's access token
    */
-  public boolean remoteCatalogAuthorizesUsers() {
+  public boolean forwardsUserToken() {
     return IcebergCatalogBackend.REST.equals(catalogBackend)
         && !icebergConfig.isRestBackendServiceAccount()
         && isRESTCatalog();

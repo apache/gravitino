@@ -221,7 +221,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
     // authorization. IRC2 handles authorization. A REST backend connected as a service account is
     // never skipped: the remote catalog sees only the service account, so IRC1 must authorize.
-    return catalogWrapper.remoteCatalogAuthorizesUsers();
+    return catalogWrapper.forwardsUserToken();
   }
 
   /** Metrics are stored locally, so a downstream REST catalog cannot authorize the report. */

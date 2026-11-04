@@ -46,7 +46,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -54,7 +53,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.capability.Capability;
@@ -169,24 +167,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    if (entityCombinedTable.imported()
-        && isReplacedExternally(entityCombinedTable)
-        && catalogReportsTableUuid(catalogIdent)) {
-      EntityCombinedTable stale = entityCombinedTable;
-      // The registration under this name belongs to a table that was dropped outside Gravitino;
-      // the catalog now reports another table. Drop the stale registration, which removes its
-      // grants, tags, policies and owner, and register the new table below.
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      LOG.info(
-          "Table {} was replaced outside Gravitino; dropping the registration of the previous table",
-          ident);
-      TreeLockUtils.doWithTreeLock(
-          schemaIdent, LockType.WRITE, () -> deleteStaleRegistration(ident, stale));
-      entityCombinedTable =
-          TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
-    }
-
     if (!entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
@@ -211,8 +191,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         }
       }
     }
-
-    recordTableUuidIfMissing(ident, catalogIdent, entityCombinedTable);
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
@@ -415,7 +393,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withName(alteredTable.name())
                                 .withNamespace(newNamespace)
                                 .withColumns(columnsUpdateResult.getRight())
-                                .withProperties(tableEntity.properties())
                                 .withAuditInfo(
                                     AuditInfo.builder()
                                         .withCreator(tableEntity.auditInfo().creator())
@@ -637,10 +614,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
             .withColumns(columnEntityList)
-            .withProperties(
-                catalogReportsTableUuid(getCatalogIdentifier(identifier))
-                    ? registrationProperties(table.tableFromCatalog())
-                    : Collections.emptyMap())
             .withAuditInfo(audit)
             .build();
     try {
@@ -661,135 +634,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
         .withHiddenProperties(table.hiddenProperties());
-  }
-
-  /**
-   * Returns whether the stored registration belongs to a different table than the one the catalog
-   * reports under the same name. Both sides must carry {@link Table#PROPERTY_TABLE_UUID}; a
-   * registration made before the identifier was recorded is never treated as replaced.
-   *
-   * @param table the catalog table combined with its stored entity
-   * @return {@code true} if the identifiers differ
-   */
-  @VisibleForTesting
-  static boolean isReplacedExternally(EntityCombinedTable table) {
-    TableEntity entity = table.tableEntity();
-    if (entity == null || entity.properties() == null) {
-      return false;
-    }
-    String storedUuid = entity.properties().get(Table.PROPERTY_TABLE_UUID);
-    Map<String, String> catalogProperties = table.tableFromCatalog().properties();
-    String catalogUuid =
-        catalogProperties == null ? null : catalogProperties.get(Table.PROPERTY_TABLE_UUID);
-    return StringUtils.isNotBlank(storedUuid)
-        && StringUtils.isNotBlank(catalogUuid)
-        && !storedUuid.equals(catalogUuid);
-  }
-
-  private Void deleteStaleRegistration(NameIdentifier ident, EntityCombinedTable stale) {
-    try {
-      TableEntity current = getEntity(ident, TABLE, TableEntity.class);
-      // Another node may already have replaced the registration; only drop the one we inspected.
-      if (current != null && current.id().equals(stale.tableEntity().id())) {
-        store.delete(ident, TABLE);
-        // The name now resolves to a different table. Tell the authorizer, as a drop does, so the
-        // grants of the previous table stop applying to this name immediately rather than after
-        // its caches refresh.
-        AuthorizationUtils.notifyEntityNameIdMappingChange(ident, TABLE);
-        AuthorizationUtils.authorizationPluginRemovePrivileges(
-            ident, TABLE, Collections.emptyList());
-      }
-    } catch (NoSuchEntityException e) {
-      LOG.debug("Stale registration of table {} was already removed", ident);
-    } catch (OptimisticLockException e) {
-      // Another writer changed the registration meanwhile; the caller reloads it either way.
-      LOG.info("Registration of table {} changed while replacing it; reloading", ident, e);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to drop the stale registration of table " + ident, e);
-    }
-    return null;
-  }
-
-  /**
-   * Returns whether the catalog reports {@link Table#PROPERTY_TABLE_UUID} as a reserved property it
-   * sets itself. Only then is the property trusted to identify the table; in other catalogs it is
-   * an ordinary, user-settable property.
-   */
-  private boolean catalogReportsTableUuid(NameIdentifier catalogIdent) {
-    return doWithCatalog(
-        catalogIdent,
-        catalog ->
-            catalog.doWithPropertiesMeta(
-                metadata ->
-                    metadata
-                        .tablePropertiesMetadata()
-                        .isReservedProperty(Table.PROPERTY_TABLE_UUID)),
-        IllegalArgumentException.class);
-  }
-
-  /**
-   * Records the external table identifier on a registration made before identifiers were recorded,
-   * so a later replacement of the table is recognized. Best effort: a failure only leaves the
-   * registration as it was.
-   */
-  private void recordTableUuidIfMissing(
-      NameIdentifier ident, NameIdentifier catalogIdent, EntityCombinedTable table) {
-    TableEntity entity = table.tableEntity();
-    if (!table.imported() || entity == null) {
-      return;
-    }
-    Map<String, String> stored = entity.properties();
-    if (stored != null && StringUtils.isNotBlank(stored.get(Table.PROPERTY_TABLE_UUID))) {
-      return;
-    }
-    Map<String, String> registration = registrationProperties(table.tableFromCatalog());
-    if (registration.isEmpty() || !catalogReportsTableUuid(catalogIdent)) {
-      return;
-    }
-    try {
-      TreeLockUtils.doWithTreeLock(
-          ident,
-          LockType.WRITE,
-          () ->
-              store.update(
-                  ident,
-                  TableEntity.class,
-                  TABLE,
-                  current -> {
-                    Map<String, String> properties =
-                        current.properties() == null
-                            ? new HashMap<>()
-                            : new HashMap<>(current.properties());
-                    properties.putAll(registration);
-                    return TableEntity.builder()
-                        .withId(current.id())
-                        .withName(current.name())
-                        .withNamespace(current.namespace())
-                        .withComment(current.comment())
-                        .withProperties(properties)
-                        .withColumns(current.columns())
-                        .withPartitioning(current.partitioning())
-                        .withDistribution(current.distribution())
-                        .withSortOrders(current.sortOrders())
-                        .withIndexes(current.indexes())
-                        .withAuditInfo(current.auditInfo())
-                        .build();
-                  }));
-    } catch (Exception e) {
-      LOG.warn("Failed to record the external identifier of table {}", ident, e);
-    }
-  }
-
-  /**
-   * Returns the properties to store with an imported table entity: the external table identifier,
-   * when the catalog reports one.
-   */
-  private static Map<String, String> registrationProperties(Table tableFromCatalog) {
-    Map<String, String> properties = tableFromCatalog.properties();
-    String uuid = properties == null ? null : properties.get(Table.PROPERTY_TABLE_UUID);
-    return StringUtils.isBlank(uuid)
-        ? Collections.emptyMap()
-        : Collections.singletonMap(Table.PROPERTY_TABLE_UUID, uuid);
   }
 
   private SchemaDispatcher getSchemaDispatcher() {
@@ -927,10 +771,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withName(ident.name())
             .withNamespace(ident.namespace())
             .withColumns(columnEntityList)
-            .withProperties(
-                catalogReportsTableUuid(catalogIdent)
-                    ? registrationProperties(table)
-                    : Collections.emptyMap())
             .withAuditInfo(audit)
             .build();
 

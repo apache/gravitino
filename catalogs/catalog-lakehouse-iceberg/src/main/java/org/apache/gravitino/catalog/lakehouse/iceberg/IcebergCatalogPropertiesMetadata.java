@@ -167,12 +167,13 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING,
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
                 "Who issues storage credentials for a federated REST catalog: remote passes"
-                    + " through the remote catalog's credentials, gravitino issues them through"
-                    + " this catalog's credential providers",
+                    + " through the remote catalog's credentials, local issues them through"
+                    + " this catalog's credential providers. Service-account connections always"
+                    + " use local credentials",
                 false /* immutable */,
-                IcebergConstants.REST_BACKEND_CREDENTIAL_VENDING_REMOTE /* defaultValue */,
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));

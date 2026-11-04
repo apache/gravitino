@@ -92,7 +92,7 @@ The following properties tune REST backend behavior:
 | `rest-backend-credential`          | OAuth2 client credential (`client_id:client_secret`) for a `service-account` connection. Hidden from catalog responses. | (none)        | No       |
 | `rest-backend-oauth2-server-uri`   | OAuth2 token endpoint for `rest-backend-credential`.                                                       | (none)        | No       |
 | `rest-backend-scope`               | OAuth2 scope requested with `rest-backend-credential`.                                                     | (none)        | No       |
-| `rest-backend-credential-vending`  | Who issues storage credentials through the Iceberg REST service: `remote` passes through the remote catalog's credentials, `gravitino` issues them through this catalog's `credential-providers`. | remote        | No       |
+| `rest-backend-storage-credential-source`  | Who issues storage credentials through the Iceberg REST service: `remote` passes through the remote catalog's credentials, `local` issues them through this catalog's `credential-providers`. A `service-account` connection always uses `local`, regardless of this setting. | remote        | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
