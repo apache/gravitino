@@ -108,7 +108,8 @@ public class ObjectPolicyResolver {
    * @return Matched enabled policies with contributing sources.
    */
   public Match[] resolveMatches(String metalake, MetadataObject metadataObject) {
-    return applySameTypePrecedence(metadataObject, resolveRawMatches(metalake, metadataObject));
+    return dropFartherMaintenanceMatches(
+        metadataObject, resolveMatchesWithoutPrecedence(metalake, metadataObject));
   }
 
   /**
@@ -164,21 +165,10 @@ public class ObjectPolicyResolver {
                   .collect(Collectors.toList());
           result.put(
               object,
-              policies(applySameTypePrecedence(object, selectMatches(tags, objectRelations))));
+              policies(
+                  dropFartherMaintenanceMatches(object, selectMatches(tags, objectRelations))));
         });
     return result;
-  }
-
-  /**
-   * Rejects two or more maintenance policies of the same type that both match through tags assigned
-   * directly on {@code metadataObject} (not through ancestors).
-   *
-   * @param metalake metalake name
-   * @param metadataObject object whose direct tag-derived policies are checked
-   * @throws IllegalArgumentException when a same-level same-type conflict exists
-   */
-  public void requireNoSameLevelConflict(String metalake, MetadataObject metadataObject) {
-    requireNoSameLevelConflict(metadataObject, resolveRawMatches(metalake, metadataObject));
   }
 
   /**
@@ -201,7 +191,7 @@ public class ObjectPolicyResolver {
             .distinct()
             .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
             .collect(Collectors.toList());
-    requireNoSameLevelConflict(
+    rejectSameLevelMaintenanceConflicts(
         metadataObject, selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject)));
   }
 
@@ -222,19 +212,14 @@ public class ObjectPolicyResolver {
       TagAssignment assignment,
       PolicyEntity policy,
       PolicyAssociationSelector selector) {
-    if (!UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+    if (!UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType()) || !matches(selector, assignment)) {
       return;
     }
-    if (!matches(selector, assignment)) {
-      return;
-    }
-    Match[] existing = resolveRawMatches(metalake, metadataObject);
+    Match[] existing = resolveMatchesWithoutPrecedence(metalake, metadataObject);
     TreeSet<String> names = new TreeSet<>();
     for (Match match : existing) {
-      if (match.policy().policyType() != policy.policyType()) {
-        continue;
-      }
-      if (match.sources().contains(metadataObject)) {
+      if (match.policy().policyType() == policy.policyType()
+          && match.sources().contains(metadataObject)) {
         names.add(match.policy().name());
       }
     }
@@ -247,30 +232,11 @@ public class ObjectPolicyResolver {
     }
   }
 
-  private static void requireNoSameLevelConflict(MetadataObject metadataObject, Match[] matches) {
-    Map<Policy.BuiltInType, List<Match>> byType = groupMaintenanceMatches(matches);
-    for (Map.Entry<Policy.BuiltInType, List<Match>> entry : byType.entrySet()) {
-      TreeSet<String> names = new TreeSet<>();
-      for (Match match : entry.getValue()) {
-        if (match.sources().contains(metadataObject)) {
-          names.add(match.policy().name());
-        }
-      }
-      if (names.size() > 1) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Metadata object %s has conflicting %s policies at the same level: %s",
-                metadataObject, entry.getKey().policyType(), names));
-      }
-    }
-  }
-
-  private Match[] resolveRawMatches(String metalake, MetadataObject metadataObject) {
+  private Match[] resolveMatchesWithoutPrecedence(String metalake, MetadataObject metadataObject) {
     ResolvedTag[] effectiveTags = effectiveTagResolver.resolveWithSources(metalake, metadataObject);
     if (effectiveTags.length == 0) {
       return new Match[0];
     }
-
     List<NameIdentifier> tagIdentifiers =
         Arrays.stream(effectiveTags)
             .map(resolvedTag -> resolvedTag.tag().name())
@@ -305,14 +271,16 @@ public class ObjectPolicyResolver {
 
   /**
    * Drops farther Iceberg maintenance matches of the same type when a nearer level already provides
-   * that type. Other policy types are left unchanged. Same-level ambiguity is left to {@link
-   * #requireNoSameLevelConflict(String, MetadataObject)} at write time.
+   * that type. Other policy types are left unchanged.
    */
-  static Match[] applySameTypePrecedence(MetadataObject metadataObject, Match[] matches) {
+  private static Match[] dropFartherMaintenanceMatches(
+      MetadataObject metadataObject, Match[] matches) {
     if (matches.length <= 1) {
       return matches;
     }
-    List<MetadataObject> chain = ancestryChain(metadataObject);
+    List<MetadataObject> chain = new ArrayList<>();
+    chain.add(metadataObject);
+    chain.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
     Map<Policy.BuiltInType, List<Match>> byType = groupMaintenanceMatches(matches);
     Set<Long> droppedIds = new LinkedHashSet<>();
     for (List<Match> typed : byType.values()) {
@@ -341,6 +309,25 @@ public class ObjectPolicyResolver {
         .toArray(Match[]::new);
   }
 
+  private static void rejectSameLevelMaintenanceConflicts(
+      MetadataObject metadataObject, Match[] matches) {
+    for (Map.Entry<Policy.BuiltInType, List<Match>> entry :
+        groupMaintenanceMatches(matches).entrySet()) {
+      TreeSet<String> names = new TreeSet<>();
+      for (Match match : entry.getValue()) {
+        if (match.sources().contains(metadataObject)) {
+          names.add(match.policy().name());
+        }
+      }
+      if (names.size() > 1) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Metadata object %s has conflicting %s policies at the same level: %s",
+                metadataObject, entry.getKey().policyType(), names));
+      }
+    }
+  }
+
   private static Map<Policy.BuiltInType, List<Match>> groupMaintenanceMatches(Match[] matches) {
     Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
     for (Match match : matches) {
@@ -351,13 +338,6 @@ public class ObjectPolicyResolver {
       byType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(match);
     }
     return byType;
-  }
-
-  private static List<MetadataObject> ancestryChain(MetadataObject metadataObject) {
-    List<MetadataObject> chain = new ArrayList<>();
-    chain.add(metadataObject);
-    chain.addAll(MetadataObjectUtil.getParentMetadataObjects(metadataObject));
-    return chain;
   }
 
   private static Match[] selectMatches(

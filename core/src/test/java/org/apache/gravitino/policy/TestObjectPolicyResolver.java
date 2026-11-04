@@ -400,9 +400,8 @@ public class TestObjectPolicyResolver {
     TagEntity strict = tag(2L, "maint", TagAssignment.ofValues("strict")).copyWithInherited(false);
     PolicyEntity hotPolicy = compaction(10L, "compact_hot");
     PolicyEntity strictPolicy = compaction(20L, "compact_strict");
-    when(effectiveTagResolver.resolveWithSources(METALAKE, OBJECT))
-        .thenReturn(
-            new ResolvedTag[] {new ResolvedTag(hot, OBJECT), new ResolvedTag(strict, OBJECT)});
+    ResolvedTag[] directTags =
+        new ResolvedTag[] {new ResolvedTag(hot, OBJECT), new ResolvedTag(strict, OBJECT)};
     when(relationOperations.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
             Arrays.asList(
@@ -417,7 +416,7 @@ public class TestObjectPolicyResolver {
     IllegalArgumentException thrown =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> resolver.requireNoSameLevelConflict(METALAKE, OBJECT));
+            () -> resolver.requireNoSameLevelConflict(METALAKE, OBJECT, directTags));
     Assertions.assertTrue(thrown.getMessage().contains("compact_hot"));
     Assertions.assertTrue(thrown.getMessage().contains("compact_strict"));
   }
