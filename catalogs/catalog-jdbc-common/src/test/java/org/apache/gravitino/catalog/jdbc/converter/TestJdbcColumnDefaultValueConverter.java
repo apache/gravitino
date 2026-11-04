@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.io.BaseEncoding;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -32,6 +33,30 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestJdbcColumnDefaultValueConverter {
 
   private final JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryDefaultsPreserveBytes(String hex) {
+    Assertions.assertEquals(
+        "X'" + hex + "'",
+        converter.fromGravitino(
+            Literals.of(BaseEncoding.base16().lowerCase().decode(hex), Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "X'" + hex + "'", converter.fromGravitino(Literals.of("0x" + hex, Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "'legacy'", converter.fromGravitino(Literals.of("legacy", Types.BinaryType.get())));
+    Assertions.assertEquals("'0x4142'", converter.fromGravitino(Literals.stringLiteral("0x4142")));
+    Assertions.assertEquals(
+        "X'00ff'", converter.fromGravitino(Literals.of("0x00FF", Types.BinaryType.get())));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0x0", "0xzz", "0x41'); DROP TABLE t; --"})
+  void testMalformedBinaryDefaultsAreRejected(String value) {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(Literals.of(value, Types.BinaryType.get())));
+  }
 
   @Test
   public void testFromGravitino() {

@@ -19,18 +19,32 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.HexFormat;
+import java.util.Locale;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.requests.TableUpdateRequest.UpdateTableColumnDefaultValueRequest;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestTransformTableChange {
   private SparkTableChangeConverter sparkTableChangeConverter =
@@ -80,7 +94,14 @@ public class TestTransformTableChange {
     assertDefault("", Column.DEFAULT_VALUE_NOT_SET);
     for (String expression :
         new String[] {
-          "1 + 1", "current_timestamp()", "upper('abc')", "not valid SQL!", "column_name"
+          "1 + 1",
+          "current_timestamp()",
+          "upper('abc')",
+          "not valid SQL!",
+          "column_name",
+          "+(1 + 1)",
+          "+'abc'",
+          "+true"
         }) {
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -90,12 +111,74 @@ public class TestTransformTableChange {
     }
   }
 
-  private void assertDefault(String sql, Expression expected) {
-    org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
-        (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
-            sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql));
-    Assertions.assertEquals(expected, converted.getNewDefaultValue());
+  @Test
+  void testExplicitPositiveLiteralDefaults() {
+    assertDefault("+42", Literals.integerLiteral(42));
+    assertDefault("+42L", Literals.longLiteral(42L));
+    assertDefault("+12.34", Literals.decimalLiteral(Decimal.of("12.34", 4, 2)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"UTC", "Asia/Shanghai", "America/Los_Angeles"})
+  void testTimestampDefaultsPreserveInstant(String timeZone) {
+    withSessionConfig(
+        timeZone,
+        "TIMESTAMP_LTZ",
+        () -> {
+          for (String text :
+              new String[] {"2026-11-04T12:34:56.123456", "1969-12-31T23:59:59.999999"}) {
+            Expression expected =
+                Literals.of(
+                    LocalDateTime.parse(text)
+                        .atZone(ZoneId.of(timeZone))
+                        .toInstant()
+                        .atOffset(ZoneOffset.UTC),
+                    Types.TimestampType.withTimeZone());
+            assertDefault("TIMESTAMP '" + text + "'", expected);
+            assertDefault("TIMESTAMP_LTZ '" + text + "'", expected);
+          }
+          assertDefault(
+              "TIMESTAMP '2026-11-04 12:34:56.123456+02:00'",
+              Literals.of(
+                  LocalDateTime.parse("2026-11-04T10:34:56.123456").atOffset(ZoneOffset.UTC),
+                  Types.TimestampType.withTimeZone()));
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"UTC", "Asia/Shanghai", "America/Los_Angeles"})
+  void testTimestampNtzDefaultsPreserveLocalTime(String timeZone) {
+    withSessionConfig(
+        timeZone,
+        "TIMESTAMP_NTZ",
+        () -> {
+          for (String text :
+              new String[] {"2026-11-04T12:34:56.123456", "1969-12-31T23:59:59.999999"}) {
+            Expression expected = Literals.timestampLiteral(text);
+            assertDefault("TIMESTAMP_NTZ '" + text + "'", expected);
+            assertDefault("TIMESTAMP '" + text + "'", expected);
+          }
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080FF", ""})
+  void testBinaryLiteralDefaults(String hex) throws Exception {
+    Expression converted =
+        assertDefault(
+            "X'" + hex + "'", Literals.of(HexFormat.of().parseHex(hex), Types.BinaryType.get()));
+    LiteralDTO dto = (LiteralDTO) DTOConverters.toFunctionArg(converted);
+    Assertions.assertEquals("0x" + hex.toLowerCase(Locale.ROOT), dto.value());
+    UpdateTableColumnDefaultValueRequest request =
+        new UpdateTableColumnDefaultValueRequest(new String[] {"col"}, dto);
+    UpdateTableColumnDefaultValueRequest restored =
+        JsonUtils.objectMapper()
+            .readValue(
+                JsonUtils.objectMapper().writeValueAsString(request),
+                UpdateTableColumnDefaultValueRequest.class);
+    Assertions.assertEquals(
+        "X'" + hex.toLowerCase(Locale.ROOT) + "'",
+        new JdbcColumnDefaultValueConverter().fromGravitino(restored.getNewDefaultValue()));
   }
 
   @Test
@@ -322,5 +405,26 @@ public class TestTransformTableChange {
         sparkUpdateColumnNullability.fieldNames(), gravitinoUpdateColumnNullability.fieldName());
     Assertions.assertEquals(
         sparkUpdateColumnNullability.nullable(), gravitinoUpdateColumnNullability.nullable());
+  }
+
+  private Expression assertDefault(String sql, Expression expected) {
+    org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
+        (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue)
+            sparkTableChangeConverter.toGravitinoTableChange(
+                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql));
+    Assertions.assertEquals(expected, converted.getNewDefaultValue());
+    return converted.getNewDefaultValue();
+  }
+
+  private void withSessionConfig(String timeZone, String timestampType, Runnable assertions) {
+    SQLConf conf = new SQLConf();
+    conf.setConfString("spark.sql.session.timeZone", timeZone);
+    conf.setConfString("spark.sql.timestampType", timestampType);
+    SQLConf.withExistingConf(
+        conf,
+        () -> {
+          assertions.run();
+          return null;
+        });
   }
 }

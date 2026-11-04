@@ -47,6 +47,15 @@ NamedReference field = NamedReference.field("student");
 
 Literal is a constant value.
 
+Binary literals created from a Java `byte[]` are encoded in REST literal values as `0x` followed by
+hexadecimal byte pairs, for example `"dataType": "binary", "value": "0x4142"` for the bytes `AB`.
+`"0x"` represents an empty binary value. JDBC default converters recognize this encoding and render
+the bytes using their dialect's binary syntax; provider restrictions on binary defaults still apply.
+Unprefixed binary string values retain their previous provider-specific interpretation. A binary
+string starting with `0x` must contain valid hexadecimal pairs; it is treated as encoded bytes.
+Sending encoded binary defaults requires the server-side JDBC default converters described here;
+older servers do not decode this representation.
+
 When writing table or function defaults, partition values, partitioning, distribution, or sort
 expressions, each literal must declare a recognized Gravitino type or an explicit
 [external type](./tables-and-views.md#external-type) with a nonblank `catalogString`.

@@ -19,14 +19,22 @@
 package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
+import java.time.ZoneOffset;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.utils.SparkPartitionUtils;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.catalyst.expressions.UnaryMinus;
+import org.apache.spark.sql.catalyst.expressions.UnaryPositive;
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser$;
+import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.types.BinaryType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
 
 public class SparkTableChangeConverter {
   private SparkTypeConverter sparkTypeConverter;
@@ -117,12 +125,24 @@ public class SparkTableChangeConverter {
           CatalystSqlParser$.MODULE$.parseExpression(sql);
       boolean literal =
           parsed instanceof Literal
-              || (parsed instanceof UnaryMinus && ((UnaryMinus) parsed).child() instanceof Literal);
+              || (parsed instanceof UnaryMinus && ((UnaryMinus) parsed).child() instanceof Literal)
+              || (parsed instanceof UnaryPositive
+                  && ((UnaryPositive) parsed).child() instanceof Literal);
       Preconditions.checkArgument(
           literal && parsed.resolved() && parsed.foldable(),
           "Only literal column defaults are supported: %s",
           sql);
       Object value = parsed.eval(null);
+      if (parsed.dataType() instanceof TimestampType) {
+        // Spark has already applied the SQL session/explicit zone. Preserve the instant in UTC.
+        return Literals.of(
+            DateTimeUtils.microsToInstant((long) value).atOffset(ZoneOffset.UTC),
+            Types.TimestampType.withTimeZone());
+      } else if (parsed.dataType() instanceof TimestampNTZType) {
+        return Literals.timestampLiteral(DateTimeUtils.microsToLocalDateTime((long) value));
+      } else if (parsed.dataType() instanceof BinaryType) {
+        return Literals.of((byte[]) value, Types.BinaryType.get());
+      }
       return SparkPartitionUtils.toGravitinoLiteral(
           new GenericInternalRow(new Object[] {value}), 0, parsed.dataType());
     } catch (Exception e) {
