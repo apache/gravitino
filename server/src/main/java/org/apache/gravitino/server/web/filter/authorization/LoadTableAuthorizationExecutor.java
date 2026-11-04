@@ -30,6 +30,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 
 /**
  * Authorization executor for load table operations.
@@ -109,13 +110,10 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
         .map(String::trim)
         .filter(StringUtils::isNotBlank)
         .map(
-            privilege -> {
-              try {
-                return Privilege.Name.valueOf(privilege);
-              } catch (IllegalArgumentException e) {
-                throw new BadRequestException(e, "Invalid privilege: %s", privilege);
-              }
-            })
+            privilege ->
+                RequestValidation.parse(
+                    () -> Privilege.Name.valueOf(privilege),
+                    e -> new BadRequestException(e, "Invalid privilege: %s", privilege)))
         .toList()
         .contains(Privilege.Name.MODIFY_TABLE);
   }

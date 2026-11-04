@@ -606,6 +606,45 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  /** Verifies that authorizer failures after successful input validation remain server errors. */
+  @Test
+  public void testAuthorizerIllegalArgumentExceptionRemainsInternalError() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class)) {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.isOwner(any(), any(), any(), any()))
+          .thenThrow(new IllegalArgumentException("Invalid authorizer policy"));
+      Method method = JobOperations.class.getMethod("runJob", String.class, JobRunRequest.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              new Object[] {"metalake", new JobRunRequest("template", Collections.emptyMap())});
+
+      Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation);
+
+      assertEquals(500, response.getStatus());
+      Assertions.assertTrue(
+          ((ErrorResponse) response.getEntity())
+              .getMessage()
+              .contains("Authorization failed due to system internal error"));
+      verify(authorizer).isOwner(any(), any(), any(), any());
+      verify(invocation, never()).proceed();
+    }
+  }
+
   @Test
   public void testUnexpectedIllegalArgumentExceptionRemainsInternalError() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
