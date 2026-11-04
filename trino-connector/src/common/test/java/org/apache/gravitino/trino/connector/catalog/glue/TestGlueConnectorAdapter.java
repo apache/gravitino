@@ -108,7 +108,8 @@ class TestGlueConnectorAdapter {
             ImmutableMap.of("aws-region", "us-east-1", "default-table-format", "iceberg"));
     GlueMetadataAdapter metadataAdapter =
         (GlueMetadataAdapter)
-            new GlueConnectorAdapter().getMetadataAdapter(new GravitinoCatalog("test", mockCatalog));
+            new GlueConnectorAdapter()
+                .getMetadataAdapter(new GravitinoCatalog("test", mockCatalog));
 
     ConnectorTableMetadata tableMetadata =
         new ConnectorTableMetadata(

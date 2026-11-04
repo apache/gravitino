@@ -170,8 +170,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   /**
-   * Returns the type converter for the columns of a new table. Catalogs that hold tables of
-   * several formats override this to pick the converter of the format the table is created in.
+   * Returns the type converter for the columns of a new table. Catalogs that hold tables of several
+   * formats override this to pick the converter of the format the table is created in.
    *
    * @param gravitinoTableProperties the Gravitino properties of the new table
    * @return the type converter for the columns of the table

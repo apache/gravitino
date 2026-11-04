@@ -264,8 +264,8 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
 
   /**
    * The lakehouse connector decodes table properties into its own types, while the properties of a
-   * CREATE TABLE AS SELECT statement are decoded with the Glue property metadata, so it cannot
-   * plan the layout of the new table.
+   * CREATE TABLE AS SELECT statement are decoded with the Glue property metadata, so it cannot plan
+   * the layout of the new table.
    */
   @Override
   public boolean skipsInternalNewTableLayout() {

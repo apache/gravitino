@@ -278,9 +278,7 @@ class TestGlueMetadataAdapter {
 
     assertEquals("ICEBERG", tableMetadata.getProperties().get("type"));
     assertEquals(ImmutableList.of("day(ts)"), tableMetadata.getProperties().get("partitioned_by"));
-    assertEquals(
-        ImmutableList.of("id DESC"),
-        tableMetadata.getProperties().get("sorted_by"));
+    assertEquals(ImmutableList.of("id DESC"), tableMetadata.getProperties().get("sorted_by"));
     assertEquals(2, tableMetadata.getColumns().size());
   }
 
@@ -315,8 +313,7 @@ class TestGlueMetadataAdapter {
             "tbl",
             new Column[] {
               Column.of("id", Types.LongType.get()),
-              Column.of(
-                  "u", Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get())),
+              Column.of("u", Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get())),
               Column.of("d", Types.IntervalDayType.get())
             },
             Map.of(),
@@ -356,10 +353,7 @@ class TestGlueMetadataAdapter {
     return new ConnectorTableMetadata(
         new SchemaTableName("db", "tbl"),
         ImmutableList.of(
-            ColumnMetadata.builder()
-                .setName("ts")
-                .setType(TimestampType.TIMESTAMP_MICROS)
-                .build()),
+            ColumnMetadata.builder().setName("ts").setType(TimestampType.TIMESTAMP_MICROS).build()),
         new HashMap<>(properties));
   }
 
