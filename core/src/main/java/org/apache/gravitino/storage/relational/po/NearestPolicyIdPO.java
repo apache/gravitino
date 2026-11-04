@@ -21,13 +21,13 @@ package org.apache.gravitino.storage.relational.po;
 /**
  * The enabled policies of one type matched on a table's nearest level.
  *
- * <p>{@code minPolicyId} equals {@code maxPolicyId} when exactly one policy wins that level.
+ * <p>{@code policyId} is the winner when {@code policyCount} is one.
  */
 public class NearestPolicyIdPO {
 
   private Long tableId;
-  private Long minPolicyId;
-  private Long maxPolicyId;
+  private Long policyCount;
+  private Long policyId;
 
   /**
    * @return table id
@@ -44,30 +44,30 @@ public class NearestPolicyIdPO {
   }
 
   /**
+   * @return number of distinct policies matched on the nearest level
+   */
+  public Long getPolicyCount() {
+    return policyCount;
+  }
+
+  /**
+   * @param policyCount number of distinct policies matched on the nearest level
+   */
+  public void setPolicyCount(Long policyCount) {
+    this.policyCount = policyCount;
+  }
+
+  /**
    * @return smallest policy id matched on the nearest level
    */
-  public Long getMinPolicyId() {
-    return minPolicyId;
+  public Long getPolicyId() {
+    return policyId;
   }
 
   /**
-   * @param minPolicyId smallest policy id matched on the nearest level
+   * @param policyId smallest policy id matched on the nearest level
    */
-  public void setMinPolicyId(Long minPolicyId) {
-    this.minPolicyId = minPolicyId;
-  }
-
-  /**
-   * @return largest policy id matched on the nearest level
-   */
-  public Long getMaxPolicyId() {
-    return maxPolicyId;
-  }
-
-  /**
-   * @param maxPolicyId largest policy id matched on the nearest level
-   */
-  public void setMaxPolicyId(Long maxPolicyId) {
-    this.maxPolicyId = maxPolicyId;
+  public void setPolicyId(Long policyId) {
+    this.policyId = policyId;
   }
 }

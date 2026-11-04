@@ -166,13 +166,13 @@ public class PolicyMetaService {
                     tableIds, policyType.policyType(), HierarchicalSchemaUtil.physicalSeparator()));
     for (NearestPolicyIdPO row : rows) {
       Preconditions.checkArgument(
-          row.getMinPolicyId().equals(row.getMaxPolicyId()),
-          "ambiguous %s policies on the nearest level of table %s, including %s and %s",
+          row.getPolicyCount() == 1,
+          "ambiguous %s policies on the nearest level of table %s: %s policies, including %s",
           policyType,
           row.getTableId(),
-          row.getMinPolicyId(),
-          row.getMaxPolicyId());
-      result.put(row.getTableId(), row.getMinPolicyId());
+          row.getPolicyCount(),
+          row.getPolicyId());
+      result.put(row.getTableId(), row.getPolicyId());
     }
     return result;
   }

@@ -278,8 +278,8 @@ public class PolicyMetaBaseSQLProvider {
   }
 
   /**
-   * Lists, for each table, the smallest and largest enabled policy id of {@code policyType} matched
-   * on the table's nearest level, in one statement.
+   * Lists, for each table, how many distinct enabled policies of {@code policyType} match on the
+   * table's nearest level and the smallest of their ids, in one statement.
    *
    * <p>A table inherits from its schema, the hierarchical ancestors of that schema, and its
    * catalog. For each tag the nearest assignment wins, including its values. A policy matches when
@@ -300,8 +300,8 @@ public class PolicyMetaBaseSQLProvider {
     String matches = nearestPolicyMatches();
     return "<script>"
         + "SELECT m.table_id AS tableId,"
-        + " MIN(m.policy_id) AS minPolicyId,"
-        + " MAX(m.policy_id) AS maxPolicyId"
+        + " COUNT(DISTINCT m.policy_id) AS policyCount,"
+        + " MIN(m.policy_id) AS policyId"
         + " FROM ("
         + matches
         + ") m"
