@@ -127,13 +127,17 @@ public class PolicyMetaSQLProviderFactory {
 
   /** Delegates the nearest-policy lookup. */
   public static String listNearestPolicyIds(
-      @Param("tableIds") List<Long> tableIds,
-      @Param("policyType") String policyType,
-      @Param("schemaSeparator") String schemaSeparator) {
-    return getProvider().listNearestPolicyIds(tableIds, policyType, schemaSeparator);
+      @Param("tableIds") List<Long> tableIds, @Param("policyType") String policyType) {
+    return getProvider().listNearestPolicyIds(tableIds, policyType);
   }
 
-  static class PolicyMetaMySQLProvider extends PolicyMetaBaseSQLProvider {}
+  static class PolicyMetaMySQLProvider extends PolicyMetaBaseSQLProvider {
+    @Override
+    protected String schemaSeparatorLiteral() {
+      // A bare CHAR(1) is a binary string in MySQL; match the utf8mb4 schema name column instead.
+      return "CHAR(1 USING utf8mb4)";
+    }
+  }
 
   static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {}
 }
