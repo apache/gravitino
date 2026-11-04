@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Entity.EntityType.COLUMN;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
@@ -339,15 +338,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         isRenameTable && !managed
                             ? getTableEntityBeforeRename(ident)
                             : Optional.empty();
-                    TableChange[] normalizedChanges =
-                        applyCapabilities(catalog.capabilities(), changes);
+                    // TableNormalizeDispatcher already normalized the changes. Normalization can
+                    // depend on quoting and must not be repeated on canonical physical names.
                     Table table =
-                        catalog.doWithTableOps(
-                            tableOps -> tableOps.alterTable(ident, normalizedChanges));
+                        catalog.doWithTableOps(tableOps -> tableOps.alterTable(ident, changes));
                     return new AlterTableCatalogResult(
                         snapshotTable(catalog, table, managed),
                         tableEntityBeforeRename,
-                        resolveColumnNameChanges(normalizedChanges));
+                        resolveColumnNameChanges(changes));
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
