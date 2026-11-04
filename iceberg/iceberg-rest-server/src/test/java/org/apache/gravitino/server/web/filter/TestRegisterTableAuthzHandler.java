@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -45,7 +46,11 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -61,6 +66,7 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /**
@@ -188,6 +194,50 @@ class TestRegisterTableAuthzHandler {
     MethodInvocation overwrite = registerInvocation(true, TABLE, META_LOC);
     assertForbidden(interceptor.invoke(overwrite));
     verify(catalogWrapper, never()).listNamespace(any());
+    verify(catalogWrapper, never()).loadTableMetadataFromLocation(any());
+  }
+
+  @Test
+  void testCreateDenialChecksDestinationBeforeReadingMetadata() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+
+    MethodInvocation create = registerInvocation(false, TABLE, META_LOC);
+    assertForbidden(interceptor.invoke(create));
+    verify(catalogWrapper, never()).loadTableMetadataFromLocation(any());
+    verify(catalogWrapper, never()).listNamespace(any());
+  }
+
+  @Test
+  void testOverwriteDenialDispatchesAuditAgainstTable() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> env = mockGravitinoEnv(eventBus)) {
+      assertForbidden(interceptor.invoke(registerInvocation(true, TABLE, META_LOC)));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      assertEquals(
+          NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE),
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
+  }
+
+  @Test
+  void testSourceDenialDispatchesAuditAgainstSchema() throws Throwable {
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(source);
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> env = mockGravitinoEnv(eventBus)) {
+      assertForbidden(interceptor.invoke(registerInvocation(false, "copy", META_LOC)));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      // Plain register attributes denials to the method's SCHEMA access target.
+      assertEquals(
+          NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA),
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
   }
 
   @Test
@@ -272,6 +322,14 @@ class TestRegisterTableAuthzHandler {
     doAnswer(invocation -> allowed.contains(invocation.getArgument(3)))
         .when(authorizer)
         .authorize(any(), any(), any(), any(), any());
+  }
+
+  private static MockedStatic<GravitinoEnv> mockGravitinoEnv(EventBus eventBus) {
+    MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+    when(env.eventBus()).thenReturn(eventBus);
+    return envStatic;
   }
 
   private static void assertForbidden(Object result) {

@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.RegisterTableSourceResolver;
@@ -42,22 +43,27 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /**
  * Authorizes Iceberg REST {@code registerTable} requests that the method annotation alone cannot
  * express.
  *
- * <p>An overwrite replaces the named table, so it is a modification rather than a create: this
- * handler evaluates the modify-table expression against that table itself and completes
- * authorization, so {@code CREATE_TABLE} alone cannot replace a table the caller does not own. A
- * plain register falls through to the create expression on the method. Either way, when the
- * metadata file still belongs to another live table, the load-table expression on that table is
- * required, so {@code CREATE_TABLE} alone cannot adopt an unreadable table's metadata.
+ * <p>Destination authorization runs first, before any metadata FileIO or catalog scan: overwrite
+ * uses the modify-table expression on the named table; a plain register uses the same create-table
+ * expression as {@code IcebergNamespaceOperations#registerTable}. Authorization then completes, so
+ * the shared interceptor does not re-evaluate the method expression. When the metadata file still
+ * belongs to another live table, the load-table expression on that table is required so {@code
+ * CREATE_TABLE} alone cannot adopt an unreadable table's metadata.
  */
 @SuppressWarnings("FormatStringAnnotation")
 public class RegisterTableAuthzHandler implements AuthorizationHandler {
+
+  /** Same create expression as {@code IcebergNamespaceOperations#registerTable}. */
+  private static final String CREATE_TABLE_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE";
 
   private static final Pattern SCHEMA_SPLIT =
       Pattern.compile(Pattern.quote(HierarchicalSchemaUtil.schemaSeparator()));
@@ -95,17 +101,14 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
 
-    if (request.overwrite()) {
-      requireCanOverwriteTable(nameIdentifierMap);
-    }
+    requireCanAccessDestination(nameIdentifierMap, request.overwrite());
     authorizeMetadataSources(metalakeName, catalog, schema, tableName, request);
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // An overwrite is fully authorized in process(); a plain register still needs the create
-    // expression on the method.
-    return registerTableRequest().overwrite();
+    // Destination create/overwrite and any source checks are finished in process().
+    return true;
   }
 
   @Override
@@ -113,18 +116,23 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     return registerTableRequest().overwrite() ? EntityType.TABLE : defaultType;
   }
 
-  private static void requireCanOverwriteTable(Map<EntityType, NameIdentifier> nameIdentifierMap) {
+  private static void requireCanAccessDestination(
+      Map<EntityType, NameIdentifier> nameIdentifierMap, boolean overwrite) {
+    String expression = overwrite ? MODIFY_TABLE_AUTHORIZATION_EXPRESSION : CREATE_TABLE_EXPRESSION;
+    EntityType accessType = overwrite ? EntityType.TABLE : EntityType.SCHEMA;
     boolean authorized =
-        new AuthorizationExpressionEvaluator(MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
+        new AuthorizationExpressionEvaluator(expression)
             .evaluate(
                 nameIdentifierMap,
                 new HashMap<>(),
                 new AuthorizationRequestContext(),
-                Optional.of(EntityType.TABLE.name()));
+                Optional.of(accessType.name()));
     if (!authorized) {
       throw new ForbiddenException(
-          "User '%s' is not authorized to overwrite table '%s'",
-          PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(EntityType.TABLE));
+          "User '%s' is not authorized to %s table '%s'",
+          PrincipalUtils.getCurrentUserName(),
+          overwrite ? "overwrite" : "register",
+          nameIdentifierMap.get(EntityType.TABLE));
     }
   }
 
