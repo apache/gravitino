@@ -234,6 +234,9 @@ association has a selector:
 | `ALL_VALUES` | The effective tag is present, with or without assignment values.       |
 | `TAG_VALUE`  | One effective tag assignment value equals the specified value.         |
 
+Like tag assignment values, a `TAG_VALUE` value cannot contain double quotes (`"`), backslashes
+(`\`), or control characters.
+
 The selector belongs to the association, not to the policy or the tag. An existing association
 cannot be replaced by another add request. Remove it and add it again to change its selector.
 

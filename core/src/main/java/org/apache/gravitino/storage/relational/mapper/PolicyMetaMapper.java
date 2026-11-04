@@ -19,8 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
-import org.apache.gravitino.storage.relational.po.NearestPolicyMatchPO;
+import org.apache.gravitino.storage.relational.po.NearestPolicyIdPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -221,25 +220,25 @@ public interface PolicyMetaMapper {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
 
   /**
-   * Lists enabled policy-tag candidates for nearest-policy resolution over an ancestry chain.
+   * Lists, for each table, the enabled policies of {@code policyType} matched on its nearest level.
    *
-   * @param chain table ancestry rows
+   * <p>Tables without a matching policy are absent from the result.
+   *
+   * @param tableIds table ids
    * @param policyType policy type wire value
-   * @return candidate rows (effective-tag / selector / nearest pick applied in the service)
+   * @param schemaSeparator physical hierarchical schema separator
+   * @return one row per table with a matching policy
    */
   @Results(
-      id = "nearestPolicyMatchPOResultMap",
+      id = "nearestPolicyIdPOResultMap",
       value = {
         @Result(property = "tableId", column = "tableId"),
-        @Result(property = "lvl", column = "lvl"),
-        @Result(property = "tagName", column = "tagName"),
-        @Result(property = "tagValue", column = "tagValue"),
-        @Result(property = "policyId", column = "policyId"),
-        @Result(property = "selector", column = "selector")
+        @Result(property = "minPolicyId", column = "minPolicyId"),
+        @Result(property = "maxPolicyId", column = "maxPolicyId")
       })
-  @SelectProvider(
-      type = PolicyMetaSQLProviderFactory.class,
-      method = "listNearestPolicyMatchCandidates")
-  List<NearestPolicyMatchPO> listNearestPolicyMatchCandidates(
-      @Param("chain") List<NearestPolicyChainPO> chain, @Param("policyType") String policyType);
+  @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listNearestPolicyIds")
+  List<NearestPolicyIdPO> listNearestPolicyIds(
+      @Param("tableIds") List<Long> tableIds,
+      @Param("policyType") String policyType,
+      @Param("schemaSeparator") String schemaSeparator);
 }
