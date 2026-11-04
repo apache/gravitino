@@ -111,11 +111,6 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     return true;
   }
 
-  @Override
-  public EntityType entityType(EntityType defaultType) {
-    return registerTableRequest().overwrite() ? EntityType.TABLE : defaultType;
-  }
-
   private static void requireCanAccessDestination(
       Map<EntityType, NameIdentifier> nameIdentifierMap, boolean overwrite) {
     String expression = overwrite ? MODIFY_TABLE_AUTHORIZATION_EXPRESSION : CREATE_TABLE_EXPRESSION;

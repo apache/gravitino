@@ -409,7 +409,8 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
-  public void testHandlerDenialIsRecordedAgainstHandlerTarget() throws Throwable {
+  public void testHandlerDenialIsRecordedAgainstMethodTarget() throws Throwable {
+    NameIdentifier schema = NameIdentifierUtil.ofSchema("metalake", "catalog", "schema");
     NameIdentifier table = NameIdentifierUtil.ofTable("metalake", "catalog", "schema", "table");
     EventBus eventBus = mock(EventBus.class);
     try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
@@ -428,11 +429,6 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                 public boolean authorizationCompleted() {
                   return true;
                 }
-
-                @Override
-                public Entity.EntityType entityType(Entity.EntityType defaultType) {
-                  return Entity.EntityType.TABLE;
-                }
               });
 
       assertInstanceOf(
@@ -442,7 +438,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
       ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
       verify(eventBus).dispatchEvent(event.capture());
       assertEquals(
-          table,
+          schema,
           assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
     }
   }

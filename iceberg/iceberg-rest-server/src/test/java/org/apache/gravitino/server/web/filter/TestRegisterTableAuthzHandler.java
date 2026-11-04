@@ -208,7 +208,7 @@ class TestRegisterTableAuthzHandler {
   }
 
   @Test
-  void testOverwriteDenialDispatchesAuditAgainstTable() throws Throwable {
+  void testOverwriteDenialDispatchesAuditAgainstSchema() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
     EventBus eventBus = mock(EventBus.class);
     try (MockedStatic<GravitinoEnv> env = mockGravitinoEnv(eventBus)) {
@@ -216,8 +216,9 @@ class TestRegisterTableAuthzHandler {
 
       ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
       verify(eventBus).dispatchEvent(event.capture());
+      // Denials attribute to the method annotation's SCHEMA access target.
       assertEquals(
-          NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE),
+          NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA),
           assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
     }
   }
@@ -233,7 +234,6 @@ class TestRegisterTableAuthzHandler {
 
       ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
       verify(eventBus).dispatchEvent(event.capture());
-      // Plain register attributes denials to the method's SCHEMA access target.
       assertEquals(
           NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA),
           assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());

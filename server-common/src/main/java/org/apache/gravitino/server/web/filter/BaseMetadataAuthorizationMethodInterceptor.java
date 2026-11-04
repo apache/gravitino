@@ -123,18 +123,6 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
      *     standard expression-based authorization
      */
     boolean authorizationCompleted();
-
-    /**
-     * Returns the entity type this handler authorizes the request against, used to attribute
-     * denials and audit events. Called after {@link #process}, also when it fails.
-     *
-     * @param defaultType entity type resolved from the method annotation
-     * @return the effective access entity type, {@code defaultType} unless the handler targets a
-     *     different object
-     */
-    default Entity.EntityType entityType(Entity.EntityType defaultType) {
-      return defaultType;
-    }
   }
 
   /** Invokes the protocol operation after authorization succeeds. */
@@ -348,16 +336,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
-          try {
-            authzHandler.process(nameIdentifierMap);
-          } finally {
-            // Attribute denials to the object the handler authorizes, including its own denials.
-            NameIdentifier handlerTarget =
-                nameIdentifierMap.get(authzHandler.entityType(target.entityType()));
-            if (handlerTarget != null) {
-              deniedObject = handlerTarget;
-            }
-          }
+          authzHandler.process(nameIdentifierMap);
           skipStandardCheck = authzHandler.authorizationCompleted();
         }
 
