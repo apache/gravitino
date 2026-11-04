@@ -142,6 +142,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return icebergConfig;
   }
 
+  /**
+   * Invalidates cached metadata before a subclass changes or removes a table.
+   *
+   * @param tableIdentifier the table whose cached metadata must be invalidated
+   */
+  protected void invalidateTableMetadata(TableIdentifier tableIdentifier) {
+    getMetadataCache().invalidate(tableIdentifier);
+  }
+
   private SupportsNamespaces getNamespaceCatalog() {
     SupportsNamespaces namespaceCatalog = asNamespaceCatalog;
     if (namespaceCatalog != null) {
@@ -276,12 +285,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     CatalogHandlers.dropTable(getCatalog(), tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     Table table = getCatalog().loadTable(tableIdentifier);
     if (!(table instanceof HasTableOperations)) {
       CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
