@@ -26,8 +26,9 @@ import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRe
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
-import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -277,62 +278,126 @@ public class PolicyMetaBaseSQLProvider {
   }
 
   /**
-   * Lists enabled policy-tag assignment candidates for ancestry chain rows of one policy type.
+   * Lists, for each table, the smallest and largest enabled policy id of {@code policyType} matched
+   * on the table's nearest level, in one statement.
    *
-   * <p>Java applies effective-tag override, selector matching, and nearest-level uniqueness. The
-   * SQL only joins active tag assignments to enabled policies of {@code policyType}.
+   * <p>A table inherits from its schema, the hierarchical ancestors of that schema, and its
+   * catalog. For each tag the nearest assignment wins, including its values. A policy matches when
+   * its selector is null, {@code ALL_VALUES}, or the {@code TAG_VALUE} JSON of one effective value;
+   * tag and selector values never contain characters the selector JSON escapes. The statement uses
+   * derived tables instead of CTEs and window functions so that MySQL 5.7 can run it.
    *
-   * @param chain table ancestry rows ({@code tableId}, object id/type, {@code lvl})
+   * @param tableIds table ids
    * @param policyType {@link org.apache.gravitino.policy.Policy.BuiltInType#policyType()} wire
    *     value
+   * @param schemaSeparator physical hierarchical schema separator
    * @return SQL
    */
-  public String listNearestPolicyMatchCandidates(
-      @Param("chain") List<NearestPolicyChainPO> chain, @Param("policyType") String policyType) {
+  public String listNearestPolicyIds(
+      @Param("tableIds") List<Long> tableIds,
+      @Param("policyType") String policyType,
+      @Param("schemaSeparator") String schemaSeparator) {
+    String matches = nearestPolicyMatches();
     return "<script>"
-        + "SELECT c.table_id AS tableId,"
-        + " c.lvl AS lvl,"
-        + " tg.tag_name AS tagName,"
-        + " tr.tag_value AS tagValue,"
-        + " pm.policy_id AS policyId,"
-        + " ptr.selector AS selector"
+        + "SELECT m.table_id AS tableId,"
+        + " MIN(m.policy_id) AS minPolicyId,"
+        + " MAX(m.policy_id) AS maxPolicyId"
         + " FROM ("
-        + "<foreach collection='chain' item='c' separator=' UNION ALL '>"
-        + nearestPolicyChainSelect()
-        + "</foreach>"
-        + " ) c"
-        + " JOIN "
-        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tr ON tr.metadata_object_id = c.object_id"
-        + "  AND tr.metadata_object_type = c.object_type"
-        + "  AND tr.deleted_at = 0"
-        + " JOIN "
-        + TAG_TABLE_NAME
-        + " tg ON tg.tag_id = tr.tag_id AND tg.deleted_at = 0"
+        + matches
+        + ") m"
+        + " JOIN (SELECT n.table_id, MIN(n.distance) AS distance FROM ("
+        + matches
+        + ") n GROUP BY n.table_id) nearest"
+        + " ON nearest.table_id = m.table_id AND nearest.distance = m.distance"
+        + " GROUP BY m.table_id"
+        + "</script>";
+  }
+
+  /**
+   * Enabled policies matched through each table's effective tags: table_id, distance, policy_id.
+   */
+  private static String nearestPolicyMatches() {
+    String assignments = ancestorTagAssignments();
+    return "SELECT a.table_id, a.distance, pm.policy_id"
+        + " FROM ("
+        + assignments
+        + ") a"
+        + " JOIN (SELECT e.table_id, e.tag_id, MIN(e.distance) AS distance FROM ("
+        + assignments
+        + ") e GROUP BY e.table_id, e.tag_id) effective"
+        + " ON effective.table_id = a.table_id AND effective.tag_id = a.tag_id"
+        + " AND effective.distance = a.distance"
         + " JOIN "
         + POLICY_TAG_RELATION_TABLE_NAME
-        + " ptr ON ptr.tag_id = tr.tag_id AND ptr.deleted_at = 0"
+        + " ptr ON ptr.tag_id = a.tag_id AND ptr.deleted_at = 0"
         + " JOIN "
         + POLICY_META_TABLE_NAME
         + " pm ON pm.policy_id = ptr.policy_id AND pm.deleted_at = 0"
         + " JOIN "
         + POLICY_VERSION_TABLE_NAME
-        + " pvi ON pvi.policy_id = pm.policy_id"
-        + "  AND pvi.version = pm.current_version"
-        + "  AND pvi.deleted_at = 0"
-        + " WHERE pm.policy_type = #{policyType}"
-        + "  AND pvi.enabled = 1"
-        + "</script>";
+        + " pvi ON pvi.policy_id = pm.policy_id AND pvi.version = pm.current_version"
+        + " AND pvi.deleted_at = 0"
+        + " WHERE pm.policy_type = #{policyType} AND pvi.enabled = TRUE"
+        + " AND (ptr.selector IS NULL"
+        + " OR ptr.selector = '{\"type\":\"ALL_VALUES\"}'"
+        + " OR ptr.selector = CONCAT('{\"type\":\"TAG_VALUE\",\"value\":\"', a.tag_value, '\"}'))";
+  }
+
+  /** Tag assignments on each table and its ancestors: table_id, distance, tag_id, tag_value. */
+  private static String ancestorTagAssignments() {
+    return "SELECT lv.table_id, lv.distance, tr.tag_id, tr.tag_value"
+        + " FROM ("
+        + tableAncestors()
+        + ") lv"
+        + " JOIN "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " tr ON tr.metadata_object_id = lv.object_id"
+        + " AND tr.metadata_object_type = lv.object_type AND tr.deleted_at = 0"
+        + " JOIN "
+        + TAG_TABLE_NAME
+        + " tg ON tg.tag_id = tr.tag_id AND tg.deleted_at = 0";
   }
 
   /**
-   * Returns one ancestry-chain {@code SELECT} branch. Dialects that cannot infer unbound parameter
-   * types (notably H2) override this with explicit {@code CAST}s.
-   *
-   * @return SQL fragment for one chain row
+   * Each table and its ancestors with a distance that grows outward: the table is 0, a schema is 1
+   * plus how much shorter its name is than the table's schema, and the catalog is farther than any
+   * schema.
    */
-  protected String nearestPolicyChainSelect() {
-    return " SELECT #{c.tableId} AS table_id, #{c.objectId} AS object_id,"
-        + " #{c.objectType} AS object_type, #{c.lvl} AS lvl";
+  private static String tableAncestors() {
+    String requestedTables =
+        " WHERE tm.deleted_at = 0 AND tm.table_id IN ("
+            + "<foreach collection='tableIds' item='tableId' separator=','>#{tableId}</foreach>)";
+    String leafSchema =
+        " JOIN "
+            + SchemaMetaMapper.TABLE_NAME
+            + " leaf ON leaf.schema_id = tm.schema_id AND leaf.deleted_at = 0";
+    return "SELECT tm.table_id, 'TABLE' AS object_type, tm.table_id AS object_id, 0 AS distance"
+        + " FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm"
+        + requestedTables
+        + " UNION ALL"
+        + " SELECT tm.table_id, 'SCHEMA', anc.schema_id,"
+        + " 1 + CHAR_LENGTH(leaf.schema_name) - CHAR_LENGTH(anc.schema_name)"
+        + " FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm"
+        + leafSchema
+        + " JOIN "
+        + SchemaMetaMapper.TABLE_NAME
+        + " anc ON anc.catalog_id = leaf.catalog_id AND anc.deleted_at = 0"
+        + " AND (anc.schema_id = leaf.schema_id"
+        + " OR (CHAR_LENGTH(leaf.schema_name) > CHAR_LENGTH(anc.schema_name)"
+        + " AND LEFT(leaf.schema_name, CHAR_LENGTH(anc.schema_name)) = anc.schema_name"
+        + " AND SUBSTRING(leaf.schema_name, CHAR_LENGTH(anc.schema_name) + 1, 1)"
+        + " = #{schemaSeparator}))"
+        + requestedTables
+        + " UNION ALL"
+        + " SELECT tm.table_id, 'CATALOG', tm.catalog_id, 1 + CHAR_LENGTH(leaf.schema_name)"
+        + " FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tm"
+        + leafSchema
+        + requestedTables;
   }
 }

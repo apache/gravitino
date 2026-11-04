@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.RelationEdgeTarget;
@@ -27,6 +29,7 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
@@ -74,6 +77,104 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     Assertions.assertTrue(
         service
             .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  public void testHierarchicalAncestorSchemaAndNearerSchemaWins() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createAndInsertCatalog(METALAKE, "cat");
+    SchemaEntity outer = createAndInsertSchema(METALAKE, "cat", "a");
+    SchemaEntity middle = createAndInsertSchema(METALAKE, "cat", "a:b");
+    createAndInsertSchema(METALAKE, "cat", "a:b:c");
+    TableEntity table =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "a:b:c"), "t1");
+
+    PolicyEntity outerPolicy = insertCompaction("outer_compact");
+    TagEntity outerTag = insertTag("outer_tag");
+    linkPolicy(outerTag, outerPolicy, null);
+    assignTag(outer.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("outer_tag"));
+
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    Assertions.assertEquals(
+        Optional.of(outerPolicy.id()),
+        service.resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+
+    PolicyEntity middlePolicy = insertCompaction("middle_compact");
+    TagEntity middleTag = insertTag("middle_tag");
+    linkPolicy(middleTag, middlePolicy, null);
+    assignTag(middle.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("middle_tag"));
+    Assertions.assertEquals(
+        Optional.of(middlePolicy.id()),
+        service.resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+  }
+
+  @TestTemplate
+  public void testNamePrefixWithoutSeparatorIsNotAncestor() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createAndInsertCatalog(METALAKE, "cat");
+    SchemaEntity a = createAndInsertSchema(METALAKE, "cat", "a");
+    createAndInsertSchema(METALAKE, "cat", "ab");
+    createAndInsertSchema(METALAKE, "cat", "ab:c");
+    TableEntity table =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "ab:c"), "t1");
+
+    PolicyEntity policy = insertCompaction("a_compact");
+    TagEntity tag = insertTag("a_tag");
+    linkPolicy(tag, policy, null);
+    assignTag(a.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("a_tag"));
+
+    Assertions.assertTrue(
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .isEmpty());
+  }
+
+  @TestTemplate
+  public void testBatchResolvesEachTable() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE, "cat");
+    createAndInsertSchema(METALAKE, "cat", "s1");
+    createAndInsertSchema(METALAKE, "cat", "s2");
+    TableEntity tagged =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "s1"), "t1");
+    TableEntity inherited =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "s2"), "t2");
+
+    PolicyEntity tablePolicy = insertCompaction("table_compact");
+    PolicyEntity catalogPolicy = insertCompaction("catalog_compact");
+    TagEntity tableTag = insertTag("table_tag");
+    TagEntity catalogTag = insertTag("catalog_tag");
+    linkPolicy(tableTag, tablePolicy, null);
+    linkPolicy(catalogTag, catalogPolicy, null);
+    assignTag(tagged.nameIdentifier(), Entity.EntityType.TABLE, TagValue.noValue("table_tag"));
+    assignTag(catalog.nameIdentifier(), Entity.EntityType.CATALOG, TagValue.noValue("catalog_tag"));
+
+    Assertions.assertEquals(
+        Map.of(tagged.id(), tablePolicy.id(), inherited.id(), catalogPolicy.id()),
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyIds(
+                List.of(tagged.id(), inherited.id()), Policy.BuiltInType.ICEBERG_COMPACTION));
+  }
+
+  @TestTemplate
+  public void testNearerTagValueOverridesAncestorValue() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE, "cat");
+    createAndInsertSchema(METALAKE, "cat", "schema");
+    TableEntity table =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "schema"), "t1");
+
+    PolicyEntity finance = insertCompaction("finance_compact");
+    TagEntity domain = insertTag("domain");
+    linkPolicy(domain, finance, "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}");
+    assignTag(
+        catalog.nameIdentifier(), Entity.EntityType.CATALOG, TagValue.of("domain", "finance"));
+    assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("domain", "risk"));
+
+    Assertions.assertTrue(
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION)
             .isEmpty());
   }
 

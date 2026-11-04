@@ -59,6 +59,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
@@ -243,6 +244,9 @@ public class TagManager implements TagDispatcher {
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    if (selector instanceof TagValueSelector) {
+      checkValueCharacters(((TagValueSelector) selector).value(), "Selector value");
+    }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     PolicyEntity policy = null;
     try {
@@ -602,6 +606,9 @@ public class TagManager implements TagDispatcher {
       case NO_VALUE:
         return normalizedConstraint.allowedValues();
       case ALLOWED_VALUES:
+        for (String allowedValue : normalizedConstraint.allowedValues()) {
+          checkValueCharacters(allowedValue, "Allowed tag value");
+        }
         return Arrays.stream(normalizedConstraint.allowedValues())
             .distinct()
             .toArray(String[]::new);
@@ -618,12 +625,28 @@ public class TagManager implements TagDispatcher {
     Map<String, Boolean> valuedByTagName = Maps.newHashMap();
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to add must not be null");
+      tagValue.value().ifPresent(value -> checkValueCharacters(value, "Tag value"));
       boolean valued = tagValue.value().isPresent();
       Boolean previous = valuedByTagName.putIfAbsent(tagValue.name(), valued);
       Preconditions.checkArgument(
           previous == null || previous == valued,
           "Cannot add assignments both with and without values for tag %s",
           tagValue.name());
+    }
+  }
+
+  /**
+   * Rejects double quotes, backslashes, and control characters, which the selector JSON escapes and
+   * the nearest-policy SQL compares as plain text.
+   */
+  private static void checkValueCharacters(String value, String kind) {
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      Preconditions.checkArgument(
+          c != '"' && c != '\\' && !Character.isISOControl(c),
+          "%s %s must not contain double quotes, backslashes, or control characters",
+          kind,
+          value);
     }
   }
 

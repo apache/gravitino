@@ -1245,6 +1245,42 @@ public class TestTagManager {
   }
 
   @Test
+  public void testRejectValuesThatSelectorJsonEscapes() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.createTag(
+                METALAKE,
+                "quoted_allowed",
+                null,
+                null,
+                TagValueConstraint.ofAllowedValues("a\"b")));
+
+    tagManager.createTag(METALAKE, "escaped_value", null, null);
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    for (String value : new String[] {"a\"b", "a\\b", "a\nb"}) {
+      IllegalArgumentException thrown =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tagManager.associateTagValuesForMetadataObject(
+                      METALAKE,
+                      tableObject,
+                      new TagValue[] {TagValue.of("escaped_value", value)},
+                      null));
+      Assertions.assertTrue(thrown.getMessage().contains("double quotes"));
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.addPolicyForTag(
+                METALAKE, "escaped_value", "any_policy", TagValueSelector.of("a\\b")));
+  }
+
+  @Test
   public void testPolicyAssociationsForTag() throws IOException {
     String tagName = "policy_tag";
     String policyName = "policy_for_tag";

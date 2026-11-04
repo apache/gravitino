@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.PolicyMetaPostgreSQLProvider;
-import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -126,21 +125,15 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().batchSelectPolicyByIdentifier(metalakeName, policyNames);
   }
 
-  /** Delegates nearest-policy match candidate listing. */
-  public static String listNearestPolicyMatchCandidates(
-      @Param("chain") List<NearestPolicyChainPO> chain, @Param("policyType") String policyType) {
-    return getProvider().listNearestPolicyMatchCandidates(chain, policyType);
+  /** Delegates the nearest-policy lookup. */
+  public static String listNearestPolicyIds(
+      @Param("tableIds") List<Long> tableIds,
+      @Param("policyType") String policyType,
+      @Param("schemaSeparator") String schemaSeparator) {
+    return getProvider().listNearestPolicyIds(tableIds, policyType, schemaSeparator);
   }
 
   static class PolicyMetaMySQLProvider extends PolicyMetaBaseSQLProvider {}
 
-  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {
-    @Override
-    protected String nearestPolicyChainSelect() {
-      return " SELECT CAST(#{c.tableId} AS BIGINT) AS table_id,"
-          + " CAST(#{c.objectId} AS BIGINT) AS object_id,"
-          + " CAST(#{c.objectType} AS VARCHAR(64)) AS object_type,"
-          + " CAST(#{c.lvl} AS INT) AS lvl";
-    }
-  }
+  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {}
 }

@@ -24,21 +24,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -46,13 +39,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyAssociationSelector;
-import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -60,21 +49,15 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
-import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
-import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.NearestPolicyChainPO;
-import org.apache.gravitino.storage.relational.po.NearestPolicyMatchPO;
+import org.apache.gravitino.storage.relational.po.NearestPolicyIdPO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
-import org.apache.gravitino.storage.relational.po.SchemaPO;
-import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -149,65 +132,47 @@ public class PolicyMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "resolveNearestPolicyId")
   public Optional<Long> resolveNearestPolicyId(long tableId, Policy.BuiltInType policyType) {
-    return resolveNearestPolicyIds(List.of(tableId), policyType)
-        .getOrDefault(tableId, Optional.empty());
+    return Optional.ofNullable(resolveNearestPolicyIds(List.of(tableId), policyType).get(tableId));
   }
 
   /**
-   * Batch-resolves the unique nearest enabled policy id of {@code policyType} for each table.
+   * Resolves the unique nearest enabled policy id of {@code policyType} for each table with one SQL
+   * statement.
    *
-   * <p>Uses one SQL join over the ancestry chain (table → schemas → catalog, including hierarchical
-   * schema ancestors) then applies the same effective-tag override, selector match, and nearest
-   * pick rules as the Java resolvers. Missing tables are omitted from the result map.
+   * <p>A table inherits from its schema, that schema's hierarchical ancestors, and its catalog. The
+   * nearest assignment of a tag wins, a policy matches through its tag selector, and the nearest
+   * level with a matching policy decides, as in {@code ObjectPolicyResolver}.
    *
    * @param tableIds table entity ids
    * @param policyType built-in policy type
-   * @return nearest winner per present table id
+   * @return winner policy id per table; tables without a matching policy are absent
+   * @throws IllegalArgumentException when two or more policies tie on a table's nearest level
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "resolveNearestPolicyIds")
-  public Map<Long, Optional<Long>> resolveNearestPolicyIds(
-      Collection<Long> tableIds, Policy.BuiltInType policyType) {
+  public Map<Long, Long> resolveNearestPolicyIds(
+      List<Long> tableIds, Policy.BuiltInType policyType) {
     Preconditions.checkNotNull(policyType, "policyType");
+    Map<Long, Long> result = new LinkedHashMap<>();
     if (tableIds == null || tableIds.isEmpty()) {
-      return new LinkedHashMap<>();
-    }
-    List<Long> distinctIds =
-        tableIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
-    if (distinctIds.isEmpty()) {
-      return new LinkedHashMap<>();
-    }
-
-    List<NearestPolicyChainPO> chain = buildNearestPolicyChains(distinctIds);
-    Map<Long, Optional<Long>> result = new LinkedHashMap<>();
-    for (NearestPolicyChainPO row : chain) {
-      result.putIfAbsent(row.getTableId(), Optional.empty());
-    }
-    if (chain.isEmpty()) {
       return result;
     }
-
-    List<NearestPolicyMatchPO> matches =
+    List<NearestPolicyIdPO> rows =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
-            mapper -> mapper.listNearestPolicyMatchCandidates(chain, policyType.policyType()));
-    Map<Long, List<NearestPolicyMatchPO>> byTable = new LinkedHashMap<>();
-    for (NearestPolicyMatchPO match : matches) {
-      byTable.computeIfAbsent(match.getTableId(), ignored -> new ArrayList<>()).add(match);
-    }
-    Map<Long, Integer> maxLvlByTable = new LinkedHashMap<>();
-    for (NearestPolicyChainPO row : chain) {
-      maxLvlByTable.merge(row.getTableId(), row.getLvl(), Math::max);
-    }
-    for (Map.Entry<Long, Integer> entry : maxLvlByTable.entrySet()) {
-      long tableId = entry.getKey();
-      result.put(
-          tableId,
-          pickNearestPolicyId(
-              byTable.getOrDefault(tableId, Collections.emptyList()),
-              entry.getValue(),
-              policyType));
+            mapper ->
+                mapper.listNearestPolicyIds(
+                    tableIds, policyType.policyType(), HierarchicalSchemaUtil.physicalSeparator()));
+    for (NearestPolicyIdPO row : rows) {
+      Preconditions.checkArgument(
+          row.getMinPolicyId().equals(row.getMaxPolicyId()),
+          "ambiguous %s policies on the nearest level of table %s, including %s and %s",
+          policyType,
+          row.getTableId(),
+          row.getMinPolicyId(),
+          row.getMaxPolicyId());
+      result.put(row.getTableId(), row.getMinPolicyId());
     }
     return result;
   }
@@ -679,145 +644,6 @@ public class PolicyMetaService {
           policyName);
     }
     return policyPO;
-  }
-
-  private static List<NearestPolicyChainPO> buildNearestPolicyChains(List<Long> tableIds) {
-    List<TablePO> tables =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
-    if (tables.isEmpty()) {
-      return new ArrayList<>();
-    }
-    List<Long> schemaIds =
-        tables.stream().map(TablePO::getSchemaId).distinct().collect(Collectors.toList());
-    Map<Long, SchemaPO> schemasById =
-        SessionUtils.getWithoutCommit(
-                SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds))
-            .stream()
-            .collect(Collectors.toMap(SchemaPO::getSchemaId, Function.identity(), (a, b) -> a));
-
-    String physicalSeparator = HierarchicalSchemaUtil.physicalSeparator();
-    Map<String, SchemaPO> ancestorCache = new LinkedHashMap<>();
-    List<NearestPolicyChainPO> chain = new ArrayList<>();
-    for (TablePO table : tables) {
-      long tableId = table.getTableId();
-      int lvl = 0;
-      chain.add(NearestPolicyChainPO.of(tableId, tableId, MetadataObject.Type.TABLE.name(), lvl++));
-      SchemaPO schema = schemasById.get(table.getSchemaId());
-      if (schema != null) {
-        chain.add(
-            NearestPolicyChainPO.of(
-                tableId, schema.getSchemaId(), MetadataObject.Type.SCHEMA.name(), lvl++));
-        String physicalName = schema.getSchemaName();
-        if (HierarchicalSchemaUtil.isHierarchical(physicalName, physicalSeparator)) {
-          List<String> ancestors =
-              HierarchicalSchemaUtil.getAncestorNames(physicalName, physicalSeparator);
-          for (int i = ancestors.size() - 1; i >= 0; i--) {
-            String ancestorPhysical = ancestors.get(i);
-            String cacheKey = schema.getCatalogId() + "\0" + ancestorPhysical;
-            SchemaPO ancestor =
-                ancestorCache.computeIfAbsent(
-                    cacheKey,
-                    ignored ->
-                        SessionUtils.getWithoutCommit(
-                            SchemaMetaMapper.class,
-                            mapper ->
-                                mapper.selectSchemaMetaByCatalogIdAndName(
-                                    schema.getCatalogId(), ancestorPhysical)));
-            if (ancestor != null) {
-              chain.add(
-                  NearestPolicyChainPO.of(
-                      tableId, ancestor.getSchemaId(), MetadataObject.Type.SCHEMA.name(), lvl++));
-            }
-          }
-        }
-      }
-      chain.add(
-          NearestPolicyChainPO.of(
-              tableId, table.getCatalogId(), MetadataObject.Type.CATALOG.name(), lvl));
-    }
-    return chain;
-  }
-
-  private static Optional<Long> pickNearestPolicyId(
-      List<NearestPolicyMatchPO> rows, int maxLvl, Policy.BuiltInType policyType) {
-    // Effective tags: nearer assignment (lower lvl) wins per tag name, including values.
-    Map<String, Integer> effectiveLvl = new LinkedHashMap<>();
-    Map<String, Set<String>> valuesByTagAndLvlKey = new LinkedHashMap<>();
-    for (NearestPolicyMatchPO row : rows) {
-      String valueKey = row.getTagName() + "\0" + row.getLvl();
-      valuesByTagAndLvlKey
-          .computeIfAbsent(valueKey, ignored -> new LinkedHashSet<>())
-          .add(row.getTagValue() == null ? "" : row.getTagValue());
-      effectiveLvl.merge(row.getTagName(), row.getLvl(), Math::min);
-    }
-    Map<String, TagAssignment> effectiveAssignment = new LinkedHashMap<>();
-    for (Map.Entry<String, Integer> entry : effectiveLvl.entrySet()) {
-      String tagName = entry.getKey();
-      int lvl = entry.getValue();
-      Set<String> rawValues =
-          valuesByTagAndLvlKey.getOrDefault(tagName + "\0" + lvl, Collections.emptySet());
-      List<String> values =
-          rawValues.stream()
-              .filter(StringUtils::isNotBlank)
-              .distinct()
-              .collect(Collectors.toList());
-      effectiveAssignment.put(
-          tagName,
-          values.isEmpty()
-              ? TagAssignment.noValue()
-              : TagAssignment.ofValues(values.toArray(new String[0])));
-    }
-
-    Map<Long, Set<Integer>> sourcesByPolicy = new LinkedHashMap<>();
-    for (NearestPolicyMatchPO row : rows) {
-      Integer lvl = effectiveLvl.get(row.getTagName());
-      if (lvl == null || lvl.intValue() != row.getLvl()) {
-        continue;
-      }
-      TagAssignment assignment = effectiveAssignment.get(row.getTagName());
-      if (assignment == null || !selectorMatches(row.getSelector(), assignment)) {
-        continue;
-      }
-      sourcesByPolicy
-          .computeIfAbsent(row.getPolicyId(), ignored -> new LinkedHashSet<>())
-          .add(row.getLvl());
-    }
-
-    for (int lvl = 0; lvl <= maxLvl; lvl++) {
-      TreeSet<Long> atLevel = new TreeSet<>();
-      for (Map.Entry<Long, Set<Integer>> entry : sourcesByPolicy.entrySet()) {
-        if (entry.getValue().contains(lvl)) {
-          atLevel.add(entry.getKey());
-        }
-      }
-      if (atLevel.isEmpty()) {
-        continue;
-      }
-      if (atLevel.size() > 1) {
-        throw new IllegalArgumentException(
-            String.format(
-                "ambiguous %s policies %s on nearest level %s", policyType, atLevel, lvl));
-      }
-      return Optional.of(atLevel.first());
-    }
-    return Optional.empty();
-  }
-
-  private static boolean selectorMatches(String selectorJson, TagAssignment assignment) {
-    PolicyAssociationSelector selector =
-        StringUtils.isBlank(selectorJson)
-            ? AllValuesSelector.get()
-            : PolicyAssociationSelectorSerde.deserialize(selectorJson);
-    if (selector instanceof AllValuesSelector) {
-      return true;
-    }
-    if (selector instanceof TagValueSelector) {
-      String expected = ((TagValueSelector) selector).value();
-      return Arrays.asList(assignment.values()).contains(expected);
-    }
-    throw new IllegalArgumentException(
-        "Unsupported policy association selector type: " + selector.type());
   }
 
   private static void beforePersist(PolicyEntity policy) {
