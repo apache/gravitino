@@ -99,6 +99,21 @@ public class TestExceptionHandlers {
   }
 
   @Test
+  void testPartitionForbiddenReturnsForbidden() {
+    Response response =
+        ExceptionHandlers.handlePartitionException(
+            OperationType.LIST,
+            "",
+            "table",
+            new ForbiddenException("not authorized to perform: glue:GetTable"));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   void testUnsupportedOperationReturnsNotImplemented() {
     UnsupportedOperationException exception =
         new UnsupportedOperationException("Operation is not supported");

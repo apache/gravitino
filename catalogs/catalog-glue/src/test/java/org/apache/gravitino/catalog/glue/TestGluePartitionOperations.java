@@ -24,10 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -38,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreatePartitionRequest;
 import software.amazon.awssdk.services.glue.model.DeletePartitionRequest;
@@ -46,6 +50,7 @@ import software.amazon.awssdk.services.glue.model.GetPartitionRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
+import software.amazon.awssdk.services.glue.model.InvalidInputException;
 
 class TestGluePartitionOperations {
 
@@ -186,6 +191,84 @@ class TestGluePartitionOperations {
         .thenThrow(AlreadyExistsException.builder().message("exists").build());
 
     assertThrows(PartitionAlreadyExistsException.class, () -> ops.addPartition(partition));
+  }
+
+  @Test
+  void testAddPartitionRejectsNullOrEmptyValue() {
+    for (org.apache.gravitino.rel.expressions.literals.Literal<?> bad :
+        new org.apache.gravitino.rel.expressions.literals.Literal<?>[] {
+          Literals.NULL, Literals.stringLiteral("")
+        }) {
+      IdentityPartition partition =
+          Partitions.identity(
+              "p",
+              new String[][] {{"dt"}, {"region"}},
+              new org.apache.gravitino.rel.expressions.literals.Literal[] {
+                Literals.stringLiteral("2024-01-01"), bad
+              },
+              java.util.Collections.emptyMap());
+
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, () -> ops.addPartition(partition));
+      assertTrue(ex.getMessage().contains("region"), ex.getMessage());
+    }
+    verify(mockClient, never()).createPartition(any(CreatePartitionRequest.class));
+  }
+
+  @Test
+  void testAddPartitionValueLengthLimit() {
+    IdentityPartition atLimit = partitionWithRegion(StringUtils.repeat('a', 1024));
+    ops.addPartition(atLimit);
+    verify(mockClient).createPartition(any(CreatePartitionRequest.class));
+
+    IdentityPartition overLimit = partitionWithRegion(StringUtils.repeat('a', 1025));
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> ops.addPartition(overLimit));
+    assertTrue(ex.getMessage().contains("region"), ex.getMessage());
+    verify(mockClient).createPartition(any(CreatePartitionRequest.class));
+  }
+
+  private static IdentityPartition partitionWithRegion(String region) {
+    return Partitions.identity(
+        "p",
+        new String[][] {{"dt"}, {"region"}},
+        new org.apache.gravitino.rel.expressions.literals.Literal[] {
+          Literals.stringLiteral("2024-01-01"), Literals.stringLiteral(region)
+        },
+        java.util.Collections.emptyMap());
+  }
+
+  @Test
+  void testAddPartitionMapsInvalidInputToIllegalArgument() {
+    IdentityPartition partition =
+        Partitions.identity(
+            "dt=2024-01-01/region=us",
+            new String[][] {{"dt"}, {"region"}},
+            new org.apache.gravitino.rel.expressions.literals.Literal[] {
+              Literals.stringLiteral("2024-01-01"), Literals.stringLiteral("us")
+            },
+            java.util.Collections.emptyMap());
+    when(mockClient.createPartition(any(CreatePartitionRequest.class)))
+        .thenThrow(
+            InvalidInputException.builder()
+                .message("Cannot create partitions in table without partition keys")
+                .build());
+
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> ops.addPartition(partition));
+    assertTrue(ex.getMessage().contains("without partition keys"), ex.getMessage());
+  }
+
+  @Test
+  void testListPartitionsMapsAccessDeniedToForbidden() {
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenThrow(
+            AccessDeniedException.builder()
+                .message("not authorized to perform: glue:GetPartitions")
+                .build());
+
+    ForbiddenException ex = assertThrows(ForbiddenException.class, () -> ops.listPartitions());
+    assertTrue(ex.getMessage().contains("glue:GetPartitions"), ex.getMessage());
   }
 
   @Test
