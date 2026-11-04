@@ -57,8 +57,13 @@ public class IcebergMetadataAuthorizationMethodInterceptor
 
   @Override
   public Object invoke(MethodInvocation methodInvocation) throws Throwable {
-    return authorizeMethod(
-        methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
+    try {
+      return authorizeMethod(
+          methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
+    } finally {
+      // Drop register-table metadata shared between authorization and the operation.
+      IcebergCatalogWrapper.clearCachedTableMetadataFromLocation();
+    }
   }
 
   @Override

@@ -199,10 +199,18 @@ public class TestIcebergCatalogWrapper {
     IcebergCatalogWrapper wrapper =
         new IcebergCatalogWrapper(
             new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory")));
+    String location = metadataFile.toUri().toString();
 
-    TableMetadata actual = wrapper.loadTableMetadataFromLocation(metadataFile.toUri().toString());
+    try {
+      TableMetadata actual = wrapper.loadTableMetadataFromLocation(location);
+      Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
 
-    Assertions.assertEquals(schema.asStruct(), actual.schema().asStruct());
+      // Same location on this thread reuses the parse; deleting the file must not matter.
+      Files.delete(metadataFile);
+      Assertions.assertSame(actual, wrapper.loadTableMetadataFromLocation(location));
+    } finally {
+      IcebergCatalogWrapper.clearCachedTableMetadataFromLocation();
+    }
   }
 
   @Test

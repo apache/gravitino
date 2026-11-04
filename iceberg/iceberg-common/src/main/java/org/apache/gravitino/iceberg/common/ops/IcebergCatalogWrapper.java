@@ -320,15 +320,49 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   /**
+   * Last metadata parsed on this thread by {@link #loadTableMetadataFromLocation(String)}. Kept so
+   * register-table authorization, schema validation, and overwrite UUID checks can share one FileIO
+   * read of the same location within a request.
+   */
+  private static final ThreadLocal<CachedTableMetadata> CACHED_TABLE_METADATA = new ThreadLocal<>();
+
+  private static final class CachedTableMetadata {
+    private final String location;
+    private final TableMetadata metadata;
+
+    private CachedTableMetadata(String location, TableMetadata metadata) {
+      this.location = location;
+      this.metadata = metadata;
+    }
+  }
+
+  /**
    * Loads table metadata directly from a metadata file location.
+   *
+   * <p>Repeated calls with the same location on the same thread reuse the parsed result until
+   * {@link #clearCachedTableMetadataFromLocation()} runs.
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
-    try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
-      return TableMetadataParser.read(fileIO, metadataLocation);
+    CachedTableMetadata cached = CACHED_TABLE_METADATA.get();
+    if (cached != null && cached.location.equals(metadataLocation)) {
+      return cached.metadata;
     }
+    try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
+      TableMetadata metadata = TableMetadataParser.read(fileIO, metadataLocation);
+      CACHED_TABLE_METADATA.set(new CachedTableMetadata(metadataLocation, metadata));
+      return metadata;
+    }
+  }
+
+  /**
+   * Drops any metadata cached for this thread by {@link #loadTableMetadataFromLocation(String)}.
+   * Call at the end of a request that may have loaded register-table metadata.
+   */
+  public static void clearCachedTableMetadataFromLocation() {
+    CACHED_TABLE_METADATA.remove();
   }
 
   /**
