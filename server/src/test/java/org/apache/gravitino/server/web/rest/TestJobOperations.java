@@ -26,6 +26,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.annotation.ResponseMetered;
@@ -343,6 +345,25 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testRegisterJobTemplateRejectsDottedName() {
+    JobTemplateEntity template = newShellJobTemplateEntity("a.b", "dotted name");
+    JobTemplateRegisterRequest request =
+        new JobTemplateRegisterRequest(JobOperations.toDTO(template));
+
+    try (Response response =
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(jobOperationDispatcher, never()).registerJobTemplate(any(), any());
   }
 
   @Test
@@ -683,6 +704,26 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp5 = resp6.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp5.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp5.getType());
+  }
+
+  @Test
+  public void testRenameJobTemplateRejectsDottedName() {
+    JobTemplateUpdatesRequest request =
+        new JobTemplateUpdatesRequest(
+            Lists.newArrayList(new JobTemplateUpdateRequest.RenameJobTemplateRequest("a.b")));
+
+    try (Response response =
+        target(jobTemplatePath())
+            .path("shell_template_1")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(jobOperationDispatcher, never()).alterJobTemplate(any(), any(), any());
   }
 
   @Test
