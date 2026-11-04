@@ -57,6 +57,7 @@ import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
@@ -65,6 +66,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
@@ -72,6 +74,8 @@ import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
@@ -712,6 +716,117 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertEquals("retained-secret", secrets.readSecret(urn));
         Assertions.assertTrue(d.dropSchema(ident, false));
         Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"entity-id", "entity-type", "property-key"})
+  void testImportRejectsForeignWriteThroughSecrets(String mismatch) throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      SecretPropertyOperationDispatcher secretDispatcher =
+          new SecretPropertyOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier original = NameIdentifier.of(metalake, catalog, "secret_owner_" + mismatch);
+      NameIdentifier copy = NameIdentifier.of(metalake, catalog, "secret_copy_" + mismatch);
+      d.createSchema(
+          original,
+          "owner",
+          Map.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "original-secret")),
+          Map.of());
+      SchemaEntity owner = entityStore.get(original, SCHEMA, SchemaEntity.class);
+      SecretUrn originalUrn = SecretUrn.parse(owner.properties().get("k2"));
+      Map<String, String> properties = new HashMap<>();
+      properties.put("k1", "v1");
+      if (mismatch.equals("entity-id")) {
+        // A copied URN without its source marker would otherwise be imported under a new id.
+        properties.put("k2", originalUrn.toString());
+      } else {
+        long copyId = idGenerator.nextId();
+        properties.put(ID_KEY, StringIdentifier.fromId(copyId).toString());
+        properties.put(
+            "k2",
+            SecretUrn.buildWriteThrough(
+                    "memory",
+                    Map.of(
+                        SecretConstants.ATTR_ENTITY_TYPE,
+                        mismatch.equals("entity-type") ? "catalog" : "schema",
+                        SecretConstants.ATTR_ENTITY_ID,
+                        String.valueOf(copyId),
+                        SecretConstants.ATTR_PROPERTY_KEY,
+                        mismatch.equals("property-key") ? "otherk2" : "k2"))
+                .toString());
+      }
+      catalogManager.doWithCatalogWrapper(
+          NameIdentifier.of(metalake, catalog),
+          c -> c.doWithSchemaOps(ops -> ops.createSchema(copy, "copy", properties)));
+
+      IllegalArgumentException failure =
+          Assertions.assertThrows(IllegalArgumentException.class, () -> d.loadSchema(copy));
+      Assertions.assertTrue(failure.getMessage().contains(copy.toString()));
+      Assertions.assertTrue(failure.getMessage().contains("property k2"));
+      Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
+      Assertions.assertThrows(
+          NoSuchSchemaException.class, () -> secretDispatcher.getSecrets(copy, SCHEMA));
+      Assertions.assertTrue(d.dropSchema(copy, false));
+      Assertions.assertEquals("original-secret", secrets.readSecret(originalUrn));
+      Assertions.assertEquals(
+          owner.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
+      Assertions.assertTrue(d.dropSchema(original, false));
+    }
+  }
+
+  @Test
+  void testImportRetainsExternalSecretReference() throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "external_secret_reference");
+    String reference = "urn:gravitino-secret:external:credential:k2";
+    catalogManager.doWithCatalogWrapper(
+        NameIdentifier.of(metalake, catalog),
+        c ->
+            c.doWithSchemaOps(
+                ops -> ops.createSchema(ident, "external", Map.of("k1", "v1", "k2", reference))));
+
+    Schema imported = dispatcher.loadSchema(ident);
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, imported.properties().get("k2"));
+    Assertions.assertEquals(
+        reference, entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+    Assertions.assertTrue(dispatcher.dropSchema(ident, false));
+  }
+
+  @Test
+  void testCreateSchemaReportsRegistrationConflictAndRetainsSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_registration_conflict");
+      EntityAlreadyExistsException conflict =
+          new EntityAlreadyExistsException("concurrent registration");
+      doThrow(conflict).when(entityStore).put(any(SchemaEntity.class), eq(true));
+      try {
+        SchemaAlreadyExistsException failure =
+            Assertions.assertThrows(
+                SchemaAlreadyExistsException.class,
+                () ->
+                    d.createSchema(
+                        ident,
+                        "",
+                        Map.of("k1", "v1"),
+                        Map.of("k2", new SecretBinding("memory", "retained-secret")),
+                        Map.of()));
+        Assertions.assertSame(conflict, failure.getCause());
+        Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+        Assertions.assertTrue(failure.getMessage().contains("reconcile"));
+        Assertions.assertFalse(failure.getMessage().contains("use loadSchema to import"));
+        Schema source =
+            catalogManager
+                .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                .doWithSchemaOps(ops -> ops.loadSchema(ident));
+        Assertions.assertEquals(
+            "retained-secret", secrets.readSecret(SecretUrn.parse(source.properties().get("k2"))));
       } finally {
         reset(entityStore);
       }

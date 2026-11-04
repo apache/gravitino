@@ -793,6 +793,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     try {
       store.put(tableEntity, true /* overwrite */);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table %s was created in the external catalog, but its registration conflicts with an "
+              + "existing entity. Verify and reconcile the registered and source identities before "
+              + "continuing; loading the table does not resolve this conflict.",
+          ident);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       throw new GravitinoRuntimeException(

@@ -242,6 +242,38 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testCreateTableReportsRegistrationConflict() throws Exception {
+    NameIdentifier schema = NameIdentifier.of(metalake, catalog, "table_conflict_schema");
+    schemaOperationDispatcher.createSchema(schema, "", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema.name(), "conflicting_table");
+    Column[] columns = {
+      TestColumn.builder().withName("id").withPosition(0).withType(Types.IntegerType.get()).build()
+    };
+    EntityAlreadyExistsException conflict =
+        new EntityAlreadyExistsException("concurrent registration");
+    doThrow(conflict).when(entityStore).put(any(TableEntity.class), eq(true));
+    try {
+      TableAlreadyExistsException failure =
+          Assertions.assertThrows(
+              TableAlreadyExistsException.class,
+              () ->
+                  tableOperationDispatcher.createTable(
+                      ident, columns, "", Map.of("k1", "v1", "k2", "v2"), new Transform[0]));
+      Assertions.assertSame(conflict, failure.getCause());
+      Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+      Assertions.assertTrue(failure.getMessage().contains("reconcile"));
+      Assertions.assertFalse(failure.getMessage().contains("use loadTable to import"));
+      Table source =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithTableOps(ops -> ops.loadTable(ident));
+      Assertions.assertEquals(ident.name(), source.name());
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
   public void testCreateAndLoadTable() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema51");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

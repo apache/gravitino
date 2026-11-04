@@ -56,11 +56,13 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -264,6 +266,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
             try {
               store.put(schemaEntity, true /* overwrite */);
+            } catch (EntityAlreadyExistsException e) {
+              throw new SchemaAlreadyExistsException(
+                  e,
+                  "Schema %s was created in the external catalog, but its registration conflicts "
+                      + "with an existing entity. Verify and reconcile the registered and source "
+                      + "identities before continuing; loading the schema does not resolve this conflict.",
+                  ident);
             } catch (Exception e) {
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
               throw new GravitinoRuntimeException(
@@ -727,13 +736,30 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Persist source properties, not the masked client view, so a recovered registration retains
     // secret URNs. The EntityCombinedSchema returned to the caller still applies masking.
-    Map<String, String> sourceProperties = schema.schema().properties();
+    Map<String, String> sourceProperties =
+        SecretPropertyUtils.copyEntityProperties(schema.schema().properties());
+    for (Map.Entry<String, String> property : sourceProperties.entrySet()) {
+      String value = property.getValue();
+      if (value != null && value.startsWith(SecretConstants.URN_PREFIX)) {
+        SecretUrn urn = SecretUrn.parse(value);
+        if (urn.identifierSegments().size() == 3
+            && !SecretPropertyUtils.isWriteThroughForEntity(
+                property.getKey(), value, "schema", uid)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot import schema %s: write-through secret for property %s is not owned by "
+                      + "this schema identifier and property. Remove the copied reference or "
+                      + "restore the matching source identity before importing.",
+                  identifier, property.getKey()));
+        }
+      }
+    }
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(uid)
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
-            .withProperties(sourceProperties == null ? Collections.emptyMap() : sourceProperties)
+            .withProperties(sourceProperties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(schema.auditInfo().creator())
