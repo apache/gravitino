@@ -447,42 +447,52 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
-                  RuntimeException.class);
+    Pair<Boolean, Boolean> result =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () -> {
+              NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+              boolean droppedFromCatalog =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                      RuntimeException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
-          if (isManagedTable) {
-            return droppedFromCatalog;
-          }
+              boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+              if (isManagedTable) {
+                return Pair.of(droppedFromCatalog, isManagedTable);
+              }
 
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+              // A false result is ambiguous: the external table may have been renamed or dropped
+              // band. Preserve the registration because deleting it after a rename would lose
+              // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+              // registration that requires separate cleanup.
+              if (droppedFromCatalog) {
+                try {
+                  store.delete(ident, TABLE);
+                } catch (OptimisticLockException e) {
+                  throw e;
+                } catch (NoSuchEntityException e) {
+                  LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+              // Run unconditionally: an out-of-band drop may have left orphaned schema entities.
+              // cleanup is best-effort and stops as soon as a schema still exists.
+              return Pair.of(droppedFromCatalog, isManagedTable);
+            });
+    if (!result.getRight()) {
+      TreeLockUtils.doWithTreeLock(
+          schemaIdentifier,
+          LockType.WRITE,
+          () -> {
+            OrphanedSchemaCleanup.cleanUp(this, getCatalogIdentifier(ident), schemaIdentifier);
+            return null;
+          });
+    }
+    return result.getLeft();
   }
 
   /**
@@ -840,7 +850,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return Objects.equal(left.name(), right.name())
         && columnPosition == right.position()
         && Objects.equal(left.dataType(), right.dataType())
-        && Objects.equal(left.comment(), right.comment())
+        && Objects.equal(ColumnEntity.commentForStorage(left.comment()), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
         && isSameDefaultValue(left.defaultValue(), right.defaultValue());
@@ -1106,7 +1116,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 .withName(column.name())
                 .withPosition(columnPair.getLeft())
                 .withDataType(column.dataType())
-                .withComment(column.comment())
+                .withComment(ColumnEntity.commentForStorage(column.comment()))
                 .withNullable(column.nullable())
                 .withAutoIncrement(column.autoIncrement())
                 .withDefaultValue(column.defaultValue())
@@ -1221,10 +1231,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 combinedTable.tableFromGravitino().id()));
   }
 
+  private static void validateColumnComment(String comment) {
+    Preconditions.checkArgument(
+        comment == null || comment.indexOf('\0') < 0,
+        "Column comments must not contain NUL characters");
+    ColumnEntity.COMMENT.validate(comment, COLUMN);
+  }
+
   private static void validateColumns(Column[] columns) {
     for (Column column : columns) {
       ColumnEntity.NAME.validate(column.name(), COLUMN);
-      ColumnEntity.COMMENT.validate(column.comment(), COLUMN);
+      validateColumnComment(column.comment());
     }
   }
 
@@ -1233,7 +1250,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       if (addColumn.getFieldName().length == 1) {
         ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
-        ColumnEntity.COMMENT.validate(addColumn.getComment(), COLUMN);
+        validateColumnComment(addColumn.getComment());
       }
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -1243,7 +1260,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } else if (change instanceof TableChange.UpdateColumnComment) {
       TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
       if (updateComment.getFieldName().length == 1) {
-        ColumnEntity.COMMENT.validate(updateComment.getNewComment(), COLUMN);
+        validateColumnComment(updateComment.getNewComment());
       }
     }
   }

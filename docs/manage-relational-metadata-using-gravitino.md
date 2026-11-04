@@ -269,3 +269,23 @@ identifiers = catalog.as_table_catalog().list_tables(Namespace.of("public"))
 
 </TabItem>
 </Tabs>
+
+### External column comments and existing names
+
+Loading an external table preserves its complete source column comments in the returned
+metadata. The entity store keeps a bounded, NUL-free projection of each column comment,
+without changing the source comment, column identity, or column governance metadata.
+The projection is limited to 4096 UTF-16 units so it fits every supported store.
+CREATE and ALTER requests still reject NUL column comments and comments exceeding the
+existing request limit before source DDL. No store migration is required.
+
+Existing column references use the provider's existing-name specification; new columns
+and rename targets still use creation rules. PostgreSQL accepts quoted native column
+names while retaining its UTF-8 name-length, NUL, and wildcard restrictions. Other providers
+retain their default validation until they explicitly support native-name operations.
+
+Catalog creation takes the target catalog lock, permitting sibling catalogs to operate
+while source verification runs. Table DROP holds the target table lock for source DDL
+and registration removal; best-effort orphaned-schema cleanup takes the schema lock only
+after that table lock has been released. This does not add SQL statement timeouts or
+cancel blocked source DDL. Cold table import retains its existing locking behavior.

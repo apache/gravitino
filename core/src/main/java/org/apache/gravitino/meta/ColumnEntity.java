@@ -23,6 +23,7 @@ import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
@@ -163,13 +164,33 @@ public class ColumnEntity implements Entity, Auditable {
     return new Builder();
   }
 
+  /**
+   * Projects a source column comment into the portable entity-store representation. The full source
+   * comment remains available from the connector table.
+   *
+   * @param comment the source comment
+   * @return a NUL-free comment bounded by the storage capacity
+   */
+  @Nullable
+  public static String commentForStorage(@Nullable String comment) {
+    if (comment == null) {
+      return null;
+    }
+    String safe = comment.replace("\0", "");
+    int end = Math.min(safe.length(), EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+    if (end < safe.length() && end > 0 && Character.isHighSurrogate(safe.charAt(end - 1))) {
+      end--;
+    }
+    return safe.substring(0, end);
+  }
+
   public static ColumnEntity toColumnEntity(
       Column column, int position, long uid, AuditInfo audit) {
     return builder()
         .withId(uid)
         .withName(column.name())
         .withPosition(position)
-        .withComment(column.comment())
+        .withComment(commentForStorage(column.comment()))
         .withDataType(column.dataType())
         .withNullable(column.nullable())
         .withAutoIncrement(column.autoIncrement())

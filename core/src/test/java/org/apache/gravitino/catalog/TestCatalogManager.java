@@ -235,6 +235,30 @@ public class TestCatalogManager {
     }
   }
 
+  /** Checks a catalog creation does not take a sibling catalog lock. */
+  @Test
+  public void testCatalogCreationDoesNotLockSiblingCatalogs() throws Exception {
+    try (TreeLockTestSupport.HeldLock sibling =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, "existing_sibling"), LockType.READ)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          sibling,
+          () ->
+              catalogManager.createCatalog(
+                  NameIdentifier.of(metalake, "independent_catalog_create"),
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  ImmutableMap.of(
+                      PROPERTY_KEY1,
+                      "value1",
+                      PROPERTY_KEY2,
+                      "value2",
+                      PROPERTY_KEY5_PREFIX + "1",
+                      "value3")));
+    }
+  }
+
   @Test
   void testJdbcDriverDefaultAfterProviderConfigMerge(@TempDir Path catalogPackage)
       throws IOException {
