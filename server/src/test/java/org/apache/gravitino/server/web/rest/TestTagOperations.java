@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -296,7 +297,7 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
       Assertions.assertTrue(error.getMessage().contains("a.b"));
     }
-    Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any(), any());
+    Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any());
   }
 
   @Test
