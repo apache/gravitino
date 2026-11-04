@@ -25,8 +25,10 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,11 +58,13 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -243,6 +247,7 @@ public class TagManager implements TagDispatcher {
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    requireNoConflictBeforeAddPolicy(metalake, tagName, policyName, selector);
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -257,21 +262,6 @@ public class TagManager implements TagDispatcher {
             new RelationEdgeTarget[0]);
     try {
       entityStore.relationOperations().updateEntityRelations(update);
-      try {
-        requireNoSameLevelConflictsForTag(metalake, tagName);
-      } catch (IllegalArgumentException conflict) {
-        RelationUpdate rollback =
-            RelationUpdate.of(
-                SupportsRelationOperations.Type.POLICY_TAG_REL,
-                tagIdentifier,
-                Entity.EntityType.TAG,
-                new RelationEdgeTarget[0],
-                new RelationEdgeTarget[] {
-                  RelationEdgeTarget.of(policyIdentifier, Entity.EntityType.POLICY, null)
-                });
-        entityStore.relationOperations().updateEntityRelations(rollback);
-        throw conflict;
-      }
     } catch (EntityAlreadyExistsException e) {
       throw new PolicyAlreadyAssociatedException(
           e,
@@ -455,6 +445,11 @@ public class TagManager implements TagDispatcher {
     TagValue[] tagValuesToAdd = tagsToAddSet.toArray(new TagValue[0]);
     TagValue[] tagValuesToRemove = tagsToRemoveSet.toArray(new TagValue[0]);
 
+    if (tagValuesToAdd.length > 0) {
+      requireNoConflictBeforeAssociateTags(
+          metalake, metadataObject, tagValuesToAdd, tagValuesToRemove, mode);
+    }
+
     try {
       List<TagEntity> tags;
       if (mode == TagAssociationMode.TAG_VALUES) {
@@ -479,20 +474,7 @@ public class TagManager implements TagDispatcher {
                     toNameIdentifiers(metalake, tagValuesToAdd),
                     toNameIdentifiers(metalake, tagValuesToRemove));
       }
-      String[] associated = tags.stream().map(Tag::name).distinct().toArray(String[]::new);
-      if (tagValuesToAdd.length > 0) {
-        try {
-          objectPolicyResolver.requireNoSameLevelConflict(metalake, metadataObject);
-        } catch (IllegalArgumentException conflict) {
-          try {
-            rollbackAddedTagValues(metalake, entityIdent, entityType, tagValuesToAdd, mode);
-          } catch (IOException rollbackFailure) {
-            conflict.addSuppressed(rollbackFailure);
-          }
-          throw conflict;
-        }
-      }
-      return associated;
+      return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
     } catch (NoSuchEntityException e) {
       // Tags that do not exist, including ones dropped or renamed while this change ran, are
       // ignored by the store, so a missing entity here is the metadata object itself.
@@ -529,13 +511,39 @@ public class TagManager implements TagDispatcher {
         () -> entityStore);
   }
 
-  private void requireNoSameLevelConflictsForTag(String metalake, String tagName) {
+  private void requireNoConflictBeforeAddPolicy(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    PolicyEntity policy;
+    try {
+      policy =
+          entityStore.get(
+              NameIdentifierUtil.ofPolicy(metalake, policyName),
+              Entity.EntityType.POLICY,
+              PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      // The write path reports missing policies; skip the maintenance pre-check here.
+      return;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    if (!ObjectPolicyResolver.UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+      return;
+    }
+
     MetadataObject[] objects = listMetadataObjectsForTag(metalake, tagName);
-    List<String> conflicting = new java.util.ArrayList<>();
+    List<String> conflicting = new ArrayList<>();
     IllegalArgumentException first = null;
     for (MetadataObject object : objects) {
+      Tag tagOnObject;
       try {
-        objectPolicyResolver.requireNoSameLevelConflict(metalake, object);
+        tagOnObject = getTagForMetadataObject(metalake, object, tagName);
+      } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
+        continue;
+      }
+      TagAssignment assignment = tagOnObject.assignment().orElseGet(TagAssignment::noValue);
+      try {
+        objectPolicyResolver.requireNoSameLevelConflictAddingPolicy(
+            metalake, object, assignment, policy, selector);
       } catch (IllegalArgumentException e) {
         conflicting.add(object.toString());
         if (first == null) {
@@ -546,40 +554,91 @@ public class TagManager implements TagDispatcher {
     if (first != null) {
       throw new IllegalArgumentException(
           String.format(
-              "Associating the policy with tag %s creates same-type policy conflicts on"
+              "Associating the policy with tag %s would create same-type policy conflicts on"
                   + " metadata objects %s. %s",
               tagName, conflicting, first.getMessage()),
           first);
     }
   }
 
-  private void rollbackAddedTagValues(
+  private void requireNoConflictBeforeAssociateTags(
       String metalake,
-      NameIdentifier entityIdent,
-      Entity.EntityType entityType,
+      MetadataObject metadataObject,
       TagValue[] tagValuesToAdd,
-      TagAssociationMode mode)
-      throws IOException {
-    if (mode == TagAssociationMode.TAG_VALUES) {
-      entityStore
-          .relationOperations()
-          .updateEntityRelations(
-              RelationUpdate.of(
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                  entityIdent,
-                  entityType,
-                  new RelationEdgeTarget[0],
-                  toRelationEdgeTargets(metalake, tagValuesToAdd)));
-    } else {
-      entityStore
-          .relationOperations()
-          .updateEntityRelations(
-              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-              entityIdent,
-              entityType,
-              new NameIdentifier[0],
-              toNameIdentifiers(metalake, tagValuesToAdd));
+      TagValue[] tagValuesToRemove,
+      TagAssociationMode mode) {
+    ResolvedTag[] projected =
+        projectDirectTagsAfterChange(
+            metalake, metadataObject, tagValuesToAdd, tagValuesToRemove, mode);
+    objectPolicyResolver.requireNoSameLevelConflict(metalake, metadataObject, projected);
+  }
+
+  private ResolvedTag[] projectDirectTagsAfterChange(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagValuesToAdd,
+      TagValue[] tagValuesToRemove,
+      TagAssociationMode mode) {
+    Map<String, LinkedHashSet<String>> valuesByTag = new LinkedHashMap<>();
+    Set<String> noValueTags = new LinkedHashSet<>();
+    for (Tag tag : listTagsInfoForMetadataObject(metalake, metadataObject)) {
+      TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
+      if (assignment.hasValues()) {
+        valuesByTag
+            .computeIfAbsent(tag.name(), ignored -> new LinkedHashSet<>())
+            .addAll(Arrays.asList(assignment.values()));
+      } else {
+        noValueTags.add(tag.name());
+      }
     }
+
+    for (TagValue toRemove : tagValuesToRemove) {
+      if (mode == TagAssociationMode.TAG_NAMES || !toRemove.value().isPresent()) {
+        valuesByTag.remove(toRemove.name());
+        noValueTags.remove(toRemove.name());
+        continue;
+      }
+      LinkedHashSet<String> values = valuesByTag.get(toRemove.name());
+      if (values != null) {
+        values.remove(toRemove.value().get());
+        if (values.isEmpty()) {
+          valuesByTag.remove(toRemove.name());
+        }
+      }
+    }
+
+    for (TagValue toAdd : tagValuesToAdd) {
+      if (!toAdd.value().isPresent()) {
+        if (!valuesByTag.containsKey(toAdd.name())) {
+          noValueTags.add(toAdd.name());
+        }
+        continue;
+      }
+      noValueTags.remove(toAdd.name());
+      valuesByTag
+          .computeIfAbsent(toAdd.name(), ignored -> new LinkedHashSet<>())
+          .add(toAdd.value().get());
+    }
+
+    List<ResolvedTag> projected = new ArrayList<>();
+    Set<String> names = new LinkedHashSet<>();
+    names.addAll(noValueTags);
+    names.addAll(valuesByTag.keySet());
+    for (String tagName : names) {
+      TagEntity tagEntity;
+      try {
+        tagEntity = loadTagEntity(metalake, tagName);
+      } catch (NoSuchTagException e) {
+        // Matching the store: unknown tag names in an association request are ignored.
+        continue;
+      }
+      TagAssignment assignment =
+          valuesByTag.containsKey(tagName)
+              ? TagAssignment.ofValues(valuesByTag.get(tagName).toArray(new String[0]))
+              : TagAssignment.noValue();
+      projected.add(new ResolvedTag(tagEntity.copyWithAssignment(assignment), metadataObject));
+    }
+    return projected.toArray(new ResolvedTag[0]);
   }
 
   private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {
