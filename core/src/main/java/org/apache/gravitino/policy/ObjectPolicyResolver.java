@@ -62,7 +62,7 @@ public class ObjectPolicyResolver {
   private static final Logger LOG = LoggerFactory.getLogger(ObjectPolicyResolver.class);
 
   /** Maintenance types that allow at most one effective policy per metadata-object level. */
-  static final Set<Policy.BuiltInType> UNIQUE_MAINTENANCE_TYPES =
+  public static final Set<Policy.BuiltInType> UNIQUE_MAINTENANCE_TYPES =
       ImmutableSet.of(
           Policy.BuiltInType.ICEBERG_COMPACTION,
           Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
@@ -178,7 +178,76 @@ public class ObjectPolicyResolver {
    * @throws IllegalArgumentException when a same-level same-type conflict exists
    */
   public void requireNoSameLevelConflict(String metalake, MetadataObject metadataObject) {
-    Match[] matches = resolveRawMatches(metalake, metadataObject);
+    requireNoSameLevelConflict(metadataObject, resolveRawMatches(metalake, metadataObject));
+  }
+
+  /**
+   * Rejects same-level maintenance conflicts for a projected set of direct tag assignments on
+   * {@code metadataObject}, without writing those associations.
+   *
+   * @param metalake metalake name
+   * @param metadataObject object the tags would be assigned to
+   * @param directTags projected direct tags with {@code source == metadataObject}
+   * @throws IllegalArgumentException when a same-level same-type conflict would exist
+   */
+  public void requireNoSameLevelConflict(
+      String metalake, MetadataObject metadataObject, ResolvedTag[] directTags) {
+    if (directTags.length == 0) {
+      return;
+    }
+    List<NameIdentifier> tagIdentifiers =
+        Arrays.stream(directTags)
+            .map(resolvedTag -> resolvedTag.tag().name())
+            .distinct()
+            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
+            .collect(Collectors.toList());
+    requireNoSameLevelConflict(
+        metadataObject, selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject)));
+  }
+
+  /**
+   * Rejects adding {@code policy} to a tag when that would create a same-level maintenance conflict
+   * on {@code metadataObject}, given the tag's current assignment on that object.
+   *
+   * @param metalake metalake name
+   * @param metadataObject object that already has the tag
+   * @param assignment current tag assignment on the object
+   * @param policy policy that would be linked to the tag
+   * @param selector policy-to-tag selector
+   * @throws IllegalArgumentException when a same-level same-type conflict would exist
+   */
+  public void requireNoSameLevelConflictAddingPolicy(
+      String metalake,
+      MetadataObject metadataObject,
+      TagAssignment assignment,
+      PolicyEntity policy,
+      PolicyAssociationSelector selector) {
+    if (!UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+      return;
+    }
+    if (!matches(selector, assignment)) {
+      return;
+    }
+    Match[] existing = resolveRawMatches(metalake, metadataObject);
+    TreeSet<String> names = new TreeSet<>();
+    for (Match match : existing) {
+      if (match.policy().policyType() != policy.policyType()) {
+        continue;
+      }
+      if (match.sources().contains(metadataObject)) {
+        names.add(match.policy().name());
+      }
+    }
+    names.add(policy.name());
+    if (names.size() > 1) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Metadata object %s has conflicting %s policies at the same level: %s",
+              metadataObject, policy.policyType().policyType(), names));
+    }
+  }
+
+  private static void requireNoSameLevelConflict(MetadataObject metadataObject, Match[] matches) {
     Map<Policy.BuiltInType, List<Match>> byType = groupMaintenanceMatches(matches);
     for (Map.Entry<Policy.BuiltInType, List<Match>> entry : byType.entrySet()) {
       TreeSet<String> names = new TreeSet<>();
