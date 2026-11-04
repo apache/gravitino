@@ -160,7 +160,6 @@ public class PolicyOperations {
             request.validate();
             NameIdentifierUtil.checkMetadataObjectName(
                 NameIdentifierUtil.ofPolicy(metalake, request.getName()), Entity.EntityType.POLICY);
-            validateCreatePolicyType(request.getPolicyType());
             PolicyEntity policy =
                 policyDispatcher.createPolicy(
                     metalake,
@@ -380,6 +379,7 @@ public class PolicyOperations {
     return builder.build();
   }
 
+<<<<<<< HEAD
   private static void validateCreatePolicyType(String policyType) {
     Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
     if (builtInType != Policy.BuiltInType.CUSTOM
@@ -389,5 +389,13 @@ public class PolicyOperations {
               "Built-in policy type must use prefixed value '%s', but got: %s",
               builtInType.policyType(), policyType));
     }
+=======
+  static PolicyAssociationSelectorDTO toSelectorDTO(RelationalEntity<?> association) {
+    return PolicyAssociationSelectorDTO.fromSelector(
+        association
+            .relationValue()
+            .map(PolicyAssociationSelectorSerde::deserialize)
+            .orElseGet(AllValuesSelector::get));
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
   }
 }

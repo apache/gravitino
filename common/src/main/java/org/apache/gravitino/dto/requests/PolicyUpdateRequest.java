@@ -24,12 +24,14 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -121,7 +123,19 @@ public interface PolicyUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {}
   }
 
+<<<<<<< HEAD
   /** The policy update request for updating a policy content. */
+=======
+  /**
+   * The policy update request for updating a policy content.
+   *
+   * <p>{@code newContent} fully replaces the previous content. Omitted typed fields use that
+   * content type's defaults; they are not merged with the previously stored values.
+   *
+   * <p>{@code policyType} accepts known type ids case-insensitively; the change stores the
+   * canonical lowercase value from {@link Policy.BuiltInType#policyType()}.
+   */
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
   @EqualsAndHashCode
   @Getter
   @ToString
@@ -135,6 +149,7 @@ public interface PolicyUpdateRequest extends RESTRequest {
         use = JsonTypeInfo.Id.NAME,
         include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
         property = "policyType",
+<<<<<<< HEAD
         defaultImpl = PolicyContentDTO.CustomContentDTO.class)
     @JsonSubTypes({
       // add mappings for built-in types here
@@ -144,6 +159,10 @@ public interface PolicyUpdateRequest extends RESTRequest {
           value = PolicyContentDTO.IcebergCompactionContentDTO.class,
           name = "system_iceberg_compaction")
     })
+=======
+        defaultImpl = Void.class)
+    @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
     private final PolicyContentDTO newContent;
 
     /**
@@ -165,12 +184,15 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
     @Override
     public PolicyChange policyChange() {
-      return PolicyChange.updateContent(policyType, fromDTO(newContent));
+      return PolicyChange.updateContent(
+          Policy.BuiltInType.fromPolicyType(policyType).policyType(), fromDTO(newContent));
     }
 
     @Override
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(policyType != null, "\"policyType\" must not be null");
+      // An unknown policyType binds newContent as null, so resolve the type first.
+      Policy.BuiltInType.fromPolicyType(policyType);
       Preconditions.checkArgument(newContent != null, "\"newContent\" must not be null");
       newContent.validate();
     }

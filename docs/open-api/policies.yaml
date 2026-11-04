@@ -70,6 +70,12 @@ paths:
             examples:
               PolicyCreate:
                 $ref: "#/components/examples/PolicyCreate"
+              PolicyCreateLowercaseType:
+                $ref: "#/components/examples/PolicyCreateLowercaseType"
+              PolicyCreateUppercaseType:
+                $ref: "#/components/examples/PolicyCreateUppercaseType"
+              PolicyCreateMixedCaseType:
+                $ref: "#/components/examples/PolicyCreateMixedCaseType"
 
       responses:
         "200":
@@ -139,6 +145,13 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PolicyUpdatesRequest"
+            examples:
+              PolicyUpdateContentLowercaseType:
+                $ref: "#/components/examples/PolicyUpdateContentLowercaseType"
+              PolicyUpdateContentUppercaseType:
+                $ref: "#/components/examples/PolicyUpdateContentUppercaseType"
+              PolicyUpdateContentMixedCaseType:
+                $ref: "#/components/examples/PolicyUpdateContentMixedCaseType"
       responses:
         "200":
             description: Returns the updated policy object
@@ -387,6 +400,408 @@ components:
 
   schemas:
 
+<<<<<<< HEAD
+=======
+    PolicyAssociationSelector:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: The selector type used to match tag assignments
+          enum: ["ALL_VALUES", "TAG_VALUE"]
+        value:
+          type: string
+          description: The assignment value required by a TAG_VALUE selector
+          nullable: true
+          maxLength: 256
+
+    TagForPolicyAssociation:
+      type: object
+      required:
+        - tag
+        - selector
+      properties:
+        tag:
+          $ref: "./tags.yaml#/components/schemas/Tag"
+        selector:
+          $ref: "#/components/schemas/PolicyAssociationSelector"
+
+    TagForPolicyAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        associations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagForPolicyAssociation"
+
+    IcebergCompactionContent:
+      type: object
+      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
+      properties:
+        minDataFileMse:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 405323966463344
+        minDeleteFileNumber:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        dataFileMseWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 1
+        deleteFileNumberWeight:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 100
+        maxPartitionNum:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 50
+        rewriteStrategy:
+          type: string
+          enum: [binpack, sort]
+          default: binpack
+          description: Iceberg rewrite_data_files top-level strategy.
+        sortOrder:
+          type: string
+          default: ""
+          description: Iceberg rewrite_data_files top-level sort_order. Required when rewriteStrategy is sort; must be empty for binpack.
+        rewriteOptions:
+          type: object
+          default: {}
+          description: Rewrite options with nonempty values and keys matching [A-Za-z0-9._-]+, without the job.options. prefix.
+          additionalProperties:
+            type: string
+            minLength: 1
+
+    IcebergCompactionPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_compaction]
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergCompactionPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergCompactionRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    IcebergOrphanFileRemovalContent:
+      type: object
+      description: Table-level orphan cleanup options. Scheduling is configured separately.
+      properties:
+        olderThanDays:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 36500
+          default: 3
+          description: Minimum age of orphan files in days, including for dry runs.
+        location:
+          type: string
+          nullable: true
+          description: Optional scan location within the target table's storage root.
+        dryRun:
+          type: boolean
+          default: false
+          description: List candidates without deleting them.
+
+    IcebergOrphanFileRemovalPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_orphan_file_removal]
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    IcebergOrphanFileRemovalPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    IcebergRewriteManifestsContent:
+      type: object
+      description: Thresholds for one resolved Iceberg partition spec. Supports catalog, schema, and table policies.
+      additionalProperties: false
+      properties:
+        manifest_count_critical:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 500
+          description: Inclusive count trigger, regardless of size. Must be at least manifest_count_warning.
+        manifest_count_warning:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 100
+          description: Inclusive minimum count for the average-size trigger.
+        avg_manifest_size_threshold_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 8388608
+          description: Exclusive average manifest size threshold in bytes.
+        spec_id:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: Existing partition spec. Omission resolves Iceberg's current default spec from table metadata. If it cannot be resolved, the table is skipped. The evaluated ID is retained through job submission.
+        use_caching:
+          type: boolean
+          nullable: true
+          description: Optional caching setting. Omission preserves the Iceberg runtime default.
+
+    IcebergRewriteManifestsPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_rewrite_manifests]
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    IcebergRewriteManifestsPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergRewriteManifestsRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    IcebergSnapshotExpirationContent:
+      type: object
+      description: >
+        Snapshot expiration options for system_iceberg_snapshot_expiration. Scheduling is
+        configured separately. On updateContent, newContent fully replaces the previous content;
+        omitted fields use these defaults rather than merging with stored values. Integer fields
+        must be JSON integers (not strings or floats); streamResults must be a JSON boolean.
+      additionalProperties: false
+      properties:
+        olderThanDays:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 36500
+          default: 5
+          description: Minimum age of snapshots eligible for expiration, in days (Iceberg default).
+        retainLast:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 1
+          description: Minimum number of recent snapshots to keep regardless of age.
+        streamResults:
+          type: boolean
+          default: false
+          description: Whether the expire job should stream intermediate delete results.
+
+    IcebergSnapshotExpirationPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_iceberg_snapshot_expiration]
+            content:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
+
+    IcebergSnapshotExpirationPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
+
+    RowFilterContent:
+      type: object
+      description: Expression content for a built-in row-filter policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: >-
+            A complete restricted-sql-v1 definition such as
+            `(region STRING) RETURNS BOOLEAN -> region = 'US'`.
+            Parameters must be declared and the body must return BOOLEAN. SQL CASE, predicates,
+            and allowlisted context and scalar functions are supported. The UTF-8 source must
+            not exceed 16 KiB; see the Policies documentation for grammar, types and limits.
+
+    ColumnMaskContent:
+      type: object
+      description: Expression content for a built-in column-mask policy.
+      required:
+        - expression
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          pattern: '[\s\S]*\S[\s\S]*'
+          description: >-
+            A complete restricted-sql-v1 definition such as
+            `(value STRING) RETURNS STRING -> show_last_4(value)`.
+            Exactly one parameter is required; its type must equal the return type. Its local
+            name is independent of the selected column name. The body may use SQL CASE,
+            literals, NULL, and allowlisted functions. The UTF-8 source must not exceed 16 KiB;
+            see the Policies documentation for grammar, types and limits.
+
+    AccessControlContent:
+      type: object
+      description: Rule content for a built-in access-control policy.
+      required:
+        - privileges
+        - applicableRoles
+      properties:
+        privileges:
+          type: array
+          minItems: 1
+          description: >-
+            The privileges granted when the rule matches. Limited to privileges that apply to a
+            whole securable object; column-scoped privileges are not permitted. This enum mirrors
+            AccessControlContent.PERMITTED_PRIVILEGES; change both together.
+          items:
+            type: string
+            enum:
+              - SELECT_TABLE
+              - MODIFY_TABLE
+              - PROBE_TABLE_LIKE
+              - SELECT_VIEW
+              - READ_FILESET
+              - WRITE_FILESET
+              - CONSUME_TOPIC
+              - PRODUCE_TOPIC
+              - USE_MODEL
+              - EXECUTE_FUNCTION
+              - USE_SEMANTIC_MODEL
+        applicableRoles:
+          type: array
+          minItems: 1
+          description: The names of the roles the rule applies to.
+          items:
+            type: string
+
+    RowFilterPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_row_filter]
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    RowFilterPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/RowFilterRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    ColumnMaskPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_column_mask]
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    ColumnMaskPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/ColumnMaskRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    AccessControlPolicy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              type: string
+              enum: [system_access_control]
+            content:
+              $ref: '#/components/schemas/AccessControlContent'
+
+    AccessControlPolicyCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required: [content]
+          properties:
+            policyType:
+              $ref: '#/components/schemas/AccessControlRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/AccessControlContent'
+
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
     PolicyContentBase:
       type: object
       description: A base content structure for policies
@@ -538,6 +953,46 @@ components:
             - "FUNCTION"
             - "COLUMN"
 
+    CustomRequestPolicyType:
+      type: string
+      description: Request value `custom`, matched case-insensitively.
+      pattern: '^[cC][uU][sS][tT][oO][mM]$'
+
+    IcebergCompactionRequestPolicyType:
+      type: string
+      description: Request value `system_iceberg_compaction`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[iI][cC][eE][bB][eE][rR][gG]_[cC][oO][mM][pP][aA][cC][tT][iI][oO][nN]$'
+
+    IcebergOrphanFileRemovalRequestPolicyType:
+      type: string
+      description: Request value `system_iceberg_orphan_file_removal`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[iI][cC][eE][bB][eE][rR][gG]_[oO][rR][pP][hH][aA][nN]_[fF][iI][lL][eE]_[rR][eE][mM][oO][vV][aA][lL]$'
+
+    IcebergRewriteManifestsRequestPolicyType:
+      type: string
+      description: Request value `system_iceberg_rewrite_manifests`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[iI][cC][eE][bB][eE][rR][gG]_[rR][eE][wW][rR][iI][tT][eE]_[mM][aA][nN][iI][fF][eE][sS][tT][sS]$'
+
+    IcebergSnapshotExpirationRequestPolicyType:
+      type: string
+      description: Request value `system_iceberg_snapshot_expiration`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[iI][cC][eE][bB][eE][rR][gG]_[sS][nN][aA][pP][sS][hH][oO][tT]_[eE][xX][pP][iI][rR][aA][tT][iI][oO][nN]$'
+
+    RowFilterRequestPolicyType:
+      type: string
+      description: Request value `system_row_filter`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[rR][oO][wW]_[fF][iI][lL][tT][eE][rR]$'
+
+    ColumnMaskRequestPolicyType:
+      type: string
+      description: Request value `system_column_mask`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[cC][oO][lL][uU][mM][nN]_[mM][aA][sS][kK]$'
+
+    AccessControlRequestPolicyType:
+      type: string
+      description: Request value `system_access_control`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[aA][cC][cC][eE][sS][sS]_[cC][oO][nN][tT][rR][oO][lL]$'
+
     PolicyCreateRequestBase:
       type: object
       description: A base policy create request without content
@@ -554,7 +1009,11 @@ components:
           nullable: true
         policyType:
           type: string
-          description: The type of the policy
+          description: >-
+            The type of the policy, either `custom` or a built-in `system_*` type. Known
+            values are matched case-insensitively, so request schemas select the content by a
+            case-insensitive pattern; the server stores and returns the canonical lowercase
+            form. An unknown value is rejected with HTTP 400 naming the type.
         enabled:
           type: boolean
           description: Whether the policy is enabled
@@ -568,6 +1027,11 @@ components:
           required:
             - content
           properties:
+<<<<<<< HEAD
+=======
+            policyType:
+              $ref: '#/components/schemas/CustomRequestPolicyType'
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
@@ -576,10 +1040,28 @@ components:
       type: object
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
+<<<<<<< HEAD
       discriminator:
         propertyName: policyType
         mapping:
           custom: '#/components/schemas/CustomPolicyCreateRequest'
+=======
+        - $ref: '#/components/schemas/IcebergOrphanFileRemovalPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergRewriteManifestsPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergSnapshotExpirationPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+        - $ref: '#/components/schemas/RowFilterPolicyCreateRequest'
+        - $ref: '#/components/schemas/ColumnMaskPolicyCreateRequest'
+        - $ref: '#/components/schemas/AccessControlPolicyCreateRequest'
+      example: {
+        "name": "compaction_upper",
+        "policyType": "SYSTEM_ICEBERG_COMPACTION",
+        "enabled": true,
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
 
 
     PolicyUpdatesRequest:
@@ -660,6 +1142,7 @@ components:
             - updateContent
         policyType:
           type: string
+<<<<<<< HEAD
           description: The type of the policy
         newContent:
           type: object
@@ -670,6 +1153,105 @@ components:
             propertyName: policyType
             mapping:
               custom: '#/components/schemas/CustomPolicyContent'
+=======
+          description: >-
+            The type of the policy, either `custom` or a built-in `system_*` type. Known
+            values are matched case-insensitively, so request schemas select the content by a
+            case-insensitive pattern; the server stores and returns the canonical lowercase
+            form. An unknown value is rejected with HTTP 400 naming the type.
+
+    UpdateCustomPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/CustomRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/CustomPolicyContent'
+
+    UpdateIcebergCompactionPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergCompactionRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
+    UpdateIcebergOrphanFileRemovalPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/IcebergOrphanFileRemovalContent'
+
+    UpdateIcebergRewriteManifestsPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergRewriteManifestsRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/IcebergRewriteManifestsContent'
+
+    UpdateIcebergSnapshotExpirationPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/IcebergSnapshotExpirationContent'
+
+    UpdateRowFilterPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/RowFilterRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/RowFilterContent'
+
+    UpdateColumnMaskPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/ColumnMaskRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/ColumnMaskContent'
+
+    UpdateAccessControlPolicyContentRequest:
+      allOf:
+        - $ref: '#/components/schemas/UpdatePolicyContentRequestBase'
+        - type: object
+          properties:
+            policyType:
+              $ref: '#/components/schemas/AccessControlRequestPolicyType'
+            newContent:
+              $ref: '#/components/schemas/AccessControlContent'
+
+    UpdatePolicyContentRequest:
+      description: Selects typed content using the sibling policyType field, matching REST deserialization.
+      oneOf:
+        - $ref: '#/components/schemas/UpdateCustomPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergCompactionPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergOrphanFileRemovalPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergRewriteManifestsPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateIcebergSnapshotExpirationPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateRowFilterPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateColumnMaskPolicyContentRequest'
+        - $ref: '#/components/schemas/UpdateAccessControlPolicyContentRequest'
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
       example: {
         "@type": "updateContent",
         "policyType": "custom",
@@ -814,10 +1396,83 @@ components:
         }
       }
 
+<<<<<<< HEAD
     PolicyAssociate:
       value: {
         "policiesToAdd": ["my_policy1", "my_policy2"],
         "policiesToRemove": ["my_policy3"]
+=======
+    PolicyCreateLowercaseType:
+      summary: Create a compaction policy with the canonical lowercase policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "system_iceberg_compaction",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyCreateUppercaseType:
+      summary: Create a compaction policy with an uppercase policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "SYSTEM_ICEBERG_COMPACTION",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyCreateMixedCaseType:
+      summary: Create a compaction policy with a mixed-case policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "System_Iceberg_Compaction",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyUpdateContentLowercaseType:
+      summary: Update compaction content with the canonical lowercase policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "system_iceberg_compaction",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
+      }
+
+    PolicyUpdateContentUppercaseType:
+      summary: Update compaction content with an uppercase policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "SYSTEM_ICEBERG_COMPACTION",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
+      }
+
+    PolicyUpdateContentMixedCaseType:
+      summary: Update compaction content with a mixed-case policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "System_Iceberg_Compaction",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
+>>>>>>> 90eca3316 ([#14428] fix(policy): Accept known policyType case-insensitively (#14520))
       }
 
     PolicyResponse:
