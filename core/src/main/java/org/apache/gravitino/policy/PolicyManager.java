@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,15 +36,21 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -267,6 +274,9 @@ public class PolicyManager implements PolicyDispatcher {
     if (policyEnabled(metalake, policyName) == expectedEnabledState) {
       return;
     }
+    if (expectedEnabledState) {
+      requireNoConflictBeforeEnable(metalake, policyName);
+    }
 
     try {
       entityStore.update(
@@ -287,6 +297,92 @@ public class PolicyManager implements PolicyDispatcher {
       LOG.error(
           "Failed to change policy {} enabled state under metalake {}", policyName, metalake, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /**
+   * Rejects enabling a maintenance policy when that would create a same-level same-type conflict on
+   * any metadata object reached through the policy's tag associations.
+   */
+  private void requireNoConflictBeforeEnable(String metalake, String policyName) {
+    PolicyEntity policy = loadPolicyEntity(metalake, policyName);
+    if (!ObjectPolicyResolver.UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+      return;
+    }
+
+    RelationalEntity<?>[] associations = listTagAssociationsForPolicy(metalake, policyName);
+    List<String> conflicting = new ArrayList<>();
+    IllegalArgumentException first = null;
+    for (RelationalEntity<?> association : associations) {
+      TagEntity tag = (TagEntity) association.targetEntity();
+      PolicyAssociationSelector selector =
+          association
+              .relationValue()
+              .map(PolicyAssociationSelectorSerde::deserialize)
+              .orElseGet(AllValuesSelector::get);
+      for (MetadataObject object : listMetadataObjectsForTag(metalake, tag.name())) {
+        TagAssignment assignment = assignmentOnObject(metalake, object, tag.name());
+        if (assignment == null) {
+          continue;
+        }
+        try {
+          objectPolicyResolver.requireNoSameLevelConflictAddingPolicy(
+              metalake, object, assignment, policy, selector);
+        } catch (IllegalArgumentException e) {
+          conflicting.add(object.toString());
+          if (first == null) {
+            first = e;
+          }
+        }
+      }
+    }
+    if (first != null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Enabling policy %s would create same-type policy conflicts on metadata objects %s."
+                  + " %s",
+              policyName, conflicting, first.getMessage()),
+          first);
+    }
+  }
+
+  private MetadataObject[] listMetadataObjectsForTag(String metalake, String tagName) {
+    NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, tagName);
+    try {
+      List<GenericEntity> entities =
+          entityStore
+              .relationOperations()
+              .listEntitiesByRelation(
+                  RelationQuery.of(
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                      tagId,
+                      Entity.EntityType.TAG,
+                      true,
+                      null));
+      return MetadataObjectService.fromGenericEntities(entities).toArray(new MetadataObject[0]);
+    } catch (IOException e) {
+      LOG.error(
+          "Failed to list metadata objects for tag {} under metalake {}", tagName, metalake, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private TagAssignment assignmentOnObject(
+      String metalake, MetadataObject metadataObject, String tagName) {
+    try {
+      TagEntity tag =
+          entityStore
+              .relationOperations()
+              .getEntityByRelation(
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                  MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+                  MetadataObjectUtil.toEntityType(metadataObject),
+                  NameIdentifierUtil.ofTag(metalake, tagName));
+      return tag.assignment().orElseGet(TagAssignment::noValue);
+    } catch (NoSuchEntityException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
