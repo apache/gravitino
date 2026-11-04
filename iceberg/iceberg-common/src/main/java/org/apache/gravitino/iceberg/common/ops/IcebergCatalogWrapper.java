@@ -291,14 +291,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public void purgeTable(TableIdentifier tableIdentifier) {
     invalidateTableMetadata(tableIdentifier);
-    if (isRESTCatalog()) {
-      // A remote REST catalog owns its table files and the storage access to them. Forward the
-      // purge so the remote deletes the files, rather than deleting them from this server.
-      if (!getCatalog().dropTable(tableIdentifier, true)) {
-        throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
-      }
-      return;
-    }
     Table table = getCatalog().loadTable(tableIdentifier);
     if (!(table instanceof HasTableOperations)) {
       CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
@@ -546,20 +538,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public boolean isRESTCatalog() {
     return getCatalog() instanceof RESTCatalog;
-  }
-
-  /**
-   * Returns whether the REST backend forwards the calling user's access token.
-   *
-   * <p>Only this mode allows authorization to be delegated to the remote catalog. A service-account
-   * connection presents one identity for every user, so Gravitino must authorize each request.
-   *
-   * @return {@code true} if the REST backend forwards the calling user's access token
-   */
-  public boolean forwardsUserToken() {
-    return IcebergCatalogBackend.REST.equals(catalogBackend)
-        && !icebergConfig.isRestBackendServiceAccount()
-        && isRESTCatalog();
   }
 
   @Getter

@@ -27,7 +27,6 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergConfig {
@@ -36,30 +35,22 @@ public class TestIcebergConfig {
     IcebergConfig config = new IcebergConfig(ImmutableMap.of());
     Assertions.assertEquals(
         "remote", config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
-    Assertions.assertFalse(config.useLocalStorageCredentials());
 
     IcebergConfig serviceAccountConfig =
         new IcebergConfig(
             ImmutableMap.of(IcebergConstants.REST_BACKEND_AUTH_TYPE, "service-account"));
-    Assertions.assertTrue(serviceAccountConfig.useLocalStorageCredentials());
+    Assertions.assertEquals(
+        "remote", serviceAccountConfig.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
   }
 
   @ParameterizedTest
-  @CsvSource({
-    "user-token, local, true",
-    "user-token, remote, false",
-    "service-account, local, true",
-    "service-account, remote, true"
-  })
-  void testStorageCredentialSource(String authType, String source, boolean localCredentials) {
+  @ValueSource(strings = {"local", "remote"})
+  void testStorageCredentialSource(String source) {
     IcebergConfig config =
         new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.REST_BACKEND_AUTH_TYPE,
-                authType,
-                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
-                source));
-    Assertions.assertEquals(localCredentials, config.useLocalStorageCredentials());
+            ImmutableMap.of(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, source));
+    Assertions.assertEquals(
+        source, config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
   }
 
   @ParameterizedTest
@@ -68,7 +59,9 @@ public class TestIcebergConfig {
     IcebergConfig config =
         new IcebergConfig(
             ImmutableMap.of(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, source));
-    Assertions.assertThrows(IllegalArgumentException.class, config::useLocalStorageCredentials);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE));
   }
 
   @Test

@@ -489,21 +489,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         get(REST_BACKEND_AUTH_TYPE));
   }
 
-  /**
-   * Returns whether this catalog issues storage credentials through its local providers.
-   *
-   * <p>Service-account connections always use local credentials, since the remote catalog's
-   * credentials reflect the service account's privileges rather than the caller's.
-   *
-   * @return {@code true} if {@code rest-backend-storage-credential-source} is {@code local} or the
-   *     connection uses a service account
-   */
-  public boolean useLocalStorageCredentials() {
-    return IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
-            get(REST_BACKEND_STORAGE_CREDENTIAL_SOURCE))
-        || isRestBackendServiceAccount();
-  }
-
   @Override
   public Map<String, String> getOverwriteDefaultConfig() {
     return ImmutableMap.of(

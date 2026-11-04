@@ -45,12 +45,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.BaseTable;
@@ -97,12 +99,58 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 
 public class TestCatalogWrapperForREST {
 
   private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
+
+  @Test
+  void testLocalBackendPolicies() throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    try (CatalogWrapperForREST wrapper = new CatalogWrapperForREST("local", config)) {
+      Assertions.assertFalse(wrapper.forwardsUserToken());
+      Assertions.assertTrue(wrapper.supportsAsyncPurge());
+      Assertions.assertDoesNotThrow(
+          () -> wrapper.validateServerContext(mock(IcebergRESTServerContext.class)));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "user-token, false",
+    "user-token, true",
+    "service-account, false",
+    "service-account, true"
+  })
+  void testFederatedBackendPolicies(String authType, boolean authorizationEnabled)
+      throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                authType));
+    IcebergRESTServerContext context = mock(IcebergRESTServerContext.class);
+    when(context.isAuthorizationEnabled()).thenReturn(authorizationEnabled);
+    try (CatalogWrapperForREST wrapper = new FederatedCatalogWrapper("remote", config)) {
+      Assertions.assertEquals("user-token".equals(authType), wrapper.forwardsUserToken());
+      Assertions.assertFalse(wrapper.supportsAsyncPurge());
+      if ("service-account".equals(authType) && !authorizationEnabled) {
+        IllegalArgumentException failure =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> wrapper.validateServerContext(context));
+        Assertions.assertTrue(
+            failure.getMessage().contains("requires authorization to be enabled"));
+      } else {
+        Assertions.assertDoesNotThrow(() -> wrapper.validateServerContext(context));
+      }
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
@@ -901,8 +949,14 @@ public class TestCatalogWrapperForREST {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"local", "service-account"})
-  void testFederatedLoadTableWithLocalStorageCredentials(String mode) throws Exception {
+  @CsvSource({
+    "user-token, local",
+    "service-account, local",
+    "service-account, remote",
+    "service-account, "
+  })
+  void testFederatedLoadTableWithLocalStorageCredentials(
+      String authType, @Nullable String credentialSource) throws Exception {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     TableMetadata metadata =
         TableMetadataParser.fromJson(
@@ -958,23 +1012,18 @@ public class TestCatalogWrapperForREST {
                   "prefix",
                   "upstream"));
 
-      IcebergConfig config =
-          new IcebergConfig(
-              ImmutableMap.of(
-                  IcebergConstants.CATALOG_BACKEND,
-                  "memory",
-                  IcebergConstants.WAREHOUSE,
-                  "/tmp/warehouse",
+      ImmutableMap.Builder<String, String> properties =
+          ImmutableMap.<String, String>builder()
+              .put(IcebergConstants.CATALOG_BACKEND, "memory")
+              .put(IcebergConstants.WAREHOUSE, "/tmp/warehouse")
+              .put(
                   CredentialConstants.CREDENTIAL_PROVIDERS,
-                  DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
-                  // A service account catalog issues credentials through Gravitino even when
-                  // credential vending is left at its default.
-                  mode.equals("service-account")
-                      ? IcebergConstants.REST_BACKEND_AUTH_TYPE
-                      : IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
-                  mode.equals("service-account")
-                      ? IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT
-                      : IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL));
+                  DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE)
+              .put(IcebergConstants.REST_BACKEND_AUTH_TYPE, authType);
+      if (credentialSource != null) {
+        properties.put(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE, credentialSource);
+      }
+      IcebergConfig config = new IcebergConfig(properties.build());
       CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
 
       LoadTableResponse response = wrapper.loadTable(table, true, CredentialPrivilege.READ);

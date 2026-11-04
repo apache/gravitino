@@ -45,6 +45,7 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
@@ -124,6 +125,31 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
+  }
+
+  /**
+   * Validates server settings required by this catalog before it serves requests.
+   *
+   * @param serverContext the REST server context
+   */
+  public void validateServerContext(IcebergRESTServerContext serverContext) {}
+
+  /**
+   * Reports whether this catalog forwards the caller's access token to a remote catalog.
+   *
+   * @return {@code false} for a local catalog backend
+   */
+  public boolean forwardsUserToken() {
+    return false;
+  }
+
+  /**
+   * Reports whether this server can enqueue file cleanup after dropping a table.
+   *
+   * @return {@code true} for a local catalog backend
+   */
+  public boolean supportsAsyncPurge() {
+    return true;
   }
 
   public LoadTableResponse createTable(

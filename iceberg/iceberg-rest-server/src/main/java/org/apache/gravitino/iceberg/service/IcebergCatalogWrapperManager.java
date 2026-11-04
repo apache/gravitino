@@ -142,7 +142,14 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       throw new NoSuchCatalogException(
           "Couldn't find Iceberg configuration for catalog %s", catalogName);
     }
-    return createCatalogWrapper(catalogName, icebergConfig.get());
+    CatalogWrapperForREST wrapper = createCatalogWrapper(catalogName, icebergConfig.get());
+    try {
+      wrapper.validateServerContext(serverContext);
+      return wrapper;
+    } catch (RuntimeException e) {
+      closeIcebergCatalogWrapper(wrapper);
+      throw e;
+    }
   }
 
   // Overriding this method to create a new CatalogWrapperForREST for test;
@@ -160,9 +167,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     IcebergCatalogBackend backend =
         IcebergCatalogBackend.valueOf(
             enrichedConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
-    if (backend == IcebergCatalogBackend.REST && enrichedConfig.isRestBackendServiceAccount()) {
-      checkServiceAccountAuthorizationEnabled(catalogName);
-    }
     CatalogWrapperForREST rest =
         backend == IcebergCatalogBackend.REST
             ? new FederatedCatalogWrapper(catalogName, enrichedConfig)
@@ -252,30 +256,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
         String key, CatalogWrapperForREST value, long currentTime, long currentDuration) {
       // Preserve expire-after-access, but never extend past the GCS token refresh deadline.
       return expireAfterCreate(key, value, currentTime);
-    }
-  }
-
-  /**
-   * A catalog connected as a service account presents one identity to the remote catalog, so only
-   * this server can authorize its users. Refuse to serve it when authorization is disabled, where
-   * every caller would act as the service account.
-   */
-  private static void checkServiceAccountAuthorizationEnabled(String catalogName) {
-    boolean authorizationEnabled;
-    try {
-      authorizationEnabled = IcebergRESTServerContext.getInstance().isAuthorizationEnabled();
-    } catch (IllegalStateException e) {
-      // The server context is not initialized, as in tests that build wrappers directly.
-      return;
-    }
-    if (!authorizationEnabled) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s connects to its remote catalog as a service account (%s=%s), which"
-                  + " requires authorization to be enabled",
-              catalogName,
-              IcebergConstants.REST_BACKEND_AUTH_TYPE,
-              IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT));
     }
   }
 }

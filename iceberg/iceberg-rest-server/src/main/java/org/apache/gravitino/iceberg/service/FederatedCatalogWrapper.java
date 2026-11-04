@@ -30,8 +30,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -139,7 +141,49 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     super(catalogName, config);
     // A service account's credentials reflect what the service account may do, not the caller,
     // so a catalog connected as a service account never passes the remote's credentials through.
-    this.vendCredentialsLocally = config.useLocalStorageCredentials();
+    this.vendCredentialsLocally =
+        IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE))
+            || config.isRestBackendServiceAccount();
+  }
+
+  /**
+   * Requires local authorization when the remote catalog is accessed as a service account.
+   *
+   * @param serverContext the REST server context
+   */
+  @Override
+  public void validateServerContext(IcebergRESTServerContext serverContext) {
+    if (getIcebergConfig().isRestBackendServiceAccount()
+        && !serverContext.isAuthorizationEnabled()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s connects to its remote catalog as a service account (%s=%s), which"
+                  + " requires authorization to be enabled",
+              catalogCredentialManager.catalogName(),
+              IcebergConstants.REST_BACKEND_AUTH_TYPE,
+              IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT));
+    }
+  }
+
+  /**
+   * Reports whether the remote catalog receives the calling user's access token.
+   *
+   * @return {@code true} for a user-token connection, or {@code false} for a service account
+   */
+  @Override
+  public boolean forwardsUserToken() {
+    return !getIcebergConfig().isRestBackendServiceAccount();
+  }
+
+  /**
+   * Keeps cleanup of the remote catalog's files on the remote server.
+   *
+   * @return {@code false}, since this server must forward purge requests to the remote catalog
+   */
+  @Override
+  public boolean supportsAsyncPurge() {
+    return false;
   }
 
   /**

@@ -85,6 +85,7 @@ class TestIcebergAsyncPurge {
   @Test
   void testAsyncDropEnqueuesJob() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
     TableMetadata metadata = mock(TableMetadata.class);
     when(metadata.metadataFileLocation()).thenReturn("s3://b/db/t/metadata/0.json");
@@ -124,6 +125,7 @@ class TestIcebergAsyncPurge {
   @Test
   void testFallbackToSyncWhenDisabled() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
 
     tableExecutor(wrapper, Optional.empty()).dropTable(context(true), TABLE, true);
 
@@ -137,7 +139,7 @@ class TestIcebergAsyncPurge {
     // instead of being queued for this server to delete the files.
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
-    when(wrapper.isRESTCatalog()).thenReturn(true);
+    when(wrapper.supportsAsyncPurge()).thenReturn(false);
 
     tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true);
 
