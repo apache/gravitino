@@ -133,7 +133,8 @@ public class TestLancePartitionStatisticStorage {
                     PartitionStatisticsModification.drop(
                         targetPartitionName, Lists.newArrayList("statistic0")))));
 
-    storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+    int deletedCount = storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+    Assertions.assertEquals(1, deletedCount);
 
     listedStats =
         storage.listStatistics(
@@ -174,7 +175,8 @@ public class TestLancePartitionStatisticStorage {
                           "partition01", Lists.newArrayList("statistic1")),
                       PartitionStatisticsModification.drop(
                           "partition02", Lists.newArrayList("statistic2")))));
-      storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+      deletedCount = storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+      Assertions.assertEquals(2, deletedCount);
 
       listedStats =
           storage.listStatistics(
@@ -419,6 +421,105 @@ public class TestLancePartitionStatisticStorage {
                   PartitionRange.BoundType.CLOSED));
 
       Assertions.assertTrue(listedStats.isEmpty());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
+  }
+
+  @Test
+  public void testDropStatisticsReturnsAccurateCount() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_drop_count").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put("statistic0", StatisticValues.stringValue("value0"));
+      stats.put("statistic1", StatisticValues.stringValue("value1"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update("partition00", stats)))));
+
+      // Drop a statistic name that doesn't exist in the partition.
+      int deletedCount =
+          storage.dropStatistics(
+              metalakeName,
+              Lists.newArrayList(
+                  MetadataObjectStatisticsDrop.of(
+                      metadataObject,
+                      Lists.newArrayList(
+                          PartitionStatisticsModification.drop(
+                              "partition00", Lists.newArrayList("statistic_not_exists"))))));
+      Assertions.assertEquals(0, deletedCount);
+
+      // Drop a partition that doesn't exist.
+      deletedCount =
+          storage.dropStatistics(
+              metalakeName,
+              Lists.newArrayList(
+                  MetadataObjectStatisticsDrop.of(
+                      metadataObject,
+                      Lists.newArrayList(
+                          PartitionStatisticsModification.drop(
+                              "partition_not_exists", Lists.newArrayList("statistic0"))))));
+      Assertions.assertEquals(0, deletedCount);
+
+      // Drop a mix of existing and non-existing statistics, only the existing ones are counted.
+      deletedCount =
+          storage.dropStatistics(
+              metalakeName,
+              Lists.newArrayList(
+                  MetadataObjectStatisticsDrop.of(
+                      metadataObject,
+                      Lists.newArrayList(
+                          PartitionStatisticsModification.drop(
+                              "partition00",
+                              Lists.newArrayList("statistic0", "statistic_not_exists"))))));
+      Assertions.assertEquals(1, deletedCount);
+
+      // Drop the remaining statistic, the count should reflect exactly one deleted row.
+      deletedCount =
+          storage.dropStatistics(
+              metalakeName,
+              Lists.newArrayList(
+                  MetadataObjectStatisticsDrop.of(
+                      metadataObject,
+                      Lists.newArrayList(
+                          PartitionStatisticsModification.drop(
+                              "partition00", Lists.newArrayList("statistic1"))))));
+      Assertions.assertEquals(1, deletedCount);
+
+      // All statistics have been dropped, dropping again returns 0.
+      deletedCount =
+          storage.dropStatistics(
+              metalakeName,
+              Lists.newArrayList(
+                  MetadataObjectStatisticsDrop.of(
+                      metadataObject,
+                      Lists.newArrayList(
+                          PartitionStatisticsModification.drop(
+                              "partition00", Lists.newArrayList("statistic0", "statistic1"))))));
+      Assertions.assertEquals(0, deletedCount);
     } finally {
       FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
       storage.close();

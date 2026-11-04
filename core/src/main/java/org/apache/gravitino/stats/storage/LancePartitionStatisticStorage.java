@@ -197,17 +197,17 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   public int dropStatistics(
       String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop)
       throws IOException {
+    int deletedCount = 0;
     for (MetadataObjectStatisticsDrop objectDrop : partitionStatisticsToDrop) {
       NameIdentifier identifier =
           MetadataObjectUtil.toEntityIdent(metalake, objectDrop.metadataObject());
       Entity.EntityType type = MetadataObjectUtil.toEntityType(objectDrop.metadataObject());
 
       Long tableId = entityStore.get(identifier, type, TableEntity.class).id();
-      dropStatisticsImpl(tableId, objectDrop.drops());
+      deletedCount += dropStatisticsImpl(tableId, objectDrop.drops());
     }
 
-    // Lance storage can't get the number of dropped statistics, so we return 1 as a placeholder.
-    return 1;
+    return deletedCount;
   }
 
   @Override
@@ -278,7 +278,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     }
   }
 
-  private void dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
+  private int dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
     Dataset dataset = open(getFilePath(tableId));
     try {
       List<String> partitionSQLs = Lists.newArrayList();
@@ -297,13 +297,21 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                 + ")");
       }
 
-      if (partitionSQLs.size() == 1) {
-        dataset.delete(partitionSQLs.get(0));
-      } else if (partitionSQLs.size() > 1) {
-        String filterSQL =
-            partitionSQLs.stream().map(str -> "(" + str + ")").collect(Collectors.joining(" OR "));
-        dataset.delete(filterSQL);
+      if (partitionSQLs.isEmpty()) {
+        return 0;
       }
+
+      String filterSQL =
+          partitionSQLs.size() == 1
+              ? partitionSQLs.get(0)
+              : partitionSQLs.stream()
+                  .map(str -> "(" + str + ")")
+                  .collect(Collectors.joining(" OR "));
+
+      // Count the matching rows before deletion so that the returned count is accurate.
+      long deletedCount = dataset.countRows(filterSQL);
+      dataset.delete(filterSQL);
+      return (int) deletedCount;
     } finally {
       if (dataset != null) {
         dataset.close();
