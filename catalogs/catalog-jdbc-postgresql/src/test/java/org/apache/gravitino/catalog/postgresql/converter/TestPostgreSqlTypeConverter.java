@@ -119,8 +119,6 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   public void testCharArrayArrayType() {
     // CHAR(n)[] (type name "_bpchar") carries its element length through the column size; the
     // element bean must keep it or toGravitino unboxes a null column size and fails with an NPE.
@@ -213,7 +211,6 @@ public class TestPostgreSqlTypeConverter {
   }
 
   @Test
->>>>>>> 05e59885a ([#13159] fix(postgresql): preserve scalar and array type metadata (#14521))
   public void testFromGravitinoType() {
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
     checkGravitinoTypeToJdbcType(INT_2, Types.ShortType.get());
