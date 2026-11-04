@@ -189,6 +189,17 @@ public class MetalakeOperations {
     }
 
     LOG.info("Received set request for metalake: {}", metalakeName);
+<<<<<<< HEAD
+=======
+    try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleMetalakeException(OperationType.SET, metalakeName, e);
+    }
+
+    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+
+>>>>>>> 8f19ee03c ([#14580] fix(rest): validate null request fields before dispatch (#14582))
     try {
       return Utils.doAs(
           httpRequest,
