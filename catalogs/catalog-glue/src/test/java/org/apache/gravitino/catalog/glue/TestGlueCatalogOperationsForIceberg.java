@@ -191,13 +191,10 @@ class TestGlueCatalogOperationsForIceberg {
     org.apache.iceberg.UpdateSchema mockUpdateSchema = mock(org.apache.iceberg.UpdateSchema.class);
     when(mockTable.newTransaction()).thenReturn(mockTransaction);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
-    when(mockUpdateSchema.caseSensitive(false)).thenReturn(mockUpdateSchema);
 
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
     ops.alterTable(
         ident, TableChange.addColumn(new String[] {"score"}, Types.DoubleType.get(), true));
-
-    verify(mockUpdateSchema).caseSensitive(false);
 
     verify(mockIcebergCatalog, Mockito.times(2)).loadTable(any(TableIdentifier.class));
     verify(mockUpdateSchema)

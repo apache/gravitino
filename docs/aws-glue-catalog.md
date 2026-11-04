@@ -18,7 +18,7 @@ Apache Gravitino uses [AWS Glue Data Catalog](https://aws.amazon.com/glue/) as a
 * Gravitino uses the AWS SDK v2 to communicate with Glue.
 
 :::note
-The Glue catalog is case-insensitive for schema, table and column names. AWS Glue folds database, table and column names to lowercase on storage.
+The Glue catalog is case-insensitive for schema and table names, which AWS Glue stores in lowercase. Column names of Hive-format tables are stored in lowercase as well. Iceberg tables keep the case of their column names in the Iceberg metadata, while the copy of the columns in Glue is lowercase, so some engines may not read mixed-case Iceberg columns.
 :::
 
 :::caution

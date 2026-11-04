@@ -542,9 +542,7 @@ final class GlueIcebergTableHelper {
     Transaction transaction = table.newTransaction();
 
     if (hasSchemaChange) {
-      // Gravitino folds column names in requests to lower case, as Glue does, so look up existing
-      // Iceberg columns without regard to case; Iceberg keeps their original case.
-      UpdateSchema update = transaction.updateSchema().caseSensitive(false);
+      UpdateSchema update = transaction.updateSchema();
       for (TableChange change : changes) {
         if (change instanceof TableChange.AddColumn) {
           TableChange.AddColumn add = (TableChange.AddColumn) change;
@@ -670,10 +668,10 @@ final class GlueIcebergTableHelper {
       update.moveFirst(name);
     } else if (position instanceof TableChange.After) {
       update.moveAfter(name, ((TableChange.After) position).getColumn());
-    } else if (schema.caseInsensitiveFindField(name) != null) {
+    } else if (schema.findField(name) != null) {
       List<Types.NestedField> columns = schema.columns();
       String last = columns.get(columns.size() - 1).name();
-      if (!last.equalsIgnoreCase(name)) {
+      if (!last.equals(name)) {
         update.moveAfter(name, last);
       }
     }

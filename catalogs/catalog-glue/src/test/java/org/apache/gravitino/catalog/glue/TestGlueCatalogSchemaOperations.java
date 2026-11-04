@@ -556,6 +556,23 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
+  void testAlterSchemaReturnsSubmittedDefinitionWhenReadBackFails() {
+    Database database =
+        Database.builder().name("mydb").locationUri("s3://bucket/native_db").build();
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(GetDatabaseResponse.builder().database(database).build())
+        .thenThrow(ThrottlingException.builder().message("slow down").build());
+
+    GlueSchema result =
+        ops.alterSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"), SchemaChange.setProperty("k", "v"));
+
+    verify(mockClient).updateDatabase(any(UpdateDatabaseRequest.class));
+    assertEquals("v", result.properties().get("k"));
+    assertEquals("s3://bucket/native_db", result.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
   void testAlterSchemaLocationChangesLocationUri() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     useFakeGlueDatabase(Database.builder().name("mydb").locationUri("s3://bucket/old").build());
