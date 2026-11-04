@@ -29,6 +29,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 
 /**
@@ -57,7 +58,7 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
   public boolean execute(AuthorizationRequestContext context) throws Exception {
     Object request = extractFromParameters(parameters, args);
     if (request == null) {
-      return false;
+      throw new BadRequestException("Request body cannot be null");
     }
 
     context.setOriginalAuthorizationExpression(expression);
@@ -67,7 +68,11 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
         request instanceof TagsAssociateRequest,
         "Only tag can use AssociateTagAuthorizationExecutor, please contact the administrator.");
     TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
-    tagsAssociateRequest.validate();
+    try {
+      tagsAssociateRequest.validate();
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException(e, "%s", e.getMessage());
+    }
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
     return authorizeTag(tagsAssociateRequest.getTagsToAdd(), context, targetType)
         && authorizeTag(tagsAssociateRequest.getTagsToRemove(), context, targetType);

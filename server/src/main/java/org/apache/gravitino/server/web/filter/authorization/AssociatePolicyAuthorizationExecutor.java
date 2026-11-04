@@ -29,6 +29,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
+import org.apache.gravitino.exceptions.BadRequestException;
 
 /**
  * Metadata object authorization for {@link
@@ -57,7 +58,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
   public boolean execute(AuthorizationRequestContext context) throws Exception {
     Object request = extractFromParameters(parameters, args);
     if (request == null) {
-      return false;
+      throw new BadRequestException("Request body cannot be null");
     }
 
     context.setOriginalAuthorizationExpression(expression);
@@ -67,7 +68,11 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
         request instanceof PoliciesAssociateRequest,
         "Only policy can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
     PoliciesAssociateRequest policiesAssociateRequest = (PoliciesAssociateRequest) request;
-    policiesAssociateRequest.validate();
+    try {
+      policiesAssociateRequest.validate();
+    } catch (IllegalArgumentException e) {
+      throw new BadRequestException(e, "%s", e.getMessage());
+    }
     // Authorize both 'policiesToAdd' and 'policiesToRemove' fields.
     return authorizePolicy(policiesAssociateRequest.getPoliciesToAdd(), context, targetType)
         && authorizePolicy(policiesAssociateRequest.getPoliciesToRemove(), context, targetType);
