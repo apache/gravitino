@@ -53,13 +53,9 @@ public class ViewUpdatesRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(updates != null, "updates must not be null");
     Preconditions.checkArgument(!updates.isEmpty(), "updates must not be empty");
-<<<<<<< HEAD
-    updates.forEach(RESTRequest::validate);
-=======
     for (int i = 0; i < updates.size(); i++) {
       Preconditions.checkArgument(updates.get(i) != null, "updates[%s] must not be null", i);
-      updates.get(i).validateWithPrefix("updates[" + i + "].");
+      updates.get(i).validate();
     }
->>>>>>> 8f19ee03c ([#14580] fix(rest): validate null request fields before dispatch (#14582))
   }
 }

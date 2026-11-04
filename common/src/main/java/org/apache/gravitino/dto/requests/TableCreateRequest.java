@@ -124,15 +124,13 @@ public class TableCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
 
-<<<<<<< HEAD
-=======
+    Preconditions.checkArgument(
+        columns != null, "\"columns\" field is required and cannot be null");
+    RequestValidation.elements(columns, "columns");
     RequestValidation.elements(partitioning, "partitioning");
+    RequestValidation.elements(sortOrders, "sortOrders");
     RequestValidation.elements(indexes, "indexes");
 
-    // DTO conversion can normalize null literals and discard their declared types.
-    WritableDataTypeValidator.validateTable(columns, partitioning, distribution, sortOrders);
-
->>>>>>> 8f19ee03c ([#14580] fix(rest): validate null request fields before dispatch (#14582))
     if (sortOrders != null) {
       Arrays.stream(sortOrders).forEach(sortOrder -> sortOrder.validate(columns));
     }
