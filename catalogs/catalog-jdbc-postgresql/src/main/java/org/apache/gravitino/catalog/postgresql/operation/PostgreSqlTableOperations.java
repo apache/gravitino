@@ -85,6 +85,16 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
   public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
+  private static final String STANDALONE_UNIQUE_INDEX_SQL =
+      "SELECT 1 FROM pg_catalog.pg_index i "
+          + "JOIN pg_catalog.pg_class idx ON idx.oid = i.indexrelid "
+          + "JOIN pg_catalog.pg_class t ON t.oid = i.indrelid "
+          + "JOIN pg_catalog.pg_namespace s ON s.oid = t.relnamespace "
+          + "WHERE s.nspname = ? AND t.relname = ? AND idx.relname = ? AND i.indisunique "
+          + "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c "
+          + "WHERE c.conindid = i.indexrelid AND c.conrelid = i.indrelid "
+          + "AND c.contype IN ('p', 'u'))";
+
   private static final String POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "PostgreSQL does not support nested column names.";
 
@@ -440,7 +450,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
-        alterSql.add(deleteIndexDefinition(tableName, (TableChange.DeleteIndex) change));
+        TableChange.DeleteIndex deleteIndex = (TableChange.DeleteIndex) change;
+        rejectStandaloneUniqueIndex(schemaName, tableName, deleteIndex.getName());
+        alterSql.add(deleteIndexDefinition(tableName, deleteIndex));
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         alterSql.add(
             updateColumnAutoIncrementDefinition(
@@ -508,6 +520,26 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
     sqlBuilder.append("(").append(getIndexFieldStr(addIndex.getFieldNames())).append(");");
     return sqlBuilder.toString();
+  }
+
+  private void rejectStandaloneUniqueIndex(String schema, String table, String index) {
+    // The table-scoped constraint drop cannot remove a standalone index. Refuse both strict and
+    // IF EXISTS requests rather than silently succeeding or dropping a schema-scoped index name.
+    // This lookup runs during SQL generation, before borrowing the DDL execution connection.
+    try (Connection connection = getConnection(schema);
+        PreparedStatement statement = connection.prepareStatement(STANDALONE_UNIQUE_INDEX_SQL)) {
+      statement.setString(1, schema);
+      statement.setString(2, table);
+      statement.setString(3, index);
+      try (ResultSet result = statement.executeQuery()) {
+        Preconditions.checkArgument(
+            !result.next(),
+            "Index %s is a standalone unique index, not a table constraint; deleting it through the table index API is not supported",
+            index);
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   private String updateColumnNullabilityDefinition(

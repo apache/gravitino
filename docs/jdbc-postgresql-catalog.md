@@ -249,3 +249,14 @@ or nested-function arguments. Arguments are rendered as SQL values rather than J
 strings. `CURRENT_TIMESTAMP` remains a no-argument keyword default. Raw SQL expressions and
 SQL syntax in function names are rejected. String values containing backslashes use explicit
 PostgreSQL escape literals so that `standard_conforming_strings` does not change their meaning.
+
+ALTER requests normalize explicit NULL default literals in the same way as CREATE requests.
+A string literal containing `NULL` remains a string, and omitting a default when adding a
+column still leaves the default unset.
+
+### Deleting unique indexes
+
+The table index API drops PostgreSQL primary-key and unique constraints. A standalone
+`CREATE UNIQUE INDEX` is visible in table metadata, but deleting it through this API is
+unsupported. Both strict and `ifExists` deletion requests fail explicitly before applying
+any changes in the request. Remove standalone indexes directly in PostgreSQL.

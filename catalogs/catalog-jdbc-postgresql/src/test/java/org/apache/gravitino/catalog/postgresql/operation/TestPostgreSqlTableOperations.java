@@ -41,6 +41,8 @@ import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -70,6 +72,104 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
+
+  @Test
+  void testStandaloneUniqueIndexDeletionIsExplicitlyRejected() throws SQLException {
+    String table = RandomNameUtils.genRandomName("standalone_index_");
+    String index = "native\" unique; --";
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("id").withType(INT).withNullable(true).build()
+        },
+        "before",
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "CREATE UNIQUE INDEX \""
+              + index.replace("\"", "\"\"")
+              + "\" ON "
+              + TEST_DB_NAME
+              + "."
+              + table
+              + "(id)");
+      for (boolean ifExists : new boolean[] {false, true}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    TABLE_OPERATIONS.alterTable(
+                        TEST_DB_NAME,
+                        table,
+                        TableChange.updateComment("must not be applied"),
+                        TableChange.deleteIndex(index, ifExists)));
+        Assertions.assertTrue(error.getMessage().contains("standalone"));
+        JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, table);
+        Assertions.assertEquals("before", loaded.comment());
+        Assertions.assertTrue(Arrays.stream(loaded.index()).anyMatch(i -> index.equals(i.name())));
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
+
+  @Test
+  void testRestNullDefaultsAreSqlNullOnAlter() throws SQLException {
+    String table = RandomNameUtils.genRandomName("null_default_");
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("s")
+              .withType(VARCHAR)
+              .withNullable(true)
+              .withDefaultValue(Literals.stringLiteral("before"))
+              .build(),
+          JdbcColumn.builder()
+              .withName("i")
+              .withType(INT)
+              .withNullable(true)
+              .withDefaultValue(Literals.integerLiteral(42))
+              .build()
+        },
+        null,
+        Map.of(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      TableUpdateRequest update =
+          new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+              new String[] {"s"}, LiteralDTO.NULL);
+      TableUpdateRequest typedNull =
+          new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+              new String[] {"i"}, LiteralDTO.builder().withDataType(INT).withValue(null).build());
+      TableUpdateRequest add =
+          new TableUpdateRequest.AddTableColumnRequest(
+              new String[] {"added"}, VARCHAR, null, null, true, false, LiteralDTO.NULL);
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME, table, update.tableChange(), typedNull.tableChange(), add.tableChange());
+      statement.executeUpdate("INSERT INTO " + TEST_DB_NAME + "." + table + " DEFAULT VALUES");
+      try (ResultSet result =
+          statement.executeQuery("SELECT s,i,added FROM " + TEST_DB_NAME + "." + table)) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertNull(result.getObject(1));
+        Assertions.assertNull(result.getObject(2));
+        Assertions.assertNull(result.getObject(3));
+      }
+      for (Column column : TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns())
+        Assertions.assertEquals(Literals.NULL, column.defaultValue());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
 
   @Test
   void testDdlFragmentsAreRejectedOnCreateAndAlter() {
