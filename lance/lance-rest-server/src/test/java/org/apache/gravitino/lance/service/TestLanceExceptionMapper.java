@@ -19,8 +19,12 @@
 package org.apache.gravitino.lance.service;
 
 import java.io.IOException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -49,10 +53,24 @@ public class TestLanceExceptionMapper extends JerseyTest {
      * @return never returns normally
      */
     @GET
+    @Produces(MediaType.APPLICATION_JSON)
     public String fail() {
       AssertionError error = new AssertionError("assertion failure");
       error.initCause(new IllegalStateException("root cause"));
       throw error;
+    }
+
+    /**
+     * Accepts JSON to exercise unsupported request media types.
+     *
+     * @param body the request body
+     * @return the accepted body
+     */
+    @POST
+    @Path("consume")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public String consume(String body) {
+      return body;
     }
   }
 
@@ -73,6 +91,30 @@ public class TestLanceExceptionMapper extends JerseyTest {
         .register(ErrorResource.class)
         .register(LanceExceptionMapper.class)
         .register(JacksonFeature.class);
+  }
+
+  @Test
+  void testMethodNotAllowed() {
+    try (Response response = target("error").request().put(Entity.json("{}"))) {
+      Assertions.assertEquals(405, response.getStatus());
+      Assertions.assertTrue(response.getAllowedMethods().contains("GET"));
+      Assertions.assertEquals(13, response.readEntity(ErrorResponse.class).getCode());
+    }
+  }
+
+  @Test
+  void testUnsupportedMediaType() {
+    try (Response response = target("error/consume").request().post(Entity.text("body"))) {
+      Assertions.assertEquals(415, response.getStatus());
+      Assertions.assertEquals(13, response.readEntity(ErrorResponse.class).getCode());
+    }
+  }
+
+  @Test
+  void testNotAcceptable() {
+    try (Response response = target("error").request(MediaType.TEXT_PLAIN).get()) {
+      Assertions.assertEquals(406, response.getStatus());
+    }
   }
 
   /** Verifies that an uncaught error is converted to a Lance internal error response. */
