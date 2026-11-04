@@ -195,8 +195,28 @@ public class ObjectPolicyResolver {
             .distinct()
             .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
             .collect(Collectors.toList());
-    rejectSameLevelMaintenanceConflicts(
-        metadataObject, selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject)));
+    Match[] matches = selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject));
+    Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
+    for (Match match : matches) {
+      Policy.BuiltInType type = match.policy().policyType();
+      if (UNIQUE_MAINTENANCE_TYPES.contains(type)) {
+        byType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(match);
+      }
+    }
+    for (Map.Entry<Policy.BuiltInType, List<Match>> entry : byType.entrySet()) {
+      TreeSet<String> names = new TreeSet<>();
+      for (Match match : entry.getValue()) {
+        if (match.sources().contains(metadataObject)) {
+          names.add(match.policy().name());
+        }
+      }
+      if (names.size() > 1) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Metadata object %s has conflicting %s policies at the same level: %s",
+                metadataObject, entry.getKey().policyType(), names));
+      }
+    }
   }
 
   /**
@@ -219,9 +239,8 @@ public class ObjectPolicyResolver {
     if (!UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType()) || !matches(selector, assignment)) {
       return;
     }
-    Match[] existing = resolveMatches(metalake, metadataObject);
     TreeSet<String> names = new TreeSet<>();
-    for (Match match : existing) {
+    for (Match match : resolveMatches(metalake, metadataObject)) {
       if (match.policy().policyType() == policy.policyType()
           && match.sources().contains(metadataObject)) {
         names.add(match.policy().name());
@@ -257,37 +276,6 @@ public class ObjectPolicyResolver {
 
   private static PolicyEntity[] policies(Match[] matches) {
     return Arrays.stream(matches).map(Match::policy).toArray(PolicyEntity[]::new);
-  }
-
-  private static void rejectSameLevelMaintenanceConflicts(
-      MetadataObject metadataObject, Match[] matches) {
-    for (Map.Entry<Policy.BuiltInType, List<Match>> entry :
-        groupMaintenanceMatches(matches).entrySet()) {
-      TreeSet<String> names = new TreeSet<>();
-      for (Match match : entry.getValue()) {
-        if (match.sources().contains(metadataObject)) {
-          names.add(match.policy().name());
-        }
-      }
-      if (names.size() > 1) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Metadata object %s has conflicting %s policies at the same level: %s",
-                metadataObject, entry.getKey().policyType(), names));
-      }
-    }
-  }
-
-  private static Map<Policy.BuiltInType, List<Match>> groupMaintenanceMatches(Match[] matches) {
-    Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
-    for (Match match : matches) {
-      Policy.BuiltInType type = match.policy().policyType();
-      if (!UNIQUE_MAINTENANCE_TYPES.contains(type)) {
-        continue;
-      }
-      byType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(match);
-    }
-    return byType;
   }
 
   private static Match[] selectMatches(
