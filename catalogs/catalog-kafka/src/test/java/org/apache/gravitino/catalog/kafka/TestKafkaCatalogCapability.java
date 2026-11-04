@@ -43,28 +43,40 @@ public class TestKafkaCatalogCapability {
 
   @Test
   void testValidTopicNames() {
-    for (String name : new String[] {"a", "Topic_123-test", "_topic", "a".repeat(64)}) {
+    for (String name :
+        new String[] {
+          "a",
+          "Topic_123-test",
+          "_topic",
+          "-topic",
+          "-",
+          "a".repeat(64),
+          "a".repeat(65),
+          "a".repeat(128)
+        }) {
       Assertions.assertTrue(capability.specificationOnName(Scope.TOPIC, name).supported(), name);
     }
   }
 
   @Test
   void testKafkaIllegalTopicNames() {
-    for (String name : new String[] {"a/b", "a=b", "a/b=c"}) {
+    for (String name :
+        new String[] {"", "*", ".", "..", "a/b", "a=b", "a/b=c", "a b", "a$b", "caf\u00e9"}) {
       CapabilityResult result = capability.specificationOnName(Scope.TOPIC, name);
       Assertions.assertFalse(result.supported(), name);
-      Assertions.assertTrue(result.unsupportedMessage().contains("ASCII alphanumerics"));
+      Assertions.assertEquals(
+          "Kafka topic names in Gravitino must be 1 to 128 characters long and contain only ASCII"
+              + " alphanumerics, '_' and '-'.",
+          result.unsupportedMessage());
     }
   }
 
   @Test
-  void testDefaultTopicNameRestrictions() {
-    for (String name :
-        new String[] {"", "*", ".", "..", "a.b", "-topic", "a b", "a$b", "a".repeat(65)}) {
-      CapabilityResult expected = Capability.DEFAULT.specificationOnName(Scope.TOPIC, name);
-      CapabilityResult actual = capability.specificationOnName(Scope.TOPIC, name);
-      Assertions.assertFalse(actual.supported(), name);
-      Assertions.assertEquals(expected.unsupportedMessage(), actual.unsupportedMessage(), name);
+  void testGravitinoTopicNameRestrictions() {
+    for (String name : new String[] {"a.b", "a".repeat(129)}) {
+      CapabilityResult result = capability.specificationOnName(Scope.TOPIC, name);
+      Assertions.assertFalse(result.supported(), name);
+      Assertions.assertTrue(result.unsupportedMessage().contains("1 to 128 characters"));
     }
   }
 
@@ -74,7 +86,8 @@ public class TestKafkaCatalogCapability {
       if (scope == Scope.TOPIC) {
         continue;
       }
-      for (String name : new String[] {"a/b", "a=b", "a.b", "*", "a".repeat(65)}) {
+      for (String name :
+          new String[] {"a/b", "a=b", "a.b", "*", "-topic", "a".repeat(65), "a".repeat(128)}) {
         CapabilityResult expected = Capability.DEFAULT.specificationOnName(scope, name);
         CapabilityResult actual = capability.specificationOnName(scope, name);
         Assertions.assertEquals(expected.supported(), actual.supported(), scope + ": " + name);
@@ -94,7 +107,7 @@ public class TestKafkaCatalogCapability {
     FieldUtils.writeField(operations, "httpRequest", Mockito.mock(HttpServletRequest.class), true);
 
     Map<String, String> properties = Map.of("partition-count", "1", "replication-factor", "1");
-    for (String name : new String[] {"a/b", "a=b"}) {
+    for (String name : new String[] {"a/b", "a=b", "a.b", "a".repeat(129)}) {
       TopicCreateRequest request = new TopicCreateRequest(name, null, properties);
       try (Response response = operations.createTopic("metalake", "kafka", "default", request)) {
         Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
@@ -102,7 +115,12 @@ public class TestKafkaCatalogCapability {
         Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
         Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
         Assertions.assertTrue(error.getMessage().contains(name));
-        Assertions.assertTrue(error.getMessage().contains("ASCII alphanumerics"));
+        Assertions.assertTrue(
+            error
+                .getMessage()
+                .contains(
+                    "Kafka topic names in Gravitino must be 1 to 128 characters long and contain only"
+                        + " ASCII alphanumerics, '_' and '-'."));
       }
     }
     Mockito.verifyNoInteractions(dispatcher);

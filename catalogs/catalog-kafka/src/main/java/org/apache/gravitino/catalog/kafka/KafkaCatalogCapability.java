@@ -23,7 +23,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class KafkaCatalogCapability implements Capability {
-  private static final String TOPIC_NAME_PATTERN = "[a-zA-Z0-9._-]+";
+  private static final String TOPIC_NAME_PATTERN = "[a-zA-Z0-9_-]{1,128}";
 
   @Override
   public CapabilityResult managedStorage(Scope scope) {
@@ -35,7 +35,11 @@ public class KafkaCatalogCapability implements Capability {
   }
 
   /**
-   * Checks names against Gravitino's default rules and Kafka's topic character restrictions.
+   * Checks topic names against Kafka's character restrictions and Gravitino's compatibility limits.
+   * Other scopes use Gravitino's default name rules.
+   *
+   * <p>Topic names cannot contain dots because Gravitino authorization does not support them, and
+   * cannot exceed 128 characters because of the metadata store's name length limit.
    *
    * @param scope The scope of the capability.
    * @param name The name to check.
@@ -43,15 +47,15 @@ public class KafkaCatalogCapability implements Capability {
    */
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    CapabilityResult result = Capability.super.specificationOnName(scope, name);
-    if (!result.supported() || scope != Scope.TOPIC) {
-      return result;
+    if (scope != Scope.TOPIC) {
+      return Capability.super.specificationOnName(scope, name);
     }
 
     if (!name.matches(TOPIC_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
-          "Kafka topic names must contain only ASCII alphanumerics, '.', '_' and '-'.");
+          "Kafka topic names in Gravitino must be 1 to 128 characters long and contain only ASCII"
+              + " alphanumerics, '_' and '-'.");
     }
-    return result;
+    return CapabilityResult.SUPPORTED;
   }
 }
