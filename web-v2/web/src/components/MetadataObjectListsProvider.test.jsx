@@ -1,0 +1,264 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { act, StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { Provider } from 'react-redux'
+import { configureStore } from '@reduxjs/toolkit'
+import { defHttp } from '@/lib/utils/axios'
+import metalakes from '@/lib/store/metalakes'
+import tags from '@/lib/store/tags'
+import policies from '@/lib/store/policies'
+import Tags from './CustomTags'
+import Policies from './PolicyTag'
+import MetadataObjectListsProvider from './MetadataObjectListsProvider'
+
+vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), post: vi.fn() } }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams({ metalake: 'demo' })
+}))
+
+let root
+let container
+let store
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+  store = configureStore({ reducer: { metalakes, tags, policies } })
+  defHttp.get.mockResolvedValue({ tags: [], policies: [] })
+})
+
+afterEach(async () => {
+  await act(async () => root.unmount())
+  container.remove()
+  vi.unstubAllGlobals()
+})
+
+const kinds = ['tags', 'policies']
+const endpoint = (kind, metalake = 'demo') => `/api/bulk/metalakes/${metalake}/objects/${kind}`
+
+const response = (kind, names, type = 'schema') => ({
+  code: 0,
+  results: names.map(name => ({
+    metadataObject: { type, fullName: `catalog.${name}` },
+    [kind]:
+      kind === 'tags'
+        ? { code: 0, tags: [{ name: `tag-${name}`, properties: {}, inherited: true }], hasInaccessibleTags: false }
+        : {
+            code: 0,
+            policies: [{ name: `policy-${name}`, enabled: true, inherited: false }],
+            hasInaccessiblePolicies: false
+          }
+  }))
+})
+const namesFrom = request => request.data.metadataObjects.map(object => object.fullName.slice('catalog.'.length))
+const kindFrom = request => request.url.split('/').at(-1)
+
+const resolveRequests = (type = 'schema') =>
+  defHttp.post.mockImplementation(request => Promise.resolve(response(kindFrom(request), namesFrom(request), type)))
+const settle = async () => act(async () => new Promise(resolve => setTimeout(resolve, 10)))
+
+async function renderRows(names, metalake = 'demo', type = 'schema', showPolicies = true) {
+  await act(async () => {
+    root.render(
+      <StrictMode>
+        <Provider store={store}>
+          <MetadataObjectListsProvider key={metalake} metalake={metalake}>
+            {names.map(name => (
+              <div key={name} data-row={name}>
+                <Tags metadataObjectType={type} metadataObjectFullName={`catalog.${name}`} />
+                {showPolicies && <Policies metadataObjectType={type} metadataObjectFullName={`catalog.${name}`} />}
+              </div>
+            ))}
+          </MetadataObjectListsProvider>
+        </Provider>
+      </StrictMode>
+    )
+  })
+  await settle()
+}
+
+it('batches each kind separately and renders it without waiting for the other', async () => {
+  const finish = {}
+  defHttp.post.mockImplementation(
+    request =>
+      new Promise(resolve => {
+        finish[kindFrom(request)] = resolve
+      })
+  )
+  await renderRows(['one', 'two'])
+  expect(defHttp.get).not.toHaveBeenCalled()
+  expect(defHttp.post).toHaveBeenCalledTimes(2)
+  for (const kind of kinds) {
+    expect(defHttp.post).toHaveBeenCalledWith({
+      url: endpoint(kind),
+      data: {
+        metadataObjects: [
+          { type: 'SCHEMA', fullName: 'catalog.one' },
+          { type: 'SCHEMA', fullName: 'catalog.two' }
+        ]
+      }
+    })
+  }
+  await act(async () => finish.tags(response('tags', ['one', 'two'])))
+  expect(container.textContent).toContain('tag-one')
+  expect(container.textContent).toContain('tag-two')
+  expect(container.textContent).not.toContain('No Policies')
+  expect(container.textContent).not.toContain('policy-one')
+  await act(async () => finish.policies(response('policies', ['one', 'two'])))
+  expect(container.textContent).toContain('policy-one')
+  expect(container.textContent).toContain('policy-two')
+  expect(container.querySelector('[aria-label="lock"]')).not.toBeNull()
+})
+
+it.each(['table', 'TABLE'])('matches responses with type %s', async type => {
+  resolveRequests(type)
+  await renderRows(['s.customers'], 'demo', 'table')
+  expect(container.textContent).toContain('tag-s.customers')
+  expect(container.textContent).toContain('policy-s.customers')
+  expect(container.textContent).not.toContain('Unable to load')
+})
+
+it('discards responses for rows removed by pagination', async () => {
+  const finish = {}
+  defHttp.post.mockImplementation(
+    request =>
+      new Promise(resolve => {
+        finish[kindFrom(request)] = resolve
+      })
+  )
+  await renderRows(['one'])
+  resolveRequests()
+  await renderRows(['two'])
+  await act(async () => kinds.forEach(kind => finish[kind](response(kind, ['one']))))
+  expect(container.textContent).toContain('tag-two')
+  expect(container.textContent).toContain('policy-two')
+  expect(container.textContent).not.toContain('tag-one')
+  expect(container.textContent).not.toContain('policy-one')
+  expect(defHttp.post).toHaveBeenCalledTimes(4)
+})
+
+it.each(kinds)('retries only failed %s while retaining the successful kind', async failed => {
+  defHttp.post.mockImplementation(request =>
+    kindFrom(request) === failed
+      ? Promise.reject(new Error('unavailable'))
+      : Promise.resolve(response(kindFrom(request), namesFrom(request)))
+  )
+  await renderRows(['one'])
+  const successful = failed === 'tags' ? 'policy-one' : 'tag-one'
+  expect(container.textContent).toContain(successful)
+  expect(container.textContent).toContain(`Unable to load ${failed}`)
+  expect(container.textContent).not.toContain(failed === 'tags' ? 'No Tags' : 'No Policies')
+  const retry = [...container.querySelectorAll('button')].find(button => button.textContent.includes('Retry'))
+  expect(retry).toBeDefined()
+  resolveRequests()
+  await act(async () => retry.click())
+  await settle()
+  expect(defHttp.post).toHaveBeenCalledTimes(3)
+  expect(defHttp.post.mock.lastCall[0].url).toBe(endpoint(failed))
+  expect(container.textContent).toContain('tag-one')
+  expect(container.textContent).toContain('policy-one')
+})
+
+it('refreshes both kinds after removing a tag', async () => {
+  let removed = false
+  defHttp.post.mockImplementation(request => {
+    if (!request.url.includes('/bulk/')) {
+      removed = true
+
+      return Promise.resolve({ code: 0 })
+    }
+    const kind = kindFrom(request)
+    const result = response(kind, namesFrom(request))
+    if (removed) result.results[0][kind][kind] = []
+    else if (kind === 'tags') result.results[0].tags.tags[0].inherited = false
+
+    return Promise.resolve(result)
+  })
+  await renderRows(['one'])
+  const close = container.querySelector('.ant-tag-close-icon')
+  expect(close).not.toBeNull()
+  await act(async () => close.click())
+  await settle()
+  expect(container.textContent).toContain('No Tags')
+  expect(container.textContent).toContain('No Policies')
+  expect(defHttp.post).toHaveBeenCalledTimes(5)
+  expect(defHttp.get).not.toHaveBeenCalled()
+})
+
+it('does not reuse results across metalakes', async () => {
+  resolveRequests()
+  await renderRows(['one'])
+  const finish = {}
+  defHttp.post.mockImplementation(
+    request =>
+      new Promise(resolve => {
+        finish[kindFrom(request)] = resolve
+      })
+  )
+  await renderRows(['one'], 'other')
+  expect(container.textContent).not.toContain('tag-one')
+  expect(container.textContent).not.toContain('policy-one')
+  for (const kind of kinds)
+    expect(defHttp.post).toHaveBeenCalledWith(expect.objectContaining({ url: endpoint(kind, 'other') }))
+  await act(async () => kinds.forEach(kind => finish[kind](response(kind, ['one']))))
+  expect(container.textContent).toContain('tag-one')
+})
+
+it('bounds each kind to 100 objects and renders all its chunks together', async () => {
+  const names = Array.from({ length: 101 }, (_, index) => `schema${index}`)
+  let finishLastTags
+  defHttp.post.mockImplementation(request => {
+    const kind = kindFrom(request)
+    if (kind === 'tags' && request.data.metadataObjects.length === 1) {
+      return new Promise(resolve => {
+        finishLastTags = resolve
+      })
+    }
+
+    return Promise.resolve(response(kind, namesFrom(request)))
+  })
+  await renderRows(names)
+  expect(defHttp.post).toHaveBeenCalledTimes(4)
+  for (const kind of kinds) {
+    expect(
+      defHttp.post.mock.calls
+        .filter(([request]) => kindFrom(request) === kind)
+        .map(([request]) => request.data.metadataObjects.length)
+    ).toEqual([100, 1])
+  }
+  expect(container.textContent).toContain('policy-schema100')
+  expect(container.textContent).not.toContain('tag-schema0')
+  await act(async () => finishLastTags(response('tags', names.slice(100))))
+  expect(container.textContent).toContain('tag-schema0')
+  expect(container.textContent).toContain('tag-schema100')
+})
+
+it('only requests kinds with mounted consumers', async () => {
+  resolveRequests()
+  await renderRows(['one'], 'demo', 'schema', false)
+  expect(defHttp.post).toHaveBeenCalledTimes(1)
+  expect(defHttp.post.mock.lastCall[0].url).toBe(endpoint('tags'))
+})

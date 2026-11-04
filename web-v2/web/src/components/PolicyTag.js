@@ -20,12 +20,13 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
+import { Button, Flex, Select, Space, Spin, Tag, Tooltip, theme } from 'antd'
 import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { associatePolicy } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
+import { useMetadataObjectList } from './MetadataObjectListsProvider'
 
 const tagInputStyle = {
   width: 100,
@@ -43,7 +44,10 @@ export default function PolicyTag({ ...props }) {
   const router = useRouter()
   const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
-  const [policiesForEntity, setPoliciesForEntity] = useState([])
+  const [loadedPolicies, setPoliciesForEntity] = useState([])
+  const list = useMetadataObjectList('policies', metadataObjectType, metadataObjectFullName)
+  const bulk = list !== null
+  const policiesForEntity = list?.data?.policies || loadedPolicies
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
 
@@ -60,10 +64,10 @@ export default function PolicyTag({ ...props }) {
       const policies = await getPoliciesForEntity()
       setPoliciesForEntity(policies)
     }
-    if (currentMetalake && metadataObjectType && metadataObjectFullName) {
+    if (!bulk && currentMetalake && metadataObjectType && metadataObjectFullName) {
       initLoad()
     }
-  }, [metadataObjectType, metadataObjectFullName])
+  }, [bulk, currentMetalake, metadataObjectType, metadataObjectFullName])
 
   useEffect(() => {
     if (inputVisible) {
@@ -101,6 +105,15 @@ export default function PolicyTag({ ...props }) {
     )
   }
 
+  const refreshPolicies = async () => {
+    if (bulk) {
+      list.refresh()
+    } else {
+      const policies = await getPoliciesForEntity()
+      setPoliciesForEntity(policies)
+    }
+  }
+
   const handleChange = async value => {
     if (value && !policiesForEntity?.map(policy => policy.name)?.includes(value)) {
       await dispatch(
@@ -111,8 +124,7 @@ export default function PolicyTag({ ...props }) {
           data: { policiesToAdd: [value] }
         })
       )
-      const policies = await getPoliciesForEntity()
-      setPoliciesForEntity(policies)
+      await refreshPolicies()
     }
     setInputVisible(false)
   }
@@ -126,8 +138,7 @@ export default function PolicyTag({ ...props }) {
         data: { policiesToRemove: [removedPolicy] }
       })
     )
-    const policies = await getPoliciesForEntity()
-    setPoliciesForEntity(policies)
+    await refreshPolicies()
   }
 
   const handleBlur = () => {
@@ -142,6 +153,19 @@ export default function PolicyTag({ ...props }) {
     height: 22,
     background: token.colorBgContainer,
     borderStyle: 'dashed'
+  }
+
+  if (bulk && !list.data) {
+    return list.error ? (
+      <span>
+        Unable to load policies.{' '}
+        <Button type='link' size='small' onClick={list.retry}>
+          Retry
+        </Button>
+      </span>
+    ) : (
+      <Spin size='small' aria-label='Loading policies' />
+    )
   }
 
   return (

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
@@ -72,19 +74,6 @@ public class TagManager implements TagDispatcher {
   private final IdGenerator idGenerator;
 
   private final EntityStore entityStore;
-
-  private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
-      Sets.newHashSet(
-          MetadataObject.Type.CATALOG,
-          MetadataObject.Type.SCHEMA,
-          MetadataObject.Type.TABLE,
-          MetadataObject.Type.VIEW,
-          MetadataObject.Type.FILESET,
-          MetadataObject.Type.TOPIC,
-          MetadataObject.Type.COLUMN,
-          MetadataObject.Type.MODEL,
-          MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;
@@ -350,6 +339,21 @@ public class TagManager implements TagDispatcher {
     }
   }
 
+  @Override
+  public Map<MetadataObject, Tag[]> listEffectiveTagsForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    Map<MetadataObject, Tag[]> result = new LinkedHashMap<>();
+    new EffectiveTagResolver(entityStore)
+        .resolveWithSourcesForDisplay(metalake, metadataObjects)
+        .forEach(
+            (object, tags) ->
+                result.put(
+                    object,
+                    Arrays.stream(tags).map(resolved -> resolved.tag()).toArray(Tag[]::new)));
+    return result;
+  }
+
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
       throws NoSuchMetadataObjectException {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
@@ -415,7 +419,7 @@ public class TagManager implements TagDispatcher {
       TagAssociationMode mode)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
-        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
+        MetadataObjects.TAG_AND_POLICY_SUPPORTED_TYPES.contains(metadataObject.type()),
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());
     validateTagValuesToAdd(tagsToAdd);

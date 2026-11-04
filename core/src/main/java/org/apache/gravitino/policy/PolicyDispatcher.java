@@ -181,4 +181,20 @@ public interface PolicyDispatcher {
         object -> result.put(object, listPolicyInfosForMetadataObject(metalake, object)));
     return result;
   }
+
+  /**
+   * Lists effective policies for display using registered table and schema identities when
+   * available.
+   *
+   * <p>Unregistered objects retain live validation and import. Results do not verify external
+   * changes to registered objects. This method must not be used for policy enforcement.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return effective policies keyed by requested object
+   */
+  default Map<MetadataObject, PolicyEntity[]> listPolicyInfosForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    return listPolicyInfosForMetadataObjects(metalake, metadataObjects);
+  }
 }

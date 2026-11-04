@@ -20,6 +20,7 @@ package org.apache.gravitino.listener;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
@@ -289,14 +290,32 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
   @Override
   public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
       String metalake, List<MetadataObject> metadataObjects) {
+    return dispatchBatchRead(
+        metalake,
+        metadataObjects,
+        () -> dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects));
+  }
+
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    return dispatchBatchRead(
+        metalake,
+        metadataObjects,
+        () -> dispatcher.listPolicyInfosForDisplay(metalake, metadataObjects));
+  }
+
+  private Map<MetadataObject, PolicyEntity[]> dispatchBatchRead(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      Supplier<Map<MetadataObject, PolicyEntity[]>> read) {
     metadataObjects.forEach(
         object ->
             eventBus.dispatchEvent(
                 new ListPolicyInfosForMetadataObjectPreEvent(
                     PrincipalUtils.getCurrentUserName(), metalake, object)));
     try {
-      Map<MetadataObject, PolicyEntity[]> results =
-          dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects);
+      Map<MetadataObject, PolicyEntity[]> results = read.get();
       metadataObjects.forEach(
           object -> {
             PolicyEntity[] policies = results.get(object);

@@ -61,6 +61,8 @@ import org.apache.gravitino.server.authorization.annotations.ExpressionCondition
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.BulkMetadataObjectPolicyOperations;
+import org.apache.gravitino.server.web.rest.BulkMetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.ExceptionHandlers;
@@ -129,6 +131,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             StatisticOperations.class.getName(),
             PartitionOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
+            BulkMetadataObjectTagOperations.class.getName(),
+            BulkMetadataObjectPolicyOperations.class.getName(),
             TagOperations.class.getName(),
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),

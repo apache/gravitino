@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.listener;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
@@ -444,6 +445,38 @@ public class TagEventDispatcher implements TagDispatcher {
         return normalizedConstraint.allowedValues();
       default:
         throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
+    }
+  }
+
+  @Override
+  public Map<MetadataObject, Tag[]> listEffectiveTagsForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    metadataObjects.forEach(
+        object ->
+            eventBus.dispatchEvent(
+                new ListTagsInfoForMetadataObjectPreEvent(
+                    PrincipalUtils.getCurrentUserName(), metalake, object)));
+    try {
+      Map<MetadataObject, Tag[]> results =
+          dispatcher.listEffectiveTagsForDisplay(metalake, metadataObjects);
+      metadataObjects.forEach(
+          object -> {
+            Tag[] tags = results.get(object);
+            eventBus.dispatchEvent(
+                new ListTagsInfoForMetadataObjectEvent(
+                    PrincipalUtils.getCurrentUserName(),
+                    metalake,
+                    object,
+                    tags != null ? tags.length : -1));
+          });
+      return results;
+    } catch (Exception e) {
+      metadataObjects.forEach(
+          object ->
+              eventBus.dispatchEvent(
+                  new ListTagsInfoForMetadataObjectFailureEvent(
+                      PrincipalUtils.getCurrentUserName(), metalake, object, e)));
+      throw e;
     }
   }
 }

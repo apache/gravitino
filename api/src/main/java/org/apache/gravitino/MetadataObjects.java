@@ -36,6 +36,23 @@ public class MetadataObjects {
   /** The reserved name for the metadata object. */
   public static final String METADATA_OBJECT_RESERVED_NAME = "*";
 
+  /**
+   * The {@link MetadataObject.Type}s that support being associated with tags and policies, either
+   * individually or through the bulk lookup APIs.
+   */
+  public static final Set<MetadataObject.Type> TAG_AND_POLICY_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.COLUMN,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
+
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   private static final Joiner DOT_JOINER = Joiner.on('.');

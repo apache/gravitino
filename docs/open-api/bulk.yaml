@@ -19,6 +19,102 @@
 
 paths:
 
+  /bulk/metalakes/{metalake}/objects/tags:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    post:
+      tags:
+        - tag
+      summary: List effective tags in bulk
+      operationId: listMetadataObjectTags
+      description: >-
+        Returns effective tags for each requested object, including inherited
+        tags. Results follow request order and omit tags the caller
+        cannot view. Each result indicates whether tags were omitted. Access to every
+        requested object is required. Registered tables and schemas use their last registered
+        identities without reloading external metadata; out-of-band changes are not checked.
+        Unregistered objects and other object types retain live validation and import.
+        The request fails as a whole if any object cannot be resolved.
+        The maximum request size is controlled by gravitino.server.bulk.maxItems,
+        which defaults to 100. This operation does not modify tag or policy assignments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkMetadataObjectsRequest"
+      responses:
+        "200":
+          description: Effective tags for every requested object, including empty results
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkMetadataObjectTagListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: The caller cannot access one or more requested metadata objects
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "404":
+          description: The metalake or a requested object does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/objects/policies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    post:
+      tags:
+        - policy
+      summary: List effective policies in bulk
+      operationId: listMetadataObjectPolicies
+      description: >-
+        Returns effective policies for each requested object, including inherited
+        policies. Results follow request order and omit policies the caller
+        cannot view. Each result indicates whether policies were omitted. Access to every
+        requested object is required. Registered tables and schemas use their last registered
+        identities without reloading external metadata; out-of-band changes are not checked.
+        Unregistered objects and other object types retain live validation and import.
+        The request fails as a whole if any object cannot be resolved.
+        The maximum request size is controlled by gravitino.server.bulk.maxItems,
+        which defaults to 100. This operation does not modify tag or policy assignments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkMetadataObjectsRequest"
+      responses:
+        "200":
+          description: Effective policies for every requested object, including empty results
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkMetadataObjectPolicyListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: The caller cannot access one or more requested metadata objects
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "404":
+          description: The metalake or a requested object does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /bulk/metalakes/{metalake}/users/add:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -274,6 +370,70 @@ paths:
 components:
 
   schemas:
+    BulkMetadataObjectsRequest:
+      type: object
+      required: [metadataObjects]
+      properties:
+        metadataObjects:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Distinct metadata objects to load, bounded by the server bulk item limit
+          items:
+            type: object
+            required: [type, fullName]
+            properties:
+              type:
+                type: string
+                enum: [CATALOG, SCHEMA, TABLE, VIEW, COLUMN, FILESET, TOPIC, MODEL, FUNCTION, SEMANTIC_MODEL]
+              fullName:
+                type: string
+                minLength: 1
+                description: Fully qualified object name within the metalake
+          example:
+            - type: SCHEMA
+              fullName: catalog.schema1
+            - type: SCHEMA
+              fullName: catalog.schema2
+
+    BulkMetadataObjectTagListResponse:
+      type: object
+      required: [code, results]
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        results:
+          type: array
+          items:
+            type: object
+            required: [metadataObject, tags]
+            properties:
+              metadataObject:
+                $ref: "./tags.yaml#/components/schemas/MetadataObject"
+              tags:
+                $ref: "./tags.yaml#/components/responses/MetadataObjectTagListResponse"
+
+    BulkMetadataObjectPolicyListResponse:
+      type: object
+      required: [code, results]
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        results:
+          type: array
+          items:
+            type: object
+            required: [metadataObject, policies]
+            properties:
+              metadataObject:
+                $ref: "./tags.yaml#/components/schemas/MetadataObject"
+              policies:
+                $ref: "./policies.yaml#/components/schemas/MetadataObjectPolicyListResponse"
+
     BulkUserAddRequest:
       type: object
       required:

@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -215,6 +216,50 @@ public class EffectiveTagResolver {
       return new LinkedHashMap<>();
     }
     MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
+    return resolveValidated(metalake, metadataObjects);
+  }
+
+  /**
+   * Resolves assignments for display without reloading registered tables and schemas.
+   *
+   * <p>Results use the last registered identity. Unregistered objects and other object types still
+   * use live validation and import. This method must not be used for policy enforcement.
+   *
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return effective tags with their contributing sources
+   */
+  public Map<MetadataObject, ResolvedTag[]> resolveWithSourcesForDisplay(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    List<MetadataObject> needsValidation = new ArrayList<>();
+    for (MetadataObject object : metadataObjects) {
+      Entity.EntityType type = MetadataObjectUtil.toEntityType(object);
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      if (type == Entity.EntityType.TABLE) {
+        NameIdentifierUtil.checkTable(identifier);
+      } else if (type == Entity.EntityType.SCHEMA) {
+        NameIdentifierUtil.checkSchema(identifier);
+      } else {
+        needsValidation.add(object);
+        continue;
+      }
+      try {
+        if (!entityStore.exists(identifier, type)) {
+          needsValidation.add(object);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to check registered metadata objects", e);
+      }
+    }
+    MetadataObjectUtil.checkMetadataObjects(metalake, needsValidation);
+    return resolveValidated(metalake, metadataObjects);
+  }
+
+  private Map<MetadataObject, ResolvedTag[]> resolveValidated(
+      String metalake, List<MetadataObject> metadataObjects) {
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
         new EnumMap<>(Entity.EntityType.class);

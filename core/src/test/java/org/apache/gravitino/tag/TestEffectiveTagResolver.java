@@ -26,8 +26,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,13 +62,14 @@ public class TestEffectiveTagResolver {
   private static final MetadataObject CATALOG =
       MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
 
+  private EntityStore entityStore;
   private SupportsRelationOperations relationOperations;
   private EffectiveTagResolver resolver;
   private MockedStatic<MetadataObjectUtil> metadataObjectUtil;
 
   @BeforeEach
   void setUp() {
-    EntityStore entityStore = mock(EntityStore.class);
+    entityStore = mock(EntityStore.class);
     relationOperations = mock(SupportsRelationOperations.class);
     when(entityStore.relationOperations()).thenReturn(relationOperations);
     resolver = new EffectiveTagResolver(entityStore);
@@ -82,6 +85,68 @@ public class TestEffectiveTagResolver {
   @AfterEach
   void tearDown() {
     metadataObjectUtil.close();
+  }
+
+  @Test
+  void testDisplayReadFallsBackToValidationForUnregisteredTable() {
+    NoSuchMetadataObjectException missing = new NoSuchMetadataObjectException("missing table");
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(METALAKE, List.of(TABLE)))
+        .thenThrow(missing);
+
+    Assertions.assertSame(
+        missing,
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE))));
+  }
+
+  @Test
+  void testDisplayReadDoesNotHideStoreFailure() throws Exception {
+    IOException failure = new IOException("store unavailable");
+    when(entityStore.exists(
+            MetadataObjectUtil.toEntityIdent(METALAKE, TABLE), Entity.EntityType.TABLE))
+        .thenThrow(failure);
+
+    RuntimeException actual =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE)));
+    Assertions.assertSame(failure, actual.getCause());
+    verifyNoInteractions(relationOperations);
+  }
+
+  @Test
+  void testDisplayReadStillValidatesColumns() {
+    MetadataObject column =
+        MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN);
+    NoSuchMetadataObjectException missing = new NoSuchMetadataObjectException("missing table");
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(METALAKE, List.of(column)))
+        .thenThrow(missing);
+
+    Assertions.assertSame(
+        missing,
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class,
+            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(column))));
+  }
+
+  @Test
+  void testDisplayReadRejectsMalformedTableIdentifier() {
+    MetadataObject malformed = mock(MetadataObject.class);
+    when(malformed.type()).thenReturn(MetadataObject.Type.TABLE);
+    when(malformed.fullName()).thenReturn("table");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(malformed)));
+    verifyNoInteractions(entityStore);
+  }
+
+  @Test
+  void testDisplayReadOfEmptyListDoesNotAccessStore() {
+    Assertions.assertTrue(resolver.resolveWithSourcesForDisplay(METALAKE, List.of()).isEmpty());
+    verifyNoInteractions(entityStore);
   }
 
   @Test

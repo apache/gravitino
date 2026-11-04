@@ -306,6 +306,42 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testDisplayReadUsesStoredPoliciesWhenConnectorFails() {
+    NameIdentifier tableIdent = NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE);
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA);
+    MetadataObject table = NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+    MetadataObject schema =
+        NameIdentifierUtil.toMetadataObject(schemaIdent, Entity.EntityType.SCHEMA);
+    PolicyEntity policy =
+        createCustomPolicy(
+            METALAKE,
+            "display_policy",
+            PolicyContents.custom(ImmutableMap.of(), SUPPORTS_OBJECT_TYPES, null));
+    associatePolicyThroughTag(policy, schema);
+    RuntimeException unavailable = new RuntimeException("Iceberg metadata file is unavailable");
+    Mockito.doThrow(unavailable).when(tableDispatcher).tableExists(tableIdent);
+    Mockito.doThrow(unavailable).when(schemaDispatcher).schemaExists(schemaIdent);
+    try {
+      Map<MetadataObject, PolicyEntity[]> result =
+          policyManager.listPolicyInfosForDisplay(METALAKE, List.of(table, schema));
+      Assertions.assertEquals(1, result.get(table).length);
+      Assertions.assertEquals("display_policy", result.get(table)[0].name());
+      Assertions.assertTrue(result.get(table)[0].inherited().orElseThrow());
+      Assertions.assertEquals(1, result.get(schema).length);
+      Assertions.assertEquals("display_policy", result.get(schema)[0].name());
+      Assertions.assertFalse(result.get(schema)[0].inherited().orElseThrow());
+      Assertions.assertSame(
+          unavailable,
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> policyManager.listPolicyInfosForMetadataObjects(METALAKE, List.of(table))));
+    } finally {
+      Mockito.doReturn(true).when(tableDispatcher).tableExists(tableIdent);
+      Mockito.doReturn(true).when(schemaDispatcher).schemaExists(schemaIdent);
+    }
+  }
+
+  @Test
   public void testCreateAndGetPolicy() {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
