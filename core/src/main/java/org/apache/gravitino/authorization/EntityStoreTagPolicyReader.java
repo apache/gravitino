@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -78,7 +79,10 @@ public final class EntityStoreTagPolicyReader implements TagPolicyReader {
     }
     Map<NameIdentifier, TagEntity> tagsByIdentifier = new LinkedHashMap<>();
     for (TagEntity tag : effectiveTags) {
-      tagsByIdentifier.put(NameIdentifierUtil.ofTag(metalake, tag.name()), tag);
+      Preconditions.checkArgument(
+          tagsByIdentifier.putIfAbsent(NameIdentifierUtil.ofTag(metalake, tag.name()), tag) == null,
+          "Duplicate effective tag name: %s",
+          tag.name());
     }
     try {
       List<RelationalEntity<?>> relations =
@@ -94,13 +98,23 @@ public final class EntityStoreTagPolicyReader implements TagPolicyReader {
             Objects.requireNonNull(
                 tagsByIdentifier.get(relation.source()),
                 "Policy binding has an unexpected source tag");
-        // SQL NULL matches this tag with any assigned value or no value.
-        PolicyAssociationSelector selector =
-            relation
-                .relationValue()
-                .map(PolicyAssociationSelectorSerde::deserialize)
-                .orElseGet(AllValuesSelector::get);
-        bindings.add(new ResolvedTagPolicy(tag, (PolicyEntity) relation.targetEntity(), selector));
+        PolicyEntity policy = (PolicyEntity) relation.targetEntity();
+        PolicyAssociationSelector selector;
+        try {
+          // SQL NULL matches this tag with any assigned value or no value.
+          selector =
+              relation
+                  .relationValue()
+                  .map(PolicyAssociationSelectorSerde::deserialize)
+                  .orElseGet(AllValuesSelector::get);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(
+              String.format(
+                  "Invalid stored selector in metalake %s for tag ID %s and policy ID %s",
+                  metalake, tag.id(), policy.id()),
+              e);
+        }
+        bindings.add(new ResolvedTagPolicy(tag, policy, selector));
       }
       return List.copyOf(bindings);
     } catch (IOException e) {

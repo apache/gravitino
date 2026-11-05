@@ -22,7 +22,10 @@ package org.apache.gravitino.authorization;
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.METALAKE;
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.policy;
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.tag;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +42,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.TagPolicyTestUtils.InMemoryReader;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -154,11 +158,59 @@ class TestEntityStoreTagPolicyReader {
   @Test
   void testMalformedSelectorDoesNotBecomePresenceMatch() throws Exception {
     for (String invalid : Arrays.asList("{", "null", "{\"type\":\"UNKNOWN\"}")) {
-      stubBindings(List.of(relation(invalid)));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> reader.loadPolicyBindings(METALAKE, List.of(bronze)));
+      stubBindings(List.of(relation(null), relation(invalid)));
+      IllegalStateException failure =
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () -> reader.loadPolicyBindings(METALAKE, List.of(bronze)));
+      Assertions.assertInstanceOf(IllegalArgumentException.class, failure.getCause());
+      Assertions.assertTrue(failure.getMessage().contains(METALAKE));
+      Assertions.assertTrue(failure.getMessage().contains("tag ID 1"));
+      Assertions.assertTrue(failure.getMessage().contains("policy ID 10"));
     }
+  }
+
+  @Test
+  void testMissingTargetOrAncestorFailsClosedForTheRequest() throws Exception {
+    TagPolicyResolver resolver = new TagPolicyResolver(reader);
+    for (MetadataObject missing : Arrays.asList(TABLE, SCHEMA, CATALOG)) {
+      stubTags(TABLE, List.of(bronze));
+      stubTags(SCHEMA, Collections.emptyList());
+      stubTags(CATALOG, List.of(gold));
+      NoSuchEntityException failure = new NoSuchEntityException("Missing object %s", missing);
+      when(relations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(METALAKE, missing),
+              MetadataObjectUtil.toEntityType(missing)))
+          .thenThrow(failure);
+      AuthorizationRequestContext context = new AuthorizationRequestContext();
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              NoSuchEntityException.class, () -> resolver.resolve(METALAKE, TABLE, context)));
+      stubTags(missing, Collections.emptyList());
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              NoSuchEntityException.class, () -> resolver.resolve(METALAKE, TABLE, context)));
+      Assertions.assertTrue(
+          resolver.resolve(METALAKE, TABLE, new AuthorizationRequestContext()).isEmpty());
+    }
+    verify(relations, times(3))
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(bronze.nameIdentifier()),
+            Entity.EntityType.TAG);
+  }
+
+  @Test
+  void testDuplicateTagNamesAreRejectedBeforeReadingPolicies() {
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> reader.loadPolicyBindings(METALAKE, List.of(bronze, gold)));
+    Assertions.assertTrue(failure.getMessage().contains("certified"));
+    verifyNoInteractions(relations);
   }
 
   @Test
@@ -168,11 +220,12 @@ class TestEntityStoreTagPolicyReader {
   }
 
   private void stubTags(MetadataObject object, List<TagEntity> tags) throws IOException {
-    when(relations.<TagEntity>listEntitiesByRelation(
+    doReturn(tags)
+        .when(relations)
+        .listEntitiesByRelation(
             SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
             MetadataObjectUtil.toEntityIdent(METALAKE, object),
-            MetadataObjectUtil.toEntityType(object)))
-        .thenReturn(tags);
+            MetadataObjectUtil.toEntityType(object));
   }
 
   private void stubBindings(List<RelationalEntity<?>> bindings) throws IOException {

@@ -41,6 +41,8 @@ public interface TagPolicyReader {
    * @param metalake the containing metalake
    * @param effectiveTags the target object's effective tags, one per tag name
    * @return bindings paired with the supplied effective tags, empty if none exist
+   * @throws IllegalArgumentException if effective tag names are duplicated
+   * @throws IllegalStateException if a stored selector is invalid
    * @throws RuntimeException if the bindings cannot be read
    */
   List<ResolvedTagPolicy> loadPolicyBindings(String metalake, List<TagEntity> effectiveTags);

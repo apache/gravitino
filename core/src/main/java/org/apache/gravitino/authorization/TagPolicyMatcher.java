@@ -19,17 +19,14 @@
 
 package org.apache.gravitino.authorization;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.policy.AccessControlContent;
-import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyAssociationSelector;
-import org.apache.gravitino.policy.TagValueSelector;
+import org.apache.gravitino.policy.PolicySelectorMatcher;
 import org.apache.gravitino.tag.TagAssignment;
 
 /** Matches requested privileges and active roles against resolved tag-policy bindings. */
@@ -62,22 +59,11 @@ public final class TagPolicyMatcher {
       AccessControlContent content = (AccessControlContent) binding.policy().content();
       if (content.privileges().contains(privilege)
           && !Collections.disjoint(content.applicableRoles(), activeRoleNames)
-          && matches(
+          && PolicySelectorMatcher.matches(
               binding.selector(), binding.tag().assignment().orElseGet(TagAssignment::noValue))) {
         return Optional.of(binding);
       }
     }
     return Optional.empty();
-  }
-
-  private static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
-    if (selector instanceof AllValuesSelector) {
-      return true;
-    }
-    if (selector instanceof TagValueSelector) {
-      return Arrays.asList(assignment.values()).contains(((TagValueSelector) selector).value());
-    }
-    throw new IllegalArgumentException(
-        "Unsupported policy association selector type: " + selector.type());
   }
 }

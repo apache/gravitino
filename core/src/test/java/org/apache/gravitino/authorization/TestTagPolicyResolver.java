@@ -104,7 +104,7 @@ class TestTagPolicyResolver {
                 resolver.resolve(METALAKE, TABLE, context))
             .isPresent());
     Assertions.assertSame(resolved, resolver.resolve(METALAKE, TABLE, context));
-    Assertions.assertEquals(4, reader.tagReads.get());
+    Assertions.assertEquals(3, reader.tagReads.get());
     Assertions.assertEquals(2, reader.policyReads.get());
   }
 
@@ -168,9 +168,76 @@ class TestTagPolicyResolver {
     resolver.resolve(METALAKE, TABLE, context);
     resolver.resolve("another", TABLE, context);
     MetadataObject view = MetadataObjects.of("catalog.finance", "orders", MetadataObject.Type.VIEW);
-    resolver.resolve(METALAKE, view, context);
-    Assertions.assertEquals(9, reader.tagReads.get());
+    Assertions.assertArrayEquals(
+        new String[] {"gold"},
+        resolver.resolve(METALAKE, view, context).get(0).tag().assignment().orElseThrow().values());
+    Assertions.assertEquals(7, reader.tagReads.get());
     Assertions.assertEquals(3, reader.policyReads.get());
+  }
+
+  @Test
+  void testSiblingTargetsShareAncestorSnapshotOnlyWithinRequest() {
+    List<TagEntity> catalogTags = new ArrayList<>(List.of(gold));
+    reader.assignments.put(CATALOG, catalogTags);
+    resolver.resolve(METALAKE, TABLE, context);
+    catalogTags.set(0, bronze);
+    MetadataObject sibling =
+        MetadataObjects.of("catalog.finance", "invoices", MetadataObject.Type.TABLE);
+    List<ResolvedTagPolicy> result = resolver.resolve(METALAKE, sibling, context);
+    Assertions.assertArrayEquals(
+        new String[] {"gold"}, result.get(0).tag().assignment().orElseThrow().values());
+    Assertions.assertTrue(result.get(0).tag().inherited().orElseThrow());
+    Assertions.assertEquals(4, reader.tagReads.get());
+    Assertions.assertArrayEquals(
+        new String[] {"bronze"},
+        resolver
+            .resolve(METALAKE, sibling, new AuthorizationRequestContext())
+            .get(0)
+            .tag()
+            .assignment()
+            .orElseThrow()
+            .values());
+    Assertions.assertEquals(7, reader.tagReads.get());
+  }
+
+  @Test
+  void testConcurrentSiblingTargetsReadSharedAncestorsOnlyOnce() throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(4);
+    try {
+      List<Callable<List<ResolvedTagPolicy>>> tasks = new ArrayList<>();
+      for (int i = 0; i < 20; i++) {
+        MetadataObject sibling =
+            MetadataObjects.of("catalog.finance", "table" + i, MetadataObject.Type.TABLE);
+        tasks.add(() -> resolver.resolve(METALAKE, sibling, context));
+      }
+      for (Future<List<ResolvedTagPolicy>> result : executor.invokeAll(tasks)) {
+        Assertions.assertArrayEquals(
+            new String[] {"gold"}, result.get().get(0).tag().assignment().orElseThrow().values());
+      }
+      Assertions.assertEquals(22, reader.tagReads.get());
+      Assertions.assertEquals(20, reader.policyReads.get());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void testAncestorReadFailureIsSharedAcrossTargetsUntilNextRequest() {
+    reader.assignments.put(SCHEMA, null);
+    RuntimeException failure =
+        Assertions.assertThrows(
+            NullPointerException.class, () -> resolver.resolve(METALAKE, TABLE, context));
+    reader.assignments.put(SCHEMA, Collections.emptyList());
+    MetadataObject sibling =
+        MetadataObjects.of("catalog.finance", "invoices", MetadataObject.Type.TABLE);
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            NullPointerException.class, () -> resolver.resolve(METALAKE, sibling, context)));
+    Assertions.assertEquals(3, reader.tagReads.get());
+    Assertions.assertEquals(0, reader.policyReads.get());
+    Assertions.assertFalse(
+        resolver.resolve(METALAKE, sibling, new AuthorizationRequestContext()).isEmpty());
   }
 
   @Test
