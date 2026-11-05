@@ -281,7 +281,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         LOG.warn("Invalid authorization request", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (IllegalMetadataObjectException ex) {
-        LOG.warn("Invalid metadata object type during authorization", ex);
+        LOG.warn("Invalid metadata object during authorization", ex);
         return Utils.illegalArguments(
             IllegalArgumentException.class.getSimpleName(), ex.getMessage(), ex);
       } catch (IllegalNameIdentifierException ex) {
