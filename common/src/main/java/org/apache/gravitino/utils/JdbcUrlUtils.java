@@ -52,17 +52,6 @@ public class JdbcUrlUtils {
   private static final Pattern USER_INFO =
       Pattern.compile("(?i)(?://[^/?#]*@|jdbc:oracle:(?:thin|oci|oci8):[^/@]+/[^@]*@)");
 
-  /**
-   * Detects credentials embedded in JDBC URLs, including encoded parameter names.
-   *
-   * @param url the JDBC URL, or null
-   * @return whether the URL must not be exposed as a public catalog property
-   */
-  public static boolean containsCredentials(@Nullable String url) {
-    return url != null
-        && decodedFormsForScan(url).stream().anyMatch(JdbcUrlUtils::containsCredentialParameters);
-  }
-
   // The DBCP2 connection-pool property whose value is a list of connection properties forwarded
   // verbatim to the JDBC driver. Unsafe parameters smuggled here would otherwise evade a check
   // that only inspects the URL string and the raw config values.
@@ -93,6 +82,17 @@ public class JdbcUrlUtils {
 
   private JdbcUrlUtils() {
     // Utility class, no instantiation allowed
+  }
+
+  /**
+   * Detects credentials embedded in JDBC URLs, including encoded parameter names.
+   *
+   * @param url the JDBC URL, or null
+   * @return whether the URL must not be exposed as a public catalog property
+   */
+  public static boolean containsCredentials(@Nullable String url) {
+    return url != null
+        && decodedFormsForScan(url).stream().anyMatch(JdbcUrlUtils::containsCredentialParameters);
   }
 
   /**
