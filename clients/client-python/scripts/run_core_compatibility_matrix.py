@@ -32,6 +32,7 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from email.parser import Parser
 from pathlib import Path
+from tempfile import mkdtemp
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, build_opener
 from zipfile import ZipFile
@@ -271,8 +272,9 @@ def build_wheel(artifact: Path, directory: Path, interpreter: str) -> Path:
     if artifact.suffix == ".whl":
         return artifact
     builder = prepare_environment(interpreter, directory / "builder")
-    wheels = directory / "artifacts"
-    wheels.mkdir(exist_ok=True)
+    artifacts = directory / "artifacts"
+    artifacts.mkdir(exist_ok=True)
+    wheels = Path(mkdtemp(prefix="wheel-", dir=artifacts))
     run_command(
         [
             str(builder),

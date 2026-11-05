@@ -121,6 +121,40 @@ class TestCoreCompatibilityMatrix(unittest.TestCase):
             self.assertTrue((workspace / "tests/test_fixture.py").is_file())
             self.assertFalse((workspace / "gravitino").exists())
 
+    def test_wheel_build_isolates_outputs_in_reused_matrix_directory(self):
+        """Each build selects its own wheel despite older artifacts and versions."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            artifacts = directory / "artifacts"
+            artifacts.mkdir()
+            stale = artifacts / "apache_gravitino-0.9.0-py3-none-any.whl"
+            stale.write_bytes(b"stale")
+
+            def build(command, *_):
+                output = Path(command[command.index("--wheel-dir") + 1])
+                source = Path(command[-1])
+                name = source.name.removesuffix(".tar.gz") + "-py3-none-any.whl"
+                (output / name).write_bytes(source.read_bytes())
+
+            wheels = []
+            with (
+                patch.object(
+                    MATRIX, "prepare_environment", return_value=Path(sys.executable)
+                ),
+                patch.object(MATRIX, "run_command", side_effect=build),
+            ):
+                for index, version in enumerate(("1.0.0", "2.0.0", "2.0.0")):
+                    artifact = directory / f"apache_gravitino-{version}.tar.gz"
+                    artifact.write_bytes(str(index).encode())
+                    wheel = MATRIX.build_wheel(artifact, directory, sys.executable)
+                    self.assertEqual(
+                        wheel.name, f"apache_gravitino-{version}-py3-none-any.whl"
+                    )
+                    self.assertEqual(wheel.read_bytes(), artifact.read_bytes())
+                    wheels.append(wheel)
+            self.assertEqual(len({wheel.parent for wheel in wheels}), len(wheels))
+            self.assertEqual(stale.read_bytes(), b"stale")
+
     def test_same_version_wheel_replaces_installed_content(self):
         """A real pip install must consume new bytes despite an unchanged version."""
         with tempfile.TemporaryDirectory() as temporary:
