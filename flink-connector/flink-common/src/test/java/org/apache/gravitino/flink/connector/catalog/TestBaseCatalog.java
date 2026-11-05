@@ -607,6 +607,35 @@ public abstract class TestBaseCatalog {
   }
 
   /**
+   * The handle keeps using the REST client of the manager that loaded it, so the catalog must be
+   * loaded again after the shared manager is closed and created again.
+   */
+  @Test
+  void testCatalogHandleReloadedWhenManagerIsReplaced() {
+    Catalog first = Mockito.mock(Catalog.class);
+    Catalog second = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager firstManager = Mockito.mock(GravitinoCatalogManager.class);
+    GravitinoCatalogManager secondManager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(firstManager.getGravitinoCatalogInfo("test")).thenReturn(first);
+    Mockito.when(secondManager.getGravitinoCatalogInfo("test")).thenReturn(second);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(firstManager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+      Assertions.assertSame(first, catalog.catalog());
+      Assertions.assertSame(first, catalog.catalog());
+
+      mocked.when(GravitinoCatalogManager::get).thenReturn(secondManager);
+      Assertions.assertSame(second, catalog.catalog());
+      Assertions.assertSame(second, catalog.catalog());
+
+      Mockito.verify(firstManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+      Mockito.verify(secondManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
    * Builds a catalog that does not override catalog(), so tests exercise the memoization in
    * BaseCatalog.catalog() itself.
    */
