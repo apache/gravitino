@@ -138,7 +138,10 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.timestampLiteral(
             LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
-        return Literals.varcharLiteral(type.getColumnSize(), columnDefaultValue);
+        Integer length = type.getColumnSize();
+        return length == null || length <= 0 || length == Integer.MAX_VALUE
+            ? Literals.stringLiteral(columnDefaultValue)
+            : Literals.varcharLiteral(length, columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);
