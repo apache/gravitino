@@ -29,6 +29,7 @@ dependencies {
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
+  compileOnly(libs.aws.dynamodb)
   compileOnly(libs.lombok)
 
   implementation(project(":catalogs:catalog-common")) {

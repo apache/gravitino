@@ -70,6 +70,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -132,6 +133,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     this.schemaDispatcherSupplier =
         Preconditions.checkNotNull(
             schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");
+  }
+
+  /**
+   * Checks whether a table exists, treating catalogs without table operations as empty.
+   *
+   * @param ident the table identifier
+   * @return whether the table exists
+   */
+  @Override
+  public boolean tableExists(NameIdentifier ident) {
+    boolean supportsTables =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+            RuntimeException.class);
+    return supportsTables && TableDispatcher.super.tableExists(ident);
   }
 
   /**
@@ -400,8 +417,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 updateColumnsIfNecessary(
                                     alteredTable,
                                     tableEntity,
-                                    alignNameChangesWithStoredColumns(
-                                        catalogResult.columnNameChanges, tableEntity.columns()));
+                                    alignNameChangesWithCatalogColumns(
+                                        alignNameChangesWithStoredColumns(
+                                            catalogResult.columnNameChanges, tableEntity.columns()),
+                                        alteredTable.columns()));
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -776,9 +795,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withCreateTime(Instant.now())
             .build();
     List<ColumnEntity> columnEntityList =
-        IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
-            .collect(Collectors.toList());
+        toColumnEntities(withCatalogColumnNames(columns, table.columns()), audit);
 
     TableEntity tableEntity =
         TableEntity.builder()
@@ -811,6 +828,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(catalogResult.hiddenProperties);
+  }
+
+  /**
+   * Returns the requested columns under the names the catalog reports for them. A catalog may store
+   * a name in another case than requested, and the stored entity has to carry the name the catalog
+   * reports on later loads. A column whose name differs by more than case keeps the requested name.
+   *
+   * @param columns the columns of the create request
+   * @param catalogColumns the columns the catalog reports for the created table
+   * @return the columns to store
+   */
+  @VisibleForTesting
+  static Column[] withCatalogColumnNames(Column[] columns, Column[] catalogColumns) {
+    if (columns.length != catalogColumns.length) {
+      return columns;
+    }
+
+    Column[] named = columns.clone();
+    for (int i = 0; i < columns.length; i++) {
+      Column column = columns[i];
+      String catalogName = catalogColumns[i].name();
+      if (!catalogName.equals(column.name()) && catalogName.equalsIgnoreCase(column.name())) {
+        named[i] =
+            Column.of(
+                catalogName,
+                column.dataType(),
+                column.comment(),
+                column.nullable(),
+                column.autoIncrement(),
+                column.defaultValue());
+      }
+    }
+    return named;
   }
 
   private TableCatalogResult snapshotTable(
@@ -1034,6 +1084,47 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         }
       }
       aligned.put(name, change.getValue());
+    }
+    return aligned;
+  }
+
+  /**
+   * Points column renames at the names the catalog reports.
+   *
+   * <p>A catalog may store a name in another case than requested, such as Glue for Hive-format
+   * tables. A rename target the catalog does not report is mapped to the catalog column it matches
+   * when exactly one unclaimed column does, so the rename keeps the column id instead of being
+   * stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops keyed by the stored column names
+   * @param catalogColumns the columns the catalog reports, or {@code null} if it reports none
+   * @return the renames and drops with targets the catalog reports
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithCatalogColumns(
+      Map<String, String> nameChanges, @Nullable Column[] catalogColumns) {
+    if (nameChanges.isEmpty() || catalogColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> catalogNames =
+        Arrays.stream(catalogColumns).map(Column::name).collect(Collectors.toSet());
+    Set<String> claimed = new HashSet<>(nameChanges.values());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String target = change.getValue();
+      if (target != null && !catalogNames.contains(target)) {
+        List<String> matches =
+            catalogNames.stream()
+                .filter(target::equalsIgnoreCase)
+                .filter(name -> !claimed.contains(name))
+                .collect(Collectors.toList());
+        if (matches.size() == 1) {
+          target = matches.get(0);
+          claimed.add(target);
+        }
+      }
+      aligned.put(change.getKey(), target);
     }
     return aligned;
   }
