@@ -161,7 +161,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
    *     the caller performs an ordinary load
    */
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "reported", "modified", "load"})
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
   public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
     Instant importTime = Instant.EPOCH.plusSeconds(60);
     AuditInfo importAudit =
@@ -196,6 +196,10 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(identifier, VIEW);
     clearInvocations(entityStore);
 
+    if ("raced".equals(scenario)) {
+      viewOperationDispatcher.loadView(identifier);
+      clearInvocations(entityStore);
+    }
     View loaded =
         "load".equals(scenario)
             ? viewOperationDispatcher.loadView(identifier)
@@ -211,26 +215,37 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         "modified".equals(scenario) ? Instant.EPOCH : null,
         imported.auditInfo().lastModifiedTime());
     Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
-    verify(entityStore).put(any(ViewEntity.class), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
 
     clearInvocations(entityStore);
     viewOperationDispatcher.importView(
         identifier,
         AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
     Assertions.assertEquals(
-        expectedCreator, entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+        "load".equals(scenario) ? "bob" : expectedCreator,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
     Assertions.assertEquals(
-        expectedTime, entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().createTime());
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().createTime());
     verify(entityStore, never()).put(any(), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
   }
 
   /** Explicit imports require audit information. */
   @Test
   public void testImportRejectsNullAudit() {
     Assertions.assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () ->
             viewOperationDispatcher.importView(
                 NameIdentifier.of(metalake, catalog, "schema", "missing"), null));

@@ -145,7 +145,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   /** {@inheritDoc} */
   @Override
   public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
-    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
     return loadAndImportView(ident, auditInfo);
   }
 
@@ -543,12 +543,44 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      entityCombinedView =
-          TreeLockUtils.doWithTreeLock(
-              schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+      try {
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(
+                schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+        if (!entityCombinedView.imported()) {
+          throw new UnsupportedOperationException(
+              "View managed by multiple catalogs. This may cause unexpected issues such as "
+                  + "privilege conflicts. To resolve: Remove all catalogs managing this view, "
+                  + "then recreate one catalog to ensure single-catalog management.");
+        }
+      }
     }
 
-    return entityCombinedView;
+    ViewEntity entity =
+        fillMissingCreationAudit(
+            entityCombinedView.viewEntity(),
+            ViewEntity.class,
+            entityCombinedView.viewFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                ViewEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(current.columns())
+                    .withRepresentations(current.representations())
+                    .withDefaultCatalog(current.defaultCatalog())
+                    .withDefaultSchema(current.defaultSchema())
+                    .withProperties(current.properties())
+                    .withAuditInfo(audit)
+                    .build());
+    return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), entity)
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
+        .withImported(entityCombinedView.imported());
   }
 
   private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)
@@ -564,13 +596,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
-      LOG.warn(
-          "The View uid {} existed but still need to be imported, this could happen "
-              + "when View is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+      // Keep the source identity, but never overwrite a concurrently imported registration.
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -605,12 +631,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, true /* overwrite */);
+      store.put(viewEntity, false /* overwrite */);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
-      throw new UnsupportedOperationException(
-          "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+      throw e;
     } catch (OptimisticLockException e) {
       // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
@@ -620,11 +643,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     }
 
     return EntityCombinedView.of(catalogView, viewEntity)
-        .withHiddenProperties(
-            getMaskAndOmitKeys(
-                getCatalogIdentifier(ident),
-                HasPropertyMetadata::tablePropertiesMetadata,
-                catalogView.properties()))
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
         .withImported(true);
   }
 

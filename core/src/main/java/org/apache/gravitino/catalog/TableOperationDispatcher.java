@@ -170,7 +170,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   /** {@inheritDoc} */
   @Override
   public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
-    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
     return loadAndImportTable(ident, auditInfo);
   }
 
@@ -585,8 +585,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {
           throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+              "Table managed by multiple catalogs. This may cause unexpected issues such as "
+                  + "privilege conflicts. To resolve: Remove all catalogs managing this table, "
+                  + "then recreate one catalog to ensure single-catalog management.");
         }
       }
     }
@@ -594,6 +595,26 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
     TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    updatedEntity =
+        fillMissingCreationAudit(
+            updatedEntity,
+            TableEntity.class,
+            entityCombinedTable.tableFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withProperties(current.properties())
+                    .withColumns(current.columns())
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
+                    .withAuditInfo(audit)
+                    .build());
 
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())

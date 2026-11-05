@@ -34,12 +34,13 @@ import org.apache.gravitino.rel.TableCatalog;
 public interface TableDispatcher extends TableCatalog {
   /**
    * Imports an externally created table into Gravitino, or returns the already imported entity.
-   * Catalog-reported audit fields take precedence over the supplied audit. Existing entity audits
-   * are preserved. This operation does not create the table in the underlying catalog.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * Loading also refreshes changed columns and their modification audit. This operation does not
+   * create the table in the underlying catalog.
    *
    * @param ident the identifier of the existing external table
-   * @param auditInfo fallback audit information used on initial import when the catalog reports no
-   *     creator
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
    * @return the imported table
    * @throws NoSuchTableException if the external table does not exist
    */

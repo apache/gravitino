@@ -102,7 +102,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
    *     the caller performs an ordinary load
    */
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "reported", "modified", "load"})
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
   public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
     Instant importTime = Instant.EPOCH.plusSeconds(60);
     AuditInfo importAudit =
@@ -137,6 +137,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(identifier, SCHEMA);
     clearInvocations(entityStore);
 
+    if ("raced".equals(scenario)) {
+      dispatcher.loadSchema(identifier);
+      clearInvocations(entityStore);
+    }
     Schema loaded =
         "load".equals(scenario)
             ? dispatcher.loadSchema(identifier)
@@ -152,21 +156,30 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
         "modified".equals(scenario) ? Instant.EPOCH : null,
         imported.auditInfo().lastModifiedTime());
     Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
-    verify(entityStore).put(any(SchemaEntity.class), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(SchemaEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(SchemaEntity.class), eq(SCHEMA), any());
+    } else {
+      verify(entityStore).put(any(SchemaEntity.class), anyBoolean());
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
 
     clearInvocations(entityStore);
     dispatcher.importSchema(
         identifier,
         AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
     Assertions.assertEquals(
-        expectedCreator,
+        "load".equals(scenario) ? "bob" : expectedCreator,
         entityStore.get(identifier, SCHEMA, SchemaEntity.class).auditInfo().creator());
     Assertions.assertEquals(
-        expectedTime,
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
         entityStore.get(identifier, SCHEMA, SchemaEntity.class).auditInfo().createTime());
     verify(entityStore, never()).put(any(), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(SchemaEntity.class), eq(SCHEMA), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
   }
 
   @Test
@@ -273,7 +286,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testImportRejectsNullAudit() {
     Assertions.assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () -> dispatcher.importSchema(NameIdentifier.of(metalake, catalog, "missing"), null));
   }
 

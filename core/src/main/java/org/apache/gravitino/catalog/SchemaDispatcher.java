@@ -91,14 +91,15 @@ public interface SchemaDispatcher extends SupportsSchemas {
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     throw new UnsupportedOperationException("Creating a schema with secrets is not supported");
   }
+
   /**
    * Imports an externally created schema into Gravitino, or returns the already imported entity.
-   * Catalog-reported audit fields take precedence over the supplied audit. Existing entity audits
-   * are preserved. This operation does not create the schema in the underlying catalog.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * This operation does not create the schema in the underlying catalog.
    *
    * @param ident the identifier of the existing external schema
-   * @param auditInfo fallback audit information used on initial import when the catalog reports no
-   *     creator
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
    * @return the imported schema
    * @throws NoSuchSchemaException if the external schema does not exist
    */

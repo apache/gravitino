@@ -33,12 +33,12 @@ import org.apache.gravitino.rel.ViewCatalog;
 public interface ViewDispatcher extends ViewCatalog {
   /**
    * Imports an externally created view into Gravitino, or returns the already imported entity.
-   * Catalog-reported audit fields take precedence over the supplied audit. Existing entity audits
-   * are preserved. This operation does not create the view in the underlying catalog.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * This operation does not create the view in the underlying catalog.
    *
    * @param ident the identifier of the existing external view
-   * @param auditInfo fallback audit information used on initial import when the catalog reports no
-   *     creator
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
    * @return the imported view
    * @throws NoSuchViewException if the external view does not exist
    */

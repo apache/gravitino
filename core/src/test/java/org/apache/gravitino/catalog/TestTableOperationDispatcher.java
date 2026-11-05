@@ -146,7 +146,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
    *     the caller performs an ordinary load
    */
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "reported", "modified", "load"})
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
   public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
     Instant importTime = Instant.EPOCH.plusSeconds(60);
     AuditInfo importAudit =
@@ -186,6 +186,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(identifier, TABLE);
     clearInvocations(entityStore);
 
+    if ("raced".equals(scenario)) {
+      tableOperationDispatcher.loadTable(identifier);
+      clearInvocations(entityStore);
+    }
     Table loaded =
         "load".equals(scenario)
             ? tableOperationDispatcher.loadTable(identifier)
@@ -201,28 +205,37 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         "modified".equals(scenario) ? Instant.EPOCH : null,
         imported.auditInfo().lastModifiedTime());
     Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
-    verify(entityStore).put(any(TableEntity.class), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
 
     clearInvocations(entityStore);
     tableOperationDispatcher.importTable(
         identifier,
         AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
     Assertions.assertEquals(
-        expectedCreator,
+        "load".equals(scenario) ? "bob" : expectedCreator,
         entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
     Assertions.assertEquals(
-        expectedTime,
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
         entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().createTime());
     verify(entityStore, never()).put(any(), anyBoolean());
-    verify(entityStore, never()).update(any(), any(), any(), any());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
   }
 
   /** Explicit imports require audit information. */
   @Test
   public void testImportRejectsNullAudit() {
     Assertions.assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () ->
             tableOperationDispatcher.importTable(
                 NameIdentifier.of(metalake, catalog, "schema", "missing"), null));

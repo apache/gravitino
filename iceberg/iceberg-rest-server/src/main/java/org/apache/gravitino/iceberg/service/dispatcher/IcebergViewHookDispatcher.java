@@ -183,9 +183,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   /**
    * Import a view into Gravitino's metadata catalog by loading it through the ViewDispatcher.
    *
-   * <p>This method calls {@link ViewDispatcher#importView(NameIdentifier, AuditInfo)} which
-   * delegates to the underlying catalog's ViewCatalog implementation. This ensures Gravitino is
-   * aware of the view and can apply authorization policies to it.
+   * <p>This method calls {@link ViewDispatcher#importView(NameIdentifier, AuditInfo)} which loads
+   * the existing view and registers it in Gravitino's entity store so authorization policies can
+   * apply to it.
    *
    * <p>This is a best-effort operation - if it fails, we log a warning but don't fail the Iceberg
    * REST operation, as the view was successfully created in the underlying catalog.

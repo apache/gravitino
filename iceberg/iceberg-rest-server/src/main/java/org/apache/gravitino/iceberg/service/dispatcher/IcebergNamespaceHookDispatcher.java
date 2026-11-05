@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Entity;
@@ -90,16 +91,20 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
               newlyOwned.addAll(getMissingAncestors(context, leaf));
               return dispatcher.createNamespace(context, createRequest);
             });
-    // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
-    // Gravitino entity row for each ancestor, so a single leaf import covers the branch.
-    // Newly inserted ancestor rows inherit the leaf audit in that same write.
+    // Import ancestors from outermost to innermost before the leaf. Only namespaces this
+    // request actually created receive its audit; pre-existing external ancestors retain
+    // their source audit or unknown creation fields. An ordinary load may already have
+    // registered a newly created ancestor, in which case importSchema fills its missing audit.
     // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
     // that Gravitino doesn't know about. Do not drop the namespace on import failure: another
     // client may already have created objects in it.
-    importSchema(
-        catalogName,
-        leaf,
-        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
+    AuditInfo audit =
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build();
+    for (int level = 1; level < leaf.length(); level++) {
+      Namespace ancestor = Namespace.of(Arrays.copyOf(leaf.levels(), level));
+      importSchema(catalogName, ancestor, newlyOwned.contains(ancestor) ? audit : AuditInfo.EMPTY);
+    }
+    importSchema(catalogName, leaf, audit);
 
     // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
     // every newly-created namespace in this request gets an owner assigned.

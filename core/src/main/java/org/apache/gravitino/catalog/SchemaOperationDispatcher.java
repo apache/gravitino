@@ -318,7 +318,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
       throws NoSuchSchemaException {
-    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
     return loadAndImportSchema(ident, auditInfo);
   }
 
@@ -679,14 +679,32 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
           throw new UnsupportedOperationException(
-              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+              "Schema managed by multiple catalogs. This may cause unexpected issues such as "
+                  + "privilege conflicts. To resolve: Remove all catalogs managing this schema, "
+                  + "then recreate one catalog to ensure single-catalog management.");
         }
         schema = reloaded;
       }
     }
 
-    return schema;
+    SchemaEntity entity =
+        fillMissingCreationAudit(
+            schema.schemaEntity(),
+            SchemaEntity.class,
+            schema.schema().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                SchemaEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withProperties(current.properties())
+                    .withAuditInfo(audit)
+                    .build());
+    return EntityCombinedSchema.of(schema.schema(), entity)
+        .withHiddenProperties(schema.hiddenProperties())
+        .withImported(schema.imported());
   }
 
   private EntityCombinedSchema importSchemaFromCatalog(
@@ -813,11 +831,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       throw new RuntimeException("Failed to import schema entity to the store", e);
     }
     return EntityCombinedSchema.of(schema.schema(), schemaEntity)
-        .withHiddenProperties(
-            getMaskAndOmitKeys(
-                getCatalogIdentifier(identifier),
-                HasPropertyMetadata::schemaPropertiesMetadata,
-                schema.schema().properties()))
+        .withHiddenProperties(schema.hiddenProperties())
         .withImported(true);
   }
 

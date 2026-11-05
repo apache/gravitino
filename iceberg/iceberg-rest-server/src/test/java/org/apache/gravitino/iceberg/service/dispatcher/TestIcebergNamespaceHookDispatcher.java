@@ -556,9 +556,15 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockInternalSchemaDispatcher.importSchema(any(), any()))
         .thenAnswer(
             invocation -> {
+              NameIdentifier identifier = invocation.getArgument(0);
               AuditInfo audit = invocation.getArgument(1);
-              Assertions.assertEquals(TEST_USER, audit.creator());
-              Assertions.assertNotNull(audit.createTime());
+              if (identifier.name().equals("A")) {
+                Assertions.assertNull(audit.creator());
+                Assertions.assertNull(audit.createTime());
+              } else {
+                Assertions.assertEquals(TEST_USER, audit.creator());
+                Assertions.assertNotNull(audit.createTime());
+              }
               return null;
             });
 
