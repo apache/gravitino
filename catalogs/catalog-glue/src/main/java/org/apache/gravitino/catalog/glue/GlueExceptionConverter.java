@@ -260,11 +260,11 @@ final class GlueExceptionConverter {
           awsErrorDetail(glueException));
     }
     if (e instanceof ConcurrentModificationException) {
-      return new OptimisticLockException(
-          e,
-          "%s was changed concurrently; the request can be retried. AWS error: %s",
-          context,
-          awsErrorDetail(glueException));
+      return new RuntimeException(
+          String.format(
+              "%s was changed concurrently; the request can be retried. AWS error: %s",
+              context, awsErrorDetail(glueException)),
+          e);
     }
     if (e instanceof InvalidInputException || e instanceof ValidationException) {
       return new IllegalArgumentException(

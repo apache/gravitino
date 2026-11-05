@@ -40,7 +40,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -1566,7 +1565,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testAlterConcurrentModificationIsConflict() {
+  void testAlterConcurrentModificationIsRetryable() {
     useFakeGlueTable(nativeTable());
     when(mockClient.updateTable(any(UpdateTableRequest.class)))
         .thenThrow(
@@ -1574,8 +1573,10 @@ class TestGlueCatalogTableOperations {
                 .message("Update table failed due to concurrent modifications")
                 .build());
 
-    assertThrows(
-        OptimisticLockException.class,
-        () -> ops.alterTable(ALTER_IDENT, TableChange.setProperty("k", "v")));
+    RuntimeException e =
+        assertThrows(
+            RuntimeException.class,
+            () -> ops.alterTable(ALTER_IDENT, TableChange.setProperty("k", "v")));
+    assertTrue(e.getMessage().contains("was changed concurrently"), e.getMessage());
   }
 }
