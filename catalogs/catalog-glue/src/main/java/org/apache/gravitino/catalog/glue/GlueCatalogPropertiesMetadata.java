@@ -105,13 +105,16 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               positiveLongEntry(
                   AWS_GLUE_API_CALL_TIMEOUT_MS,
                   "Upper bound in milliseconds for one Glue API call made by the catalog,"
-                      + " including retries. Not applied to Iceberg table I/O.",
+                      + " including retries. Also applied to the Glue calls of Iceberg tables, but"
+                      + " not to S3 I/O.",
                   DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS))
           .put(
               AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS,
               positiveLongEntry(
                   AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS,
-                  "Upper bound in milliseconds for a single attempt of a Glue API call.",
+                  "Upper bound in milliseconds for a single attempt of a Glue API call. Also used"
+                      + " as the connection and socket timeout of the S3 client used for Iceberg"
+                      + " tables.",
                   DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS))
           .put(
               AWS_GLUE_MAX_ATTEMPTS,
@@ -119,7 +122,8 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   .withName(AWS_GLUE_MAX_ATTEMPTS)
                   .withDescription(
                       "Maximum number of attempts of a Glue API call made by the catalog,"
-                          + " including the first one. Not applied to Iceberg table I/O.")
+                          + " including the first one. Also applied to the Glue calls of Iceberg"
+                          + " tables, but not to S3 I/O.")
                   .withJavaType(Integer.class)
                   .withDefaultValue(DEFAULT_AWS_GLUE_MAX_ATTEMPTS)
                   .withDecoder(
