@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -37,12 +41,13 @@ import org.apache.iceberg.util.ByteBuffers;
 import org.apache.iceberg.util.DateTimeUtil;
 
 /**
- * Converts Iceberg format-version 3 column defaults into Gravitino {@link Expression} values.
+ * Converts between Iceberg format-version 3 column defaults and Gravitino {@link Expression}
+ * values.
  *
  * <p>Iceberg {@code write-default} maps to {@link Column#defaultValue()} and {@code
  * initial-default} maps to {@link Column#initialDefaultValue()}.
  */
-final class FromIcebergColumnDefault {
+public final class FromIcebergColumnDefault {
 
   private FromIcebergColumnDefault() {}
 
@@ -65,6 +70,91 @@ final class FromIcebergColumnDefault {
   static Expression initialDefault(NestedField field) {
     return toGravitino(
         field.initialDefaultLiteral(), field.type(), Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Converts a Gravitino default expression to an Iceberg {@link Literal}, or {@code null} when
+   * unset / NULL.
+   *
+   * @param expression the Gravitino expression
+   * @param icebergType the target Iceberg field type
+   * @return the Iceberg literal, or null when unset
+   */
+  public static Literal<?> toIceberg(Expression expression, Type icebergType) {
+    if (expression == null
+        || expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+        || expression.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET)
+        || Literals.NULL.equals(expression)) {
+      return null;
+    }
+    Preconditions.checkArgument(
+        expression instanceof org.apache.gravitino.rel.expressions.literals.Literal,
+        "Iceberg column defaults must be literals, got: %s",
+        expression);
+    Object value = ((org.apache.gravitino.rel.expressions.literals.Literal<?>) expression).value();
+    Literal<?> icebergLiteral;
+    switch (icebergType.typeId()) {
+      case BOOLEAN:
+        icebergLiteral = Literal.of((Boolean) value);
+        break;
+      case INTEGER:
+        icebergLiteral = Literal.of(((Number) value).intValue());
+        break;
+      case LONG:
+        icebergLiteral = Literal.of(((Number) value).longValue());
+        break;
+      case FLOAT:
+        icebergLiteral = Literal.of(((Number) value).floatValue());
+        break;
+      case DOUBLE:
+        icebergLiteral = Literal.of(((Number) value).doubleValue());
+        break;
+      case STRING:
+        icebergLiteral = Literal.of(String.valueOf(value));
+        break;
+      case DATE:
+        icebergLiteral = Literal.of(DateTimeUtil.daysFromDate((LocalDate) value));
+        break;
+      case TIME:
+        icebergLiteral = Literal.of(DateTimeUtil.microsFromTime((LocalTime) value));
+        break;
+      case TIMESTAMP:
+        {
+          TimestampType timestampType = (TimestampType) icebergType;
+          long micros = DateTimeUtil.microsFromTimestamp((LocalDateTime) value);
+          icebergLiteral =
+              timestampType.shouldAdjustToUTC()
+                  ? Literal.of(micros).to(timestampType)
+                  : Literal.of(micros);
+          break;
+        }
+      case TIMESTAMP_NANO:
+        {
+          TimestampNanoType timestampNanoType = (TimestampNanoType) icebergType;
+          icebergLiteral =
+              Literal.of(DateTimeUtil.nanosFromTimestamp((LocalDateTime) value))
+                  .to(timestampNanoType);
+          break;
+        }
+      case DECIMAL:
+        icebergLiteral =
+            Literal.of(value instanceof Decimal ? ((Decimal) value).value() : (BigDecimal) value);
+        break;
+      case UUID:
+        icebergLiteral = Literal.of(UUID.fromString(String.valueOf(value)));
+        break;
+      case FIXED:
+      case BINARY:
+        icebergLiteral = Literal.of(toByteArray(value));
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported Iceberg column default type: " + icebergType);
+    }
+    Literal<?> typed = icebergLiteral.to(icebergType);
+    Preconditions.checkArgument(
+        typed != null, "Cannot cast column default %s to Iceberg type %s", value, icebergType);
+    return typed;
   }
 
   private static Expression toGravitino(Literal<?> icebergDefault, Type type, Expression unset) {

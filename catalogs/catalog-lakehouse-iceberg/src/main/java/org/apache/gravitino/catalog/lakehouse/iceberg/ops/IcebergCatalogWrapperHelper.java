@@ -30,8 +30,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.converter.FromIcebergColumnDefault;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
-import org.apache.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergColumnDefault;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.Column;
@@ -176,7 +176,7 @@ public class IcebergCatalogWrapperHelper {
         IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType());
     // Iceberg addColumn seeds both initial-default and write-default from this single value.
     Literal<?> defaultValue =
-        ToIcebergColumnDefault.fromExpression(addColumn.getDefaultValue(), icebergType);
+        FromIcebergColumnDefault.toIceberg(addColumn.getDefaultValue(), icebergType);
     String parent = getParentName(addColumn.fieldName());
     String leaf = getLeafName(addColumn.fieldName());
 
@@ -212,7 +212,7 @@ public class IcebergCatalogWrapperHelper {
     Preconditions.checkArgument(field != null, "Cannot update missing column: %s", fieldName);
     // Iceberg updateColumnDefault updates write-default only; initial-default is fixed at add time.
     Literal<?> newDefault =
-        ToIcebergColumnDefault.fromExpression(
+        FromIcebergColumnDefault.toIceberg(
             updateColumnDefaultValue.getNewDefaultValue(), field.type());
     icebergUpdateSchema.updateColumnDefault(fieldName, newDefault);
   }
