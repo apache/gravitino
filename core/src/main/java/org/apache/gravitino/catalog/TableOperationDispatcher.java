@@ -465,6 +465,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               }
 
               // A false result is ambiguous: the external table may have been renamed or dropped
+              // out of
               // band. Preserve the registration because deleting it after a rename would lose
               // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
               // registration that requires separate cleanup.
@@ -479,11 +480,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   throw new RuntimeException(e);
                 }
               }
-              // Run unconditionally: an out-of-band drop may have left orphaned schema entities.
-              // cleanup is best-effort and stops as soon as a schema still exists.
               return Pair.of(droppedFromCatalog, isManagedTable);
             });
     if (!result.getRight()) {
+      // Run even after a false drop result: out-of-band drops can leave orphaned schemas.
+      // Release the table lock before taking the schema write lock to avoid a lock upgrade.
       TreeLockUtils.doWithTreeLock(
           schemaIdentifier,
           LockType.WRITE,

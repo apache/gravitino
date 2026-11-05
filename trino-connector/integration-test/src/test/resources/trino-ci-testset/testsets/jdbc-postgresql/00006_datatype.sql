@@ -71,8 +71,9 @@ INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, 
 VALUES ('Sample text 1', 'same9', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 1992382342, DATE '2024-01-01',
         NULL, TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
--- Failed inserts must roll back their JDBC staging tables.
-SHOW TABLES;
+-- Failed inserts must roll back their JDBC staging tables. Trino aborts transactions
+-- asynchronously, so wait for cleanup while still failing if staging tables remain.
+<RETRY_UNTIL_MATCH> SHOW TABLES;
 
 CREATE TABLE tb03  (int_array ARRAY(INTEGER));
 

@@ -21,11 +21,13 @@ package org.apache.gravitino.trino.connector.integration.test;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -37,11 +39,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -250,8 +254,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         }
       }
 
-      String result = queryRunner.runQuery(sql).trim();
-      result = result.replaceAll("WARNING:.*?\\n", "");
+      String result = executeQuery(queryRunner, sql, expectResult, Duration.ofSeconds(30));
       boolean match = match(expectResult, result);
 
       if (match) {
@@ -277,6 +280,35 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     testStatus.error = "";
     passCount.incrementAndGet();
     LOG.info("Test progress {}/{}", passCount.get(), totalCount.get());
+  }
+
+  // Only explicitly marked read queries wait for asynchronous connector cleanup. Keep the last
+  // result on timeout so the caller reports the expected/actual mismatch instead of hiding a leak.
+  static String executeQuery(
+      TrinoQueryRunner runner, String sql, String expected, Duration timeout) {
+    String retryFlag = "<RETRY_UNTIL_MATCH>";
+    if (!sql.startsWith(retryFlag)) {
+      return runner.runQuery(sql).trim().replaceAll("WARNING:.*?\\n", "");
+    }
+    String query = sql.substring(retryFlag.length()).trim();
+    if (!query.toUpperCase(Locale.ROOT).startsWith("SHOW ")) {
+      throw new IllegalArgumentException("RETRY_UNTIL_MATCH only supports SHOW queries");
+    }
+    AtomicReference<String> result = new AtomicReference<>("");
+    try {
+      Awaitility.await()
+          .atMost(timeout)
+          .pollDelay(Duration.ZERO)
+          .pollInterval(Duration.ofMillis(100))
+          .until(
+              () -> {
+                result.set(runner.runQuery(query).trim().replaceAll("WARNING:.*?\\n", ""));
+                return match(expected, result.get());
+              });
+    } catch (ConditionTimeoutException e) {
+      // The existing result check will fail with the final query output.
+    }
+    return result.get();
   }
 
   /**
@@ -492,7 +524,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     FileOutputStream outputStream = new FileOutputStream(resultFileName);
 
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
 
     boolean firstLine = true;
     while (sqlMatcher.find()) {
@@ -502,6 +534,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       firstLine = false;
 
       String sql = resolveParameters(sqlMatcher.group(1));
+      sql = sql.replaceFirst("^<RETRY_UNTIL_MATCH>\\s*", "");
       String result = queryRunner.runQuery(sql).trim();
       LOG.info("Execute sql:\n{}\nResult:\n{}", sql, result);
       outputStream.write(result.getBytes(StandardCharsets.UTF_8));
