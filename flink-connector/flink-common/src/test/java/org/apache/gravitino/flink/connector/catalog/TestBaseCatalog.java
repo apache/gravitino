@@ -551,10 +551,8 @@ public abstract class TestBaseCatalog {
   }
 
   /**
-   * Computed columns, metadata columns, and watermark specs cannot round-trip through the Gravitino
-   * column model: without this guard they were silently stored as plain physical columns (computed
-   * column reads back NULL, watermark discarded). createTable must reject them instead of
-   * mis-storing the schema. On the unfixed tree these created successfully.
+   * Computed columns, metadata columns and watermarks cannot be represented by Gravitino columns.
+   * createTable must reject them instead of storing plain physical columns without the watermark.
    */
   @Test
   void testCreateTableRejectsComputedColumnsAndWatermarks() {
@@ -571,6 +569,17 @@ public abstract class TestBaseCatalog {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> catalog.createTable(new ObjectPath("db", "t1"), computedTable, false));
+
+    // metadata column: m INT METADATA
+    List<Column> metadata =
+        Arrays.asList(
+            Column.physical("a", DataTypes.INT()),
+            Column.metadata("m", DataTypes.INT(), null, false));
+    ResolvedCatalogTable metadataTable =
+        resolvedCatalogTable(resolvedSchema(metadata, Collections.emptyList()));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t4"), metadataTable, false));
 
     // watermark spec on a timestamp column
     List<WatermarkSpec> watermarkSpecs =
@@ -596,10 +605,8 @@ public abstract class TestBaseCatalog {
   }
 
   /**
-   * TableChange.add(Column.computed(...)) is a public factory on every supported Flink version;
-   * without the guard in the alter path the added column was flattened into a plain physical
-   * Gravitino column - the same silent loss the create-path guard prevents. Adding a plain physical
-   * column still goes through.
+   * ALTER TABLE ... ADD of a computed column must be rejected like createTable does, while adding a
+   * physical column still goes through.
    */
   @Test
   void testAlterTableRejectsComputedColumns() throws Exception {
@@ -637,9 +644,8 @@ public abstract class TestBaseCatalog {
   }
 
   /**
-   * The remediation advice must match the catalog's capabilities: "Use a generic table" is only
-   * actionable for the Hive family, which serializes the full Flink schema on its generic-table
-   * path; catalogs without that path are told to compute the element in the query.
+   * The generic table advice is only given by catalogs that support generic tables, which is only
+   * the Hive catalog.
    */
   @Test
   void testUnsupportedSchemaAdviceMentionsGenericTablesOnlyWhenSupported() {

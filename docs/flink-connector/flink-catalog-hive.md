@@ -39,6 +39,9 @@ When loading or altering a table, Gravitino Flink connector detects generic tabl
 reconstructed from the serialized `flink.*` properties. Hive tables continue to use the native
 Hive schema.
 
+Only generic tables keep computed columns, metadata columns and watermarks. Creating a Hive table
+(`connector=hive`) with them, or adding such a column to it, fails.
+
 :::note
 Set `connector=hive` explicitly when creating a raw Hive table. Otherwise, the table is
 created as a generic table by default in HiveCatalog. Starting from Apache Flink 1.18,
