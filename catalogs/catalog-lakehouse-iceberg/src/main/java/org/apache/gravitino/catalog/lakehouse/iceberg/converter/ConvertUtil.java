@@ -54,23 +54,17 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert Gravitino columns to an Iceberg Schema, including format-version 3 column defaults.
+   * Convert an array of Gravitino columns to an Iceberg Schema.
    *
    * @param columns Gravitino columns.
    * @return Iceberg schema.
    */
   public static Schema toIcebergSchema(Column[] columns) {
     Preconditions.checkArgument(columns != null, "columns must not be null");
-    org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
-        Arrays.stream(columns)
-            .map(
-                col ->
-                    org.apache.gravitino.rel.types.Types.StructType.Field.of(
-                        col.name(), col.dataType(), col.nullable(), col.comment()))
-            .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
-    org.apache.gravitino.rel.types.Types.StructType structType =
-        org.apache.gravitino.rel.types.Types.StructType.of(fields);
-    Type converted = ToIcebergTypeVisitor.visit(structType, new ToIcebergType(structType));
+    org.apache.gravitino.rel.types.Types.StructType gravitinoStructType =
+        toGravitinoStructType(columns);
+    Type converted =
+        ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
     List<Types.NestedField> icebergFields = converted.asNestedType().asStructType().fields();
     List<Types.NestedField> withDefaults = new ArrayList<>(icebergFields.size());
     for (int i = 0; i < icebergFields.size(); i++) {
@@ -93,7 +87,7 @@ public class ConvertUtil {
 
   /**
    * Converts a Gravitino default expression to an Iceberg {@link Literal}, or {@code null} when
-   * unset / NULL.
+   * unset / NULL. Used by create and alter paths.
    *
    * @param expression the Gravitino expression
    * @param icebergType the target Iceberg field type
@@ -111,7 +105,66 @@ public class ConvertUtil {
         "Iceberg column defaults must be literals, got: %s",
         expression);
     Object value = ((org.apache.gravitino.rel.expressions.literals.Literal<?>) expression).value();
-    Literal<?> typed = toIcebergLiteralValue(value, icebergType).to(icebergType);
+    Literal<?> icebergLiteral;
+    switch (icebergType.typeId()) {
+      case BOOLEAN:
+        icebergLiteral = Literal.of((Boolean) value);
+        break;
+      case INTEGER:
+        icebergLiteral = Literal.of(((Number) value).intValue());
+        break;
+      case LONG:
+        icebergLiteral = Literal.of(((Number) value).longValue());
+        break;
+      case FLOAT:
+        icebergLiteral = Literal.of(((Number) value).floatValue());
+        break;
+      case DOUBLE:
+        icebergLiteral = Literal.of(((Number) value).doubleValue());
+        break;
+      case STRING:
+        icebergLiteral = Literal.of(String.valueOf(value));
+        break;
+      case DATE:
+        icebergLiteral = Literal.of(DateTimeUtil.daysFromDate((LocalDate) value));
+        break;
+      case TIME:
+        icebergLiteral = Literal.of(DateTimeUtil.microsFromTime((LocalTime) value));
+        break;
+      case TIMESTAMP:
+        {
+          Types.TimestampType timestampType = (Types.TimestampType) icebergType;
+          long micros = DateTimeUtil.microsFromTimestamp((LocalDateTime) value);
+          icebergLiteral =
+              timestampType.shouldAdjustToUTC()
+                  ? Literal.of(micros).to(timestampType)
+                  : Literal.of(micros);
+          break;
+        }
+      case TIMESTAMP_NANO:
+        {
+          Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) icebergType;
+          icebergLiteral =
+              Literal.of(DateTimeUtil.nanosFromTimestamp((LocalDateTime) value))
+                  .to(timestampNanoType);
+          break;
+        }
+      case DECIMAL:
+        icebergLiteral =
+            Literal.of(value instanceof Decimal ? ((Decimal) value).value() : (BigDecimal) value);
+        break;
+      case UUID:
+        icebergLiteral = Literal.of(UUID.fromString(String.valueOf(value)));
+        break;
+      case FIXED:
+      case BINARY:
+        icebergLiteral = Literal.of(toByteArray(value));
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported Iceberg column default type: " + icebergType);
+    }
+    Literal<?> typed = icebergLiteral.to(icebergType);
     Preconditions.checkArgument(
         typed != null, "Cannot cast column default %s to Iceberg type %s", value, icebergType);
     return typed;
@@ -145,50 +198,22 @@ public class ConvertUtil {
         .build();
   }
 
-  private static Literal<?> toIcebergLiteralValue(Object value, Type icebergType) {
-    switch (icebergType.typeId()) {
-      case BOOLEAN:
-        return Literal.of((Boolean) value);
-      case INTEGER:
-        return Literal.of(((Number) value).intValue());
-      case LONG:
-        return Literal.of(((Number) value).longValue());
-      case FLOAT:
-        return Literal.of(((Number) value).floatValue());
-      case DOUBLE:
-        return Literal.of(((Number) value).doubleValue());
-      case STRING:
-        return Literal.of(String.valueOf(value));
-      case DATE:
-        return Literal.of(DateTimeUtil.daysFromDate((LocalDate) value));
-      case TIME:
-        return Literal.of(DateTimeUtil.microsFromTime((LocalTime) value));
-      case TIMESTAMP:
-        {
-          Types.TimestampType timestampType = (Types.TimestampType) icebergType;
-          long micros = DateTimeUtil.microsFromTimestamp((LocalDateTime) value);
-          return timestampType.shouldAdjustToUTC()
-              ? Literal.of(micros).to(timestampType)
-              : Literal.of(micros);
-        }
-      case TIMESTAMP_NANO:
-        {
-          Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) icebergType;
-          return Literal.of(DateTimeUtil.nanosFromTimestamp((LocalDateTime) value))
-              .to(timestampNanoType);
-        }
-      case DECIMAL:
-        return Literal.of(
-            value instanceof Decimal ? ((Decimal) value).value() : (BigDecimal) value);
-      case UUID:
-        return Literal.of(UUID.fromString(String.valueOf(value)));
-      case FIXED:
-      case BINARY:
-        return Literal.of(toByteArray(value));
-      default:
-        throw new IllegalArgumentException(
-            "Unsupported Iceberg column default type: " + icebergType);
-    }
+  /**
+   * Convert Gravitino columns to the Gravitino StructType.
+   *
+   * @param columns Gravitino columns
+   * @return Gravitino StructType
+   */
+  private static org.apache.gravitino.rel.types.Types.StructType toGravitinoStructType(
+      Column[] columns) {
+    org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
+        Arrays.stream(columns)
+            .map(
+                column ->
+                    org.apache.gravitino.rel.types.Types.StructType.Field.of(
+                        column.name(), column.dataType(), column.nullable(), column.comment()))
+            .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
+    return org.apache.gravitino.rel.types.Types.StructType.of(fields);
   }
 
   private static Expression toGravitinoLiteral(
