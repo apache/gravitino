@@ -39,19 +39,19 @@ The Glue catalog supports creating, updating, and deleting databases and tables 
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Glue catalog has the following properties:
 
-| Property Name                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                              | Default Value | Required | Immutable |
-|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|
-| `aws-region`                           | AWS region for the Glue Data Catalog, as a known AWS region identifier in lower case (e.g. `us-east-1`).                                                                                                                                                                                                                                                                                                                                 | (none)        | Yes      | Yes       |
-| `aws-glue-catalog-id`                  | The 12-digit AWS account ID that owns the Glue catalog. When omitted, defaults to the caller's AWS account ID.                                                                                                                                                                                                                                                                                                                           | (none)        | No       | Yes       |
-| `aws-access-key-id`                    | AWS access key ID for static credential authentication. When omitted, the default credential chain is used. Temporary keys (prefix `ASIA`) are not supported, because they need a session token.                                                                                                                                                                                                                                         | (none)        | No       | No        |
-| `aws-secret-access-key`                | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                                                                                                                                                                                                                                                               | (none)        | No       | No        |
-| `aws-glue-endpoint`                    | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`). Must be an `http` or `https` URL.                                                                                                                                                                                                                                                                                                       | (none)        | No       | No        |
-| `aws-glue-api-call-timeout-ms`         | Upper bound in milliseconds for one Glue API call made by the catalog, including all retries. The AWS clients used for Iceberg tables only take `aws-glue-api-call-attempt-timeout-ms`.                                                                                                                                                                                                                                                  | `30000`       | No       | No        |
-| `aws-glue-api-call-attempt-timeout-ms` | Upper bound in milliseconds for a single attempt of a Glue API call. Also used as the connection and socket timeout of the AWS clients (Glue and S3) used for Iceberg tables.                                                                                                                                                                                                                                                            | `10000`       | No       | No        |
-| `aws-glue-max-attempts`                | Maximum number of attempts of a Glue API call made by the catalog, including the first one. Retries apply to throttling and transient failures. The AWS clients used for Iceberg tables keep the AWS SDK default.                                                                                                                                                                                                                        | `4`           | No       | No        |
-| `warehouse`                            | Base storage path used as the warehouse when no explicit `location` is specified at table creation time and the Glue database declares no `LocationUri` (e.g. `s3://my-bucket/warehouse`). Table location is then derived as `warehouse/database/table`. Must be a URI with a scheme. Iceberg tables need an `s3://`, `s3a://` or `s3n://` location.                                                                                     | (none)        | Yes      | No        |
-| `default-table-format`                 | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                                                                                                                                                                                                                                               | `hive`        | No       | No        |
-| `table-format-filter`                  | Comma-separated list of table formats exposed by the catalog. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. A table's format is its `table-format` property; a table without it is `iceberg` when it has `table_type=ICEBERG`, and `hive` otherwise, including Delta tables registered by other engines. Tables of other formats are absent from list, load, alter and drop, and cannot be created through the catalog. | `all`         | No       | No        |
+| Property Name                          | Description                                                                                                                                                                                                                                                                                                                                                                                                           | Default Value | Required | Immutable |
+|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|
+| `aws-region`                           | AWS region for the Glue Data Catalog, as a known AWS region identifier in lower case (e.g. `us-east-1`).                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | Yes       |
+| `aws-glue-catalog-id`                  | The 12-digit AWS account ID that owns the Glue catalog. When omitted, defaults to the caller's AWS account ID.                                                                                                                                                                                                                                                                                                        | (none)        | No       | Yes       |
+| `aws-access-key-id`                    | AWS access key ID for static credential authentication. When omitted, the default credential chain is used. Temporary keys (prefix `ASIA`) are not supported, because they need a session token.                                                                                                                                                                                                                      | (none)        | No       | No        |
+| `aws-secret-access-key`                | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                                                                                                                                                                                                                                            | (none)        | No       | No        |
+| `aws-glue-endpoint`                    | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`). Must be an `http` or `https` URL.                                                                                                                                                                                                                                                                                    | (none)        | No       | No        |
+| `aws-glue-api-call-timeout-ms`         | Upper bound in milliseconds for one Glue API call made by the catalog, including all retries. Also applied to the Glue calls of Iceberg tables, but not to S3 I/O.                                                                                                                                                                                                                                                    | `30000`       | No       | No        |
+| `aws-glue-api-call-attempt-timeout-ms` | Upper bound in milliseconds for a single attempt of a Glue API call. Also used as the connection and socket timeout of the S3 client used for Iceberg tables.                                                                                                                                                                                                                                                         | `10000`       | No       | No        |
+| `aws-glue-max-attempts`                | Maximum number of attempts of a Glue API call made by the catalog, including the first one. Retries apply to throttling and transient failures. Also applied to the Glue calls of Iceberg tables, but not to S3 I/O.                                                                                                                                                                                                  | `4`           | No       | No        |
+| `warehouse`                            | Base storage path used as the warehouse when no explicit `location` is specified at table creation time and the Glue database declares no `LocationUri` (e.g. `s3://my-bucket/warehouse`). Table location is then derived as `warehouse/database/table`. Must be a URI with a scheme. Iceberg tables need an `s3://`, `s3a://` or `s3n://` location.                                                                  | (none)        | Yes      | No        |
+| `default-table-format`                 | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                                                                                                                                                                                                                            | `hive`        | No       | No        |
+| `table-format-filter`                  | Comma-separated list of table formats exposed by the catalog. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. A table is `iceberg` when it has `table_type=ICEBERG`, and `hive` otherwise, including Delta tables registered by other engines, so `delta` and `parquet` match no table. Tables of other formats are absent from list, load, alter and drop, and cannot be created through the catalog. | `all`         | No       | No        |
 
 :::note
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) take precedence over the default credential chain (environment variables, instance profile, container credentials).
@@ -170,8 +170,8 @@ The following table lists predefined properties for Glue tables. Additional key-
 | `serde-lib`         | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                                                                                                                                                           | `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe`         | No       | No       | Yes       |
 | `serde-name`        | The name of the serde.                                                                                                                                                                                                                                                                | (none)                                                       | No       | No       | No        |
 | `serde.parameter.`  | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating ORC serde lib to create row indexes.                                                                                                                                             | (none)                                                       | No       | No       | No        |
-| `table-format`      | Table format stored in Glue `Table.parameters()`. Use `ICEBERG` to create an Iceberg table. Common values: `ICEBERG`, `HIVE`.                                                                                                                                                         | (none)                                                       | No       | No       | Yes       |
-| `metadata_location` | Iceberg table metadata file location stored in Glue `Table.parameters()`. When set during `createTable()`, registers an existing Iceberg table rather than creating a new one.                                                                                                        | (none)                                                       | No       | No       | No        |
+| `table-format`      | Format the table is created in: `HIVE` or `ICEBERG`. It is not stored; a loaded table reports `ICEBERG` when it has `table_type=ICEBERG`, and `HIVE` otherwise.                                                                                                                       | (catalog `default-table-format`)                             | No       | No       | Yes       |
+| `metadata_location` | Iceberg table metadata file location stored in Glue `Table.parameters()`. When set during `createTable()`, registers an existing Iceberg table rather than creating a new one; see [Register an Existing Iceberg Table](#register-an-existing-iceberg-table).                         | (none)                                                       | No       | No       | No        |
 | `comment`           | Used to store a table comment.                                                                                                                                                                                                                                                        | (none)                                                       | No       | Yes      | No        |
 
 :::note
@@ -239,58 +239,79 @@ The `warehouse` catalog property is required, but it is used only as a fallback 
 
 ### Register an Existing Iceberg Table
 
-To register an Iceberg table that already exists in S3, set `metadata_location` to the path of the existing `metadata.json` file during `createTable()`. In this mode, Gravitino registers the table in Glue without creating new metadata.
+To register an Iceberg table that already exists in S3, set `metadata_location` to the path of the existing `metadata.json` file during `createTable()`. Gravitino reads the metadata file before it creates the Glue table, and refuses the request if the file does not exist or is not Iceberg table metadata. No new metadata file is written.
+
+The columns, location, partitioning and sort order of a registered table come from the metadata file. Send `"columns": []` to take the columns from the metadata file; if columns are given, their names must match it. Do not set `location`, partitioning or sort order. A property in the request cannot give a property of the metadata file another value.
+
+A registered table shares its metadata and data files with the table it was registered from, so Gravitino marks it with the Glue parameter `gravitino.iceberg.registered=true` and changes only its Glue parameters afterwards: property changes are stored in Glue, and column, partition and other schema changes are refused. Properties of the metadata file cannot be set or removed, because Iceberg engines read them from that file. A registered table cannot be purged.
+
+A table registered by an earlier Gravitino version, or by a registration that stopped before the parameter was written, has no marker. Gravitino treats it as the owner of its metadata, so an alter through Gravitino writes new metadata files and forks the history it shares with the source table. Gravitino cannot detect such tables, and the parameter cannot be set through Gravitino; to protect one, add the parameter to the table directly in AWS Glue.
 
 ### Iceberg Column Types
 
 Iceberg tables use the Iceberg type system, which differs from Hive types. The following table lists the Gravitino types supported for Iceberg tables and how they map to Iceberg types:
 
-| Gravitino Data Type      | Iceberg Data Type     | Notes                                               |
-|--------------------------|-----------------------|-----------------------------------------------------|
-| `boolean`                | `boolean`             |                                                     |
-| `byte`                   | `int`                 | Widened to 32-bit integer                           |
-| `short`                  | `int`                 | Widened to 32-bit integer                           |
-| `integer`                | `int`                 |                                                     |
-| `long`                   | `long`                |                                                     |
-| `float`                  | `float`               |                                                     |
-| `double`                 | `double`              |                                                     |
-| `decimal(p, s)`          | `decimal(p, s)`       |                                                     |
-| `string`                 | `string`              |                                                     |
-| `varchar`                | `string`              | Iceberg has no variable-length char types           |
-| `char`                   | `string`              | Iceberg has no variable-length char types           |
-| `date`                   | `date`                |                                                     |
-| `time(6)`                | `time`                | Only microsecond precision (6) is supported         |
-| `timestamp(6)`           | `timestamp`           | Only microsecond precision (6) is supported         |
-| `timestamptz(6)`         | `timestamptz`         | Only microsecond precision (6) is supported         |
-| `binary`                 | `binary`              |                                                     |
-| `fixed(n)`               | `binary`              | Mapped to variable-length binary                    |
-| `uuid`                   | `uuid`                |                                                     |
-| `list`                   | `list`                |                                                     |
-| `map`                    | `map`                 |                                                     |
-| `struct`                 | `struct`              |                                                     |
+| Gravitino Data Type         | Iceberg Data Type           | Notes                                       |
+|-----------------------------|-----------------------------|---------------------------------------------|
+| `boolean`                   | `boolean`                   |                                             |
+| `integer`                   | `int`                       |                                             |
+| `long`                      | `long`                      |                                             |
+| `float`                     | `float`                     |                                             |
+| `double`                    | `double`                    |                                             |
+| `decimal(p, s)`             | `decimal(p, s)`             |                                             |
+| `string`                    | `string`                    |                                             |
+| `varchar`                   | `string`                    | Iceberg has no variable-length char types   |
+| `char`                      | `string`                    | Iceberg has no variable-length char types   |
+| `date`                      | `date`                      |                                             |
+| `time(6)`                   | `time`                      | Only microsecond precision (6) is supported |
+| `timestamp(6)`              | `timestamp`                 |                                             |
+| `timestamptz(6)`            | `timestamptz`               |                                             |
+| `timestamp(9)`              | `timestamp_ns`              | Needs format version 3                      |
+| `timestamptz(9)`            | `timestamptz_ns`            | Needs format version 3                      |
+| `binary`                    | `binary`                    |                                             |
+| `fixed(n)`                  | `fixed(n)`                  |                                             |
+| `uuid`                      | `uuid`                      |                                             |
+| `variant`                   | `variant`                   | Needs format version 3                      |
+| `geometry(crs)`             | `geometry(crs)`             | Needs format version 3                      |
+| `geography(crs, algorithm)` | `geography(crs, algorithm)` | Needs format version 3                      |
+| `null`                      | `unknown`                   | Needs format version 3                      |
+| `list`                      | `list`                      |                                             |
+| `map`                       | `map`                       |                                             |
+| `struct`                    | `struct`                    |                                             |
+
+:::caution
+`byte`, `short` and unsigned types are not supported for Iceberg tables; use `integer` or `long`.
+:::
 
 ### Iceberg Table Alter Operations
 
 For Iceberg tables, the following alter operations are supported:
 
-| Operation                       | Gravitino Table Update Request    |
-|---------------------------------|-----------------------------------|
-| Add column                      | `Add a column`                    |
-| Delete column                   | `Delete a column`                 |
-| Rename column                   | `Rename a column`                 |
-| Update column type              | `Update the type of a column`     |
-| Update column comment           | `Update the column comment`       |
-| Update column nullability       | `Update column nullability`       |
-| Set table property              | `Set a table property`            |
-| Remove table property           | `Remove a table property`         |
+| Operation                 | Gravitino Table Update Request    |
+|---------------------------|-----------------------------------|
+| Add column                | `Add a column`                    |
+| Delete column             | `Delete a column`                 |
+| Rename column             | `Rename a column`                 |
+| Update column type        | `Update the type of a column`     |
+| Update column position    | `Update the position of a column` |
+| Update column comment     | `Update the column comment`       |
+| Update column nullability | `Update column nullability`       |
+| Set table property        | `Set a table property`            |
+| Remove table property     | `Remove a table property`         |
+
+Schema and property changes of one request are committed in one Iceberg transaction, so they are applied together or not at all. A request that reports an error may still have been applied, for example when the commit state is unknown or the reload after the commit fails, so check the table before retrying. Property changes of a registered table are stored in Glue and do not use an Iceberg transaction.
 
 :::caution
-Schema changes and property changes are committed in two separate Iceberg transactions. If the schema commit succeeds but the property commit fails, the table is left in a partially altered state.
+Nested column operations, auto-increment and column default values are not supported for Iceberg tables via this catalog.
 :::
 
-:::caution
-Nested column operations (add, delete, rename, type update) are not supported for Iceberg tables via this catalog.
-:::
+### Drop and Purge Iceberg Tables
+
+Dropping an Iceberg table removes only its Glue entry; the metadata and data files stay in S3. Purging an Iceberg table also deletes the data and metadata files its metadata references. Hive-format tables and registered Iceberg tables cannot be purged.
+
+### Iceberg Table Partitions
+
+Iceberg tables keep their partitions in Iceberg metadata, not in Glue, so partition operations are not supported for them. The partitioning of an Iceberg table is reported by the table itself; fields with the `void` transform, which Iceberg v1 tables keep for dropped partition fields, are left out.
 
 ## Security
 
