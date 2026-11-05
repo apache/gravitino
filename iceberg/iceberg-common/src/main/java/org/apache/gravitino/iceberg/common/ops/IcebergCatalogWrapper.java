@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -61,6 +62,7 @@ import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -99,6 +101,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private static final int MIN_FORMAT_VERSION = 1;
 
   private static final int MAX_FORMAT_VERSION = 3;
+
+  // Iceberg JdbcCatalog declares iceberg_namespace_properties.property_value as VARCHAR(1000).
+  private static final int MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH = 1000;
 
   private final Object initializationLock = new Object();
   private volatile Catalog catalog;
@@ -140,6 +145,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public IcebergConfig getIcebergConfig() {
     return icebergConfig;
+  }
+
+  /**
+   * Invalidates cached metadata before a subclass changes or removes a table.
+   *
+   * @param tableIdentifier the table whose cached metadata must be invalidated
+   */
+  protected void invalidateTableMetadata(TableIdentifier tableIdentifier) {
+    getMetadataCache().invalidate(tableIdentifier);
   }
 
   private SupportsNamespaces getNamespaceCatalog() {
@@ -193,6 +207,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public CreateNamespaceResponse createNamespace(CreateNamespaceRequest request) {
     validateNamespace(Optional.of(request.namespace()));
+    validateNamespaceProperties(request.properties());
     return CatalogHandlers.createNamespace(getNamespaceCatalog(), request);
   }
 
@@ -219,6 +234,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public UpdateNamespacePropertiesResponse updateNamespaceProperties(
       Namespace namespace, UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     validateNamespace(Optional.of(namespace));
+    validateNamespaceProperties(updateNamespacePropertiesRequest.updates());
     return CatalogHandlers.updateNamespaceProperties(
         getNamespaceCatalog(), namespace, updateNamespacePropertiesRequest);
   }
@@ -276,12 +292,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     CatalogHandlers.dropTable(getCatalog(), tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     Table table = getCatalog().loadTable(tableIdentifier);
     if (!(table instanceof HasTableOperations)) {
       CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
@@ -324,10 +340,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
+   * @throws BadRequestException if no metadata file exists at the location
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
       return TableMetadataParser.read(fileIO, metadataLocation);
+    } catch (NotFoundException e) {
+      // The location comes from the request, so a missing file is a client error. 404 is reserved
+      // by the REST spec for a namespace or table that does not exist.
+      throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
     }
   }
 
@@ -440,7 +461,14 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
     request.validate();
-    return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
+    try {
+      return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
+    } catch (NotFoundException e) {
+      // As in registerTable: the metadata location comes from the request.
+      throw new BadRequestException(
+          "Cannot register view %s: metadata location %s does not exist",
+          request.name(), request.metadataLocation());
+    }
   }
 
   public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {
@@ -664,6 +692,24 @@ public class IcebergCatalogWrapper implements AutoCloseable {
               "Cannot set default sort order to %s: the table has no sort order with that id", id);
         }
       }
+    }
+  }
+
+  @VisibleForTesting
+  void validateNamespaceProperties(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
+    if (getCatalog() instanceof JdbcCatalog) {
+      properties.forEach(
+          (key, value) ->
+              Preconditions.checkArgument(
+                  value == null
+                      || value.codePointCount(0, value.length())
+                          <= MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH,
+                  "Namespace property '%s' exceeds the JDBC catalog limit of %s characters",
+                  key,
+                  MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH));
     }
   }
 }

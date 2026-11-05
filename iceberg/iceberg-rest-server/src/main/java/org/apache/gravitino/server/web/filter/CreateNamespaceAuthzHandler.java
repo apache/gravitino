@@ -88,6 +88,11 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
     return false;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.SCHEMA;
+  }
+
   private CreateNamespaceRequest extractRequest() {
     for (int i = 0; i < parameters.length; i++) {
       IcebergAuthorizationMetadata metadata =

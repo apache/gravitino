@@ -27,6 +27,9 @@
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
 
+-- Support external column names up to 300 characters (including BigQuery).
+ALTER TABLE table_column_version_info ALTER COLUMN column_name TYPE VARCHAR(300);
+
 ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS current_version INT NOT NULL DEFAULT 1;
 ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS last_version INT NOT NULL DEFAULT 1;
 COMMENT ON COLUMN model_meta.current_version IS 'model current version';

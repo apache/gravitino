@@ -116,6 +116,11 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     return crossNamespaceRename;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.VIEW;
+  }
+
   /**
    * Validates authorization for cross-namespace view renames: ownership is required on the source
    * view, and {@code CREATE_VIEW} is required on the destination schema. Gravitino does not define

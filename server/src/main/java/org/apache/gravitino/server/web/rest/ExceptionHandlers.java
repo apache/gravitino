@@ -790,11 +790,14 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String credential, String parent, Exception e) {
-      String errorMsg = getCredentialErrorMsg(parent, getErrorMsg(e));
+      String errorMsg = getCredentialErrorMsg(credential, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
