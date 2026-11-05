@@ -142,7 +142,7 @@ view = views.load_view(NameIdentifier.of("public", "active_customers"))
 | Rename             | `{"@type":"rename","newName":"view_renamed"}`                | `ViewChange.rename("view_renamed")`        | `ViewChange.rename("view_renamed")`        |
 | Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `ViewChange.setProperty("key1", "value1")` | `ViewChange.set_property("key1", "value1")` |
 | Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `ViewChange.removeProperty("key1")`        | `ViewChange.remove_property("key1")`       |
-| Replace a view     | `{"@type":"replace",...}`                                    | `ViewChange.replaceView(...)`              | `ViewChange.replace_view(...)`             |
+| Replace a view     | `{"@type":"replaceView",...}`                                | `ViewChange.replaceView(...)`              | `ViewChange.replace_view(...)`             |
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
