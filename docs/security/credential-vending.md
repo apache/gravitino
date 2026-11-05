@@ -32,6 +32,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 ## General Configurations
 
+<<<<<<< HEAD
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required |
 |-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|
 | `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                            | (none)        | Yes      |
@@ -42,6 +43,66 @@ Gravitino credential vending is used to generate temporary or static credentials
 If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present. The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
 
 ## Build-in Credentials Configurations
+=======
+| Property                        | Description                                                                                                                       | Default value | Required             |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------|
+| `credential-providers`          | The credential provider types, separated by comma. If omitted, Gravitino infers some providers from the other properties present. | (none)        | Yes, unless inferred |
+| `credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino removes the credential from the cache.                                   | 0.15          | No                   |
+| `credential-cache-max-size`     | Max size for the credential cache.                                                                                                | 10000         | No                   |
+
+### Values for `credential-providers`
+
+| Value                | Storage | Vends                                                      |
+|----------------------|---------|------------------------------------------------------------|
+| `s3-token`           | S3      | Temporary STS credentials, scoped to the table path        |
+| `aws-irsa`           | S3      | Credentials from an IAM role for service accounts, for EKS |
+| `s3-secret-key`      | S3      | The configured static access key and secret                |
+| `oss-token`          | OSS     | Temporary STS credentials, scoped to the table path        |
+| `oss-secret-key`     | OSS     | The configured static access key and secret                |
+| `adls-token`         | ADLS    | A user delegation SAS token                                |
+| `azure-account-key`  | ADLS    | The configured static storage account key                  |
+| `gcs-token`          | GCS     | A downscoped access token                                  |
+| `cos-token`          | COS     | A temporary STS token                                      |
+| `cos-secret-key`     | COS     | The configured static access key and secret                |
+| `jdbc-user-password` | JDBC    | The configured JDBC username and password                  |
+| `aws-secret-key`     | Glue    | The configured AWS access key and secret for Glue API auth |
+| `dlf-secret-key`     | Paimon  | The configured DLF access key and secret (optional token)  |
+
+Each value has its own properties, listed in the sections below. To vend for more than one storage type on a catalog, separate values with a comma. Custom providers can be added by implementing `CredentialProvider`, described under [Custom Credentials](#custom-credentials).
+
+### When `credential-providers` Is Omitted
+
+If a catalog does not set `credential-providers`, Gravitino infers providers from the credential properties present:
+
+| Properties present                                           | Provider enabled    |
+|--------------------------------------------------------------|---------------------|
+| `s3-access-key-id` and `s3-secret-access-key`                | `s3-secret-key`     |
+| `oss-access-key-id` and `oss-secret-access-key`              | `oss-secret-key`    |
+| `azure-storage-account-name` and `azure-storage-account-key` | `azure-account-key` |
+| `cos-access-key-id` and `cos-secret-access-key`              | `cos-secret-key`    |
+| `gcs-service-account-file` (Fileset and Iceberg only)        | `gcs-token`         |
+| `aws-access-key-id` and `aws-secret-access-key`              | `aws-secret-key`    |
+| `dlf-access-key-id` and `dlf-access-key-secret`              | `dlf-secret-key`    |
+
+JDBC catalogs additionally infer `jdbc-user-password` from `jdbc-user` and `jdbc-password`.
+
+The inferred provider list is returned as the catalog's `credential-providers` property when the catalog is loaded, so clients such as the Spark connector see the same list the server vends credentials with. Only the provider names are returned, never the credential values.
+
+Four providers have no inference rule and must always be set explicitly: `s3-token`, `oss-token`, `adls-token`, and `aws-irsa`. In particular, setting `s3-role-arn` without `credential-providers` does not enable `s3-token`. The catalog falls back to `s3-secret-key` and vends the static access key instead, which is long-lived and not scoped to the table path. Set `credential-providers` explicitly whenever you want token-based vending.
+
+### Static providers and `getCredentials` privileges
+
+Static providers return the configured source account's long-lived credentials. Catalog-level
+`getCredentials` requires metadata access plus both `USE_SECRETS` and
+`INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Grant these privileges only to trusted
+connectors/operators: the credentials carry all source-account permissions and do not enforce
+Gravitino table-level grants or denies when used directly against the source.
+
+Fileset credential authorization remains path-based. Static fileset credentials may still
+have broader source access than the requested path, so prefer short-lived scoped providers
+(`s3-token`, `oss-token`, `adls-token`, `gcs-token`, `cos-token`, `aws-irsa`) when available.
+Do not grant fileset access backed by unrestricted static accounts to untrusted principals.
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
 
 ### S3 Credentials
 
@@ -233,12 +294,49 @@ The Gravitino Spark and Flink connectors automatically call the credential vendi
 
 ### Backward Compatibility: `gravitino.catalog.credential.backfillToProperties`
 
+<<<<<<< HEAD
 During a rolling upgrade from Gravitino < 1.4.0 to 1.4.0, older clients that read catalog properties directly (rather than calling `/credentials`) would lose access to credentials because the properties are now hidden. To allow a zero-downtime migration, set the following property in `gravitino.conf`:
+=======
+Gravitino supports custom credentials. You can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar in the classpath of the IRC or the Fileset catalog.
+
+## Deployment
+
+The credential provider implementations ship in separate jars. Whichever component vends the credentials needs the right jar on its classpath, or the provider cannot be created and no credentials are vended.
+
+| Vending component | Jar                                                | Classpath                                                                              |
+|-------------------|----------------------------------------------------|----------------------------------------------------------------------------------------|
+| IRC               | `gravitino-iceberg-{cloud}-bundle`                 | See [Deployment](../iceberg-rest-service.md#deployment); it differs by deployment mode |
+| Iceberg catalog   | `gravitino-iceberg-{cloud}-bundle`                 | `catalogs/lakehouse-iceberg/libs/`                                                     |
+| Fileset catalog   | `gravitino-{cloud}-bundle`                         | `catalogs/fileset/libs/`                                                               |
+| Hive catalog      | `gravitino-{cloud}`                                | `catalogs/hive/libs/`                                                                  |
+| Glue catalog      | `gravitino-aws`                                    | `catalogs/glue/libs/`                                                                  |
+| Paimon catalog    | `gravitino-aws` for S3, `gravitino-aliyun` for OSS | `catalogs/lakehouse-paimon/libs/`                                                      |
+
+Substitute `{cloud}` with `aws`, `gcp`, `aliyun`, or `azure`. Note the two jar families: the `-bundle` variants also carry Hadoop and cloud SDK packages, which the Fileset catalog and the IRC need. The Hive, Glue, and Paimon catalogs only vend credentials, so they take the plain `gravitino-{cloud}` jar.
+
+The Gravitino Iceberg cloud bundle jars already include the Iceberg cloud bundle jars, so there is no need to download and include those separately.
+
+Vending JDBC user and password requires no additional jar.
+
+Bundle jars on Maven Central:
+
+- [gravitino-aws-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), [gravitino-gcp-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle), [gravitino-aliyun-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), [gravitino-azure-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
+- [gravitino-iceberg-aws-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle), [gravitino-iceberg-gcp-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle), [gravitino-iceberg-aliyun-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle), [gravitino-iceberg-azure-bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
+- [gravitino-aws](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws), [gravitino-aliyun](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
+
+## Upgrading From a Release Earlier Than 1.3.0
+
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-password`, `aws-access-key-id` / `aws-secret-access-key` (Glue), and `dlf-access-key-id` / `dlf-access-key-secret` / `dlf-security-token` (Paimon DLF) are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext when not hidden). Plaintext secrets are available via `getSecrets` when the caller holds `USE_SECRETS` (or is metalake owner); cloud access-key pairs are included only with `INCLUDE_CREDENTIAL_SECRETS` (or metalake owner). Connectors use both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS` (or metalake ownership) with catalog-level `getCredentials` / `GET .../credentials` to recover S3/OSS/COS/Azure/JDBC cloud keys, as well as Glue AWS API keys (`AwsSecretKeyCredential`) and Paimon DLF pairs (`DlfSecretKeyCredential`). Vended-only fields such as `s3-session-token` are not catalog properties. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+
+
+For a zero-downtime migration, set the following in `gravitino.conf`:
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
 
 ```properties
 gravitino.catalog.credential.backfillToProperties = true
 ```
 
+<<<<<<< HEAD
 When enabled, the server re-includes hidden credential properties in `GET /catalogs/{catalog}` responses for backward compatibility.
 
 :::caution
@@ -277,3 +375,29 @@ gravitino.iceberg-rest.s3-role-arn = {role_arn}
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
 --conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
 ```
+=======
+The Gravitino server then re-includes the hidden properties in its catalog GET responses. Turn it off once all clients use the Gravitino credential endpoint, since it exposes credentials in plaintext.
+
+### Catalog credential access
+
+With authorization enabled, catalog-level credential vending requires both `USE_SECRETS`
+and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership, in addition to metadata access.
+`USE_CATALOG` alone does not allow retrieving the source account. Engine users that need
+catalog credentials must receive these privileges explicitly. Catalog credentials are
+unscoped: they carry the source account's privileges, including access beyond a single
+Gravitino table. Fileset path-based credential authorization is unchanged. GVFS skips an optional catalog
+credential lookup when it is forbidden, then uses the fileset credential endpoint; denial at
+that fileset endpoint still prevents access.
+
+For relational JDBC catalogs, `jdbc-url` must not contain passwords, tokens, or inline user
+information. Move login credentials to `jdbc-user` and `jdbc-password` (or secret references)
+**before upgrading**. Legacy credential-bearing `jdbc-url` properties are masked when they
+reach the property read path, but loading a catalog can fail earlier during configuration
+validation. PostgreSQL catalog ALTER also loads the old configuration first, so it cannot
+repair such a URL after upgrading. If already upgraded, use the previous server version to
+migrate the catalog configuration before upgrading again.
+
+This URL validation and masking apply to relational JDBC catalogs' `jdbc-url` property;
+JDBC-backed Iceberg/Paimon `uri` properties are outside this change. Class-loader diagnostics
+show property names only.
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))

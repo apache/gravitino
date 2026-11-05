@@ -74,6 +74,7 @@ import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -955,11 +956,94 @@ public abstract class BaseGVFSOperations implements Closeable {
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
     allProperties.putAll(catalog.properties());
 
+<<<<<<< HEAD
     Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
     allProperties.putAll(schema.properties());
     allProperties.putAll(filesetProperties);
     allProperties.putAll(extractNonDefaultConfig(conf));
     return allProperties;
+=======
+    Map<String, String> all = new HashMap<>();
+    putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
+    putStaticCatalogCredentialInfo(all, catalog);
+    putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
+    putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    all.putAll(extractNonDefaultConfig(conf));
+    return all;
+  }
+
+  private static void putPropsAndSecrets(
+      Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
+    if (props != null) {
+      target.putAll(CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(props));
+    }
+    if (secrets != null) {
+      target.putAll(secrets.getSecrets());
+    }
+  }
+
+  /**
+   * Merges static ({@code expireTimeInMs == 0}) {@link Credential#credentialInfo()} from catalog
+   * {@code getCredentials} into GVFS configuration. Invoked when a filesystem is created, so
+   * results are not cached here — rotated keys are picked up on the next filesystem build. Expiring
+   * credentials are skipped; path token vending uses a separate fileset path.
+   */
+  private void putStaticCatalogCredentialInfo(Map<String, String> target, Catalog catalog) {
+    if (catalog == null) {
+      return;
+    }
+    Map<String, String> loaded = loadStaticCatalogCredentialInfo(catalog);
+    if (loaded != null && !loaded.isEmpty()) {
+      target.putAll(loaded);
+    }
+  }
+
+  /**
+   * Loads static catalog credential info.
+   *
+   * @return a map of static credential info (may be empty), or {@code null} if loading failed
+   *     transiently
+   */
+  @Nullable
+  private static Map<String, String> loadStaticCatalogCredentialInfo(Catalog catalog) {
+    Map<String, String> staticInfo = new HashMap<>();
+    try {
+      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      if (supportsCredentials == null) {
+        return staticInfo;
+      }
+      Credential[] credentials = supportsCredentials.getCredentials();
+      if (credentials == null) {
+        return staticInfo;
+      }
+      for (Credential credential : credentials) {
+        if (credential == null
+            || credential.expireTimeInMs() != 0
+            || credential.credentialInfo() == null) {
+          continue;
+        }
+        staticInfo.putAll(credential.credentialInfo());
+      }
+    } catch (UnsupportedOperationException | NotFoundException e) {
+      LOG.debug(
+          "Catalog {} does not support credential recovery via getCredentials: {}",
+          catalog.name(),
+          e.toString());
+    } catch (ForbiddenException e) {
+      // Catalog-wide credentials are optional; fileset path authorization is separate.
+      LOG.debug(
+          "Catalog credentials for {} are not permitted; using fileset credential vending",
+          catalog.name());
+    } catch (RESTException e) {
+      LOG.warn(
+          "Failed to load static credentials for catalog {} via getCredentials; continuing without"
+              + " them: {}",
+          catalog.name(),
+          e.toString());
+      return null;
+    }
+    return staticInfo;
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {

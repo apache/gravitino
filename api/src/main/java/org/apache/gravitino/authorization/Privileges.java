@@ -1244,6 +1244,155 @@ public class Privileges {
     }
   }
 
+<<<<<<< HEAD
+=======
+  /** The privilege to view policy metadata, content, and associations. */
+  public static final class ViewPolicy extends GenericPrivilege<ViewPolicy> {
+
+    private static final ViewPolicy ALLOW_INSTANCE =
+        new ViewPolicy(Condition.ALLOW, Name.VIEW_POLICY);
+    private static final ViewPolicy DENY_INSTANCE =
+        new ViewPolicy(Condition.DENY, Name.VIEW_POLICY);
+
+    private ViewPolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewPolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewPolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to list configured secrets providers. */
+  public static final class ViewSecretProviders extends GenericPrivilege<ViewSecretProviders> {
+
+    private static final ViewSecretProviders ALLOW_INSTANCE =
+        new ViewSecretProviders(Condition.ALLOW, Name.VIEW_SECRET_PROVIDERS);
+    private static final ViewSecretProviders DENY_INSTANCE =
+        new ViewSecretProviders(Condition.DENY, Name.VIEW_SECRET_PROVIDERS);
+
+    private ViewSecretProviders(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewSecretProviders allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewSecretProviders deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /**
+   * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecrets},
+   * cloud access-key pairs are omitted from the result.
+   *
+   * <p>Catalog {@code getCredentials} requires both this privilege and {@link
+   * IncludeCredentialSecrets}, or metalake ownership, in addition to metadata access. Fileset
+   * credential authorization is path-based. Callers that are not the metalake owner and lack this
+   * privilege receive an empty {@code getSecrets} result rather than a forbidden error, once they
+   * can already access the metadata object.
+   */
+  public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
+
+    private static final UseSecrets ALLOW_INSTANCE =
+        new UseSecrets(Condition.ALLOW, Name.USE_SECRETS);
+    private static final UseSecrets DENY_INSTANCE =
+        new UseSecrets(Condition.DENY, Name.USE_SECRETS);
+
+    private UseSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /**
+   * When held together with {@link UseSecrets}, includes cloud access-key pairs and other
+   * credential secrets in the {@code getSecrets} result. Both privileges are also required for
+   * catalog {@code getCredentials}, unless the caller is the metalake owner.
+   *
+   * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
+   * and holders of both privileges receive the full secrets map; holders of only {@link UseSecrets}
+   * get cloud access-key pairs omitted.
+   */
+  public static final class IncludeCredentialSecrets
+      extends GenericPrivilege<IncludeCredentialSecrets> {
+
+    private static final IncludeCredentialSecrets ALLOW_INSTANCE =
+        new IncludeCredentialSecrets(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRETS);
+    private static final IncludeCredentialSecrets DENY_INSTANCE =
+        new IncludeCredentialSecrets(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRETS);
+
+    private IncludeCredentialSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static IncludeCredentialSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static IncludeCredentialSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SECRET_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
   /** The privilege to register a job template. */
   public static class RegisterJobTemplate extends GenericPrivilege<RegisterJobTemplate> {
     private static final RegisterJobTemplate ALLOW_INSTANCE =

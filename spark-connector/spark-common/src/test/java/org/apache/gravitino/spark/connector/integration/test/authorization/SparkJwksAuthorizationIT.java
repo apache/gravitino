@@ -196,7 +196,14 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.CreateTable.allow(),
+<<<<<<< HEAD
                 Privileges.SelectTable.allow()));
+=======
+                Privileges.SelectTable.allow(),
+                // Spark JDBC needs both secret privileges to receive catalog credentials.
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     metalake.createRole(ALICE_ROLE, new HashMap<>(), ImmutableList.of(catalogAccess));
     metalake.grantRolesToUser(ImmutableList.of(ALICE_ROLE), ALICE);
   }
@@ -250,6 +257,9 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
     GravitinoMetalake bobMetalake = bobClient.loadMetalake(METALAKE);
     Catalog catalog = bobMetalake.loadCatalog(CATALOG);
     Assertions.assertNotNull(catalog);
+    // Metadata visibility does not grant Bob the source account's credentials.
+    Assertions.assertThrows(
+        ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
 
     boolean tableExists =
         catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA, ALICE_TABLE));

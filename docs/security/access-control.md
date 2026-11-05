@@ -165,6 +165,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 
 ### Data Object Privileges
 
+<<<<<<< HEAD
 | Privilege            | Grantable On                        | What It Allows                                                     |
 |----------------------|-------------------------------------|--------------------------------------------------------------------|
 | `CREATE_CATALOG`     | Metalake                            | Create catalogs                                                    |
@@ -188,6 +189,37 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema           | Register functions in any schema in scope                          |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function | Read the metadata of, and execute, any function in scope           |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function | Alter or drop any function in scope                                |
+=======
+| Privilege            | Grantable On                                                                | What It Allows                                                       |
+|----------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `CREATE_CATALOG`     | Metalake                                                                    | Create catalogs                                                      |
+| `USE_CATALOG`        | Metalake, Catalog                                                           | Use any catalog in scope, and reach the objects inside it            |
+| `CREATE_SCHEMA`      | Metalake, Catalog, Schema                                                   | Create schemas or nested schemas in scope                            |
+| `USE_SCHEMA`         | Metalake, Catalog, Schema                                                   | Use any schema in scope, and reach the objects inside it             |
+| `CREATE_TABLE`       | Metalake, Catalog, Schema                                                   | Create tables in any schema in scope                                 |
+| `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View                                      | Probe whether a table-like object exists without reading its data    |
+| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read any table in scope                                              |
+| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read and write to, and alter the schema of, any table in scope       |
+| `CREATE_VIEW`        | Metalake, Catalog, Schema                                                   | Create views in any schema in scope                                  |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View                                             | Read view metadata in scope                                          |
+| `CREATE_TOPIC`       | Metalake, Catalog, Schema                                                   | Create topics in any schema in scope                                 |
+| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from any topic in scope                                      |
+| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic                                            | Consume from, produce to, and alter any topic in scope               |
+| `CREATE_FILESET`     | Metalake, Catalog, Schema                                                   | Create filesets in any schema in scope                               |
+| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset                                          | Read any fileset in scope                                            |
+| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset                                          | Read, write, and alter any fileset in scope                          |
+| `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
+| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
+| `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials` |
+| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
+| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
+| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
+| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
+| `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
@@ -258,7 +290,16 @@ ownership, the same as altering it, because the caller chooses what the server c
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
+<<<<<<< HEAD
 alter or delete. Fetching a credential takes whatever loading the object takes.
+=======
+alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
+`USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
+holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata access plus both
+`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Missing either privilege
+returns a forbidden error. Fileset credential vending retains its path-based authorization. Callers who can load the object but lack
+`USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

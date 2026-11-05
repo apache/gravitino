@@ -26,6 +26,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 
 public class JdbcConfig extends Config {
 
@@ -149,7 +150,12 @@ public class JdbcConfig extends Config {
           .createWithDefault(true);
 
   public String getJdbcUrl() {
-    return get(JDBC_URL);
+    String url = get(JDBC_URL);
+    if (JdbcUrlUtils.containsCredentials(url)) {
+      throw new IllegalArgumentException(
+          "Credentials in jdbc-url are not supported; use jdbc-user and jdbc-password properties");
+    }
+    return url;
   }
 
   public String getJdbcDriver() {

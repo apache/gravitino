@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -46,6 +45,7 @@ import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -102,11 +102,32 @@ public class MetadataObjectCredentialOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (!supportsCredentialOperations(object)) {
-              throw new NotSupportedException(
-                  "Doesn't support credential operations for metadata object type");
+              throw new IllegalArgumentException(
+                  "Credential operations are not supported for metadata object type "
+                      + object.type());
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+<<<<<<< HEAD
+=======
+            Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
+            // Catalog credentials are not restricted to individual tables or paths. Metadata access
+            // alone must not grant the catalog account's source privileges.
+            if (object.type() == MetadataObject.Type.CATALOG
+                && (!MetadataAuthzHelper.checkAccess(
+                        identifier,
+                        entityType,
+                        AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)
+                    || !MetadataAuthzHelper.checkAccess(
+                        identifier,
+                        entityType,
+                        AuthorizationExpressionConstants
+                            .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION))) {
+              throw new ForbiddenException(
+                  "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
+            }
+
+>>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
             Map<String, String> filteredFilesetHeaders =
                 Utils.filterFilesetCredentialHeaders(httpRequest);
             // set the fileset info into the thread local context
