@@ -54,6 +54,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -75,12 +76,19 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -106,6 +114,7 @@ import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -117,6 +126,8 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -126,6 +137,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 public class TestTagManager {
@@ -166,6 +179,18 @@ public class TestTagManager {
   private static IdGenerator idGenerator;
 
   private static TagManager tagManager;
+
+  private static final CatalogManager catalogManager = mock(CatalogManager.class);
+  private static final BaseCatalog<?> backendCatalog = mock(BaseCatalog.class);
+  private static CatalogManager previousCatalogManager;
+
+  private static final Capability CASE_INSENSITIVE_CAPABILITY =
+      new Capability() {
+        @Override
+        public CapabilityResult caseSensitiveOnName(Scope scope) {
+          return CapabilityResult.unsupported("case insensitive");
+        }
+      };
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -301,6 +326,11 @@ public class TestTagManager {
     entityStore.put(function, false /* overwritten */);
 
     tagManager = new TagManager(idGenerator, entityStore);
+    previousCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, backendCatalog);
+    when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
 
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
@@ -329,7 +359,9 @@ public class TestTagManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() throws IOException, IllegalAccessException {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
@@ -379,6 +411,182 @@ public class TestTagManager {
     tagManager.associateTagsForMetadataObject(METALAKE, functionObject, null, functionTags);
 
     Arrays.stream(tagManager.listTags(METALAKE)).forEach(n -> tagManager.deleteTag(METALAKE, n));
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"SCHEMA", "TABLE", "COLUMN", "VIEW", "FUNCTION"})
+  void testTagOperationsNormalizeCaseInsensitiveNames(Entity.EntityType type) {
+    MetadataObject canonical = tagTarget(type, false);
+    MetadataObject request = tagTarget(type, true);
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    try {
+      assertTagRoundTrip(request, canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+    }
+  }
+
+  @Test
+  void testTagOperationsPreserveCaseSensitiveNames() {
+    MetadataObject canonical = tagTarget(Entity.EntityType.TABLE, false);
+    MetadataObject differentlyCased = tagTarget(Entity.EntityType.TABLE, true);
+    Tag tag = tagManager.createTag(METALAKE, "case_sensitive_tag", null, null);
+    tagManager.associateTagsForMetadataObject(METALAKE, canonical, new String[] {tag.name()}, null);
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.listTagsForMetadataObject(METALAKE, differentlyCased));
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> tagManager.getTagForMetadataObject(METALAKE, differentlyCased, tag.name()));
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE, differentlyCased, null, new String[] {tag.name()}));
+    Assertions.assertArrayEquals(
+        new String[] {tag.name()}, tagManager.listTagsForMetadataObject(METALAKE, canonical));
+  }
+
+  @Test
+  void testTagOperationsPreserveQuotedNamesAndOriginalExistenceCheck() {
+    Capability quoteAware =
+        new Capability() {
+          @Override
+          public String normalizeName(Scope scope, String name) {
+            return name.startsWith("\"") && name.endsWith("\"")
+                ? name.substring(1, name.length() - 1)
+                : name.toUpperCase(Locale.ROOT);
+          }
+        };
+    NameIdentifier quotedTable =
+        NameIdentifier.of(METALAKE, CATALOG, "\"" + SCHEMA + "\"", "\"" + TABLE + "\"");
+    MetadataObject request =
+        NameIdentifierUtil.toMetadataObject(quotedTable, Entity.EntityType.TABLE);
+    when(backendCatalog.capability()).thenReturn(quoteAware);
+    when(tableDispatcher.tableExists(any()))
+        .thenAnswer(invocation -> quotedTable.equals(invocation.getArgument(0)));
+    try {
+      assertTagRoundTrip(request, request, tagTarget(Entity.EntityType.TABLE, false));
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      when(tableDispatcher.tableExists(any())).thenReturn(true);
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TABLE", "COLUMN"})
+  void testTagOperationsResolvePhysicalTableName(Entity.EntityType type) {
+    CatalogOperations ops =
+        mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    Mockito.doReturn(ops).when(backendCatalog).ops();
+    when(((SupportsTableNameResolution) ops).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier ident = invocation.getArgument(0);
+              return ident.name().equals("table_alias")
+                  ? NameIdentifier.of(ident.namespace(), TABLE)
+                  : ident;
+            });
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    NameIdentifier alias =
+        type == Entity.EntityType.TABLE
+            ? NameIdentifier.of(METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), "TABLE_ALIAS")
+            : NameIdentifier.of(
+                METALAKE,
+                CATALOG,
+                SCHEMA.toUpperCase(Locale.ROOT),
+                "TABLE_ALIAS",
+                COLUMN.toUpperCase(Locale.ROOT));
+    MetadataObject canonical = tagTarget(type, false);
+    try {
+      assertTagRoundTrip(NameIdentifierUtil.toMetadataObject(alias, type), canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      Mockito.doReturn(null).when(backendCatalog).ops();
+    }
+  }
+
+  @Test
+  void testTagOperationsUseCustomNormalization() throws IOException {
+    NameIdentifier uppercase = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "CUSTOM_TABLE");
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    entityStore.put(
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(uppercase.name())
+            .withNamespace(uppercase.namespace())
+            .withColumns(Lists.newArrayList())
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    Capability uppercaseTables =
+        new Capability() {
+          @Override
+          public String normalizeName(Scope scope, String name) {
+            return scope == Scope.TABLE ? name.toUpperCase(Locale.ROOT) : name;
+          }
+        };
+    when(backendCatalog.capability()).thenReturn(uppercaseTables);
+    try {
+      MetadataObject request =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(uppercase.namespace(), "custom_table"), Entity.EntityType.TABLE);
+      MetadataObject canonical =
+          NameIdentifierUtil.toMetadataObject(uppercase, Entity.EntityType.TABLE);
+      assertTagRoundTrip(request, canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      entityStore.delete(uppercase, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testTagOperationsPreserveSemanticModelName() throws IOException {
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "SalesModel");
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    Dataset dataset =
+        Dataset.builder()
+            .withName("sales")
+            .withSource(NameIdentifier.of(CATALOG, SCHEMA, TABLE))
+            .build();
+    entityStore.put(
+        SemanticModelEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(audit)
+            .withDefinition(
+                SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build())
+            .build(),
+        false);
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(true);
+    try {
+      MetadataObject request =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), ident.name()),
+              Entity.EntityType.SEMANTIC_MODEL);
+      MetadataObject canonical =
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SEMANTIC_MODEL);
+      assertTagRoundTrip(request, canonical, canonical);
+      MetadataObject wrongCase =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(ident.namespace(), "salesmodel"), Entity.EntityType.SEMANTIC_MODEL);
+      Assertions.assertThrows(
+          NoSuchMetadataObjectException.class,
+          () -> tagManager.listTagsForMetadataObject(METALAKE, wrongCase));
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(false);
+      entityStore.delete(ident, Entity.EntityType.SEMANTIC_MODEL);
+    }
   }
 
   @Test
@@ -1430,5 +1638,66 @@ public class TestTagManager {
   private static void assertAssignmentValues(Tag tag, String[] expectedValues) {
     Assertions.assertTrue(tag.assignment().isPresent());
     Assertions.assertArrayEquals(expectedValues, tag.assignment().get().values());
+  }
+
+  private static MetadataObject tagTarget(Entity.EntityType type, boolean upperCase) {
+    String schema = upperCase ? SCHEMA.toUpperCase(Locale.ROOT) : SCHEMA;
+    String table = upperCase ? TABLE.toUpperCase(Locale.ROOT) : TABLE;
+    NameIdentifier ident;
+    switch (type) {
+      case SCHEMA:
+        ident = NameIdentifier.of(METALAKE, CATALOG, schema);
+        break;
+      case TABLE:
+        ident = NameIdentifier.of(METALAKE, CATALOG, schema, table);
+        break;
+      case COLUMN:
+        String column = upperCase ? COLUMN.toUpperCase(Locale.ROOT) : COLUMN;
+        ident = NameIdentifier.of(METALAKE, CATALOG, schema, table, column);
+        break;
+      case VIEW:
+      case FUNCTION:
+        String name = type == Entity.EntityType.VIEW ? VIEW : FUNCTION;
+        name = upperCase ? name.toUpperCase(Locale.ROOT) : name;
+        ident = NameIdentifier.of(METALAKE, CATALOG, schema, name);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported test target: " + type);
+    }
+    return NameIdentifierUtil.toMetadataObject(ident, type);
+  }
+
+  private static void assertTagRoundTrip(
+      MetadataObject request, MetadataObject alias, MetadataObject storedObject) {
+    Tag tag = tagManager.createTag(METALAKE, "normalization_tag", null, null);
+    String[] names = {tag.name()};
+    tagManager.associateTagsForMetadataObject(METALAKE, alias, names, null);
+    Assertions.assertArrayEquals(names, tagManager.listTagsForMetadataObject(METALAKE, request));
+    Assertions.assertEquals(
+        tag.name(), tagManager.listTagsInfoForMetadataObject(METALAKE, request)[0].name());
+    Assertions.assertEquals(
+        tag.name(), tagManager.getTagForMetadataObject(METALAKE, request, tag.name()).name());
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {storedObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name()));
+
+    Assertions.assertEquals(
+        0, tagManager.associateTagsForMetadataObject(METALAKE, request, null, names).length);
+    Assertions.assertArrayEquals(
+        names, tagManager.associateTagsForMetadataObject(METALAKE, request, names, null));
+    tagManager.associateTagsForMetadataObject(METALAKE, alias, null, names);
+    TagValue[] values = {TagValue.of(tag.name(), "MixedCaseValue")};
+    Assertions.assertArrayEquals(
+        names, tagManager.associateTagValuesForMetadataObject(METALAKE, request, values, null));
+    Assertions.assertArrayEquals(
+        new String[] {"MixedCaseValue"},
+        tagManager
+            .getTagForMetadataObject(METALAKE, alias, tag.name())
+            .assignment()
+            .get()
+            .values());
+    Assertions.assertEquals(
+        0, tagManager.associateTagValuesForMetadataObject(METALAKE, request, null, values).length);
+    Assertions.assertEquals(0, tagManager.listTagsInfoForMetadataObject(METALAKE, alias).length);
   }
 }
