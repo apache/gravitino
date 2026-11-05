@@ -20,24 +20,29 @@ package org.apache.gravitino;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.tag.TagValue;
 
 /**
  * The domain changes whose rules depend on other domains, or whose authorization depends on the
- * current parent: creating a domain, changing or removing its parent and changing its status. Each
- * change runs in one transaction. It locks the rows of the domains involved, reads them, hands them
- * to the caller's check as a {@link LockedDomainState}, and writes the change only if the check
- * returns. A check that throws rolls the change back, and the exception reaches the caller
- * unchanged, unless it is caused by a database error, which is reported like any other failure of
- * the store.
+ * current parent: creating a domain, changing or removing its parent, changing its status and
+ * changing its backing tag. Each change runs in one transaction. It locks the rows of the domains
+ * involved, reads them, hands them to the caller's check as a {@link LockedDomainState}, and writes
+ * the change only if the check returns. A check that throws rolls the change back, and the
+ * exception reaches the caller unchanged, unless it is caused by a database error, which is
+ * reported like any other failure of the store.
  *
  * <p>The store only locks, reads and writes; the rules themselves, such as how deep the hierarchy
  * may be or which status a parent needs, are the caller's check. Since the check sees the domains
@@ -47,29 +52,89 @@ import org.apache.gravitino.meta.DomainEntity;
  * <p>In a {@link LockedDomainState}, the domain being changed and its parent are read with locking
  * reads, which do not read the backing tag name, so their {@link DomainEntity#backingTag()} is
  * empty; their backing tag ID and value are set. For an insert, the domain is the caller's new
- * entity.
+ * entity with its backing tag set.
  */
 public interface SupportsDomainOperations {
 
   /**
-   * Inserts a domain. If the domain has a parent, it is inserted as a sub-domain of that parent,
-   * together with its parent edge.
+   * Inserts a domain backed by an existing tag. If the domain has a parent, it is inserted as a
+   * sub-domain of that parent, together with its parent edge.
    *
-   * <p>The metalake is locked shared and the parent, if any, is locked shared, so the parent cannot
-   * be attached elsewhere, deleted or unpublished before the change commits. The domain is written
-   * before the check runs, so a duplicate name fails first. The check gets the new domain, the
-   * parent with its own parent set, and no sub-domains. This operation must own its transaction so
-   * a failed check rolls back the inserted domain; it cannot run inside another transaction.
+   * <p>The metalake is locked shared, the parent, if any, shared, and the tag exclusively, so the
+   * parent cannot be attached elsewhere, deleted or unpublished, and the tag cannot be deleted or
+   * bound to another domain, before the change commits. The tag is resolved by name and re-checked
+   * after it is locked. The parent and the tag are locked before the domain is written, so a
+   * missing parent or tag is reported before a duplicate domain name; the domain is written before
+   * the check runs, so a duplicate name is reported before a broken rule. The check gets the new
+   * domain with its backing tag set, the parent with its own parent set, no sub-domains, the tag,
+   * and the domains it already backs. This operation must own its transaction and cannot run inside
+   * another transaction.
    *
-   * @param domain The domain to insert.
+   * @param domain The domain to insert, without a backing tag.
+   * @param backingTag The existing tag, with an optional value, that backs the domain.
    * @param check The check of the locked state.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists.
    * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws NoSuchTagException If the tag does not exist.
    * @throws IllegalStateException If it is called inside a transaction.
    */
-  void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
-      throws IOException, EntityAlreadyExistsException, NoSuchEntityException;
+  void insertDomainWithBackingTag(
+      DomainEntity domain, TagValue backingTag, Consumer<LockedDomainState> check)
+      throws IOException, EntityAlreadyExistsException, NoSuchEntityException, NoSuchTagException;
+
+  /**
+   * Inserts a domain together with a new tag that backs it without a value. If the domain has a
+   * parent, it is inserted as a sub-domain of that parent, together with its parent edge. The tag,
+   * the domain and the edge are written in one transaction, so a failure leaves none of them.
+   *
+   * <p>The metalake is locked shared and the parent, if any, shared. The new tag has no row to lock
+   * yet; the unique key on its name fails a concurrent tag with the same name. The domain is
+   * written before the tag, so a duplicate domain name is reported before a duplicate tag name, and
+   * both are written before the check runs, so a duplicate name is reported before a broken rule.
+   * The check gets the new domain with its backing tag set, the parent with its own parent set, no
+   * sub-domains, the new tag, and no other domains.
+   *
+   * @param domain The domain to insert, without a backing tag.
+   * @param backingTag The new tag that backs the domain.
+   * @param check The check of the locked state.
+   * @throws IOException If the domain cannot be stored.
+   * @throws EntityAlreadyExistsException If a domain with the same name exists.
+   * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws TagAlreadyExistsException If a tag with the same name exists.
+   * @throws IllegalStateException If it is called inside a transaction.
+   */
+  void insertDomainWithNewBackingTag(
+      DomainEntity domain, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException, EntityAlreadyExistsException, NoSuchEntityException,
+          TagAlreadyExistsException;
+
+  /**
+   * Sets or removes the backing tag of a domain. Setting the current backing tag writes nothing.
+   *
+   * <p>The metalake is locked shared, the domain exclusively and then the new tag, if any,
+   * exclusively, so the tag cannot be deleted or bound to another domain before the change commits.
+   * The tag is resolved by name and re-checked after it is locked. The check gets the domain with
+   * its current parent and backing tag set, no parent and no sub-domains, the new tag, and the
+   * domains it already backs, which include this domain if it is already backed by the tag.
+   *
+   * @param ident The identifier of the domain.
+   * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
+   *     remove the backing tag.
+   * @param auditInfo The audit info of the change; the domain keeps its creator and takes its last
+   *     modifier.
+   * @param check The check of the locked state.
+   * @return The domain after the change.
+   * @throws IOException If the change cannot be stored.
+   * @throws NoSuchEntityException If the domain does not exist.
+   * @throws NoSuchTagException If the tag does not exist.
+   */
+  DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier ident,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException, NoSuchEntityException, NoSuchTagException;
 
   /**
    * Sets the parent of a domain: attaches a top-level domain, or moves a sub-domain to another
@@ -161,9 +226,11 @@ public interface SupportsDomainOperations {
     private final DomainEntity domain;
     @Nullable private final DomainEntity parent;
     private final List<DomainEntity> subDomains;
+    @Nullable private final TagEntity backingTag;
+    private final List<DomainEntity> backingTagBindings;
 
     /**
-     * Creates the locked state of a change.
+     * Creates the locked state of a change that involves no backing tag.
      *
      * @param domain The domain being changed, with its current parent set.
      * @param parent The parent involved in the change, with its own parent set, or null if none.
@@ -171,9 +238,29 @@ public interface SupportsDomainOperations {
      */
     public LockedDomainState(
         DomainEntity domain, @Nullable DomainEntity parent, List<DomainEntity> subDomains) {
+      this(domain, parent, subDomains, null, Collections.emptyList());
+    }
+
+    /**
+     * Creates the locked state of a change.
+     *
+     * @param domain The domain being changed, with its current parent set.
+     * @param parent The parent involved in the change, with its own parent set, or null if none.
+     * @param subDomains The sub-domains of the domain being changed.
+     * @param backingTag The backing tag the change binds, or null if none.
+     * @param backingTagBindings The domains the backing tag backs before the change.
+     */
+    public LockedDomainState(
+        DomainEntity domain,
+        @Nullable DomainEntity parent,
+        List<DomainEntity> subDomains,
+        @Nullable TagEntity backingTag,
+        List<DomainEntity> backingTagBindings) {
       this.domain = domain;
       this.parent = parent;
       this.subDomains = ImmutableList.copyOf(subDomains);
+      this.backingTag = backingTag;
+      this.backingTagBindings = ImmutableList.copyOf(backingTagBindings);
     }
 
     /**
@@ -205,6 +292,26 @@ public interface SupportsDomainOperations {
      */
     public List<DomainEntity> subDomains() {
       return subDomains;
+    }
+
+    /**
+     * Returns the backing tag the change binds, as it is under the lock: the existing tag to bind,
+     * or the new tag to create.
+     *
+     * @return The backing tag, or empty if the change binds none.
+     */
+    public Optional<TagEntity> backingTag() {
+      return Optional.ofNullable(backingTag);
+    }
+
+    /**
+     * Returns the domains that the backing tag of the change backs before the change, read under
+     * the lock on the tag. Their parents are not set.
+     *
+     * @return The domains bound to the backing tag.
+     */
+    public List<DomainEntity> backingTagBindings() {
+      return backingTagBindings;
     }
   }
 }

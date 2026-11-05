@@ -57,24 +57,32 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -127,7 +135,7 @@ public class TestDomainManager {
   }
 
   @AfterEach
-  public void cleanUp() {
+  public void cleanUp() throws IOException {
     DomainEntity[] domains = domainManager.listDomainInfos(METALAKE);
     // Sub-domains first, since a domain with sub-domains cannot be deleted.
     Arrays.stream(domains)
@@ -136,23 +144,31 @@ public class TestDomainManager {
     Arrays.stream(domains)
         .filter(domain -> !domain.parent().isPresent())
         .forEach(domain -> domainManager.deleteDomain(METALAKE, domain.name()));
+    for (TagEntity tag :
+        entityStore.list(NamespaceUtil.ofTag(METALAKE), TagEntity.class, Entity.EntityType.TAG)) {
+      entityStore.delete(tag.nameIdentifier(), Entity.EntityType.TAG);
+    }
   }
 
   @Test
   public void testCreateGetAndListDomains() {
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
-    DomainEntity finance = domainManager.createDomain(METALAKE, "Finance", "comment", properties);
+    DomainEntity finance =
+        domainManager.createDomain(
+            METALAKE, "Finance", "comment", properties, TagValue.noValue("Finance"), true);
     Assertions.assertEquals("Finance", finance.name());
     Assertions.assertEquals(NamespaceUtil.ofDomain(METALAKE), finance.namespace());
     Assertions.assertEquals("comment", finance.comment());
     Assertions.assertEquals(properties, finance.properties());
     Assertions.assertEquals(Domain.Status.DRAFT, finance.status());
     Assertions.assertFalse(finance.parent().isPresent());
-    Assertions.assertFalse(finance.backingTag().isPresent());
+    Assertions.assertEquals(TagValue.noValue("Finance"), finance.backingTag().orElse(null));
     Assertions.assertNotNull(finance.auditInfo().creator());
     Assertions.assertEquals(finance, domainManager.getDomain(METALAKE, "Finance"));
 
-    DomainEntity markets = domainManager.createDomain(METALAKE, "Markets", null, null);
+    DomainEntity markets =
+        domainManager.createDomain(
+            METALAKE, "Markets", null, null, TagValue.noValue("Markets"), true);
     Assertions.assertNull(markets.comment());
     Assertions.assertTrue(markets.properties().isEmpty());
 
@@ -165,21 +181,26 @@ public class TestDomainManager {
 
     Assertions.assertThrows(
         DomainAlreadyExistsException.class,
-        () -> domainManager.createDomain(METALAKE, "Finance", null, null));
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.noValue("Finance2"), true));
     Assertions.assertThrows(
         NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "missing"));
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
-        () -> domainManager.createDomain("missing_metalake", "Finance", null, null));
+        () ->
+            domainManager.createDomain(
+                "missing_metalake", "Finance", null, null, TagValue.noValue("Finance"), true));
     Assertions.assertThrows(
         NoSuchMetalakeException.class, () -> domainManager.listDomains("missing_metalake"));
   }
 
   @Test
   public void testCreateSubdomain() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
     DomainEntity trading =
-        domainManager.createSubdomain(METALAKE, "Finance", "Trading", "comment", null);
+        domainManager.createSubdomain(
+            METALAKE, "Finance", "Trading", "comment", null, TagValue.noValue("Trading"), true);
     Assertions.assertEquals("Finance", trading.parent().get());
     Assertions.assertEquals(Domain.Status.DRAFT, trading.status());
     Assertions.assertEquals(trading, domainManager.getDomain(METALAKE, "Trading"));
@@ -193,30 +214,45 @@ public class TestDomainManager {
     IllegalArgumentException e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> domainManager.createSubdomain(METALAKE, "Trading", "Desk", null, null));
+            () ->
+                domainManager.createSubdomain(
+                    METALAKE, "Trading", "Desk", null, null, TagValue.noValue("Desk"), true));
     Assertions.assertTrue(e.getMessage().contains("itself a sub-domain"), e.getMessage());
     Assertions.assertThrows(
         NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "Desk"));
 
     Assertions.assertThrows(
         NoSuchDomainException.class,
-        () -> domainManager.createSubdomain(METALAKE, "missing", "Desk", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "missing", "Desk", null, null, TagValue.noValue("Desk"), true));
     // A domain cannot be its own parent.
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> domainManager.createSubdomain(METALAKE, "Finance", "Finance", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Finance", null, null, TagValue.noValue("Finance2"), true));
     Assertions.assertThrows(
         DomainAlreadyExistsException.class,
-        () -> domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Trading", null, null, TagValue.noValue("Trading2"), true));
     Assertions.assertThrows(
         NoSuchDomainException.class, () -> domainManager.listSubdomains(METALAKE, "missing"));
   }
 
   @Test
   public void testAlterDomain() {
-    domainManager.createDomain(METALAKE, "Finance", "comment", ImmutableMap.of("k1", "v1"));
-    domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null);
-    domainManager.createDomain(METALAKE, "Markets", null, null);
+    domainManager.createDomain(
+        METALAKE,
+        "Finance",
+        "comment",
+        ImmutableMap.of("k1", "v1"),
+        TagValue.noValue("Finance"),
+        true);
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("Trading"), true);
+    domainManager.createDomain(METALAKE, "Markets", null, null, TagValue.noValue("Markets"), true);
 
     DomainEntity altered =
         domainManager.alterDomain(
@@ -254,8 +290,9 @@ public class TestDomainManager {
 
   @Test
   public void testDeleteDomain() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
-    domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("Trading"), true);
 
     Assertions.assertThrows(
         NonEmptyDomainException.class, () -> domainManager.deleteDomain(METALAKE, "Finance"));
@@ -270,8 +307,9 @@ public class TestDomainManager {
 
   @Test
   public void testPublishAndUnpublish() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
-    domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("Trading"), true);
 
     // A sub-domain needs a published parent.
     Assertions.assertThrows(
@@ -311,9 +349,9 @@ public class TestDomainManager {
 
   @Test
   public void testAttachMoveAndDetach() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
-    domainManager.createDomain(METALAKE, "Markets", null, null);
-    domainManager.createDomain(METALAKE, "Trading", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    domainManager.createDomain(METALAKE, "Markets", null, null, TagValue.noValue("Markets"), true);
+    domainManager.createDomain(METALAKE, "Trading", null, null, TagValue.noValue("Trading"), true);
 
     DomainEntity attached = domainManager.attachDomain(METALAKE, "Trading", "Finance");
     Assertions.assertEquals("Finance", attached.parent().get());
@@ -345,7 +383,8 @@ public class TestDomainManager {
     Assertions.assertTrue(e.getMessage().contains("[Trading]"), e.getMessage());
     Assertions.assertFalse(domainManager.getDomain(METALAKE, "Markets").parent().isPresent());
     // A sub-domain cannot be moved under another sub-domain.
-    domainManager.createSubdomain(METALAKE, "Finance", "Desk", null, null);
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Desk", null, null, TagValue.noValue("Desk"), true);
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> domainManager.attachDomain(METALAKE, "Trading", "Desk"));
@@ -369,8 +408,8 @@ public class TestDomainManager {
 
   @Test
   public void testAttachChecksStatus() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
-    domainManager.createDomain(METALAKE, "Trading", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    domainManager.createDomain(METALAKE, "Trading", null, null, TagValue.noValue("Trading"), true);
     domainManager.publishDomain(METALAKE, "Trading");
 
     // A published domain needs a published parent.
@@ -384,8 +423,8 @@ public class TestDomainManager {
         "Finance", domainManager.attachDomain(METALAKE, "Trading", "Finance").parent().get());
 
     // A draft domain can be attached under a draft or a published parent.
-    domainManager.createDomain(METALAKE, "Draft", null, null);
-    domainManager.createDomain(METALAKE, "Desk", null, null);
+    domainManager.createDomain(METALAKE, "Draft", null, null, TagValue.noValue("Draft"), true);
+    domainManager.createDomain(METALAKE, "Desk", null, null, TagValue.noValue("Desk"), true);
     Assertions.assertEquals(
         "Draft", domainManager.attachDomain(METALAKE, "Desk", "Draft").parent().get());
     Assertions.assertEquals(
@@ -456,8 +495,253 @@ public class TestDomainManager {
   }
 
   @Test
+  public void testCreateWithNewBackingTag() throws IOException {
+    DomainEntity finance =
+        domainManager.createDomain(
+            METALAKE, "Finance", null, null, TagValue.noValue("finance_tag"), true);
+    Assertions.assertEquals(TagValue.noValue("finance_tag"), finance.backingTag().orElse(null));
+    TagEntity tag =
+        entityStore.get(
+            NameIdentifierUtil.ofTag(METALAKE, "finance_tag"),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    Assertions.assertEquals(finance.backingTagId(), tag.id());
+    Assertions.assertEquals(TagValueConstraint.noValue(), tag.valueConstraint());
+    Assertions.assertNotNull(tag.auditInfo().creator());
+
+    // A new tag cannot have a value, and a backing tag is required.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.of("markets_tag", "v"), true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> domainManager.createDomain(METALAKE, "Markets", null, null, null, true));
+
+    // An existing tag is never adopted, and nothing is created.
+    Assertions.assertThrows(
+        TagAlreadyExistsException.class,
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Trading", null, null, TagValue.noValue("finance_tag"), true));
+    Assertions.assertThrows(
+        NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "Trading"));
+
+    // A create that fails after the new tag is written leaves no tag behind: here the check
+    // refuses a parent that is itself a sub-domain.
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("trading_tag"), true);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Trading", "Desk", null, null, TagValue.noValue("desk_tag"), true));
+    Assertions.assertFalse(
+        entityStore.exists(NameIdentifierUtil.ofTag(METALAKE, "desk_tag"), Entity.EntityType.TAG));
+    Assertions.assertThrows(
+        NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "Desk"));
+
+    // A domain name in use fails before the new tag is written.
+    Assertions.assertThrows(
+        DomainAlreadyExistsException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.noValue("markets_tag"), true));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofTag(METALAKE, "markets_tag"), Entity.EntityType.TAG));
+  }
+
+  @Test
+  public void testCreateWithExistingBackingTag() throws IOException {
+    createTag("dept", TagValueConstraint.ofAllowedValues("finance", "markets", "tax"));
+    createTag("plain", TagValueConstraint.noValue());
+    createTag("any", TagValueConstraint.anyValue());
+
+    DomainEntity finance =
+        domainManager.createDomain(
+            METALAKE, "Finance", null, null, TagValue.of("dept", "finance"), false);
+    Assertions.assertEquals(TagValue.of("dept", "finance"), finance.backingTag().orElse(null));
+    Assertions.assertEquals(finance, domainManager.getDomain(METALAKE, "Finance"));
+    DomainEntity tax =
+        domainManager.createSubdomain(
+            METALAKE, "Finance", "Tax", null, null, TagValue.of("dept", "tax"), false);
+    Assertions.assertEquals("Finance", tax.parent().orElse(null));
+    Assertions.assertEquals(TagValue.of("dept", "tax"), tax.backingTag().orElse(null));
+
+    // The tag must exist and allow the value.
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.noValue("missing"), false));
+    // The tag is locked before the domain is written, so a missing tag is reported before a domain
+    // name in use, and a domain name in use before a value the tag does not allow.
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.noValue("missing"), false));
+    Assertions.assertThrows(
+        DomainAlreadyExistsException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.of("dept", "other"), false));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.of("dept", "other"), false));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.noValue("dept"), false));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.of("plain", "v"), false));
+
+    // A value backs one domain, and valued and valueless bindings of a tag are never mixed.
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.of("dept", "finance"), false));
+    domainManager.createDomain(METALAKE, "Plain", null, null, TagValue.noValue("plain"), false);
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Markets", null, null, TagValue.noValue("plain"), false));
+    domainManager.createDomain(METALAKE, "Any", null, null, TagValue.noValue("any"), false);
+    BackingTagAlreadyBoundException e =
+        Assertions.assertThrows(
+            BackingTagAlreadyBoundException.class,
+            () ->
+                domainManager.createDomain(
+                    METALAKE, "Markets", null, null, TagValue.of("any", "v"), false));
+    Assertions.assertTrue(e.getMessage().contains("without a value"), e.getMessage());
+    Assertions.assertThrows(
+        NoSuchDomainException.class, () -> domainManager.getDomain(METALAKE, "Markets"));
+
+    Assertions.assertEquals(
+        TagValue.of("dept", "markets"),
+        domainManager
+            .createDomain(METALAKE, "Markets", null, null, TagValue.of("dept", "markets"), false)
+            .backingTag()
+            .orElse(null));
+  }
+
+  @Test
+  public void testUpdateBackingTag() throws IOException {
+    createTag("dept", TagValueConstraint.ofAllowedValues("finance", "markets"));
+    createTag("region", TagValueConstraint.anyValue());
+    domainManager.createDomain(
+        METALAKE, "Finance", null, null, TagValue.of("dept", "finance"), false);
+    domainManager.createDomain(
+        METALAKE, "Markets", null, null, TagValue.of("dept", "markets"), false);
+
+    DomainEntity updated =
+        domainManager.updateBackingTag(METALAKE, "Finance", TagValue.of("region", "emea"));
+    Assertions.assertEquals(TagValue.of("region", "emea"), updated.backingTag().orElse(null));
+    Assertions.assertNotNull(updated.auditInfo().lastModifier());
+    Assertions.assertEquals(updated, domainManager.getDomain(METALAKE, "Finance"));
+    // Setting the current backing tag changes nothing.
+    Assertions.assertEquals(
+        updated,
+        domainManager.updateBackingTag(METALAKE, "Finance", TagValue.of("region", "emea")));
+
+    // A domain may change the value of its own tag, but not take a value bound elsewhere.
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Finance", TagValue.of("dept", "markets")));
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Markets", TagValue.noValue("region")));
+    Assertions.assertEquals(
+        TagValue.of("dept", "finance"),
+        domainManager
+            .updateBackingTag(METALAKE, "Markets", TagValue.of("dept", "finance"))
+            .backingTag()
+            .orElse(null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Finance", TagValue.of("dept", "other")));
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Finance", TagValue.noValue("missing")));
+    Assertions.assertEquals(
+        TagValue.of("region", "emea"),
+        domainManager.getDomain(METALAKE, "Finance").backingTag().orElse(null));
+
+    // Removing the backing tag leaves the domain without one, until a new one is set.
+    DomainEntity removed = domainManager.updateBackingTag(METALAKE, "Finance", null);
+    Assertions.assertFalse(removed.backingTag().isPresent());
+    Assertions.assertEquals(removed, domainManager.updateBackingTag(METALAKE, "Finance", null));
+    Assertions.assertEquals(
+        TagValue.of("region", "apac"),
+        domainManager
+            .updateBackingTag(METALAKE, "Finance", TagValue.of("region", "apac"))
+            .backingTag()
+            .orElse(null));
+
+    Assertions.assertThrows(
+        NoSuchDomainException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "missing", TagValue.noValue("region")));
+  }
+
+  @Test
+  public void testBackingTagChecks() {
+    TagEntity plain = tag("plain", new String[0]);
+    DomainEntity finance =
+        domain("Finance", null, Domain.Status.DRAFT).toBuilder()
+            .withBackingTagId(plain.id())
+            .build();
+
+    // Setting the current backing tag is not checked, even if the tag no longer allows it now.
+    DomainManager.checkBackingTagUpdate(
+        new LockedDomainState(
+            finance,
+            null,
+            Collections.emptyList(),
+            TagEntity.builder()
+                .withId(plain.id())
+                .withName("plain")
+                .withNamespace(plain.namespace())
+                .withAllowedValues(new String[] {"v"})
+                .withAuditInfo(plain.auditInfo())
+                .build(),
+            Collections.singletonList(finance)),
+        TagValue.noValue("plain"));
+    // Removing it is not checked either.
+    DomainManager.checkBackingTagUpdate(
+        new LockedDomainState(finance, null, Collections.emptyList()), null);
+
+    // The domain's own binding does not conflict with it.
+    DomainEntity markets = domain("Markets", null, Domain.Status.DRAFT);
+    DomainManager.checkBackingTagUpdate(
+        new LockedDomainState(
+            markets, null, Collections.emptyList(), plain, Collections.singletonList(markets)),
+        TagValue.noValue("plain"));
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            DomainManager.checkBackingTagUpdate(
+                new LockedDomainState(
+                    markets,
+                    null,
+                    Collections.emptyList(),
+                    plain,
+                    Collections.singletonList(finance)),
+                TagValue.noValue("plain")));
+  }
+
+  @Test
   public void testCheckDomainMetadataObject() {
-    domainManager.createDomain(METALAKE, "Finance", null, null);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
     MetadataObjectUtil.checkMetadataObject(
         METALAKE, MetadataObjects.of(null, "Finance", MetadataObject.Type.DOMAIN));
     Assertions.assertThrows(
@@ -478,6 +762,27 @@ public class TestDomainManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  private static TagEntity tag(String name, String[] allowedValues) {
+    return TagEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofTag(METALAKE))
+        .withAllowedValues(allowedValues)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private static void createTag(String name, TagValueConstraint constraint) throws IOException {
+    entityStore.put(
+        tag(
+            name,
+            constraint.type() == TagValueConstraint.Type.ANY_VALUE
+                ? null
+                : constraint.allowedValues()),
+        false /* overwritten */);
   }
 
   private static Config mockConfig() {

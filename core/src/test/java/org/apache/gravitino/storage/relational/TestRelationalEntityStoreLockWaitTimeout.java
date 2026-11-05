@@ -55,6 +55,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.exceptions.PersistenceException;
@@ -351,7 +352,18 @@ public class TestRelationalEntityStoreLockWaitTimeout {
             "batchDelete",
             () -> store.batchDelete(List.of(Pair.of(TABLE_IDENT, Entity.EntityType.TABLE)), false)),
         Pair.of("batchPut", () -> store.batchPut(List.of(table), true)),
-        Pair.of("insertDomain", () -> store.insertDomain(domain(), state -> {})),
+        Pair.of(
+            "insertDomainWithBackingTag",
+            () ->
+                store.insertDomainWithBackingTag(domain(), TagValue.of("tag1", "v1"), state -> {})),
+        Pair.of(
+            "insertDomainWithNewBackingTag",
+            () -> store.insertDomainWithNewBackingTag(domain(), backingTag(), state -> {})),
+        Pair.of(
+            "updateDomainBackingTagAndGet",
+            () ->
+                store.updateDomainBackingTagAndGet(
+                    DOMAIN_IDENT, TagValue.noValue("tag1"), AUDIT_INFO, state -> {})),
         Pair.of(
             "setDomainParentAndGet",
             () ->
@@ -377,6 +389,16 @@ public class TestRelationalEntityStoreLockWaitTimeout {
         .withNamespace(DOMAIN_IDENT.namespace())
         .withProperties(ImmutableMap.of())
         .withStatus(Domain.Status.DRAFT)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private static TagEntity backingTag() {
+    return TagEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName("tag1")
+        .withNamespace(NamespaceUtil.ofTag(METALAKE))
+        .withAllowedValues(new String[0])
         .withAuditInfo(AUDIT_INFO)
         .build();
   }

@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
@@ -37,16 +39,22 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -55,8 +63,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The domain manager. It keeps the domain hierarchy one level deep and the status of each domain
- * consistent with its parent and sub-domains (see {@link DomainDispatcher}).
+ * The domain manager. It keeps the domain hierarchy one level deep, the status of each domain
+ * consistent with its parent and sub-domains, and the backing tag bindings free of conflicts (see
+ * {@link DomainDispatcher}).
  *
  * <p>The rules that involve other domains are checked by the entity store's domain operations,
  * against the domains as they are under the row locks of the change, so that a concurrent change
@@ -115,9 +124,12 @@ public class DomainManager implements DomainDispatcher {
       String metalake,
       String name,
       @Nullable String comment,
-      @Nullable Map<String, String> properties)
-      throws DomainAlreadyExistsException {
-    return insertDomain(metalake, null, name, comment, properties);
+      @Nullable Map<String, String> properties,
+      TagValue backingTag,
+      boolean createBackingTag)
+      throws DomainAlreadyExistsException, NoSuchTagException, TagAlreadyExistsException,
+          BackingTagAlreadyBoundException, IllegalArgumentException {
+    return insertDomain(metalake, null, name, comment, properties, backingTag, createBackingTag);
   }
 
   @Override
@@ -126,10 +138,13 @@ public class DomainManager implements DomainDispatcher {
       String parent,
       String name,
       @Nullable String comment,
-      @Nullable Map<String, String> properties)
-      throws NoSuchDomainException, DomainAlreadyExistsException, IllegalArgumentException {
+      @Nullable Map<String, String> properties,
+      TagValue backingTag,
+      boolean createBackingTag)
+      throws NoSuchDomainException, DomainAlreadyExistsException, NoSuchTagException,
+          TagAlreadyExistsException, BackingTagAlreadyBoundException, IllegalArgumentException {
     checkParentName(name, parent);
-    return insertDomain(metalake, parent, name, comment, properties);
+    return insertDomain(metalake, parent, name, comment, properties, backingTag, createBackingTag);
   }
 
   @Override
@@ -203,6 +218,27 @@ public class DomainManager implements DomainDispatcher {
   }
 
   @Override
+  public DomainEntity updateBackingTag(String metalake, String name, @Nullable TagValue backingTag)
+      throws NoSuchDomainException, NoSuchTagException, BackingTagAlreadyBoundException,
+          IllegalArgumentException {
+    checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+    try {
+      return domainOperations()
+          .updateDomainBackingTagAndGet(
+              NameIdentifierUtil.ofDomain(metalake, name),
+              backingTag,
+              newAuditInfo(),
+              state -> checkBackingTagUpdate(state, backingTag));
+    } catch (NoSuchEntityException e) {
+      throw noSuchDomain(e, metalake, name);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to update the backing tag of domain {} under metalake {}", name, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  @Override
   public DomainEntity[] listSubdomainInfos(String metalake, String name)
       throws NoSuchDomainException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
@@ -260,15 +296,39 @@ public class DomainManager implements DomainDispatcher {
   }
 
   /**
-   * Checks a new sub-domain against its locked parent: the parent must be top-level, so that a
-   * sub-domain has no sub-domains. A new domain has no sub-domains of its own and is a draft, so
-   * the other rules of an attach hold for it.
+   * Checks a new domain against the locked state: the parent of a new sub-domain must be top-level,
+   * so that a sub-domain has no sub-domains, and the backing tag must allow the value and not
+   * conflict with the bindings of other domains. A new domain has no sub-domains of its own and is
+   * a draft, so the other rules of an attach hold for it.
    *
    * @param state The locked state of the insert.
    */
   @VisibleForTesting
   static void checkNewDomain(LockedDomainState state) {
-    state.parent().ifPresent(parent -> checkParentIsTopLevel(state.domain(), parent));
+    DomainEntity domain = state.domain();
+    state.parent().ifPresent(parent -> checkParentIsTopLevel(domain, parent));
+    checkBinding(domain, Optional.ofNullable(domain.backingTagValue()), state);
+  }
+
+  /**
+   * Checks a change of the backing tag against the locked state. Removing the backing tag, or
+   * setting the current one, changes no binding and is not checked.
+   *
+   * @param state The locked state of the change.
+   * @param backingTag The new backing tag, or null to remove it.
+   */
+  @VisibleForTesting
+  static void checkBackingTagUpdate(LockedDomainState state, @Nullable TagValue backingTag) {
+    if (backingTag == null) {
+      return;
+    }
+    DomainEntity domain = state.domain();
+    TagEntity tag = lockedBackingTag(state);
+    if (Objects.equals(domain.backingTagId(), tag.id())
+        && Objects.equals(domain.backingTagValue(), backingTag.value().orElse(null))) {
+      return;
+    }
+    checkBinding(domain, backingTag.value(), state);
   }
 
   /**
@@ -357,10 +417,17 @@ public class DomainManager implements DomainDispatcher {
       @Nullable String parent,
       String name,
       @Nullable String comment,
-      @Nullable Map<String, String> properties) {
+      @Nullable Map<String, String> properties,
+      TagValue backingTag,
+      boolean createBackingTag) {
+    Preconditions.checkArgument(
+        backingTag != null, "The backing tag of domain %s must not be null", name);
+    Preconditions.checkArgument(
+        !createBackingTag || !backingTag.value().isPresent(),
+        "The new backing tag %s of domain %s cannot have a value",
+        backingTag.name(),
+        name);
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
-    // TODO: The next PR of #13884 sets the backing tag here: it creates a new tag or binds an
-    // existing (tag, value), in the same transaction as the domain, under the binding rules.
     DomainEntity domain =
         DomainEntity.builder()
             .withId(idGenerator.nextId())
@@ -378,19 +445,29 @@ public class DomainManager implements DomainDispatcher {
             .build();
 
     try {
-      // Return the parent's name as stored, read under its lock, rather than the requested one:
-      // on MySQL, a name with trailing spaces finds the same parent row.
-      String[] storedParent = new String[] {parent};
-      domainOperations()
-          .insertDomain(
-              domain,
-              state -> {
-                checkNewDomain(state);
-                state.parent().ifPresent(lockedParent -> storedParent[0] = lockedParent.name());
-              });
-      return Objects.equals(storedParent[0], parent)
-          ? domain
-          : domain.toBuilder().withParent(storedParent[0]).build();
+      // Return the domain as the check saw it, with its backing tag set, and with the parent's
+      // name as stored, read under its lock, rather than the requested one: on MySQL, a name with
+      // trailing spaces finds the same parent row.
+      DomainEntity[] inserted = new DomainEntity[1];
+      Consumer<LockedDomainState> check =
+          state -> {
+            checkNewDomain(state);
+            DomainEntity checked = state.domain();
+            inserted[0] =
+                state
+                    .parent()
+                    .map(
+                        lockedParent -> checked.toBuilder().withParent(lockedParent.name()).build())
+                    .orElse(checked);
+          };
+      if (createBackingTag) {
+        domainOperations()
+            .insertDomainWithNewBackingTag(
+                domain, newBackingTag(metalake, backingTag.name()), check);
+      } else {
+        domainOperations().insertDomainWithBackingTag(domain, backingTag, check);
+      }
+      return inserted[0];
     } catch (EntityAlreadyExistsException e) {
       throw new DomainAlreadyExistsException(
           e, "Domain %s under metalake %s already exists", name, metalake);
@@ -434,6 +511,22 @@ public class DomainManager implements DomainDispatcher {
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  // A new backing tag allows no values, so it backs one domain only.
+  private TagEntity newBackingTag(String metalake, String tagName) {
+    return TagEntity.builder()
+        .withId(idGenerator.nextId())
+        .withName(tagName)
+        .withNamespace(NamespaceUtil.ofTag(metalake))
+        .withProperties(Collections.emptyMap())
+        .withAllowedValues(TagValueConstraint.noValue().allowedValues())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                .withCreateTime(Instant.now())
+                .build())
+        .build();
   }
 
   private SupportsDomainOperations domainOperations() {
@@ -494,6 +587,44 @@ public class DomainManager implements DomainDispatcher {
     Preconditions.checkArgument(parent != null, "The parent domain name must not be null");
     Preconditions.checkArgument(
         !Objects.equals(name, parent), "Domain %s cannot be its own parent", name);
+  }
+
+  // Checks that the locked backing tag allows the value and that no other domain has a binding of
+  // the tag that conflicts with it: a tag has either one binding without a value, or bindings with
+  // values where each value backs at most one domain.
+  private static void checkBinding(
+      DomainEntity domain, Optional<String> value, LockedDomainState state) {
+    TagEntity tag = lockedBackingTag(state);
+    tag.validateAllowedValue(
+        value.map(v -> TagValue.of(tag.name(), v)).orElseGet(() -> TagValue.noValue(tag.name())));
+
+    for (DomainEntity bound : state.backingTagBindings()) {
+      if (Objects.equals(bound.id(), domain.id())) {
+        continue;
+      }
+      if (bound.backingTagValue() == null) {
+        throw new BackingTagAlreadyBoundException(
+            "Tag %s already backs domain %s without a value, so it cannot back domain %s",
+            tag.name(), bound.name(), domain.name());
+      }
+      if (!value.isPresent()) {
+        throw new BackingTagAlreadyBoundException(
+            "Tag %s already backs domain %s with value %s, so it cannot back domain %s without a"
+                + " value",
+            tag.name(), bound.name(), bound.backingTagValue(), domain.name());
+      }
+      if (value.get().equals(bound.backingTagValue())) {
+        throw new BackingTagAlreadyBoundException(
+            "Tag %s with value %s already backs domain %s, so it cannot back domain %s",
+            tag.name(), value.get(), bound.name(), domain.name());
+      }
+    }
+  }
+
+  private static TagEntity lockedBackingTag(LockedDomainState state) {
+    return state
+        .backingTag()
+        .orElseThrow(() -> new IllegalStateException("A backing tag binding needs a tag"));
   }
 
   private static void checkParentIsTopLevel(DomainEntity domain, DomainEntity parent) {
