@@ -64,7 +64,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.DatabaseInput;
+import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GetPartitionRequest;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.TableInput;
@@ -498,6 +502,101 @@ abstract class AbstractGlueCatalogIT {
   // -------------------------------------------------------------------------
   // Partition tests
   // -------------------------------------------------------------------------
+
+  @Test
+  void testAlterNativeTableKeepsFieldsGravitinoDoesNotModel() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    glueClient()
+        .createTable(
+            CreateTableRequest.builder()
+                .databaseName(schema)
+                .tableInput(
+                    TableInput.builder()
+                        .name("native_tbl")
+                        .owner("crawler")
+                        .tableType("EXTERNAL_TABLE")
+                        .parameters(Map.of("classification", "csv"))
+                        .storageDescriptor(
+                            StorageDescriptor.builder()
+                                .columns(
+                                    software.amazon.awssdk.services.glue.model.Column.builder()
+                                        .name("s")
+                                        .type("struct<Outer:int>")
+                                        .parameters(Map.of("stat", "1"))
+                                        .build())
+                                .location("s3://gravitino-test-bucket/" + schema + "/native_tbl")
+                                .parameters(Map.of("recordCount", "10"))
+                                .build())
+                        .build())
+                .build());
+
+    ops.alterTable(tableIdent(schema, "native_tbl"), TableChange.updateComment("altered"));
+
+    software.amazon.awssdk.services.glue.model.Table stored =
+        glueClient()
+            .getTable(GetTableRequest.builder().databaseName(schema).name("native_tbl").build())
+            .table();
+    assertEquals("altered", stored.description());
+    assertEquals("crawler", stored.owner());
+    assertEquals("csv", stored.parameters().get("classification"));
+    assertEquals("10", stored.storageDescriptor().parameters().get("recordCount"));
+    assertEquals("struct<Outer:int>", stored.storageDescriptor().columns().get(0).type());
+    assertEquals("1", stored.storageDescriptor().columns().get(0).parameters().get("stat"));
+  }
+
+  @Test
+  void testAlterSchemaKeepsNativeLocationUri() {
+    String schema = newSchema();
+    String location = "s3://gravitino-test-bucket/" + schema;
+    glueClient()
+        .createDatabase(
+            CreateDatabaseRequest.builder()
+                .databaseInput(DatabaseInput.builder().name(schema).locationUri(location).build())
+                .build());
+
+    ops.alterSchema(schemaIdent(schema), SchemaChange.setProperty("k", "v"));
+
+    assertEquals(
+        location,
+        glueClient()
+            .getDatabase(GetDatabaseRequest.builder().name(schema).build())
+            .database()
+            .locationUri());
+    assertEquals(
+        location, ops.loadSchema(schemaIdent(schema)).properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAddPartitionIsEscapedAndReadable() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    SupportsPartitions sp = createPartitionedTable(schema, "ptbl");
+
+    Partition added = sp.addPartition(identityPartition("2025/12/31"));
+
+    assertEquals("dt=2025%2F12%2F31", added.name());
+    assertTrue(Arrays.asList(sp.listPartitionNames()).contains("dt=2025%2F12%2F31"));
+    assertEquals("dt=2025%2F12%2F31", sp.getPartition("dt=2025%2F12%2F31").name());
+
+    software.amazon.awssdk.services.glue.model.Partition stored =
+        glueClient()
+            .getPartition(
+                GetPartitionRequest.builder()
+                    .databaseName(schema)
+                    .tableName("ptbl")
+                    .partitionValues("2025/12/31")
+                    .build())
+            .partition();
+    assertEquals(
+        "s3://gravitino-test-bucket/" + schema + "/ptbl/dt=2025%2F12%2F31",
+        stored.storageDescriptor().location());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
+        stored.storageDescriptor().serdeInfo().serializationLibrary());
+
+    assertTrue(sp.dropPartition("dt=2025%2F12%2F31"));
+  }
 
   @Test
   void testAddPartition() {

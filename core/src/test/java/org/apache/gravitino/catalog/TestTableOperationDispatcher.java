@@ -1247,6 +1247,139 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testAlterTableKeepsColumnIdWhenRenameDiffersInCase() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_column_rename_case");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_column_rename_case");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    // A catalog that matches column names case-insensitively, such as MySQL, accepts "col" for a
+    // column stored as "Col".
+    entityStore.update(
+        tableIdent,
+        TableEntity.class,
+        TABLE,
+        (TableEntity old) -> renameStoredColumn(old, "col", "Col"));
+    long colId = columnIds(tableIdent).get("Col");
+
+    tableOperationDispatcher.alterTable(
+        tableIdent, TableChange.renameColumn(new String[] {"col"}, "renamed"));
+
+    Map<String, Long> ids = columnIds(tableIdent);
+    Assertions.assertEquals(ImmutableMap.of("renamed", colId), ids);
+  }
+
+  @Test
+  public void testAlignNameChangesWithStoredColumns() {
+    List<ColumnEntity> stored =
+        Arrays.asList(storedColumn("Col"), storedColumn("Other"), storedColumn("dup"));
+
+    Map<String, String> changes = new HashMap<>();
+    changes.put("col", "renamed");
+    changes.put("OTHER", null);
+    Map<String, String> expected = new HashMap<>();
+    expected.put("Col", "renamed");
+    expected.put("Other", null);
+    Assertions.assertEquals(
+        expected, TableOperationDispatcher.alignNameChangesWithStoredColumns(changes, stored));
+
+    // An exact match wins, and a name matching several stored columns is left as it is.
+    List<ColumnEntity> ambiguous =
+        Arrays.asList(
+            storedColumn("a"), storedColumn("A"), storedColumn("Dup"), storedColumn("DUP"));
+    Map<String, String> exactAndAmbiguous = ImmutableMap.of("a", "b", "dup", "c");
+    Assertions.assertEquals(
+        exactAndAmbiguous,
+        TableOperationDispatcher.alignNameChangesWithStoredColumns(exactAndAmbiguous, ambiguous));
+  }
+
+  @Test
+  public void testAlignNameChangesWithCatalogColumns() {
+    Column[] folded = {catalogColumn("customerid"), catalogColumn("cust"), catalogColumn("amount")};
+
+    // A rename target that differs in case from a catalog column is mapped to it.
+    Map<String, String> changes = new HashMap<>();
+    changes.put("cust_id", "CustomerId");
+    changes.put("cust2", "CUST");
+    changes.put("amount2", "amount");
+    changes.put("dropped", null);
+    Map<String, String> expected = new HashMap<>();
+    expected.put("cust_id", "customerid");
+    expected.put("cust2", "cust");
+    expected.put("amount2", "amount");
+    expected.put("dropped", null);
+    Assertions.assertEquals(
+        expected, TableOperationDispatcher.alignNameChangesWithCatalogColumns(changes, folded));
+
+    // A column is not taken from a rename that names it exactly, and several matches are ambiguous.
+    Map<String, String> claimed = ImmutableMap.of("a", "x", "b", "X");
+    Assertions.assertEquals(
+        claimed,
+        TableOperationDispatcher.alignNameChangesWithCatalogColumns(
+            claimed, new Column[] {catalogColumn("x")}));
+    Map<String, String> ambiguous = ImmutableMap.of("a", "Xy");
+    Assertions.assertEquals(
+        ambiguous,
+        TableOperationDispatcher.alignNameChangesWithCatalogColumns(
+            ambiguous, new Column[] {catalogColumn("xy"), catalogColumn("XY")}));
+
+    // A catalog that reports no columns leaves the changes as they are.
+    Assertions.assertEquals(
+        ambiguous, TableOperationDispatcher.alignNameChangesWithCatalogColumns(ambiguous, null));
+  }
+
+  @Test
+  public void testWithCatalogColumnNames() {
+    Column requested = Column.of("UserId", Types.LongType.get(), "the user", false, false, null);
+    Column other = catalogColumn("Other");
+
+    Column[] named =
+        TableOperationDispatcher.withCatalogColumnNames(
+            new Column[] {requested, other},
+            new Column[] {catalogColumn("userid"), catalogColumn("different")});
+    Assertions.assertEquals("userid", named[0].name());
+    Assertions.assertEquals(Types.LongType.get(), named[0].dataType());
+    Assertions.assertEquals("the user", named[0].comment());
+    Assertions.assertFalse(named[0].nullable());
+    Assertions.assertEquals("Other", named[1].name());
+
+    // Columns that do not line up with the request keep the requested names.
+    Column[] mismatched = {requested};
+    Assertions.assertArrayEquals(
+        mismatched,
+        TableOperationDispatcher.withCatalogColumnNames(
+            mismatched, new Column[] {catalogColumn("userid"), catalogColumn("extra")}));
+  }
+
+  private static Column catalogColumn(String name) {
+    return Column.of(name, Types.IntegerType.get());
+  }
+
+  private static ColumnEntity storedColumn(String name) {
+    return ColumnEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withPosition(0)
+        .withDataType(Types.IntegerType.get())
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  @Test
+>>>>>>> 7ab9943c0 ([#14560] fix(catalog-glue): Fix Hive table, schema and partition handling (#14561))
   public void testResolveColumnNameChanges() {
     Assertions.assertEquals(
         ImmutableMap.of("a", "c"),

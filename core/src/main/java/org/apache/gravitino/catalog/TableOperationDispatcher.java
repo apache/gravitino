@@ -341,7 +341,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
                                 updateColumnsIfNecessary(
+<<<<<<< HEAD
                                     alteredTable, tableEntity, catalogResult.columnNameChanges);
+=======
+                                    alteredTable,
+                                    tableEntity,
+                                    alignNameChangesWithCatalogColumns(
+                                        alignNameChangesWithStoredColumns(
+                                            catalogResult.columnNameChanges, tableEntity.columns()),
+                                        alteredTable.columns()));
+>>>>>>> 7ab9943c0 ([#14560] fix(catalog-glue): Fix Hive table, schema and partition handling (#14561))
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -670,9 +679,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withCreateTime(Instant.now())
             .build();
     List<ColumnEntity> columnEntityList =
-        IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
-            .collect(Collectors.toList());
+        toColumnEntities(withCatalogColumnNames(columns, table.columns()), audit);
 
     TableEntity tableEntity =
         TableEntity.builder()
@@ -693,6 +700,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(catalogResult.hiddenProperties);
+  }
+
+  /**
+   * Returns the requested columns under the names the catalog reports for them. A catalog may store
+   * a name in another case than requested, and the stored entity has to carry the name the catalog
+   * reports on later loads. A column whose name differs by more than case keeps the requested name.
+   *
+   * @param columns the columns of the create request
+   * @param catalogColumns the columns the catalog reports for the created table
+   * @return the columns to store
+   */
+  @VisibleForTesting
+  static Column[] withCatalogColumnNames(Column[] columns, Column[] catalogColumns) {
+    if (columns.length != catalogColumns.length) {
+      return columns;
+    }
+
+    Column[] named = columns.clone();
+    for (int i = 0; i < columns.length; i++) {
+      Column column = columns[i];
+      String catalogName = catalogColumns[i].name();
+      if (!catalogName.equals(column.name()) && catalogName.equalsIgnoreCase(column.name())) {
+        named[i] =
+            Column.of(
+                catalogName,
+                column.dataType(),
+                column.comment(),
+                column.nullable(),
+                column.autoIncrement(),
+                column.defaultValue());
+      }
+    }
+    return named;
   }
 
   private TableCatalogResult snapshotTable(
@@ -828,6 +868,89 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return originalToCurrent;
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Keys the column renames and drops by the names of the stored columns.
+   *
+   * <p>Some catalogs, such as MySQL, match column names case-insensitively while reporting
+   * case-sensitive names, so they accept a change whose column name differs in case from the stored
+   * one. Such a name is mapped to the stored column it matches when exactly one does, so a rename
+   * keeps the column id instead of being stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops returned by {@link #resolveColumnNameChanges}
+   * @param storedColumns the columns of the stored table entity, or {@code null} if it has none
+   * @return the renames and drops keyed by the stored column names
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithStoredColumns(
+      Map<String, String> nameChanges, @Nullable List<ColumnEntity> storedColumns) {
+    if (nameChanges.isEmpty() || storedColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> storedNames =
+        storedColumns.stream().map(ColumnEntity::name).collect(Collectors.toSet());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String name = change.getKey();
+      if (!storedNames.contains(name)) {
+        List<String> matches =
+            storedNames.stream()
+                .filter(stored -> stored.equalsIgnoreCase(change.getKey()))
+                .filter(stored -> !nameChanges.containsKey(stored))
+                .collect(Collectors.toList());
+        if (matches.size() == 1 && !aligned.containsKey(matches.get(0))) {
+          name = matches.get(0);
+        }
+      }
+      aligned.put(name, change.getValue());
+    }
+    return aligned;
+  }
+
+  /**
+   * Points column renames at the names the catalog reports.
+   *
+   * <p>A catalog may store a name in another case than requested, such as Glue for Hive-format
+   * tables. A rename target the catalog does not report is mapped to the catalog column it matches
+   * when exactly one unclaimed column does, so the rename keeps the column id instead of being
+   * stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops keyed by the stored column names
+   * @param catalogColumns the columns the catalog reports, or {@code null} if it reports none
+   * @return the renames and drops with targets the catalog reports
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithCatalogColumns(
+      Map<String, String> nameChanges, @Nullable Column[] catalogColumns) {
+    if (nameChanges.isEmpty() || catalogColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> catalogNames =
+        Arrays.stream(catalogColumns).map(Column::name).collect(Collectors.toSet());
+    Set<String> claimed = new HashSet<>(nameChanges.values());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String target = change.getValue();
+      if (target != null && !catalogNames.contains(target)) {
+        List<String> matches =
+            catalogNames.stream()
+                .filter(target::equalsIgnoreCase)
+                .filter(name -> !claimed.contains(name))
+                .collect(Collectors.toList());
+        if (matches.size() == 1) {
+          target = matches.get(0);
+          claimed.add(target);
+        }
+      }
+      aligned.put(change.getKey(), target);
+    }
+    return aligned;
+  }
+
+>>>>>>> 7ab9943c0 ([#14560] fix(catalog-glue): Fix Hive table, schema and partition handling (#14561))
   /** Returns the original name of the pre-existing column currently called {@code name}. */
   @Nullable
   private static String originalColumnNamed(
