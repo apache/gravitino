@@ -19,8 +19,10 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -232,5 +234,63 @@ class TestGlueTypeConverter {
   private static void roundTrip(String glueType, Type gravitinoType) {
     assertEquals(gravitinoType, CONVERTER.toGravitino(glueType));
     assertEquals(glueType, CONVERTER.fromGravitino(gravitinoType));
+  }
+
+  @Test
+  void testStructFieldNamesKeepTheirCase() {
+    String glueType = "struct<Outer:struct<InNer:int>,lowx:string>";
+    Types.StructType struct = (Types.StructType) CONVERTER.toGravitino(glueType);
+
+    assertEquals("Outer", struct.fields()[0].name());
+    assertEquals("InNer", ((Types.StructType) struct.fields()[0].type()).fields()[0].name());
+    assertEquals(glueType, CONVERTER.fromGravitino(struct));
+  }
+
+  @Test
+  void testStructFieldNameThatBreaksTypeStringIsRefused() {
+    for (String name : new String[] {"a:b", "x,y", "a<b", " ", "a(", "b)", " a", "a "}) {
+      Types.StructType struct =
+          Types.StructType.of(Types.StructType.Field.nullableField(name, Types.IntegerType.get()));
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(struct));
+      assertTrue(e.getMessage().contains("Struct field name"), e.getMessage());
+    }
+  }
+
+  @Test
+  void testBareDecimalAndDoublePrecision() {
+    assertEquals(Types.DecimalType.of(10, 0), CONVERTER.toGravitino("decimal"));
+    assertEquals(Types.DecimalType.of(10, 0), CONVERTER.toGravitino("DECIMAL"));
+    assertEquals(
+        Types.ListType.nullable(Types.DecimalType.of(10, 0)),
+        CONVERTER.toGravitino("array<DECIMAL>"));
+    assertEquals(Types.DoubleType.get(), CONVERTER.toGravitino("double precision"));
+    assertEquals(
+        Types.MapType.valueNullable(Types.StringType.get(), Types.DoubleType.get()),
+        CONVERTER.toGravitino("map<string,DOUBLE PRECISION>"));
+  }
+
+  @Test
+  void testUnsignedIntegersAreRefused() {
+    for (Type type :
+        new Type[] {
+          Types.ByteType.unsigned(),
+          Types.ShortType.unsigned(),
+          Types.IntegerType.unsigned(),
+          Types.LongType.unsigned()
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(type));
+      assertTrue(e.getMessage().contains(type.simpleString()), e.getMessage());
+    }
+  }
+
+  @Test
+  void testUnsupportedTypeMessageUsesTypeSyntax() {
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.FixedType.of(16)));
+    assertTrue(e.getMessage().contains("fixed(16)"), e.getMessage());
+    assertFalse(e.getMessage().contains("@"), e.getMessage());
   }
 }

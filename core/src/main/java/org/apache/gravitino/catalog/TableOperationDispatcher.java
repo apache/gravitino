@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Entity.EntityType.COLUMN;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
@@ -161,22 +160,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to load.
    * @return The loaded {@link Table} object representing the requested table.
    * @throws NoSuchTableException If the specified table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
 
-    if (!entityCombinedTable.imported()) {
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the table.
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
       try {
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
         // HA race: another Gravitino node concurrently imported this table. Reload from the
         // entity store to pick up the entity stored by the winning node.
@@ -213,6 +227,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadTable to import it.
    */
   @Override
   public Table createTable(
@@ -238,8 +254,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Lock the table node, not the schema, so tables in the same schema can be created
     // concurrently. The connector call and the entity-store write otherwise run under one
     // schema-wide lock, which serialized all creates in a schema. Ancestors are still read-locked,
-    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop/import
-    // (schema WRITE); a same-name create, load or alter contends on the table node.
+    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop
+    // (schema WRITE); a same-name create, load/import or alter contends on the table node.
     // Trade-off: listTables may briefly observe a table whose creation has not committed yet.
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -322,15 +338,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         isRenameTable && !managed
                             ? getTableEntityBeforeRename(ident)
                             : Optional.empty();
-                    TableChange[] normalizedChanges =
-                        applyCapabilities(catalog.capabilities(), changes);
+                    // TableNormalizeDispatcher already normalized the changes. Normalization can
+                    // depend on quoting and must not be repeated on canonical physical names.
                     Table table =
-                        catalog.doWithTableOps(
-                            tableOps -> tableOps.alterTable(ident, normalizedChanges));
+                        catalog.doWithTableOps(tableOps -> tableOps.alterTable(ident, changes));
                     return new AlterTableCatalogResult(
                         snapshotTable(catalog, table, managed),
                         tableEntityBeforeRename,
-                        resolveColumnNameChanges(normalizedChanges));
+                        resolveColumnNameChanges(changes));
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
@@ -385,8 +400,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 updateColumnsIfNecessary(
                                     alteredTable,
                                     tableEntity,
-                                    alignNameChangesWithStoredColumns(
-                                        catalogResult.columnNameChanges, tableEntity.columns()));
+                                    alignNameChangesWithCatalogColumns(
+                                        alignNameChangesWithStoredColumns(
+                                            catalogResult.columnNameChanges, tableEntity.columns()),
+                                        alteredTable.columns()));
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -761,9 +778,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withCreateTime(Instant.now())
             .build();
     List<ColumnEntity> columnEntityList =
-        IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
-            .collect(Collectors.toList());
+        toColumnEntities(withCatalogColumnNames(columns, table.columns()), audit);
 
     TableEntity tableEntity =
         TableEntity.builder()
@@ -776,14 +791,59 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     try {
       store.put(tableEntity, true /* overwrite */);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table %s was created in the external catalog, but its registration conflicts with an "
+              + "existing entity. Verify and reconcile the registered and source identities before "
+              + "continuing; loading the table does not resolve this conflict.",
+          ident);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      throw new GravitinoRuntimeException(
+          e,
+          "Table %s was created in the external catalog, but its registration in Gravitino "
+              + "failed. Resolve the entity-store error, verify the source identity, and use "
+              + "loadTable to import it. Do not repeat createTable; it will report already exists.",
+          ident);
     }
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(catalogResult.hiddenProperties);
+  }
+
+  /**
+   * Returns the requested columns under the names the catalog reports for them. A catalog may store
+   * a name in another case than requested, and the stored entity has to carry the name the catalog
+   * reports on later loads. A column whose name differs by more than case keeps the requested name.
+   *
+   * @param columns the columns of the create request
+   * @param catalogColumns the columns the catalog reports for the created table
+   * @return the columns to store
+   */
+  @VisibleForTesting
+  static Column[] withCatalogColumnNames(Column[] columns, Column[] catalogColumns) {
+    if (columns.length != catalogColumns.length) {
+      return columns;
+    }
+
+    Column[] named = columns.clone();
+    for (int i = 0; i < columns.length; i++) {
+      Column column = columns[i];
+      String catalogName = catalogColumns[i].name();
+      if (!catalogName.equals(column.name()) && catalogName.equalsIgnoreCase(column.name())) {
+        named[i] =
+            Column.of(
+                catalogName,
+                column.dataType(),
+                column.comment(),
+                column.nullable(),
+                column.autoIncrement(),
+                column.defaultValue());
+      }
+    }
+    return named;
   }
 
   private TableCatalogResult snapshotTable(
@@ -1007,6 +1067,47 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         }
       }
       aligned.put(name, change.getValue());
+    }
+    return aligned;
+  }
+
+  /**
+   * Points column renames at the names the catalog reports.
+   *
+   * <p>A catalog may store a name in another case than requested, such as Glue for Hive-format
+   * tables. A rename target the catalog does not report is mapped to the catalog column it matches
+   * when exactly one unclaimed column does, so the rename keeps the column id instead of being
+   * stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops keyed by the stored column names
+   * @param catalogColumns the columns the catalog reports, or {@code null} if it reports none
+   * @return the renames and drops with targets the catalog reports
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithCatalogColumns(
+      Map<String, String> nameChanges, @Nullable Column[] catalogColumns) {
+    if (nameChanges.isEmpty() || catalogColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> catalogNames =
+        Arrays.stream(catalogColumns).map(Column::name).collect(Collectors.toSet());
+    Set<String> claimed = new HashSet<>(nameChanges.values());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String target = change.getValue();
+      if (target != null && !catalogNames.contains(target)) {
+        List<String> matches =
+            catalogNames.stream()
+                .filter(target::equalsIgnoreCase)
+                .filter(name -> !claimed.contains(name))
+                .collect(Collectors.toList());
+        if (matches.size() == 1) {
+          target = matches.get(0);
+          claimed.add(target);
+        }
+      }
+      aligned.put(change.getKey(), target);
     }
     return aligned;
   }

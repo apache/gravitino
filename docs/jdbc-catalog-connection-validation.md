@@ -110,3 +110,34 @@ A timeout value you set directly on the connection or in the `jdbc-url` query st
 overridden; drivers whose family is not recognized are left unbounded by Gravitino. The pooled
 timeout is applied as a per-connection bound, so the pool stays lazy and no connection is opened
 until the first real round trip.
+
+## Driver adapter for physical connection deadlines
+
+Connector implementations can opt into `org.apache.gravitino.utils.BoundedConnectionDriver`
+when their JDBC driver does not enforce a login timeout. Wrap the driver with a positive
+timeout in milliseconds and pass the wrapper to the connection pool as its driver. No
+existing connector is automatically switched to this adapter by this addition.
+
+Only `Driver.connect` runs on a worker. Metadata, validation and SQL remain on the caller;
+this does not introduce delayed DDL or an automatic retry. A connection returned after
+timeout/interruption is closed by the worker and never handed to the caller or pool.
+While an abandoned attempt is still connecting or closing, new attempts through that wrapper
+fail immediately. Pool waits, connection validation, SQL and total request duration retain
+their own budgets.
+
+The core-loaded adapter shares at most 64 daemon workers per server JVM, with no queue.
+Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
+healthy connects. Cancellation is best effort: an uninterruptible driver or close can retain
+a worker and its driver resources until it returns or the server restarts. Completed workers
+restore their context class loader. The adapter does not bound arbitrary driver constructor
+work or clean up driver-owned global threads.
+
+Each attempt and its late connection cleanup use the submitting caller's access-control
+context and JAAS subject. Shared workers are created without inheriting the first caller's
+subject, so reusing a worker does not reuse that caller's JAAS subject.
+
+This guarantee covers access-control contexts and JAAS subjects, not arbitrary `ThreadLocal`
+or `InheritableThreadLocal` state. Drivers using the shared workers must clean up their own
+thread-local state and must not depend on inherited thread locals for caller authentication.
+Drivers that cannot meet these requirements must not opt into this adapter. Isolating workers
+by catalog alone would not isolate different users of the same catalog.
