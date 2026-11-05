@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -572,7 +573,8 @@ public class CapabilityHelpers {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        column.defaultValue());
+        column.defaultValue(),
+        column.initialDefaultValue());
   }
 
   static String applyCapabilitiesOnName(
@@ -620,12 +622,21 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue(), capabilities);
   }
 
   private static void applyColumnDefaultValue(
       String columnName, Expression defaultValue, Capability capabilities) {
     Preconditions.checkArgument(
         capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
+        capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+  }
+
+  private static void applyColumnInitialDefaultValue(
+      String columnName, Expression initialDefaultValue, Capability capabilities) {
+    Preconditions.checkArgument(
+        capabilities.columnDefaultValue().supported()
+            || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
   }
 

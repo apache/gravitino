@@ -27,6 +27,7 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -117,6 +118,33 @@ public class TestIcebergTableUpdate {
     LoadTableResponse loadTableResponse = updateTable(identifier, updateComment);
     String comment = loadTableResponse.tableMetadata().property("comment", "");
     Assertions.assertTrue(comment.equals(comments));
+  }
+
+  @Test
+  public void testAddColumnWithDefaultValue() {
+    String addColumnName = "add_with_default";
+    TableChange addColumn =
+        TableChange.addColumn(
+            new String[] {addColumnName},
+            Types.StringType.get(),
+            "doc",
+            Literals.stringLiteral("seed"));
+    LoadTableResponse response = updateTable(identifier, addColumn);
+    NestedField field = response.tableMetadata().schema().findField(addColumnName);
+    Assertions.assertNotNull(field);
+    Assertions.assertEquals("seed", field.writeDefault());
+    Assertions.assertEquals("seed", field.initialDefault());
+    Assertions.assertTrue(response.tableMetadata().formatVersion() >= 3);
+  }
+
+  @Test
+  public void testUpdateColumnDefaultValue() {
+    TableChange updateDefault =
+        TableChange.updateColumnDefaultValue(firstField, Literals.stringLiteral("updated_default"));
+    LoadTableResponse response = updateTable(identifier, updateDefault);
+    NestedField field = response.tableMetadata().schema().findField(firstField[0]);
+    Assertions.assertEquals("updated_default", field.writeDefault());
+    Assertions.assertTrue(response.tableMetadata().formatVersion() >= 3);
   }
 
   @Test

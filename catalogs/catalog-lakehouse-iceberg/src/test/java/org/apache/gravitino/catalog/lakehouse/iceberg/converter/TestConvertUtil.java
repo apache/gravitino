@@ -711,6 +711,37 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertEquals(Literals.stringLiteral("US"), column.initialDefaultValue());
   }
 
+  @Test
+  public void testToIcebergSchemaAppliesWriteAndInitialDefaults() {
+    Column[] columns =
+        new Column[] {
+          IcebergColumn.builder()
+              .withName("region")
+              .withType(org.apache.gravitino.rel.types.Types.StringType.get())
+              .withNullable(false)
+              .withDefaultValue(Literals.stringLiteral("EU"))
+              .withInitialDefaultValue(Literals.stringLiteral("US"))
+              .build(),
+          IcebergColumn.builder()
+              .withName("n")
+              .withType(org.apache.gravitino.rel.types.Types.IntegerType.get())
+              .withNullable(true)
+              .withDefaultValue(Literals.integerLiteral(8))
+              .build()
+        };
+
+    Schema schema = ConvertUtil.toIcebergSchema(columns);
+    Types.NestedField region = schema.findField("region");
+    Assertions.assertEquals("EU", region.writeDefault());
+    Assertions.assertEquals("US", region.initialDefault());
+
+    Types.NestedField n = schema.findField("n");
+    // When only write-default is supplied, seed both (Iceberg addColumn behavior).
+    Assertions.assertEquals(8, n.writeDefault());
+    Assertions.assertEquals(8, n.initialDefault());
+    Assertions.assertTrue(ConvertUtil.hasColumnDefaults(columns));
+  }
+
   private static void checkType(Type type, org.apache.gravitino.rel.types.Type expected) {
     org.apache.gravitino.rel.types.Type actual = CONVERTER.toGravitino(type);
     checkType(actual, expected);

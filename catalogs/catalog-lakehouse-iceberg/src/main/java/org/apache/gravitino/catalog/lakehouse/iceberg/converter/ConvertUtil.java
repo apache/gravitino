@@ -21,7 +21,12 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
@@ -45,15 +50,12 @@ public class ConvertUtil {
    * @return Iceberg schema.
    */
   public static Schema toIcebergSchema(IcebergTable gravitinoTable) {
-    org.apache.gravitino.rel.types.Types.StructType gravitinoStructType =
-        toGravitinoStructType(gravitinoTable);
-    Type converted =
-        ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
-    return new Schema(converted.asNestedType().asStructType().fields());
+    return toIcebergSchema(gravitinoTable.columns());
   }
 
   /**
-   * Convert an array of Gravitino columns to an Iceberg Schema.
+   * Convert an array of Gravitino columns to an Iceberg Schema, including format-version 3 column
+   * defaults when present.
    *
    * @param columns Gravitino columns.
    * @return Iceberg schema.
@@ -70,7 +72,130 @@ public class ConvertUtil {
     org.apache.gravitino.rel.types.Types.StructType structType =
         org.apache.gravitino.rel.types.Types.StructType.of(fields);
     Type converted = ToIcebergTypeVisitor.visit(structType, new ToIcebergType(structType));
-    return new Schema(converted.asNestedType().asStructType().fields());
+    List<Types.NestedField> icebergFields = converted.asNestedType().asStructType().fields();
+    List<Types.NestedField> withDefaults = new ArrayList<>(icebergFields.size());
+    for (int i = 0; i < icebergFields.size(); i++) {
+      withDefaults.add(applyColumnDefaults(icebergFields.get(i), columns[i]));
+    }
+    return new Schema(withDefaults);
+  }
+
+  /**
+   * Returns {@code true} if any column carries a write or initial default.
+   *
+   * @param columns the columns to inspect
+   * @return whether any column default is set
+   */
+  public static boolean hasColumnDefaults(Column[] columns) {
+    if (columns == null) {
+      return false;
+    }
+    for (Column column : columns) {
+      if (!isUnsetDefault(column.defaultValue())
+          || !isUnsetInitialDefault(column.initialDefaultValue())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Converts a Gravitino default expression to an Iceberg {@link Literal}, or {@code null} when the
+   * expression is unset.
+   *
+   * @param expression the Gravitino expression
+   * @param icebergType the target Iceberg field type
+   * @return the Iceberg literal, or null when unset
+   */
+  public static Literal<?> toIcebergLiteral(Expression expression, Type icebergType) {
+    if (isUnsetDefault(expression) || isUnsetInitialDefault(expression)) {
+      return null;
+    }
+    if (Literals.NULL.equals(expression)) {
+      return null;
+    }
+    Preconditions.checkArgument(
+        expression instanceof org.apache.gravitino.rel.expressions.literals.Literal,
+        "Iceberg column defaults must be literals, got: %s",
+        expression);
+    Object value = ((org.apache.gravitino.rel.expressions.literals.Literal<?>) expression).value();
+    Literal<?> icebergLiteral = literalFromJavaValue(value, icebergType);
+    Literal<?> typed = icebergLiteral.to(icebergType);
+    Preconditions.checkArgument(
+        typed != null, "Cannot cast column default %s to Iceberg type %s", value, icebergType);
+    return typed;
+  }
+
+  private static Types.NestedField applyColumnDefaults(Types.NestedField field, Column column) {
+    Literal<?> writeDefault = toIcebergLiteral(column.defaultValue(), field.type());
+    Literal<?> initialDefault = toIcebergLiteral(column.initialDefaultValue(), field.type());
+    if (writeDefault == null && initialDefault == null) {
+      return field;
+    }
+    // When only one side is supplied, seed both (Iceberg addColumn behavior for new fields).
+    Literal<?> effectiveWrite = writeDefault != null ? writeDefault : initialDefault;
+    Literal<?> effectiveInitial = initialDefault != null ? initialDefault : writeDefault;
+    return Types.NestedField.from(field)
+        .withWriteDefault(effectiveWrite)
+        .withInitialDefault(effectiveInitial)
+        .build();
+  }
+
+  private static Literal<?> literalFromJavaValue(Object value, Type icebergType) {
+    switch (icebergType.typeId()) {
+      case BOOLEAN:
+        return Literal.of((Boolean) value);
+      case INTEGER:
+        return Literal.of(((Number) value).intValue());
+      case LONG:
+        return Literal.of(((Number) value).longValue());
+      case FLOAT:
+        return Literal.of(((Number) value).floatValue());
+      case DOUBLE:
+        return Literal.of(((Number) value).doubleValue());
+      case STRING:
+        return Literal.of(String.valueOf(value));
+      case DATE:
+        return Literal.of(DateTimeUtil.daysFromDate((LocalDate) value));
+      case TIME:
+        return Literal.of(DateTimeUtil.microsFromTime((LocalTime) value));
+      case TIMESTAMP:
+        {
+          Types.TimestampType timestampType = (Types.TimestampType) icebergType;
+          long micros = DateTimeUtil.microsFromTimestamp((LocalDateTime) value);
+          if (timestampType.shouldAdjustToUTC()) {
+            return Literal.of(micros).to(timestampType);
+          }
+          return Literal.of(micros);
+        }
+      case TIMESTAMP_NANO:
+        {
+          Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) icebergType;
+          long nanos = DateTimeUtil.nanosFromTimestamp((LocalDateTime) value);
+          return Literal.of(nanos).to(timestampNanoType);
+        }
+      case DECIMAL:
+        if (value instanceof Decimal) {
+          return Literal.of(((Decimal) value).value());
+        }
+        return Literal.of((BigDecimal) value);
+      case UUID:
+        return Literal.of(UUID.fromString(String.valueOf(value)));
+      case FIXED:
+      case BINARY:
+        return Literal.of(toByteArray(value));
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported Iceberg column default type: " + icebergType);
+    }
+  }
+
+  private static boolean isUnsetDefault(Expression expression) {
+    return expression == null || expression.equals(Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  private static boolean isUnsetInitialDefault(Expression expression) {
+    return expression == null || expression.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
   }
 
   /**
@@ -190,24 +315,6 @@ public class ConvertUtil {
       return (byte[]) value;
     }
     return ByteBuffers.toByteArray((ByteBuffer) value);
-  }
-
-  /**
-   * Convert the Gravitino Iceberg table to the Gravitino StructType
-   *
-   * @param icebergTable Gravitino Iceberg table
-   * @return Gravitino StructType
-   */
-  private static org.apache.gravitino.rel.types.Types.StructType toGravitinoStructType(
-      IcebergTable icebergTable) {
-    org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
-        Arrays.stream(icebergTable.columns())
-            .map(
-                column ->
-                    org.apache.gravitino.rel.types.Types.StructType.Field.of(
-                        column.name(), column.dataType(), column.nullable(), column.comment()))
-            .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
-    return org.apache.gravitino.rel.types.Types.StructType.of(fields);
   }
 
   private ConvertUtil() {}

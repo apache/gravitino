@@ -106,12 +106,24 @@ public class IcebergTable extends BaseTable {
     properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
     properties.put(
         IcebergTablePropertiesMetadata.DISTRIBUTION_MODE, transformDistribution(distribution));
+    Map<String, String> createProperties = rebuildCreateProperties(properties);
+    if (ConvertUtil.hasColumnDefaults(columns())) {
+      // Column defaults require Iceberg format-version 3+.
+      String formatVersion = createProperties.get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
+      int version =
+          StringUtils.isBlank(formatVersion)
+              ? IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION
+              : Integer.parseInt(formatVersion);
+      if (version < 3) {
+        createProperties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+      }
+    }
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()
             .withName(name)
             .withLocation(location)
             .withSchema(schema)
-            .setProperties(rebuildCreateProperties(properties))
+            .setProperties(createProperties)
             .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();

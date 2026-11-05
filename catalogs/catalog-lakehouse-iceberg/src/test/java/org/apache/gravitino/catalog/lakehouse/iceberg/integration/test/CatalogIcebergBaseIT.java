@@ -1285,22 +1285,25 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         columns[0].name(),
         ((Transform.SingleFieldTransform) table.partitioning()[0]).fieldName()[0]);
 
-    // test add column with default value exception
+    // test add column with default value
     TableChange withDefaultValue =
         TableChange.addColumn(
-            new String[] {"newColumn"}, Types.ByteType.get(), "comment", Literals.NULL);
-    RuntimeException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains("Iceberg does not support column default value. Illegal column:"),
-        "The exception message is: " + exception.getMessage());
+            new String[] {"newColumn"},
+            Types.StringType.get(),
+            "comment",
+            Literals.stringLiteral("default_v"));
+    catalog
+        .asTableCatalog()
+        .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue);
+    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
+    Column addedWithDefault =
+        Arrays.stream(table.columns())
+            .filter(c -> "newColumn".equals(c.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("newColumn not found"));
+    Assertions.assertEquals(Literals.stringLiteral("default_v"), addedWithDefault.defaultValue());
+    Assertions.assertEquals(
+        Literals.stringLiteral("default_v"), addedWithDefault.initialDefaultValue());
 
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
@@ -1332,15 +1335,11 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     TableChange change2 =
         TableChange.updateColumnDefaultValue(
             new String[] {col1.name()}, Literals.of("hello", Types.StringType.get()));
-    illegalArgumentException =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, change2));
-    Assertions.assertTrue(
-        illegalArgumentException
-            .getMessage()
-            .contains("Iceberg does not support column default value. Illegal column: name"),
-        "The exception is: " + illegalArgumentException.getMessage());
+    Assertions.assertDoesNotThrow(() -> tableCatalog.alterTable(tableIdentifier, change2));
+    Table updatedDefaultTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Literals.of("hello", Types.StringType.get()),
+        updatedDefaultTable.columns()[0].defaultValue());
 
     catalog
         .asTableCatalog()

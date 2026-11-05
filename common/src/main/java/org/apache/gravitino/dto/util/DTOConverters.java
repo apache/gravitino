@@ -1309,7 +1309,10 @@ public class DTOConverters {
    * @return The column.
    */
   public static Column fromDTO(ColumnDTO column) {
-    if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+    boolean defaultUnset = column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET);
+    boolean initialUnset =
+        column.initialDefaultValue().equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+    if (defaultUnset && initialUnset) {
       return column;
     }
     return Column.of(
@@ -1318,7 +1321,12 @@ public class DTOConverters {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        fromFunctionArg((FunctionArg) column.defaultValue()));
+        defaultUnset
+            ? Column.DEFAULT_VALUE_NOT_SET
+            : fromFunctionArg((FunctionArg) column.defaultValue()),
+        initialUnset
+            ? Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            : fromFunctionArg((FunctionArg) column.initialDefaultValue()));
   }
 
   /**
