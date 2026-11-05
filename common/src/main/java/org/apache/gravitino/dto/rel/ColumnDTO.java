@@ -70,7 +70,7 @@ public class ColumnDTO implements Column {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
   @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
-  private Expression initialDefaultValue = Column.DEFAULT_VALUE_NOT_SET;
+  private Expression initialDefaultValue = Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 
   private ColumnDTO() {}
 
@@ -100,7 +100,7 @@ public class ColumnDTO implements Column {
     this.autoIncrement = autoIncrement;
     this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
     this.initialDefaultValue =
-        initialDefaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : initialDefaultValue;
+        initialDefaultValue == null ? Column.INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
   }
 
   @Override

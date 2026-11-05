@@ -89,20 +89,29 @@ public class ConvertUtil {
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
         .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
-        .withDefaultValue(fromIcebergLiteral(nestedField.writeDefaultLiteral(), nestedField.type()))
+        .withDefaultValue(
+            fromIcebergLiteral(
+                nestedField.writeDefaultLiteral(),
+                nestedField.type(),
+                Column.DEFAULT_VALUE_NOT_SET))
         .withInitialDefaultValue(
-            fromIcebergLiteral(nestedField.initialDefaultLiteral(), nestedField.type()))
+            fromIcebergLiteral(
+                nestedField.initialDefaultLiteral(),
+                nestedField.type(),
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET))
         .build();
   }
 
-  private static Expression fromIcebergLiteral(Literal<?> icebergDefault, Type type) {
+  private static Expression fromIcebergLiteral(
+      Literal<?> icebergDefault, Type type, Expression unset) {
     if (icebergDefault == null) {
-      return Column.DEFAULT_VALUE_NOT_SET;
+      return unset;
     }
-    return toGravitinoLiteral(icebergDefault, type);
+    return toGravitinoLiteral(icebergDefault, type, unset);
   }
 
-  private static Expression toGravitinoLiteral(Literal<?> icebergDefault, Type type) {
+  private static Expression toGravitinoLiteral(
+      Literal<?> icebergDefault, Type type, Expression unset) {
     Object value = icebergDefault.value();
     if (value == null) {
       return Literals.NULL;
@@ -172,7 +181,7 @@ public class ConvertUtil {
       default:
         // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
         // rather than failing table load.
-        return Column.DEFAULT_VALUE_NOT_SET;
+        return unset;
     }
   }
 

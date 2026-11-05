@@ -69,7 +69,7 @@ public class GlueColumn extends BaseColumn {
       col.autoIncrement = autoIncrement;
       col.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       col.initialDefaultValue =
-          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
+          initialDefaultValue == null ? INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       return col;
     }
   }

@@ -98,7 +98,7 @@ public class GravitinoPaimonColumn extends BaseColumn {
       paimonColumn.autoIncrement = autoIncrement;
       paimonColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       paimonColumn.initialDefaultValue =
-          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
+          initialDefaultValue == null ? INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       return paimonColumn;
     }
   }

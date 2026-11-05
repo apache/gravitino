@@ -55,7 +55,7 @@ public class GenericColumn extends BaseColumn {
       column.nullable = nullable;
       column.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       column.initialDefaultValue =
-          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
+          initialDefaultValue == null ? INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       column.autoIncrement = autoIncrement;
       return column;
     }

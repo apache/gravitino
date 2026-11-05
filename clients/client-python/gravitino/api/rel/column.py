@@ -40,7 +40,14 @@ class Column(ABC):
     """
 
     DEFAULT_VALUE_NOT_SET = Expression.EMPTY_EXPRESSION
-    """A default value that indicates the default value is not set. This is used in `default_value()`"""
+    """Sentinel that indicates `default_value()` is not set (or not applicable)."""
+
+    INITIAL_DEFAULT_VALUE_NOT_SET = DEFAULT_VALUE_NOT_SET
+    """Sentinel that indicates `initial_default_value()` is not set (or not applicable).
+
+    Same underlying value as `DEFAULT_VALUE_NOT_SET`; the distinct name makes call sites for
+    initial defaults easier to read.
+    """
 
     DEFAULT_VALUE_OF_CURRENT_TIMESTAMP: Expression = FunctionExpression.of(
         "current_timestamp"
@@ -115,9 +122,9 @@ class Column(ABC):
 
         Returns:
             Expression:
-                The initial default value, `Column.DEFAULT_VALUE_NOT_SET` if not specified.
+                The initial default value, `Column.INITIAL_DEFAULT_VALUE_NOT_SET` if not specified.
         """
-        return Column.DEFAULT_VALUE_NOT_SET
+        return Column.INITIAL_DEFAULT_VALUE_NOT_SET
 
     def supports_tags(self) -> SupportsTags:
         """Return the `SupportsTags` if the column supports tag operations.
@@ -156,8 +163,8 @@ class Column(ABC):
             default_value (Optional[Expression], optional):
                 The default value of this column, `Column.DEFAULT_VALUE_NOT_SET` if `None`. Defaults to `None`.
             initial_default_value (Optional[Expression], optional):
-                The initial default value of this column, `Column.DEFAULT_VALUE_NOT_SET` if `None`.
-                Defaults to `None`.
+                The initial default value of this column, `Column.INITIAL_DEFAULT_VALUE_NOT_SET`
+                if `None`. Defaults to `None`.
 
         Returns:
             ColumnImpl: A `Column` instance.
@@ -172,7 +179,7 @@ class Column(ABC):
                 Column.DEFAULT_VALUE_NOT_SET if default_value is None else default_value
             ),
             initial_default_value=(
-                Column.DEFAULT_VALUE_NOT_SET
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET
                 if initial_default_value is None
                 else initial_default_value
             ),
@@ -203,7 +210,7 @@ class ColumnImpl(Column):
         self._auto_increment = auto_increment
         self._default_value = default_value
         self._initial_default_value = (
-            Column.DEFAULT_VALUE_NOT_SET
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET
             if initial_default_value is None
             else initial_default_value
         )
@@ -259,7 +266,7 @@ class ColumnImpl(Column):
                 ),
                 (
                     tuple(self._initial_default_value)
-                    if self._initial_default_value is Column.DEFAULT_VALUE_NOT_SET
+                    if self._initial_default_value is Column.INITIAL_DEFAULT_VALUE_NOT_SET
                     else self._initial_default_value
                 ),
             )

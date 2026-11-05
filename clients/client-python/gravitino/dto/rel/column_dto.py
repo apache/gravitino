@@ -66,13 +66,13 @@ class ColumnDTO(Column, DataClassJsonMixin):
     """The default value of the column."""
 
     _initial_default_value: Optional[Union[Expression, List[Expression]]] = field(
-        default_factory=lambda: Column.DEFAULT_VALUE_NOT_SET,
+        default_factory=lambda: Column.INITIAL_DEFAULT_VALUE_NOT_SET,
         metadata=config(
             field_name="initialDefaultValue",
             encoder=ColumnDefaultValueSerdes.serialize,
             decoder=ColumnDefaultValueSerdes.deserialize,
             exclude=lambda value: value is None
-            or value is Column.DEFAULT_VALUE_NOT_SET,
+            or value is Column.INITIAL_DEFAULT_VALUE_NOT_SET,
         ),
     )
     """The initial default value of the column."""
@@ -156,7 +156,7 @@ class ColumnDTO(Column, DataClassJsonMixin):
                 ),
                 (
                     None
-                    if self._initial_default_value is Column.DEFAULT_VALUE_NOT_SET
+                    if self._initial_default_value is Column.INITIAL_DEFAULT_VALUE_NOT_SET
                     else self._initial_default_value
                 ),
             )
@@ -285,7 +285,7 @@ class ColumnDTO(Column, DataClassJsonMixin):
                     else self._default_value
                 ),
                 _initial_default_value=(
-                    Column.DEFAULT_VALUE_NOT_SET
+                    Column.INITIAL_DEFAULT_VALUE_NOT_SET
                     if self._initial_default_value is None
                     else self._initial_default_value
                 ),

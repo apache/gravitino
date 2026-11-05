@@ -41,10 +41,17 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Column {
 
   /**
-   * A sentinel that indicates a column default is not set. Used by {@link #defaultValue()} and
-   * {@link #initialDefaultValue()}.
+   * A sentinel that indicates {@link #defaultValue()} is not set (or not applicable for the
+   * catalog).
    */
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+
+  /**
+   * A sentinel that indicates {@link #initialDefaultValue()} is not set (or the catalog does not
+   * provide an initial default). Same underlying value as {@link #DEFAULT_VALUE_NOT_SET}; the
+   * distinct name makes call sites for initial defaults easier to read.
+   */
+  Expression INITIAL_DEFAULT_VALUE_NOT_SET = DEFAULT_VALUE_NOT_SET;
 
   /**
    * A default value that indicates the default value will be set to the current timestamp. This is
@@ -94,10 +101,11 @@ public interface Column {
    * for rows written before the field was added. Catalogs that do not distinguish an initial
    * default may leave this unset.
    *
-   * @return The initial default value, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
+   * @return The initial default value, {@link Column#INITIAL_DEFAULT_VALUE_NOT_SET} if not
+   *     specified
    */
   default Expression initialDefaultValue() {
-    return DEFAULT_VALUE_NOT_SET;
+    return INITIAL_DEFAULT_VALUE_NOT_SET;
   }
 
   /**

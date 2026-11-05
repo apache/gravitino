@@ -45,7 +45,7 @@ public abstract class BaseColumn implements Column {
 
   protected Expression defaultValue;
 
-  protected Expression initialDefaultValue = Column.DEFAULT_VALUE_NOT_SET;
+  protected Expression initialDefaultValue = Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 
   /**
    * Returns the name of the column.
@@ -106,7 +106,7 @@ public abstract class BaseColumn implements Column {
    */
   @Override
   public Expression initialDefaultValue() {
-    return initialDefaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : initialDefaultValue;
+    return initialDefaultValue == null ? Column.INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue;
   }
 
   /**

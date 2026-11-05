@@ -287,8 +287,8 @@ public class DTOConverters {
                 : toFunctionArg(column.defaultValue()))
         .withInitialDefaultValue(
             (column.initialDefaultValue() == null
-                    || column.initialDefaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
-                ? Column.DEFAULT_VALUE_NOT_SET
+                    || column.initialDefaultValue().equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET))
+                ? Column.INITIAL_DEFAULT_VALUE_NOT_SET
                 : toFunctionArg(column.initialDefaultValue()))
         .build();
   }
