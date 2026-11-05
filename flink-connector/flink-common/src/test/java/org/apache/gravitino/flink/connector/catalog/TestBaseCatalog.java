@@ -47,6 +47,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
@@ -551,7 +552,7 @@ public abstract class TestBaseCatalog {
   /**
    * The Gravitino catalog handle must be fetched once per catalog instance: the client has no
    * catalog cache and Flink consults catalog() on every table resolution, so a per-call fetch
-   * doubled the REST traffic of each query. On the unfixed tree this failed with 3 fetches.
+   * doubled the REST traffic of each query.
    */
   @Test
   void testCatalogHandleFetchedOncePerInstance() {
@@ -569,26 +570,7 @@ public abstract class TestBaseCatalog {
     try (MockedStatic<GravitinoCatalogManager> mocked =
         Mockito.mockStatic(GravitinoCatalogManager.class)) {
       mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
-
-      // Deliberately does NOT override catalog(): the memoization under test lives in
-      // BaseCatalog.catalog() itself.
-      BaseCatalog catalog =
-          new BaseCatalog(
-              "test",
-              Collections.emptyMap(),
-              "default",
-              Mockito.mock(SchemaAndTablePropertiesConverter.class),
-              Mockito.mock(PartitionConverter.class)) {
-            @Override
-            protected AbstractCatalog realCatalog() {
-              return null;
-            }
-
-            @Override
-            protected CatalogCompat catalogCompat() {
-              return TestBaseCatalog.this.catalogCompat();
-            }
-          };
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
 
       Assertions.assertSame(info, catalog.catalog());
       Assertions.assertSame(info, catalog.catalog());
@@ -596,6 +578,55 @@ public abstract class TestBaseCatalog {
 
       Assertions.assertEquals(1, loadCalls.get(), "catalog handle must be fetched exactly once");
     }
+  }
+
+  /**
+   * A failed load must not be cached. On Flink 2.x, CREATE CATALOG opens the catalog before the
+   * catalog store creates it in Gravitino, so the first catalog() call in open() fails with
+   * NoSuchCatalogException and later calls must load the catalog again.
+   */
+  @Test
+  void testCatalogHandleLoadFailureIsNotCached() {
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(manager.getGravitinoCatalogInfo(Mockito.anyString()))
+        .thenThrow(new NoSuchCatalogException("catalog test does not exist"))
+        .thenReturn(info);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+
+      Assertions.assertThrows(NoSuchCatalogException.class, catalog::catalog);
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Mockito.verify(manager, Mockito.times(2)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
+   * Builds a catalog that does not override catalog(), so tests exercise the memoization in
+   * BaseCatalog.catalog() itself.
+   */
+  private BaseCatalog catalogWithoutCatalogOverride() {
+    return new BaseCatalog(
+        "test",
+        Collections.emptyMap(),
+        "default",
+        Mockito.mock(SchemaAndTablePropertiesConverter.class),
+        Mockito.mock(PartitionConverter.class)) {
+      @Override
+      protected AbstractCatalog realCatalog() {
+        return null;
+      }
+
+      @Override
+      protected CatalogCompat catalogCompat() {
+        return TestBaseCatalog.this.catalogCompat();
+      }
+    };
   }
 
   private class TestableBaseCatalog extends BaseCatalog {
