@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -248,6 +249,58 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
     assertEquals(1, count("tag_meta"));
     assertEquals(1, count("policy_tag_relation_meta"));
     assertEquals(0, count("tag_relation_meta"));
+  }
+
+  /** A failed assignment can be retried after legacy initialization commits without an outer tx. */
+  @TestTemplate
+  public void testRetriesBindingAfterInitializationWithoutOuterTransaction() throws Exception {
+    SessionUtils.rollbackTransaction();
+    RelationalEntityStore failingStore = spy((RelationalEntityStore) store);
+    IOException failure = new IOException("Assignment failed after initialization");
+    doAnswer(
+            invocation -> {
+              RelationUpdate update = invocation.getArgument(0);
+              if (update.relationType()
+                  == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL) {
+                throw failure;
+              }
+              return invocation.callRealMethod();
+            })
+        .when(failingStore)
+        .updateEntityRelations(any(RelationUpdate.class));
+    PolicyManager failingManager = new PolicyManager(RandomIdGenerator.INSTANCE, failingStore);
+
+    assertSame(
+        failure,
+        assertThrows(
+            IOException.class,
+            () ->
+                failingManager.addPolicyToObject(
+                    METALAKE,
+                    policy.name(),
+                    MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
+                    AUDIT_INFO)));
+
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+    assertEquals(1, count("tag_meta"));
+    assertEquals(1, count("policy_tag_relation_meta"));
+    assertEquals(0, count("tag_relation_meta"));
+    TagEntity initializedTag =
+        store.get(
+            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    SessionUtils.rollbackTransaction();
+
+    // The retry reuses initialized state and commits just the assignment without an outer tx.
+    assertEquals(initializedTag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(initializedTag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+    assertEquals(1, count("tag_meta"));
+    assertEquals(1, count("policy_tag_relation_meta"));
+    assertEquals(1, count("tag_relation_meta"));
   }
 
   /** Missing endpoints, unsupported types and missing audit metadata fail before writes. */

@@ -51,6 +51,8 @@ import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests hidden tag models and reserved namespace protection. */
 public class TestHiddenPolicyTag {
@@ -59,17 +61,44 @@ public class TestHiddenPolicyTag {
   @Test
   public void testReservedNames() {
     assertEquals(123, HiddenPolicyTag.policyId(HiddenPolicyTag.name(123)));
-    assertTrue(HiddenPolicyTag.isHidden("RESERVED_123"));
-    assertFalse(HiddenPolicyTag.isHidden(null));
-    assertFalse(HiddenPolicyTag.isHidden("data_domain"));
+    assertTrue(HiddenPolicyTag.isReservedName("RESERVED_123"));
+    assertFalse(HiddenPolicyTag.isReservedName(null));
+    assertFalse(HiddenPolicyTag.isReservedName("data_domain"));
     assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.checkVisible("RESERVED_123"));
+        IllegalArgumentException.class, () -> HiddenPolicyTag.checkNameNotReserved("RESERVED_123"));
     assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_0123"));
-    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.name(-1));
+    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("RESERVED_123"));
+    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_+123"));
+    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_-0"));
     assertThrows(
         IllegalArgumentException.class,
-        () -> HiddenPolicyTag.checkVisible("reserved_business_tag"));
+        () -> HiddenPolicyTag.checkNameNotReserved("reserved_business_tag"));
+    HiddenPolicyTag.checkNameNotReserved("data_domain");
     assertEquals("reserved_123", HiddenPolicyTag.name(123));
+  }
+
+  /** Canonical names preserve the full ID range without assuming a generator's sign convention. */
+  @ParameterizedTest
+  @ValueSource(longs = {Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE})
+  public void testPolicyIdRoundTrip(long policyId) {
+    assertEquals(policyId, HiddenPolicyTag.policyId(HiddenPolicyTag.name(policyId)));
+  }
+
+  /** Reserving names for new tags does not hide visible tags that already have those names. */
+  @Test
+  public void testReservedNameDoesNotDetermineVisibility() {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TagEntity legacy =
+        TagEntity.builder()
+            .withId(2L)
+            .withName("reserved_123")
+            .withNamespace(NamespaceUtil.ofTag("m"))
+            .withAuditInfo(audit)
+            .build();
+    assertFalse(legacy.hidden());
+    HiddenPolicyTag.checkVisible(legacy);
+    assertThrows(
+        IllegalArgumentException.class, () -> HiddenPolicyTag.checkNameNotReserved(legacy.name()));
   }
 
   /** New policies use the tag model, with matching ownership and audit metadata. */

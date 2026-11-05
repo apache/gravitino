@@ -82,8 +82,14 @@ public class PolicyManager implements PolicyDispatcher {
   /**
    * Applies a policy to an object through its hidden tag using the entity store.
    *
-   * <p>This internal operation is idempotent. Migration callers can group it with legacy cleanup in
-   * their storage transaction. It is not exposed through the policy dispatcher or client APIs.
+   * <p>New policies already have a hidden tag and policy-tag relation, so binding only writes the
+   * tag-object assignment in the relation operation's transaction. This method adds no outer
+   * transaction. For legacy policies, initialization is idempotent: a failed binding may leave an
+   * unassigned hidden tag or a tag awaiting its policy relation, and a retry completes the binding.
+   * Migration callers can group initialization, binding and legacy cleanup in their own
+   * transaction.
+   *
+   * <p>This internal method is not exposed through the policy dispatcher or client APIs.
    *
    * @param metalake The policy and object's metalake.
    * @param policyName The policy name.
@@ -101,89 +107,23 @@ public class PolicyManager implements PolicyDispatcher {
         "Unsupported policy binding object type: %s",
         object.type());
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
     PolicyEntity policy =
         entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
     Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object);
+
     // Relation lookup validates the endpoint, including columns stored as part of a table.
     entityStore
         .relationOperations()
         .listEntitiesByRelation(
             SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, objectIdent, objectType);
-    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
-    TagEntity tag;
-    try {
-      tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
-    } catch (NoSuchEntityException e) {
-      tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
-      try {
-        entityStore.put(tag, false);
-      } catch (EntityAlreadyExistsException concurrentCreate) {
-        tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
-      }
-    }
-    Preconditions.checkArgument(
-        tag.hidden()
-            && tag.valueConstraint().allowedValues() != null
-            && tag.valueConstraint().allowedValues().length == 0
-            && HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties()),
-        "Reserved tag name collision for policy %s",
-        policy.id());
-    List<RelationalEntity<?>> policies =
-        entityStore
-            .relationOperations()
-            .batchListEntitiesByRelation(
-                SupportsRelationOperations.Type.POLICY_TAG_REL,
-                Collections.singletonList(tagIdent),
-                Entity.EntityType.TAG);
-    if (policies.isEmpty()) {
-      try {
-        entityStore
-            .relationOperations()
-            .updateEntityRelations(
-                RelationUpdate.of(
-                        SupportsRelationOperations.Type.POLICY_TAG_REL,
-                        tagIdent,
-                        Entity.EntityType.TAG,
-                        new RelationEdgeTarget[] {
-                          RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
-                        },
-                        null)
-                    .withAuditInfo(auditInfo));
-      } catch (EntityAlreadyExistsException | OptimisticLockException concurrentCreate) {
-        policies =
-            entityStore
-                .relationOperations()
-                .batchListEntitiesByRelation(
-                    SupportsRelationOperations.Type.POLICY_TAG_REL,
-                    Collections.singletonList(tagIdent),
-                    Entity.EntityType.TAG);
-        if (policies.isEmpty()) {
-          throw concurrentCreate;
-        }
-      }
-    }
-    if (!policies.isEmpty()) {
-      Preconditions.checkArgument(
-          policies.size() == 1
-              && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
-              && !policies.get(0).relationValue().isPresent(),
-          "Invalid policy relation for hidden tag %s",
-          tagIdent);
-    }
-    entityStore
-        .relationOperations()
-        .updateEntityRelations(
-            RelationUpdate.of(
-                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                    objectIdent,
-                    objectType,
-                    new RelationEdgeTarget[] {
-                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
-                    },
-                    null)
-                .withAuditInfo(auditInfo));
+
+    // Reuse policy-created state, or finish initialization for a legacy policy before binding.
+    TagEntity tag = loadOrCreateHiddenTag(policy);
+    ensureHiddenTagPolicyRelation(tag.nameIdentifier(), policyIdent, auditInfo);
+    associateHiddenTagWithObject(tag.nameIdentifier(), objectIdent, objectType, auditInfo);
     return tag.id();
   }
 
@@ -360,6 +300,97 @@ public class PolicyManager implements PolicyDispatcher {
     }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return objectPolicyResolver.resolve(metalake, metadataObjects);
+  }
+
+  private TagEntity loadOrCreateHiddenTag(PolicyEntity policy) throws IOException {
+    NameIdentifier tagIdent =
+        NameIdentifierUtil.ofTag(policy.namespace().level(0), HiddenPolicyTag.name(policy.id()));
+    TagEntity tag;
+    try {
+      tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
+      tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
+      try {
+        entityStore.put(tag, false);
+      } catch (EntityAlreadyExistsException concurrentCreate) {
+        // A concurrent binding may have initialized the same legacy policy's tag.
+        tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+      }
+    }
+
+    Preconditions.checkArgument(
+        tag.hidden()
+            && tag.valueConstraint().allowedValues() != null
+            && tag.valueConstraint().allowedValues().length == 0
+            && HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties()),
+        "Reserved tag name collision for policy %s",
+        policy.id());
+    return tag;
+  }
+
+  private void ensureHiddenTagPolicyRelation(
+      NameIdentifier tagIdent, NameIdentifier policyIdent, Audit auditInfo) throws IOException {
+    List<RelationalEntity<?>> policies = listHiddenTagPolicies(tagIdent);
+    if (policies.isEmpty()) {
+      try {
+        entityStore
+            .relationOperations()
+            .updateEntityRelations(
+                RelationUpdate.of(
+                        SupportsRelationOperations.Type.POLICY_TAG_REL,
+                        tagIdent,
+                        Entity.EntityType.TAG,
+                        new RelationEdgeTarget[] {
+                          RelationEdgeTarget.of(policyIdent, Entity.EntityType.POLICY, null)
+                        },
+                        null)
+                    .withAuditInfo(auditInfo));
+        return;
+      } catch (EntityAlreadyExistsException | OptimisticLockException concurrentCreate) {
+        // Accept a competing initializer only after validating the committed relation.
+        policies = listHiddenTagPolicies(tagIdent);
+        if (policies.isEmpty()) {
+          throw concurrentCreate;
+        }
+      }
+    }
+
+    Preconditions.checkArgument(
+        policies.size() == 1
+            && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
+            && !policies.get(0).relationValue().isPresent(),
+        "Invalid policy relation for hidden tag %s",
+        tagIdent);
+  }
+
+  private List<RelationalEntity<?>> listHiddenTagPolicies(NameIdentifier tagIdent)
+      throws IOException {
+    return entityStore
+        .relationOperations()
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(tagIdent),
+            Entity.EntityType.TAG);
+  }
+
+  private void associateHiddenTagWithObject(
+      NameIdentifier tagIdent,
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      Audit auditInfo)
+      throws IOException {
+    entityStore
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                    objectIdent,
+                    objectType,
+                    new RelationEdgeTarget[] {
+                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
+                    },
+                    null)
+                .withAuditInfo(auditInfo));
   }
 
   private PolicyEntity loadPolicyEntity(String metalake, String policyName) {

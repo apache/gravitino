@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -101,6 +102,7 @@ public class TestPolicyObjectBindingAbstraction {
     ArgumentCaptor<RelationUpdate> captured = ArgumentCaptor.forClass(RelationUpdate.class);
     verify(relations).updateEntityRelations(captured.capture());
     RelationUpdate update = captured.getValue();
+    verify(store, never()).put(any(TagEntity.class), anyBoolean());
     assertEquals(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, update.relationType());
     assertEquals(objectIdent, update.sourceIdentifier());
     assertEquals(tag.nameIdentifier(), update.targetsToAdd()[0].nameIdentifier());

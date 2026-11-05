@@ -28,7 +28,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
 
-/** Internal naming convention for server-managed policy tags. */
+/** Naming and visibility checks for server-managed policy tags. */
 public final class HiddenPolicyTag {
 
   private static final String PREFIX = "reserved_";
@@ -76,7 +76,6 @@ public final class HiddenPolicyTag {
    * @return The reserved tag name.
    */
   public static String name(long policyId) {
-    Preconditions.checkArgument(policyId >= 0, "Policy ID must be non-negative");
     return PREFIX + policyId;
   }
 
@@ -86,7 +85,7 @@ public final class HiddenPolicyTag {
    * @param name The tag name.
    * @return Whether the name is reserved.
    */
-  public static boolean isHidden(@Nullable String name) {
+  public static boolean isReservedName(@Nullable String name) {
     return name != null && name.toLowerCase(Locale.ROOT).startsWith(PREFIX);
   }
 
@@ -97,7 +96,7 @@ public final class HiddenPolicyTag {
    * @return The policy entity ID.
    */
   public static long policyId(String tagName) {
-    Preconditions.checkArgument(isHidden(tagName), "Not a hidden policy tag");
+    Preconditions.checkArgument(isReservedName(tagName), "Not a reserved policy tag name");
     long id = Long.parseLong(tagName.substring(PREFIX.length()));
     Preconditions.checkArgument(name(id).equals(tagName), "Invalid hidden policy tag name");
     return id;
@@ -114,7 +113,7 @@ public final class HiddenPolicyTag {
   }
 
   /**
-   * Rejects an ordinary operation on a persisted hidden tag.
+   * Rejects an ordinary operation on a tag whose persisted hidden flag is set.
    *
    * @param tag The resolved tag entity.
    * @throws NoSuchTagException If the tag is hidden.
@@ -128,12 +127,15 @@ public final class HiddenPolicyTag {
   }
 
   /**
-   * Rejects use of the internal namespace through ordinary tag operations.
+   * Rejects the reserved prefix for a new tag name or a rename target.
    *
-   * @param name The tag name to check.
+   * <p>Existing tags use their persisted hidden flag for visibility, including visible tags created
+   * with the reserved prefix before the upgrade.
+   *
+   * @param name The proposed tag name.
    */
-  public static void checkVisible(String name) {
+  public static void checkNameNotReserved(String name) {
     Preconditions.checkArgument(
-        !isHidden(name), "Tag name is reserved for internal policy bindings");
+        !isReservedName(name), "Tag name is reserved for internal policy bindings");
   }
 }

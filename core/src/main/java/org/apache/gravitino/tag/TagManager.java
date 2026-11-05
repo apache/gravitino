@@ -124,7 +124,7 @@ public class TagManager implements TagDispatcher {
       Map<String, String> properties,
       TagValueConstraint valueConstraint)
       throws TagAlreadyExistsException {
-    HiddenPolicyTag.checkVisible(name);
+    HiddenPolicyTag.checkNameNotReserved(name);
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     TagEntity tagEntity =
@@ -163,7 +163,7 @@ public class TagManager implements TagDispatcher {
       throws NoSuchTagException, IllegalArgumentException {
     for (TagChange change : changes) {
       if (change instanceof TagChange.RenameTag) {
-        HiddenPolicyTag.checkVisible(((TagChange.RenameTag) change).getNewName());
+        HiddenPolicyTag.checkNameNotReserved(((TagChange.RenameTag) change).getNewName());
       }
     }
     checkMetalake(NameIdentifier.of(metalake), entityStore);

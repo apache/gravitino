@@ -395,8 +395,14 @@ Deleting their policy also removes any existing ownership and grant rows for the
 The `reserved_` tag name prefix is reserved for internal use,
 including alternate casing, for new tags and rename targets. Ordinary tags have `hidden=false`;
 existing tags retain that default and remain accessible even if their names use the reserved prefix.
+The persisted `hidden` field determines visibility; the name prefix only reserves names for new tags
+and rename targets. Using the prefix alone would incorrectly hide existing ordinary tags.
 Existing policies without hidden tags receive them when first bound through the internal binding
 operation; updating or overwriting a policy does not backfill its hidden tag.
+The internal binding operation reuses the hidden tag and policy-to-tag relation created with a new
+policy, and the tag-to-object assignment runs in its own storage transaction. It adds no outer
+transaction. Legacy initialization is idempotent, so a failed binding can leave internal state that a
+retry reuses. Offline migration owns the transaction that combines binding with legacy cleanup.
 
 Hidden tags require all servers to understand the `hidden` field. Stop all old servers before
 upgrading the metadata schema. Complete any required offline policy binding migration, then start

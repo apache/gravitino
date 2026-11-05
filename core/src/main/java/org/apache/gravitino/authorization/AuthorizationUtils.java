@@ -552,6 +552,7 @@ public class AuthorizationUtils {
     if (object.type() != MetadataObject.Type.TAG) {
       return;
     }
+    // Owner and privilege writes bypass TagManager, so enforce hidden-tag visibility here too.
     try {
       HiddenPolicyTag.checkVisible(
           store.get(
