@@ -56,6 +56,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
@@ -812,20 +813,20 @@ public class TestDomainRelService extends TestJDBCBackend {
     DomainEntity finance = newDomain(METALAKE_NAME, "Finance", null);
     List<LockedDomainState> states = new ArrayList<>();
 
-    domainMetaService.insertDomain(finance, states::add);
+    DomainEntity inserted = insertDomainWithCheck(finance, states::add);
     Assertions.assertEquals(
-        finance, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
+        inserted, domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
     Assertions.assertEquals(1, states.size());
-    Assertions.assertEquals(finance, states.get(0).domain());
+    Assertions.assertEquals(inserted, states.get(0).domain());
     Assertions.assertFalse(states.get(0).parent().isPresent());
     Assertions.assertTrue(states.get(0).subDomains().isEmpty());
 
     // A domain with a parent is inserted together with its edge, and the check sees the parent.
     DomainEntity trading = newDomain(METALAKE_NAME, "Trading", "Finance");
     states.clear();
-    domainMetaService.insertDomain(trading, states::add);
+    inserted = insertDomainWithCheck(trading, states::add);
     Assertions.assertEquals(
-        trading, domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
+        inserted, domainMetaService.getDomainByIdentifier(trading.nameIdentifier()));
     Assertions.assertEquals(finance.id(), selectDomainRel(trading.id()).parentId());
     LockedDomainState state = states.get(0);
     Assertions.assertEquals(finance.id(), state.parent().get().id());
@@ -834,7 +835,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     // The check sees that the parent is itself a sub-domain.
     DomainEntity desk = newDomain(METALAKE_NAME, "Desk", "Trading");
     states.clear();
-    domainMetaService.insertDomain(desk, states::add);
+    insertDomainWithCheck(desk, states::add);
     Assertions.assertEquals("Finance", states.get(0).parent().get().parent().get());
 
     // A failing check inserts neither the domain nor its edge.
@@ -842,7 +843,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            domainMetaService.insertDomain(
+            insertDomainWithCheck(
                 rejected,
                 s -> {
                   throw new IllegalArgumentException("rejected");
@@ -854,17 +855,17 @@ public class TestDomainRelService extends TestJDBCBackend {
 
     DomainEntity orphan = newDomain(METALAKE_NAME, "Orphan", "missing");
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> domainMetaService.insertDomain(orphan, s -> {}));
+        NoSuchEntityException.class, () -> insertDomainWithCheck(orphan, s -> {}));
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> domainMetaService.getDomainByIdentifier(orphan.nameIdentifier()));
 
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
-        () -> domainMetaService.insertDomain(newDomain(METALAKE_NAME, "Finance", null), s -> {}));
+        () -> insertDomainWithCheck(newDomain(METALAKE_NAME, "Finance", null), s -> {}));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> domainMetaService.insertDomain(newDomain("missing_metalake", "X", null), s -> {}));
+        () -> insertDomainWithCheck(newDomain("missing_metalake", "X", null), s -> {}));
   }
 
   @TestTemplate
@@ -879,7 +880,7 @@ public class TestDomainRelService extends TestJDBCBackend {
             Assertions.assertThrows(
                 IllegalStateException.class,
                 () ->
-                    domainMetaService.insertDomain(
+                    insertDomainWithCheck(
                         rejected,
                         state -> {
                           throw new IllegalArgumentException("rejected");
@@ -1272,7 +1273,7 @@ public class TestDomainRelService extends TestJDBCBackend {
     assertWaitsForDomainRow(
         finance.id(),
         () -> {
-          domainMetaService.insertDomain(newDomain(METALAKE_NAME, "Tax", "Finance"), s -> {});
+          insertDomainWithCheck(newDomain(METALAKE_NAME, "Tax", "Finance"), s -> {});
           return null;
         });
     assertWaitsForDomainRow(
@@ -1489,6 +1490,29 @@ public class TestDomainRelService extends TestJDBCBackend {
         .withParent(parent)
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  // Inserts a domain with a new backing tag named after its ID, and returns the domain as the check
+  // saw it, with its backing tag set.
+  private DomainEntity insertDomainWithCheck(DomainEntity domain, Consumer<LockedDomainState> check)
+      throws IOException {
+    TagEntity backingTag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_" + domain.id())
+            .withNamespace(NamespaceUtil.ofTag(domain.namespace().level(0)))
+            .withAllowedValues(new String[0])
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    DomainEntity[] checked = new DomainEntity[1];
+    domainMetaService.insertDomainWithNewBackingTag(
+        domain,
+        backingTag,
+        state -> {
+          check.accept(state);
+          checked[0] = state.domain();
+        });
+    return checked[0];
   }
 
   private void moveDomainRel(DomainEntity child, DomainEntity newParent) throws IOException {

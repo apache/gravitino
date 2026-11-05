@@ -250,6 +250,24 @@ public class DomainMetaBaseSQLProvider {
   }
 
   /**
+   * Returns SQL that lists the active domains backed by a tag, using the index on {@code
+   * (metalake_id, backing_tag_id, backing_tag_value, deleted_at)}.
+   *
+   * @param metalakeId The metalake ID.
+   * @param backingTagId The ID of the backing tag.
+   * @return The SQL.
+   */
+  public String listDomainPOsByBackingTagId(
+      @Param("metalakeId") Long metalakeId, @Param("backingTagId") Long backingTagId) {
+    return "SELECT "
+        + DOMAIN_COLUMNS
+        + " FROM "
+        + DOMAIN_TABLE_NAME
+        + " dm WHERE dm.metalake_id = #{metalakeId} AND dm.backing_tag_id = #{backingTagId}"
+        + " AND dm.deleted_at = 0";
+  }
+
+  /**
    * Returns SQL that inserts a domain.
    *
    * @param domainPO The domain to insert.

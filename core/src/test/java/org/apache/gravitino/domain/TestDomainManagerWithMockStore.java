@@ -34,18 +34,24 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
+import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -64,6 +70,7 @@ public class TestDomainManagerWithMockStore {
   private static final String METALAKE = "metalake";
   private static final NameIdentifier FINANCE = NameIdentifierUtil.ofDomain(METALAKE, "Finance");
   private static final NameIdentifier TRADING = NameIdentifierUtil.ofDomain(METALAKE, "Trading");
+  private static final TagValue BACKING_TAG = TagValue.of("dept", "finance");
 
   private EntityStore entityStore;
   private SupportsDomainOperations domainOperations;
@@ -88,6 +95,14 @@ public class TestDomainManagerWithMockStore {
                 BaseMetalake.class))
         .thenReturn(metalake);
 
+    // Like the store, an insert runs its check, which the manager returns the domain from.
+    Mockito.doAnswer(TestDomainManagerWithMockStore::runTopLevelInsertCheck)
+        .when(domainOperations)
+        .insertDomainWithBackingTag(any(), any(), any());
+    Mockito.doAnswer(TestDomainManagerWithMockStore::runTopLevelInsertCheck)
+        .when(domainOperations)
+        .insertDomainWithNewBackingTag(any(), any(), any());
+
     IdGenerator idGenerator = Mockito.mock(IdGenerator.class);
     Mockito.when(idGenerator.nextId()).thenReturn(100L);
     domainManager = new DomainManager(idGenerator, entityStore);
@@ -108,10 +123,12 @@ public class TestDomainManagerWithMockStore {
         NoSuchMetalakeException.class, () -> domainManager.getDomain("missing", "Finance"));
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
-        () -> domainManager.createDomain("missing", "Finance", null, null));
+        () -> domainManager.createDomain("missing", "Finance", null, null, BACKING_TAG, false));
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
-        () -> domainManager.createSubdomain("missing", "Finance", "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                "missing", "Finance", "Trading", null, null, BACKING_TAG, false));
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
         () -> domainManager.alterDomain("missing", "Finance", DomainChange.updateComment("c")));
@@ -129,6 +146,9 @@ public class TestDomainManagerWithMockStore {
         () -> domainManager.attachDomain("missing", "Trading", "Finance"));
     Assertions.assertThrows(
         NoSuchMetalakeException.class, () -> domainManager.detachDomain("missing", "Trading"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> domainManager.updateBackingTag("missing", "Finance", BACKING_TAG));
     Mockito.verifyNoInteractions(domainOperations);
     Mockito.verify(entityStore, Mockito.never()).update(any(), any(), any(), any());
     Mockito.verify(entityStore, Mockito.never()).delete(any(), any());
@@ -155,8 +175,10 @@ public class TestDomainManagerWithMockStore {
   public void testCreateDomain() throws IOException {
     ArgumentCaptor<DomainEntity> domainCaptor = ArgumentCaptor.forClass(DomainEntity.class);
     ArgumentCaptor<Consumer<LockedDomainState>> checkCaptor = checkCaptor();
-    DomainEntity created = domainManager.createDomain(METALAKE, "Finance", "comment", null);
-    Mockito.verify(domainOperations).insertDomain(domainCaptor.capture(), checkCaptor.capture());
+    DomainEntity created =
+        domainManager.createDomain(METALAKE, "Finance", "comment", null, BACKING_TAG, false);
+    Mockito.verify(domainOperations)
+        .insertDomainWithBackingTag(domainCaptor.capture(), eq(BACKING_TAG), checkCaptor.capture());
 
     DomainEntity inserted = domainCaptor.getValue();
     Assertions.assertSame(inserted, created);
@@ -170,31 +192,33 @@ public class TestDomainManagerWithMockStore {
 
     Mockito.doThrow(new EntityAlreadyExistsException("exists"))
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     Assertions.assertThrows(
         DomainAlreadyExistsException.class,
-        () -> domainManager.createDomain(METALAKE, "Finance", null, null));
+        () -> domainManager.createDomain(METALAKE, "Finance", null, null, BACKING_TAG, false));
 
     // The metalake was dropped after it was checked.
     Mockito.doThrow(new NoSuchEntityException("missing"))
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
-        () -> domainManager.createDomain(METALAKE, "Finance", null, null));
+        () -> domainManager.createDomain(METALAKE, "Finance", null, null, BACKING_TAG, false));
 
     Mockito.doThrow(new IOException("insert failed"))
         .when(domainOperations)
-        .insertDomain(any(), any());
-    assertIOExceptionWrapped(() -> domainManager.createDomain(METALAKE, "Finance", null, null));
+        .insertDomainWithBackingTag(any(), any(), any());
+    assertIOExceptionWrapped(
+        () -> domainManager.createDomain(METALAKE, "Finance", null, null, BACKING_TAG, false));
   }
 
   @Test
   public void testCreateSubdomain() throws IOException {
     ArgumentCaptor<DomainEntity> domainCaptor = ArgumentCaptor.forClass(DomainEntity.class);
     ArgumentCaptor<Consumer<LockedDomainState>> checkCaptor = checkCaptor();
-    domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null);
-    Mockito.verify(domainOperations).insertDomain(domainCaptor.capture(), checkCaptor.capture());
+    domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null, BACKING_TAG, false);
+    Mockito.verify(domainOperations)
+        .insertDomainWithBackingTag(domainCaptor.capture(), eq(BACKING_TAG), checkCaptor.capture());
     Assertions.assertEquals(TRADING, domainCaptor.getValue().nameIdentifier());
     Assertions.assertEquals("Finance", domainCaptor.getValue().parent().get());
     assertIsNewDomainCheck(checkCaptor.getValue());
@@ -204,54 +228,138 @@ public class TestDomainManagerWithMockStore {
     Mockito.doAnswer(
             invocation -> {
               DomainEntity newDomain = invocation.getArgument(0);
-              Consumer<LockedDomainState> check = invocation.getArgument(1);
+              Consumer<LockedDomainState> check = invocation.getArgument(2);
               DomainEntity storedParent = domain("Finance", null, Domain.Status.DRAFT);
-              check.accept(state(newDomain, storedParent));
+              check.accept(boundState(newDomain, storedParent));
               return null;
             })
         .when(domainOperations)
-        .insertDomain(any(), any());
-    DomainEntity desk = domainManager.createSubdomain(METALAKE, "Finance ", "Desk", null, null);
+        .insertDomainWithBackingTag(any(), any(), any());
+    DomainEntity desk =
+        domainManager.createSubdomain(METALAKE, "Finance ", "Desk", null, null, BACKING_TAG, false);
     Assertions.assertEquals("Finance", desk.parent().get());
     Assertions.assertEquals(NameIdentifierUtil.ofDomain(METALAKE, "Desk"), desk.nameIdentifier());
 
     // A check that throws reaches the caller unchanged.
     Mockito.doAnswer(TestDomainManagerWithMockStore::runInsertCheck)
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> domainManager.createSubdomain(METALAKE, "Trading", "Desk", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Trading", "Desk", null, null, BACKING_TAG, false));
 
     Mockito.doThrow(new NoSuchEntityException("missing"))
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     Assertions.assertThrows(
         NoSuchDomainException.class,
-        () -> domainManager.createSubdomain(METALAKE, "missing", "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "missing", "Trading", null, null, BACKING_TAG, false));
 
     Mockito.doThrow(new EntityAlreadyExistsException("exists"))
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     Assertions.assertThrows(
         DomainAlreadyExistsException.class,
-        () -> domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Trading", null, null, BACKING_TAG, false));
 
     Mockito.doThrow(new IOException("insert failed"))
         .when(domainOperations)
-        .insertDomain(any(), any());
+        .insertDomainWithBackingTag(any(), any(), any());
     assertIOExceptionWrapped(
-        () -> domainManager.createSubdomain(METALAKE, "Finance", "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Trading", null, null, BACKING_TAG, false));
 
     // A domain as its own parent, and a null parent, are refused before the store is called.
     Mockito.clearInvocations(domainOperations);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> domainManager.createSubdomain(METALAKE, "Finance", "Finance", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Finance", null, null, BACKING_TAG, false));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> domainManager.createSubdomain(METALAKE, null, "Trading", null, null));
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, null, "Trading", null, null, BACKING_TAG, false));
     Mockito.verifyNoInteractions(domainOperations);
+  }
+
+  @Test
+  public void testCreateDomainWithNewBackingTag() throws IOException {
+    ArgumentCaptor<DomainEntity> domainCaptor = ArgumentCaptor.forClass(DomainEntity.class);
+    ArgumentCaptor<TagEntity> tagCaptor = ArgumentCaptor.forClass(TagEntity.class);
+    ArgumentCaptor<Consumer<LockedDomainState>> checkCaptor = checkCaptor();
+    domainManager.createSubdomain(
+        METALAKE, "Finance", "Trading", null, null, TagValue.noValue("trading_tag"), true);
+    Mockito.verify(domainOperations)
+        .insertDomainWithNewBackingTag(
+            domainCaptor.capture(), tagCaptor.capture(), checkCaptor.capture());
+    Assertions.assertEquals(TRADING, domainCaptor.getValue().nameIdentifier());
+    TagEntity tag = tagCaptor.getValue();
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofTag(METALAKE, "trading_tag"), tag.nameIdentifier());
+    Assertions.assertEquals(100L, tag.id());
+    Assertions.assertEquals(TagValueConstraint.noValue(), tag.valueConstraint());
+    assertIsNewDomainCheck(checkCaptor.getValue());
+
+    // A tag name in use reaches the caller unchanged.
+    Mockito.doThrow(new TagAlreadyExistsException("exists"))
+        .when(domainOperations)
+        .insertDomainWithNewBackingTag(any(), any(), any());
+    Assertions.assertThrows(
+        TagAlreadyExistsException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.noValue("finance_tag"), true));
+
+    // A missing tag, a value for a new tag and a null tag are refused before the store is called.
+    Mockito.doThrow(new NoSuchTagException("missing"))
+        .when(domainOperations)
+        .insertDomainWithBackingTag(any(), any(), any());
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.noValue("missing"), false));
+    Mockito.clearInvocations(domainOperations);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Finance", null, null, TagValue.of("finance_tag", "v"), true));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> domainManager.createDomain(METALAKE, "Finance", null, null, null, false));
+    Mockito.verifyNoInteractions(domainOperations);
+  }
+
+  @Test
+  public void testUpdateBackingTag() throws IOException {
+    ArgumentCaptor<Consumer<LockedDomainState>> checkCaptor = checkCaptor();
+    TagValue backingTag = TagValue.of("dept", "finance");
+    domainManager.updateBackingTag(METALAKE, "Finance", backingTag);
+    Mockito.verify(domainOperations)
+        .updateDomainBackingTagAndGet(eq(FINANCE), eq(backingTag), any(), checkCaptor.capture());
+    assertIsBackingTagUpdateCheck(checkCaptor.getValue());
+
+    Mockito.when(domainOperations.updateDomainBackingTagAndGet(eq(FINANCE), any(), any(), any()))
+        .thenThrow(new NoSuchEntityException("missing"))
+        .thenThrow(new NoSuchTagException("missing"))
+        .thenThrow(new IOException("update failed"));
+    Assertions.assertThrows(
+        NoSuchDomainException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Finance", null));
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () -> domainManager.updateBackingTag(METALAKE, "Finance", backingTag));
+    assertIOExceptionWrapped(() -> domainManager.updateBackingTag(METALAKE, "Finance", null));
   }
 
   @Test
@@ -436,10 +544,29 @@ public class TestDomainManagerWithMockStore {
   // The insert check refuses a parent that is itself a sub-domain.
   private static void assertIsNewDomainCheck(Consumer<LockedDomainState> check) {
     DomainEntity desk = domain("Desk", "Trading", Domain.Status.DRAFT);
-    check.accept(state(desk, domain("Trading", null, Domain.Status.DRAFT)));
+    check.accept(boundState(desk, domain("Trading", null, Domain.Status.DRAFT)));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> check.accept(state(desk, domain("Trading", "Finance", Domain.Status.DRAFT))));
+        () -> check.accept(boundState(desk, domain("Trading", "Finance", Domain.Status.DRAFT))));
+  }
+
+  // The backing tag update check refuses a value bound to another domain.
+  private static void assertIsBackingTagUpdateCheck(Consumer<LockedDomainState> check) {
+    DomainEntity finance = domain("Finance", null, Domain.Status.DRAFT);
+    DomainEntity markets =
+        domain("Markets", null, Domain.Status.DRAFT).toBuilder()
+            .withBackingTagId(tag("dept").id())
+            .withBackingTagValue("finance")
+            .build();
+    check.accept(
+        new LockedDomainState(
+            finance, null, Collections.emptyList(), tag("dept"), Collections.emptyList()));
+    Assertions.assertThrows(
+        BackingTagAlreadyBoundException.class,
+        () ->
+            check.accept(
+                new LockedDomainState(
+                    finance, null, Collections.emptyList(), tag("dept"), List.of(markets))));
   }
 
   // The publish check refuses a draft parent, which the unpublish check would accept.
@@ -480,11 +607,22 @@ public class TestDomainManagerWithMockStore {
                     trading, finance, List.of(domain("Desk", "Trading", Domain.Status.DRAFT)))));
   }
 
+  // Runs the check of an insert as the store would for a top-level domain bound to a tag that
+  // allows
+  // any value and backs no other domain.
+  private static Object runTopLevelInsertCheck(InvocationOnMock invocation) {
+    DomainEntity domain = invocation.getArgument(0);
+    Consumer<LockedDomainState> check = invocation.getArgument(2);
+    check.accept(boundState(domain, null));
+    return null;
+  }
+
   private static Object runInsertCheck(InvocationOnMock invocation) {
     DomainEntity domain = invocation.getArgument(0);
-    Consumer<LockedDomainState> check = invocation.getArgument(1);
+    Consumer<LockedDomainState> check = invocation.getArgument(2);
     // The parent of the new domain is itself a sub-domain.
-    check.accept(state(domain, domain(domain.parent().get(), "Finance", Domain.Status.PUBLISHED)));
+    check.accept(
+        boundState(domain, domain(domain.parent().get(), "Finance", Domain.Status.PUBLISHED)));
     return null;
   }
 
@@ -500,6 +638,21 @@ public class TestDomainManagerWithMockStore {
 
   private static LockedDomainState state(DomainEntity domain, DomainEntity parent) {
     return new LockedDomainState(domain, parent, Collections.emptyList());
+  }
+
+  // The locked state of a new domain bound to a tag that backs no other domain.
+  private static LockedDomainState boundState(DomainEntity domain, DomainEntity parent) {
+    return new LockedDomainState(
+        domain, parent, Collections.emptyList(), tag("dept"), Collections.emptyList());
+  }
+
+  private static TagEntity tag(String name) {
+    return TagEntity.builder()
+        .withId((long) name.hashCode())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofTag(METALAKE))
+        .withAuditInfo(auditInfo())
+        .build();
   }
 
   private static DomainEntity domain(String name, String parent, Domain.Status status) {
