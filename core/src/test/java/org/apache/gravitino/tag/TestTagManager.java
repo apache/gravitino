@@ -78,10 +78,13 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -89,6 +92,7 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -96,6 +100,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -110,12 +115,15 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.AllValuesSelector;
@@ -426,6 +434,109 @@ public class TestTagManager {
     } finally {
       when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
     }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"FILESET", "TOPIC", "MODEL"})
+  void testTagOperationsNormalizeOtherCatalogObjects(Entity.EntityType type)
+      throws IOException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "normalization_object");
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    Object dispatcher;
+    String dispatcherField;
+    switch (type) {
+      case FILESET:
+        entityStore.put(
+            FilesetEntity.builder()
+                .withId(idGenerator.nextId())
+                .withName(ident.name())
+                .withNamespace(ident.namespace())
+                .withFilesetType(Fileset.Type.EXTERNAL)
+                .withStorageLocations(Map.of("default", "file:/tmp/normalization_object"))
+                .withAuditInfo(audit)
+                .build(),
+            false);
+        FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+        when(filesetDispatcher.filesetExists(any())).thenReturn(true);
+        dispatcher = filesetDispatcher;
+        dispatcherField = "internalFilesetDispatcher";
+        break;
+      case TOPIC:
+        entityStore.put(
+            TopicEntity.builder()
+                .withId(idGenerator.nextId())
+                .withName(ident.name())
+                .withNamespace(ident.namespace())
+                .withAuditInfo(audit)
+                .build(),
+            false);
+        TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
+        when(topicDispatcher.topicExists(any())).thenReturn(true);
+        dispatcher = topicDispatcher;
+        dispatcherField = "internalTopicDispatcher";
+        break;
+      case MODEL:
+        entityStore.put(
+            ModelEntity.builder()
+                .withId(idGenerator.nextId())
+                .withName(ident.name())
+                .withNamespace(ident.namespace())
+                .withLatestVersion(0)
+                .withAuditInfo(audit)
+                .build(),
+            false);
+        ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
+        when(modelDispatcher.modelExists(any())).thenReturn(true);
+        dispatcher = modelDispatcher;
+        dispatcherField = "internalModelDispatcher";
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported test target: " + type);
+    }
+    Object previousDispatcher =
+        FieldUtils.readField(GravitinoEnv.getInstance(), dispatcherField, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), dispatcherField, dispatcher, true);
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    try {
+      MetadataObject request =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(
+                  METALAKE,
+                  CATALOG,
+                  SCHEMA.toUpperCase(Locale.ROOT),
+                  ident.name().toUpperCase(Locale.ROOT)),
+              type);
+      MetadataObject canonical = NameIdentifierUtil.toMetadataObject(ident, type);
+      assertTagRoundTrip(request, canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), dispatcherField, previousDispatcher, true);
+      entityStore.delete(ident, type);
+    }
+  }
+
+  @Test
+  void testCatalogAndMetalakeTagOperationsDoNotLoadCapabilities() {
+    Mockito.clearInvocations(catalogManager);
+    MetadataObject catalogObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifier.of(METALAKE, CATALOG), Entity.EntityType.CATALOG);
+    assertTagRoundTrip(catalogObject, catalogObject, catalogObject);
+    MetadataObject metalakeObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE);
+    // Metalake tags are unsupported: preserve the existing store failure without loading a catalog.
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> tagManager.listTagsForMetadataObject(METALAKE, metalakeObject));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE, metalakeObject, new String[] {"normalization_tag"}, null));
+    Mockito.verifyNoInteractions(catalogManager);
   }
 
   @Test
