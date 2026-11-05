@@ -72,8 +72,6 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
 
-  private static final String DEFAULT_TABLE_FORMAT = "default-table-format";
-
   /**
    * Iceberg tables follow Iceberg type semantics: a Spark {@code timestamp} is an Iceberg {@code
    * timestamptz} and a Spark {@code timestamp_ntz} an Iceberg {@code timestamp}, as with the
@@ -252,7 +250,9 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     String tableFormat =
         gravitinoTableProperties.getOrDefault(
             GlueConstants.TABLE_FORMAT,
-            catalogProperties == null ? null : catalogProperties.get(DEFAULT_TABLE_FORMAT));
+            catalogProperties == null
+                ? null
+                : catalogProperties.get(GlueConstants.DEFAULT_TABLE_FORMAT));
     return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
         ? ICEBERG_TYPE_CONVERTER
         : super.getSparkTypeConverter(gravitinoTableProperties);

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -45,7 +46,6 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   private static final String PROP_AWS_REGION = "aws-region";
   private static final String PROP_AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
   private static final String PROP_AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
-  private static final String PROP_DEFAULT_TABLE_FORMAT = "default-table-format";
 
   // Trino Hive connector configuration keys for Glue
   private static final String HIVE_METASTORE = "hive.metastore";
@@ -131,7 +131,8 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   public CatalogConnectorMetadataAdapter getMetadataAdapter(GravitinoCatalog catalog) {
     return new GlueMetadataAdapter(
         propertyMetadata.getSchemaPropertyMetadata(),
-        catalog.getProperty(PROP_DEFAULT_TABLE_FORMAT, GlueMetadataAdapter.HIVE_TABLE_TYPE));
+        catalog.getProperty(
+            GlueConstants.DEFAULT_TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE));
   }
 
   @Override

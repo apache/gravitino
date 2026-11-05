@@ -46,7 +46,7 @@ public class GlueDataTypeTransformer extends HiveDataTypeTransformer {
       return Types.TimestampType.withTimeZone(TRINO_MICROS_PRECISION);
     } else if (TimestampType.class.isAssignableFrom(typeClass)) {
       // timestamp(6) is the Iceberg timestamp; timestamp(3) is the Hive one. Which of the two a
-      // table takes depends on its format, which the metadata adapter checks at create.
+      // table takes depends on its format, which the metadata adapter checks.
       int precision = ((TimestampType) type).getPrecision();
       if (precision == TRINO_MICROS_PRECISION) {
         return Types.TimestampType.withoutTimeZone(TRINO_MICROS_PRECISION);

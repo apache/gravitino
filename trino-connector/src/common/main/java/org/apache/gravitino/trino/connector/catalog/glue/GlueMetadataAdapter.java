@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.glue.GlueConstants;
@@ -63,14 +64,6 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
 
   /** The table type property for lakehouse connector (ICEBERG, HIVE, DELTA). */
   static final String LAKEHOUSE_TABLE_TYPE = "type";
-
-  /** Value of {@link #LAKEHOUSE_TABLE_TYPE} for Hive-format tables. */
-  static final String HIVE_TABLE_TYPE = "HIVE";
-
-  /** Value of {@link #LAKEHOUSE_TABLE_TYPE} for Iceberg tables. */
-  static final String ICEBERG_TABLE_TYPE = "ICEBERG";
-
-  private static final String FORMAT = "format";
 
   private static final List<PropertyMetadata<?>> GLUE_TABLE_PROPERTY_META =
       ImmutableList.of(
@@ -113,12 +106,13 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
               List.class,
               ImmutableList.of(),
               false,
+              // Sort fields stay strings here: their syntax depends on the table format, which
+              // createTable resolves.
               value ->
                   ((List<?>) value)
                       .stream()
                           .map(String.class::cast)
                           .map(name -> name.toLowerCase(Locale.ROOT))
-                          .map(SortingColumn::sortingColumnFromString)
                           .collect(toImmutableList()),
               // Hive tables carry SortingColumn values; Iceberg tables carry Iceberg sort fields
               // such as "id DESC NULLS LAST" as strings.
@@ -131,7 +125,11 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
                                       ? SortingColumn.sortingColumnToString((SortingColumn) v)
                                       : v.toString())
                           .collect(toImmutableList())),
-          stringProperty(FORMAT, "The format of the data files (PARQUET, ORC, etc.)", null, false),
+          stringProperty(
+              GlueConstants.FORMAT,
+              "The format of the data files (PARQUET, ORC, etc.)",
+              null,
+              false),
           stringProperty("location", "The S3 storage location for the table", null, false));
 
   private final PropertyConverter tableConverter = new GlueTablePropertyConverter();
@@ -145,7 +143,7 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
    * @param schemaProperties the schema properties metadata
    */
   public GlueMetadataAdapter(List<PropertyMetadata<?>> schemaProperties) {
-    this(schemaProperties, HIVE_TABLE_TYPE);
+    this(schemaProperties, GlueConstants.TABLE_FORMAT_HIVE);
   }
 
   /**
@@ -180,12 +178,12 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
     // Glue keeps the storage format of a Hive-format table as its storage classes only. The format
     // is derived from them so that SHOW CREATE TABLE recreates a table of the same format.
     if (isIcebergTable(properties)) {
-      result.putIfAbsent(LAKEHOUSE_TABLE_TYPE, ICEBERG_TABLE_TYPE);
+      result.putIfAbsent(LAKEHOUSE_TABLE_TYPE, GlueConstants.TABLE_FORMAT_ICEBERG);
     } else {
       StorageFormat format = storageFormat(properties);
       if (format != null) {
-        result.putIfAbsent(LAKEHOUSE_TABLE_TYPE, HIVE_TABLE_TYPE);
-        result.putIfAbsent(FORMAT, format.name());
+        result.putIfAbsent(LAKEHOUSE_TABLE_TYPE, GlueConstants.TABLE_FORMAT_HIVE);
+        result.putIfAbsent(GlueConstants.FORMAT, format.name());
       }
     }
     return result;
@@ -208,12 +206,23 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
         tableMetadata.getProperties().containsKey(HivePropertyMeta.HIVE_PARTITION_KEY)
             ? (List<String>) tableMetadata.getProperties().get(HivePropertyMeta.HIVE_PARTITION_KEY)
             : Collections.emptyList();
-
-    GravitinoTable table = super.createTable(tableMetadata);
+    @SuppressWarnings("unchecked")
+    List<String> sortFields =
+        tableMetadata.getProperties().containsKey(HivePropertyMeta.HIVE_SORT_ORDER_KEY)
+            ? (List<String>) tableMetadata.getProperties().get(HivePropertyMeta.HIVE_SORT_ORDER_KEY)
+            : Collections.emptyList();
 
     Object type = tableMetadata.getProperties().get(LAKEHOUSE_TABLE_TYPE);
     String tableType = type == null ? defaultTableType : type.toString();
-    if (!ICEBERG_TABLE_TYPE.equalsIgnoreCase(tableType)) {
+    boolean icebergTable = GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableType);
+
+    GravitinoTable table = super.createTable(withHiveSortColumns(tableMetadata, icebergTable));
+
+    if (icebergTable) {
+      if (!sortFields.isEmpty()) {
+        table.setSortOrders(ExpressionUtil.sortOrderFiledToExpression(sortFields));
+      }
+    } else {
       for (GravitinoColumn column : table.getColumns()) {
         checkHiveColumnType(column.getName(), column.getType());
       }
@@ -262,10 +271,19 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
         Optional.ofNullable(gravitinoTable.getComment()));
   }
 
+  /** A column of an existing Hive-format table follows the same type rules as at create. */
+  @Override
+  public void checkColumnType(GravitinoColumn column, Supplier<GravitinoTable> table) {
+    if (!isIcebergTable(table.get().getProperties())) {
+      checkHiveColumnType(column.getName(), column.getType());
+    }
+  }
+
   /**
    * The lakehouse connector decodes table properties into its own types, while the properties of a
    * CREATE TABLE AS SELECT statement are decoded with the Glue property metadata, so it cannot plan
-   * the layout of the new table.
+   * the layout of the new table. Without a layout the writers of a bucketed table still bucket the
+   * rows themselves, so a bucket may span several files, each sorted on its own.
    */
   @Override
   public boolean skipsInternalNewTableLayout() {
@@ -277,9 +295,42 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
     return ExpressionUtil.expressionToPartitionFiled(partitioning);
   }
 
+  /**
+   * The Hive conversion takes {@link SortingColumn} values and requires bucketing, so Hive-format
+   * tables get their sort fields parsed, and Iceberg tables, which set their sort order from the
+   * strings, get them removed.
+   */
+  private static ConnectorTableMetadata withHiveSortColumns(
+      ConnectorTableMetadata tableMetadata, boolean icebergTable) {
+    Map<String, Object> properties = new HashMap<>(tableMetadata.getProperties());
+    Object sortFields = properties.remove(HivePropertyMeta.HIVE_SORT_ORDER_KEY);
+    if (!icebergTable && sortFields != null) {
+      properties.put(
+          HivePropertyMeta.HIVE_SORT_ORDER_KEY,
+          ((List<?>) sortFields)
+              .stream().map(field -> toSortingColumn((String) field)).collect(toImmutableList()));
+    }
+    return new ConnectorTableMetadata(
+        tableMetadata.getTable(),
+        tableMetadata.getColumns(),
+        properties,
+        tableMetadata.getComment());
+  }
+
+  private static SortingColumn toSortingColumn(String sortField) {
+    if (sortField.toLowerCase(Locale.ROOT).matches(".*\\snulls\\s.*")) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Hive-format tables do not support a null ordering in sorted_by: " + sortField);
+    }
+    return SortingColumn.sortingColumnFromString(sortField);
+  }
+
   private static boolean isIcebergTable(Map<String, String> properties) {
-    return ICEBERG_TABLE_TYPE.equalsIgnoreCase(properties.get(GlueConstants.TABLE_TYPE_PARAM))
-        || ICEBERG_TABLE_TYPE.equalsIgnoreCase(properties.get(GlueConstants.TABLE_FORMAT));
+    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(
+            properties.get(GlueConstants.TABLE_TYPE_PARAM))
+        || GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(
+            properties.get(GlueConstants.TABLE_FORMAT));
   }
 
   /** Returns the storage format whose classes the table uses, or null if there is none. */

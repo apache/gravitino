@@ -31,6 +31,7 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.BigintType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.VarcharType;
@@ -56,6 +57,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.junit.jupiter.api.Test;
 
@@ -72,8 +74,7 @@ class TestGlueMetadataAdapter {
     properties.put("partitioned_by", ImmutableList.of("part_col"));
     properties.put("bucketed_by", ImmutableList.of("bucket_col"));
     properties.put("bucket_count", 8);
-    properties.put(
-        "sorted_by", ImmutableList.of(SortingColumn.sortingColumnFromString("bucket_col DESC")));
+    properties.put("sorted_by", ImmutableList.of("bucket_col DESC"));
 
     ConnectorTableMetadata tableMetadata =
         new ConnectorTableMetadata(
@@ -345,8 +346,141 @@ class TestGlueMetadataAdapter {
   }
 
   @Test
+  void testCheckColumnTypeFollowsTableFormat() {
+    GravitinoTable hiveTable = existingTable(Map.of("table_type", "EXTERNAL_TABLE"));
+    GravitinoTable icebergTable = existingTable(Map.of("table_type", "ICEBERG"));
+    GravitinoColumn micros =
+        new GravitinoColumn("ts", Types.TimestampType.withoutTimeZone(6), -1, "", true);
+    GravitinoColumn nestedMicros =
+        new GravitinoColumn(
+            "tss", Types.ListType.nullable(Types.TimestampType.withoutTimeZone(6)), -1, "", true);
+    GravitinoColumn millis =
+        new GravitinoColumn("ts", Types.TimestampType.withoutTimeZone(), -1, "", true);
+
+    assertThrows(TrinoException.class, () -> adapter.checkColumnType(micros, () -> hiveTable));
+    assertThrows(
+        TrinoException.class, () -> adapter.checkColumnType(nestedMicros, () -> hiveTable));
+    adapter.checkColumnType(millis, () -> hiveTable);
+    adapter.checkColumnType(micros, () -> icebergTable);
+  }
+
+  private static GravitinoTable existingTable(Map<String, String> properties) {
+    return new GravitinoTable(
+        "db",
+        "tbl",
+        mockTable(
+            "tbl",
+            new Column[] {Column.of("id", Types.LongType.get())},
+            properties,
+            new Transform[0],
+            new SortOrder[0],
+            Distributions.NONE));
+  }
+
+  @Test
   void testNewTableLayoutIsNotAskedFromLakehouseConnector() {
     assertTrue(adapter.skipsInternalNewTableLayout());
+  }
+
+  @Test
+  void testCreateIcebergTableKeepsSortOrderWithoutBucketing() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("type", "ICEBERG");
+    properties.put("sorted_by", decodeSortedBy("id ASC NULLS LAST", "ts DESC"));
+
+    GravitinoTable table = adapter.createTable(sortedTable(properties));
+
+    assertArrayEquals(
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field("id"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST),
+          SortOrders.of(
+              NamedReference.field("ts"), SortDirection.DESCENDING, NullOrdering.NULLS_LAST)
+        },
+        table.getSortOrders());
+    assertFalse(table.getProperties().containsKey("sorted_by"));
+  }
+
+  @Test
+  void testIcebergSortOrderShownByGetTableMetadataCanRecreateTable() {
+    SortOrder[] sortOrders = {
+      SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST),
+      SortOrders.of(NamedReference.field("ts"), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+    };
+    Table mockTable =
+        mockTable(
+            "tbl",
+            new Column[] {
+              Column.of("id", Types.LongType.get()),
+              Column.of("ts", Types.TimestampType.withoutTimeZone(6))
+            },
+            Map.of("table_type", "ICEBERG"),
+            new Transform[0],
+            sortOrders,
+            Distributions.NONE);
+
+    Map<String, Object> shown =
+        adapter.getTableMetadata(new GravitinoTable("db", "tbl", mockTable)).getProperties();
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("type", shown.get("type"));
+    properties.put(
+        "sorted_by", decodeSortedBy(((List<?>) shown.get("sorted_by")).toArray(new String[0])));
+
+    assertArrayEquals(sortOrders, adapter.createTable(sortedTable(properties)).getSortOrders());
+  }
+
+  @Test
+  void testCreateHiveTableRefusesNullOrderingInSortedBy() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("bucketed_by", ImmutableList.of("id"));
+    properties.put("bucket_count", 4);
+    properties.put("sorted_by", decodeSortedBy("id ASC NULLS LAST"));
+
+    TrinoException e =
+        assertThrows(TrinoException.class, () -> adapter.createTable(sortedTable(properties)));
+    assertTrue(e.getMessage().contains("id asc nulls last"), e.getMessage());
+  }
+
+  @Test
+  void testCreateHiveTableStillNeedsBucketingForSortedBy() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("sorted_by", decodeSortedBy("id"));
+
+    TrinoException e =
+        assertThrows(TrinoException.class, () -> adapter.createTable(sortedTable(properties)));
+    assertTrue(e.getMessage().contains("Sort columns can only be set"), e.getMessage());
+  }
+
+  @Test
+  void testSortedByEncodesHiveAndIcebergValues() {
+    assertEquals(
+        ImmutableList.of("a DESC", "b DESC NULLS FIRST"),
+        sortedByProperty()
+            .encode(
+                ImmutableList.of(
+                    SortingColumn.sortingColumnFromString("a DESC"), "b DESC NULLS FIRST")));
+  }
+
+  private static List<?> decodeSortedBy(String... fields) {
+    return sortedByProperty().decode(ImmutableList.copyOf(fields));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static PropertyMetadata<List<?>> sortedByProperty() {
+    return (PropertyMetadata<List<?>>)
+        GlueMetadataAdapter.getTablePropertyMetadata().stream()
+            .filter(property -> property.getName().equals("sorted_by"))
+            .findFirst()
+            .orElseThrow();
+  }
+
+  private static ConnectorTableMetadata sortedTable(Map<String, Object> properties) {
+    return new ConnectorTableMetadata(
+        new SchemaTableName("db", "tbl"),
+        ImmutableList.of(
+            ColumnMetadata.builder().setName("id").setType(BigintType.BIGINT).build(),
+            ColumnMetadata.builder().setName("ts").setType(TimestampType.TIMESTAMP_MICROS).build()),
+        properties);
   }
 
   private static ConnectorTableMetadata timestampTable(Map<String, Object> properties) {

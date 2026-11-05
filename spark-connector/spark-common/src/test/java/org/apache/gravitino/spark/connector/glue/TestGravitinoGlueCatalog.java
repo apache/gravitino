@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -271,6 +272,19 @@ public class TestGravitinoGlueCatalog {
         converter.toGravitinoType(DataTypes.TimestampNTZType));
     Assertions.assertEquals(
         DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone(6)));
+  }
+
+  @Test
+  void testTablesWithoutFormatFollowCatalogDefaultTableFormat() throws Exception {
+    Field catalogProperties = GravitinoGlueCatalog.class.getDeclaredField("catalogProperties");
+    catalogProperties.setAccessible(true);
+    catalogProperties.set(
+        gravitinoGlueCatalog, ImmutableMap.of(GlueConstants.DEFAULT_TABLE_FORMAT, "iceberg"));
+
+    SparkTypeConverter converter = gravitinoGlueCatalog.getSparkTypeConverter(ImmutableMap.of());
+
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(), converter.toGravitinoType(DataTypes.TimestampType));
   }
 
   @Test

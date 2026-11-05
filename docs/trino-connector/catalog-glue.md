@@ -198,6 +198,10 @@ CREATE TABLE glue_test.db01.table_name
 | `bucket_count`   | Number of buckets (required when `bucketed_by` is set)                                                                              | (none)                             | No       |
 | `sorted_by`      | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`. Sort terms over a transform, such as `day(ts)`, are not shown. | (none)                             | No       |
 
+For Hive-format tables, `sorted_by` requires `bucketed_by` and does not take `NULLS FIRST` or `NULLS LAST`. Iceberg tables need no bucketing.
+
+`SHOW CREATE TABLE` shows `type` and `format` of a Hive-format table only when its storage classes match a format Trino can name. For other tables, such as RCFile tables, set them yourself when you recreate the table.
+
 ## Examples
 
 Follow these steps to use the Glue catalog in Trino through Gravitino.
@@ -266,7 +270,7 @@ The Glue connector extends the Hive data type mapping with additional support fo
 | `date`           | `DATE`                        |                                                                               |
 | `time(6)`        | `TIME(6)`                     | Iceberg tables only; microsecond precision                                    |
 | `timestamp`      | `TIMESTAMP(3)`                | Hive-format tables; millisecond precision                                     |
-| `timestamp(6)`   | `TIMESTAMP(6)`                | Iceberg tables; microsecond precision. Hive-format tables refuse it at create |
+| `timestamp(6)`   | `TIMESTAMP(6)`                | Iceberg tables; microsecond precision. Hive-format tables refuse it           |
 | `timestamptz(6)` | `TIMESTAMP(6) WITH TIME ZONE` | Iceberg tables only                                                           |
 | `list`           | `ARRAY`                       |                                                                               |
 | `map`            | `MAP`                         |                                                                               |

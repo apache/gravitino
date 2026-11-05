@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -147,6 +148,15 @@ public class CatalogConnectorMetadataAdapter {
         properties,
         Optional.ofNullable(gravitinoTable.getComment()));
   }
+
+  /**
+   * Checks that an existing table can hold a column being added or changed. Adapters whose column
+   * types depend on the format of the table override this method.
+   *
+   * @param column the new definition of the column
+   * @param table supplies the table the column belongs to, loading it when called
+   */
+  public void checkColumnType(GravitinoColumn column, Supplier<GravitinoTable> table) {}
 
   /**
    * Whether the internal connector cannot plan the layout of a new table from the table metadata of
