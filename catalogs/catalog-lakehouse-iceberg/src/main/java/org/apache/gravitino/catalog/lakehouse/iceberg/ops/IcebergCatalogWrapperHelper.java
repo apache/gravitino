@@ -172,24 +172,26 @@ public class IcebergCatalogWrapperHelper {
       throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
     }
 
-    org.apache.iceberg.types.Type icebergType =
-        IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType());
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          icebergType,
+          IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType()),
           addColumn.getComment(),
-          ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType));
+          ToIcebergColumnDefault.fromGravitino(
+              addColumn.getDefaultValue(),
+              IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType())));
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
       icebergUpdateSchema.addRequiredColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
-          icebergType,
+          IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType()),
           addColumn.getComment(),
-          ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType));
+          ToIcebergColumnDefault.fromGravitino(
+              addColumn.getDefaultValue(),
+              IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType())));
     }
 
     if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
