@@ -160,6 +160,23 @@ public class TestSemanticModelSourceAssociations extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testPreserveKeepsRowsWhenDatasetNamesChange() throws Exception {
+    SemanticModelEntity original = model("staff", source.id(), "employee");
+    backend.insert(original, false);
+    List<Association> initial = rows(original.id());
+    assertEquals(1, initial.size());
+
+    SemanticModelDefinition changedDefinition = model("staff", source.id(), "manager").definition();
+    SemanticModelEntity changed =
+        copy(original, original.name(), changedDefinition, SemanticModelSourceUpdate.preserve());
+    backend.update(original.nameIdentifier(), original.type(), old -> changed);
+
+    assertEquals(changed, service().getSemanticModelByIdentifier(original.nameIdentifier()));
+    assertEquals(initial, rows(original.id()));
+    assertEquals(2, snapshotCount(original.id()));
+  }
+
+  @TestTemplate
   void testSourceRenamePreservesAssociationsAndDefinition() throws Exception {
     SemanticModelEntity original = model("staff", source.id(), "employee");
     backend.insert(original, false);

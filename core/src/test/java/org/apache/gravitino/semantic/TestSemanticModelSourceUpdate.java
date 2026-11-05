@@ -61,6 +61,13 @@ class TestSemanticModelSourceUpdate {
         () -> new SemanticModelSource("", Entity.EntityType.TABLE, 123));
   }
 
+  @Test
+  void testNullSourcesRejected() {
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> SemanticModelSourceUpdate.replace(null));
+    assertEquals("sources must not be null", exception.getMessage());
+  }
+
   private SemanticModelDefinition definition(String name) {
     return SemanticModelDefinition.builder()
         .withDatasets(

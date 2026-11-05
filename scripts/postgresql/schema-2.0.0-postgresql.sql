@@ -1351,3 +1351,12 @@ CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
 );
 CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_smsr_deleted_at ON semantic_model_source_rel (deleted_at);
+COMMENT ON TABLE semantic_model_source_rel IS 'current semantic model dataset source associations';
+COMMENT ON COLUMN semantic_model_source_rel.id IS 'auto increment id';
+COMMENT ON COLUMN semantic_model_source_rel.metalake_id IS 'containing metalake id';
+COMMENT ON COLUMN semantic_model_source_rel.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the current definition';
+COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
+COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
+COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';

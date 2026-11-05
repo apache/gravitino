@@ -696,15 +696,16 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-    `metalake_id` BIGINT(20) UNSIGNED NOT NULL,
-    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL,
-    `dataset_name` MEDIUMTEXT NOT NULL,
-    `source_type` VARCHAR(64) NOT NULL,
-    `source_id` BIGINT(20) UNSIGNED NOT NULL,
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
     PRIMARY KEY (`id`),
     KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
-    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`)
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
+    KEY `idx_smsr_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'current semantic model dataset source associations';

@@ -51,8 +51,10 @@ public final class SemanticModelSourceUpdate {
    *
    * @param sources All resolved datasets of the new definition.
    * @return The immutable replacement instruction.
+   * @throws IllegalArgumentException If sources is null or contains duplicate dataset names.
    */
   public static SemanticModelSourceUpdate replace(List<SemanticModelSource> sources) {
+    Preconditions.checkArgument(sources != null, "sources must not be null");
     Set<String> names = new HashSet<>();
     sources.forEach(
         source ->

@@ -43,7 +43,7 @@ public final class SemanticModelSource {
         datasetName != null && !datasetName.isEmpty(), "Dataset name is required");
     Preconditions.checkArgument(
         sourceType == Entity.EntityType.TABLE || sourceType == Entity.EntityType.VIEW,
-        "Source must be a table or View");
+        "Source must be a table or view");
     this.datasetName = datasetName;
     this.sourceType = sourceType;
     this.sourceId = sourceId;
