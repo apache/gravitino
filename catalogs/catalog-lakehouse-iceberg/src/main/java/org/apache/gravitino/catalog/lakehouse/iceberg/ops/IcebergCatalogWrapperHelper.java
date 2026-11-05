@@ -174,28 +174,21 @@ public class IcebergCatalogWrapperHelper {
 
     org.apache.iceberg.types.Type icebergType =
         IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType());
-    // Iceberg addColumn seeds both initial-default and write-default from this single value.
+    // Iceberg addColumn seeds both initial-default and write-default from this single value;
+    // null defaultValue is equivalent to the overload without a default.
     Literal<?> defaultValue =
         ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType);
     String parent = getParentName(addColumn.fieldName());
     String leaf = getLeafName(addColumn.fieldName());
 
     if (addColumn.isNullable()) {
-      if (defaultValue != null) {
-        icebergUpdateSchema.addColumn(
-            parent, leaf, icebergType, addColumn.getComment(), defaultValue);
-      } else {
-        icebergUpdateSchema.addColumn(parent, leaf, icebergType, addColumn.getComment());
-      }
+      icebergUpdateSchema.addColumn(
+          parent, leaf, icebergType, addColumn.getComment(), defaultValue);
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
-      if (defaultValue != null) {
-        icebergUpdateSchema.addRequiredColumn(
-            parent, leaf, icebergType, addColumn.getComment(), defaultValue);
-      } else {
-        icebergUpdateSchema.addRequiredColumn(parent, leaf, icebergType, addColumn.getComment());
-      }
+      icebergUpdateSchema.addRequiredColumn(
+          parent, leaf, icebergType, addColumn.getComment(), defaultValue);
     }
 
     if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
