@@ -49,6 +49,10 @@ paths:
                   $ref: "#/components/examples/PartitionListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -68,6 +72,10 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PartitionListResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target partition already exists
           content:
@@ -97,10 +105,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PartitionResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified partition does not exist
+          description: >-
+            Not Found - The partition or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -114,6 +126,8 @@ paths:
                   $ref: "./tables.yaml#/components/examples/NoSuchTableException"
                 NoSuchPartitionException:
                   $ref: "#/components/examples/NoSuchPartitionException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -130,6 +144,12 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionPurgeUnsupportedErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -148,7 +168,9 @@ components:
     purge:
       name: purge
       in: query
-      description: Purge the partition data
+      description: >-
+        Purge the partition data. Support depends on the catalog provider. Setting this
+        parameter to true returns HTTP 501 if the provider does not support partition purging.
       required: false
       schema:
         type: boolean
@@ -347,6 +369,17 @@ components:
           $ref: "#/components/schemas/Properties"
 
   responses:
+    PartitionPurgeUnsupportedErrorResponse:
+      description: Not Implemented - The catalog provider does not support partition purging with purge=true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1006
+            type: UnsupportedOperationException
+            message: Partition purging is not supported
+
 
     PartitionListResponse:
       description: Returns list of partition objects

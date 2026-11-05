@@ -422,6 +422,44 @@ components:
             "message": "Malformed request"
           }
 
+    ForbiddenErrorResponse:
+      description: >-
+        Forbidden - The caller is not allowed to perform the operation. When authorization
+        is enabled, a missing metalake or a caller who is not a member of the metalake
+        also returns 403.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example:
+            code: 1008
+            type: ForbiddenException
+            message: Current user alice is not a member of metalake metalake1, or the metalake does not exist
+
+    NotAcceptableErrorResponse:
+      description: >-
+        Not Acceptable - The requested API version is unsupported, or the effective
+        Accept header cannot be served by this operation. When Accept has no Gravitino
+        API version, including application/json, */*, or an absent header, the server
+        uses the version from Content-Type if present, otherwise the default API version.
+        An unsupported version returns IllegalArgumentException; failed content negotiation
+        returns RESTException.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedApiVersion:
+              value:
+                code: 1001
+                type: IllegalArgumentException
+                message: Unsupported version v99 in request header
+            IncompatibleAccept:
+              value:
+                code: 1000
+                type: RESTException
+                message: HTTP 406 Not Acceptable
+
     ServerErrorResponse:
       description:
         A server-side problem that might not be addressable from the client
