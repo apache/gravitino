@@ -380,8 +380,8 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
 - Creating a table or adding a column with `defaultValue` / `initialDefaultValue`
   sets the corresponding Iceberg defaults (Iceberg `addColumn` seeds both from a
   single value). Updating a column with `updateColumnDefaultValue` updates
-  Iceberg `write-default` only. Gravitino bumps `format-version` to 3 when
-  defaults are set on a lower-version table.
+  Iceberg `write-default` only. Column defaults require `format-version` 3+;
+  Gravitino does not silently upgrade the table format version.
 
 ### Table Partitions
 

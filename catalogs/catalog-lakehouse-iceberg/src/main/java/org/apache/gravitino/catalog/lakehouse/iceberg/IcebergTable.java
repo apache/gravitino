@@ -107,7 +107,7 @@ public class IcebergTable extends BaseTable {
     properties.put(
         IcebergTablePropertiesMetadata.DISTRIBUTION_MODE, transformDistribution(distribution));
     Map<String, String> createProperties = rebuildCreateProperties(properties);
-    // Column defaults require Iceberg format-version 3+.
+    // Column defaults require Iceberg format-version 3+; do not silently upgrade.
     boolean hasDefaults =
         schema.columns().stream()
             .anyMatch(f -> f.writeDefaultLiteral() != null || f.initialDefaultLiteral() != null);
@@ -117,9 +117,8 @@ public class IcebergTable extends BaseTable {
           StringUtils.isBlank(formatVersion)
               ? IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION
               : Integer.parseInt(formatVersion);
-      if (version < 3) {
-        createProperties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
-      }
+      Preconditions.checkArgument(
+          version >= 3, "Column defaults require Iceberg format-version 3+, but got %s", version);
     }
     CreateTableRequest.Builder builder =
         CreateTableRequest.builder()

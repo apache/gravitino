@@ -55,7 +55,6 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
@@ -213,26 +212,6 @@ public class IcebergCatalogWrapperHelper {
     icebergUpdateSchema.updateColumnDefault(fieldName, newDefault);
   }
 
-  private static boolean changeSetsColumnDefault(ColumnChange change) {
-    if (change instanceof UpdateColumnDefaultValue) {
-      return true;
-    }
-    if (change instanceof AddColumn) {
-      Expression defaultValue = ((AddColumn) change).getDefaultValue();
-      return defaultValue != null && !defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET);
-    }
-    return false;
-  }
-
-  private static void ensureFormatVersionForColumnDefaults(
-      Transaction transaction, Table icebergTable) {
-    int formatVersion = ((BaseTable) icebergTable).operations().current().formatVersion();
-    if (formatVersion < 3) {
-      // Column defaults require Iceberg format-version 3+.
-      transaction.updateProperties().set(TableProperties.FORMAT_VERSION, "3").commit();
-    }
-  }
-
   private void alterTableProperty(
       UpdateProperties icebergUpdateProperties, List<TableChange> propertyChanges) {
     for (TableChange change : propertyChanges) {
@@ -251,14 +230,9 @@ public class IcebergCatalogWrapperHelper {
   }
 
   private void alterTableColumn(
-      Transaction transaction,
-      Table icebergTable,
+      UpdateSchema icebergUpdateSchema,
       List<ColumnChange> columnChanges,
       Schema icebergTableSchema) {
-    if (columnChanges.stream().anyMatch(IcebergCatalogWrapperHelper::changeSetsColumnDefault)) {
-      ensureFormatVersionForColumnDefaults(transaction, icebergTable);
-    }
-    UpdateSchema icebergUpdateSchema = transaction.updateSchema();
     for (ColumnChange change : columnChanges) {
       if (change instanceof AddColumn) {
         doAddColumn(icebergUpdateSchema, (AddColumn) change);
@@ -326,8 +300,29 @@ public class IcebergCatalogWrapperHelper {
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);
     if (!gravitinoColumnChanges.isEmpty()) {
+      boolean setsColumnDefault =
+          gravitinoColumnChanges.stream()
+              .anyMatch(
+                  change -> {
+                    if (change instanceof UpdateColumnDefaultValue) {
+                      return true;
+                    }
+                    if (change instanceof AddColumn) {
+                      Expression defaultValue = ((AddColumn) change).getDefaultValue();
+                      return defaultValue != null
+                          && !defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET);
+                    }
+                    return false;
+                  });
+      if (setsColumnDefault) {
+        int formatVersion = ((BaseTable) icebergBaseTable).operations().current().formatVersion();
+        Preconditions.checkArgument(
+            formatVersion >= 3,
+            "Column defaults require Iceberg format-version 3+, but table format-version is %s",
+            formatVersion);
+      }
       alterTableColumn(
-          transaction, icebergBaseTable, gravitinoColumnChanges, icebergBaseTable.schema());
+          transaction.updateSchema(), gravitinoColumnChanges, icebergBaseTable.schema());
     }
 
     if (!gravitinoPropertyChanges.isEmpty()) {

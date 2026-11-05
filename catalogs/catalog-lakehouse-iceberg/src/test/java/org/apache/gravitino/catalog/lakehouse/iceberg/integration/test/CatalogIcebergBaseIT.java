@@ -1213,6 +1213,8 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   @Test
   public void testAlterIcebergTable() {
     Column[] columns = createColumns();
+    Map<String, String> alterTableProperties = createProperties();
+    alterTableProperties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
     Table table =
         catalog
             .asTableCatalog()
@@ -1220,7 +1222,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                 NameIdentifier.of(schemaName, tableName),
                 columns,
                 table_comment,
-                createProperties(),
+                alterTableProperties,
                 new Transform[] {Transforms.identity(columns[0].name())});
     Assertions.assertNull(table.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
@@ -1318,7 +1320,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
             tableIdentifier,
             newColumns,
             table_comment,
-            ImmutableMap.of(),
+            ImmutableMap.of(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3"),
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);

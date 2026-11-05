@@ -771,6 +771,48 @@ public class TestIcebergTable {
     Assertions.assertEquals("3", rebuiltFormatVersion("3"));
   }
 
+  @Test
+  void testCreateTableWithDefaultsRequiresFormatVersion3() {
+    IcebergColumn column =
+        IcebergColumn.builder()
+            .withName("region")
+            .withType(Types.StringType.get())
+            .withDefaultValue(Literals.stringLiteral("US"))
+            .build();
+    IcebergTable withoutFormat3 =
+        IcebergTable.builder()
+            .withName("defaults_v2")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(Maps.newHashMap())
+            .withColumns(new Column[] {column})
+            .withDistribution(Distributions.NONE)
+            .withPartitioning(new Transform[0])
+            .withSortOrders(new SortOrder[0])
+            .withComment("defaults require v3")
+            .build();
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, withoutFormat3::toCreateTableRequest);
+    Assertions.assertTrue(ex.getMessage().contains("format-version"));
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+    IcebergTable withFormat3 =
+        IcebergTable.builder()
+            .withName("defaults_v3")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withProperties(properties)
+            .withColumns(new Column[] {column})
+            .withDistribution(Distributions.NONE)
+            .withPartitioning(new Transform[0])
+            .withSortOrders(new SortOrder[0])
+            .withComment("defaults require v3")
+            .build();
+    Assertions.assertDoesNotThrow(withFormat3::toCreateTableRequest);
+  }
+
   private static String rebuiltFormatVersion(String input) {
     Map<String, String> properties = new HashMap<>();
     if (input != null) {
