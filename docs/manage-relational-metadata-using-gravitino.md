@@ -276,8 +276,12 @@ Loading an external table preserves its complete source column comments in the r
 metadata. The entity store keeps a bounded, NUL-free projection of each column comment,
 without changing the source comment, column identity, or column governance metadata.
 The projection is limited to 4096 UTF-16 units so it fits every supported store.
-CREATE and ALTER requests still reject NUL column comments and comments exceeding the
-existing request limit before source DDL. No store migration is required.
+CREATE and ALTER requests reject NUL column comments and comments exceeding 4096 UTF-16
+units before source DDL, including managed-table creation, ADD COLUMN and comment updates.
+Supplementary Unicode characters count as two units, so 2048 emoji fit while 4096 emoji do not.
+Accepted request comments are stored without truncation. The UTF-16 bound is needed for H2's
+VARCHAR storage limit even though MySQL and PostgreSQL count code points. No store migration
+is required.
 
 Existing column references use the provider's existing-name specification; new columns
 and rename targets still use creation rules. PostgreSQL accepts quoted native column
@@ -285,8 +289,12 @@ names while retaining its UTF-8 name-length, NUL, and wildcard restrictions. Oth
 retain their default validation until they explicitly support native-name operations.
 
 Catalog creation takes the target catalog lock, permitting sibling catalogs to operate
-while source verification runs. Table DROP holds the target table lock for source DDL
+while source verification runs. New catalogs are initialized and validated before their entity
+is persisted; local cache publication is coordinated with catalog loading. Failed verification
+does not expose a transient catalog through listing. Table DROP holds the target table lock for source DDL
 and registration removal. After releasing that table lock, best-effort cleanup checks schema
 existence under a read lock and only takes a write lock if the schema is missing, rechecking
 before deleting orphaned registrations. This does not add SQL statement timeouts or
-cancel blocked source DDL. Cold table import retains its existing locking behavior.
+cancel blocked source DDL. Cold table import retains its existing locking behavior. Table PURGE
+and view DROP also retain their schema write lock across source DDL and can still block sibling
+operations; this change narrows only table DROP.

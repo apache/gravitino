@@ -893,10 +893,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           String.format(
               "type[catalog=%s, store=%s]", catalogColumn.dataType(), entityColumn.dataType()));
     }
-    if (!Objects.equal(catalogColumn.comment(), entityColumn.comment())) {
+    String storedComment = ColumnEntity.commentForStorage(catalogColumn.comment());
+    if (!Objects.equal(storedComment, entityColumn.comment())) {
       differences.add(
-          String.format(
-              "comment[catalog=%s, store=%s]", catalogColumn.comment(), entityColumn.comment()));
+          String.format("comment[catalog=%s, store=%s]", storedComment, entityColumn.comment()));
     }
     if (catalogColumn.nullable() != entityColumn.nullable()) {
       differences.add(
@@ -1255,18 +1255,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
   }
 
-  private static void validateColumnComment(String columnName, @Nullable String comment) {
-    Preconditions.checkArgument(
-        comment == null || comment.indexOf('\0') < 0,
-        "Column comment for %s must not contain NUL characters",
-        columnName);
-    ColumnEntity.COMMENT.validate(comment, COLUMN);
-  }
-
   private static void validateColumns(Column[] columns) {
     for (Column column : columns) {
       ColumnEntity.NAME.validate(column.name(), COLUMN);
-      validateColumnComment(column.name(), column.comment());
+      ColumnEntity.validateCommentForWrite(column.name(), column.comment());
     }
   }
 
@@ -1275,7 +1267,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       if (addColumn.getFieldName().length == 1) {
         ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
-        validateColumnComment(addColumn.getFieldName()[0], addColumn.getComment());
+        ColumnEntity.validateCommentForWrite(addColumn.getFieldName()[0], addColumn.getComment());
       }
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -1285,7 +1277,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } else if (change instanceof TableChange.UpdateColumnComment) {
       TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
       if (updateComment.getFieldName().length == 1) {
-        validateColumnComment(updateComment.getFieldName()[0], updateComment.getNewComment());
+        ColumnEntity.validateCommentForWrite(
+            updateComment.getFieldName()[0], updateComment.getNewComment());
       }
     }
   }

@@ -60,6 +60,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -278,6 +279,73 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(
         changedSuffix, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
     verify(entityStore, never()).update(eq(ident), eq(TableEntity.class), eq(TABLE), any());
+  }
+
+  @Test
+  void testColumnDifferenceUsesBoundedCommentProjection() throws Exception {
+    Column source = Column.of("c", Types.StringType.get(), "a".repeat(5000));
+    ColumnEntity stored = ColumnEntity.toColumnEntity(source, 0, 1L, AuditInfo.EMPTY);
+    String same =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", source, 0, stored);
+    Assertions.assertEquals("", same);
+    Column changed = Column.of("c", Types.StringType.get(), "b\0" + "b".repeat(5000));
+    String difference =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", changed, 0, stored);
+    Assertions.assertFalse(difference.contains("\0"));
+    Assertions.assertFalse(difference.contains("b".repeat(4097)));
+    Assertions.assertTrue(difference.contains("b".repeat(4096)));
+  }
+
+  @Test
+  void testUnicodeCommentsExceedingStorageFailBeforeSourceDdl() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "unicode_comment_request");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog base =
+        catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source = spy(original);
+    FieldUtils.writeField(base, "ops", source, true);
+    try {
+      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tableOperationDispatcher.createTable(
+                        ident,
+                        new Column[] {Column.of("c", Types.StringType.get(), comment)},
+                        "comment",
+                        Map.of("k1", "v1", "k2", "v2"),
+                        new Transform[0]));
+        Assertions.assertTrue(error.getMessage().contains("4096 UTF-16"));
+      }
+      verify(source, never()).createTable(any(), any(), any(), any(), any(Transform[].class));
+      createTable(ident);
+      clearInvocations(source);
+      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), comment)));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, comment)));
+      }
+      verify(source, never()).alterTable(any(), any(TableChange[].class));
+    } finally {
+      FieldUtils.writeField(base, "ops", original, true);
+    }
   }
 
   /** Checks invalid request comments cannot partially apply source DDL. */

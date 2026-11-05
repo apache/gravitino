@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -232,6 +233,175 @@ public class TestCatalogManager {
     if (catalogManager != null) {
       catalogManager.close();
       catalogManager = null;
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCatalogCreateIsInvisibleUntilValidationCompletes(boolean failValidation)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, "publication_test");
+    CountDownLatch validationStarted = new CountDownLatch(1);
+    CountDownLatch releaseValidation = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    RuntimeException failure = new IllegalArgumentException("backend validation failed");
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(
+                new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                validationStarted.countDown();
+                Assertions.assertTrue(releaseValidation.await(10, TimeUnit.SECONDS));
+                if (failValidation) {
+                  throw failure;
+                }
+                return invocation.callRealMethod();
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      Future<Catalog> creation =
+          executor.submit(
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(PROPERTY_KEY4, new SecretBinding("memory", "password")),
+                      Map.of()));
+      try {
+        Assertions.assertTrue(validationStarted.await(5, TimeUnit.SECONDS));
+        Assertions.assertEquals(
+            0,
+            executor
+                .submit(() -> manager.listCatalogs(Namespace.of(metalake)))
+                .get(3, TimeUnit.SECONDS)
+                .length);
+        Assertions.assertEquals(
+            0,
+            executor
+                .submit(() -> manager.listCatalogsInfo(Namespace.of(metalake)))
+                .get(3, TimeUnit.SECONDS)
+                .length);
+        Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+        releaseValidation.countDown();
+        if (failValidation) {
+          Exception error =
+              Assertions.assertThrows(Exception.class, () -> creation.get(5, TimeUnit.SECONDS));
+          Assertions.assertSame(failure, error.getCause());
+          Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+        } else {
+          Assertions.assertEquals(ident.name(), creation.get(5, TimeUnit.SECONDS).name());
+          Assertions.assertEquals(1, manager.listCatalogsInfo(Namespace.of(metalake)).length);
+          Mockito.verify(manager, Mockito.never())
+              .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+        }
+      } finally {
+        releaseValidation.countDown();
+        executor.shutdownNow();
+        Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+      }
+    }
+  }
+
+  @Test
+  void testCatalogInsertAndCachePublicationDoNotPermitDuplicateLoad() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    NameIdentifier ident = NameIdentifier.of(metalake, "publication_gap");
+    CountDownLatch inserted = new CountDownLatch(1);
+    CountDownLatch releaseInsert = new CountDownLatch(1);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Mockito.doAnswer(
+            invocation -> {
+              Object result = invocation.callRealMethod();
+              inserted.countDown();
+              Assertions.assertTrue(releaseInsert.await(10, TimeUnit.SECONDS));
+              return result;
+            })
+        .when(store)
+        .put(any(CatalogEntity.class), eq(false));
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                loadStarted.countDown();
+                return invocation.callRealMethod();
+              })
+          .when(manager)
+          .acquireCatalogLease(ident);
+      Future<Catalog> creation =
+          executor.submit(
+              () ->
+                  manager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps()));
+      try {
+        Assertions.assertTrue(inserted.await(5, TimeUnit.SECONDS));
+        Future<Catalog[]> listing =
+            executor.submit(() -> manager.listCatalogsInfo(Namespace.of(metalake)));
+        Assertions.assertTrue(loadStarted.await(5, TimeUnit.SECONDS));
+        Assertions.assertThrows(
+            TimeoutException.class, () -> listing.get(200, TimeUnit.MILLISECONDS));
+        releaseInsert.countDown();
+        Assertions.assertEquals(ident.name(), creation.get(5, TimeUnit.SECONDS).name());
+        Assertions.assertEquals(ident.name(), listing.get(5, TimeUnit.SECONDS)[0].name());
+        Mockito.verify(manager, Mockito.times(1))
+            .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+        Mockito.verify(manager, Mockito.never())
+            .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+      } finally {
+        releaseInsert.countDown();
+        executor.shutdownNow();
+        Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+      }
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
+  void testFailedCatalogInsertClosesInitializedWrapper() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    IOException failure = new IOException("catalog insert failed");
+    Mockito.doThrow(failure).when(store).put(any(CatalogEntity.class), eq(false));
+    AtomicReference<CatalogManager.CatalogWrapper> initialized = new AtomicReference<>();
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                CatalogManager.CatalogWrapper wrapper =
+                    (CatalogManager.CatalogWrapper) invocation.callRealMethod();
+                initialized.set(wrapper);
+                return wrapper;
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  manager.createCatalog(
+                      NameIdentifier.of(metalake, "failed_insert"),
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps()));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertNotNull(initialized.get());
+      Assertions.assertTrue(initialized.get().isRetired());
+      Assertions.assertEquals(0, initialized.get().activeOperations());
+      Assertions.assertNull(initialized.get().catalog());
+      Mockito.verify(store, Mockito.never()).delete(any(), eq(EntityType.CATALOG), eq(true));
+    } finally {
+      store.close();
     }
   }
 
@@ -865,7 +1035,7 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 failIdent, Catalog.Type.RELATIONAL, provider, "comment", failProps));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failIdent));
-    // Store rollback: the just-persisted entity is deleted.
+    // Failed backend validation must not leave a catalog entity.
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> entityStore.get(failIdent, EntityType.CATALOG, CatalogEntity.class));
@@ -1427,8 +1597,7 @@ public class TestCatalogManager {
         new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "failed_create_cleanup");
 
-    // A creation that fails validation (key1 is required but missing) stores the entity and then
-    // rolls it back via store.delete(), which writes a DROP record to the entity change log.
+    // Validation failure must leave no catalog row. A later valid create can reuse the name.
     Map<String, String> invalidProps =
         ImmutableMap.of(
             "provider", "test", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "v");
@@ -1453,8 +1622,8 @@ public class TestCatalogManager {
     Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Cleanup DROP and subsequent ALTER both invalidate the recreated entry. No local marker
-    // may suppress either record; active operations remain protected by CatalogLease.
+    // A replayed DROP from an earlier incarnation and subsequent ALTER must both invalidate the
+    // new entry. No local marker may suppress either record; leases protect active operations.
     store
         .listener
         .get()

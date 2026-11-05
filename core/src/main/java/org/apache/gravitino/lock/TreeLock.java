@@ -39,18 +39,18 @@ import org.slf4j.LoggerFactory;
  *   /metalake                            readLock
  *   /metalake/catalog                    readLock
  *   /metalake/catalog/db1                readLock
- *   /metalake/catalog/db1/table1          readLock
+ *   /metalake/catalog/db1/table1         readLock
  * </pre>
  *
- * If we need to drop or alter a table `metalake.catalog.db1.table1` (without renaming it), the lock
- * manager will lock the following:
+ * If we need to drop a table `metalake.catalog.db1.table1`, the lock manager will lock the
+ * following:
  *
  * <pre>
  *   /                                    readLock
  *   /metalake                            readLock
  *   /metalake/catalog                    readLock
  *   /metalake/catalog/db1                readLock
- *   /metalake/catalog/db1/table1          writeLock
+ *   /metalake/catalog/db1/table1         writeLock
  * </pre>
  *
  * When we need to rename a table `metalake.catalog.db1.table1`, the lock manager will lock the
