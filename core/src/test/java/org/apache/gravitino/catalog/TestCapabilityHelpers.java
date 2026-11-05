@@ -92,6 +92,22 @@ public class TestCapabilityHelpers {
         }
       };
 
+  @Test
+  void testNewColumnDoesNotUseExistingNameRules() {
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            throw new AssertionError("New columns must use creation rules");
+          }
+        };
+    TableChange[] changes =
+        CapabilityHelpers.applyCapabilities(
+            capability,
+            TableChange.addColumn(new String[] {"new_column"}, Types.IntegerType.get()));
+    Assertions.assertEquals(1, changes.length);
+  }
+
   /** Checks existing references and new names use their respective provider rules. */
   @Test
   public void testExistingColumnReferencesDoNotUseCreationPattern() {

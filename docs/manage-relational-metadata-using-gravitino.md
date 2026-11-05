@@ -286,6 +286,7 @@ retain their default validation until they explicitly support native-name operat
 
 Catalog creation takes the target catalog lock, permitting sibling catalogs to operate
 while source verification runs. Table DROP holds the target table lock for source DDL
-and registration removal; best-effort orphaned-schema cleanup takes the schema lock only
-after that table lock has been released. This does not add SQL statement timeouts or
+and registration removal. After releasing that table lock, best-effort cleanup checks schema
+existence under a read lock and only takes a write lock if the schema is missing, rechecking
+before deleting orphaned registrations. This does not add SQL statement timeouts or
 cancel blocked source DDL. Cold table import retains its existing locking behavior.

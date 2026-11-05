@@ -460,13 +460,14 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
+    if (change instanceof TableChange.AddColumn) {
+      return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
+
     applyExistingColumnName(change.fieldName()[0], capabilities);
     String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
 
-    if (change instanceof TableChange.AddColumn) {
-      return applyCapabilities((TableChange.AddColumn) change, capabilities);
-
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {

@@ -143,6 +143,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier sibling = NameIdentifier.of(ns, "sibling");
     createTable(target);
     createTable(sibling);
+    NameIdentifier completedDrop = NameIdentifier.of(ns, "completed_drop");
+    createTable(completedDrop);
     CountDownLatch started = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     TestCatalog base =
@@ -162,6 +164,11 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Future<Boolean> drop = executor.submit(() -> tableOperationDispatcher.dropTable(target));
     try {
       Assertions.assertTrue(started.await(5, TimeUnit.SECONDS));
+      // Cleanup for a completed drop must not queue a schema writer behind the blocked drop.
+      Assertions.assertTrue(
+          executor
+              .submit(() -> tableOperationDispatcher.dropTable(completedDrop))
+              .get(3, TimeUnit.SECONDS));
       executor
           .submit(
               () -> {
@@ -177,6 +184,39 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       release.countDown();
       executor.shutdownNow();
       FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  @Test
+  void testSchemaCleanupProbeFailureAndRecreatedSchemaPreserveRegistration() throws Exception {
+    for (boolean failProbe : new boolean[] {true, false}) {
+      Namespace ns = Namespace.of(metalake, catalog, "cleanup_probe_" + failProbe);
+      NameIdentifier schemaIdent = NameIdentifier.of(ns.levels());
+      schemaOperationDispatcher.createSchema(
+          schemaIdent, "comment", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier tableIdent = NameIdentifier.of(ns, "t");
+      createTable(tableIdent);
+      TestCatalog base =
+          catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+      TestCatalogOperations original = (TestCatalogOperations) base.ops();
+      TestCatalogOperations source = spy(original);
+      FieldUtils.writeField(base, "ops", source, true);
+      try {
+        if (failProbe) {
+          doThrow(new IllegalStateException("schema probe failed"))
+              .when(source)
+              .schemaExists(schemaIdent);
+        } else {
+          // The schema reappears between the read probe and the write-locked recheck.
+          doReturn(false, true).when(source).schemaExists(schemaIdent);
+        }
+        clearInvocations(entityStore);
+        Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+        verify(source, times(failProbe ? 1 : 2)).schemaExists(schemaIdent);
+        verify(entityStore, never()).delete(eq(schemaIdent), eq(SCHEMA), anyBoolean());
+      } finally {
+        FieldUtils.writeField(base, "ops", original, true);
+      }
     }
   }
 
@@ -223,8 +263,21 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(columnId, reloaded.columns().get(0).id());
     Assertions.assertEquals(
         ColumnEntity.commentForStorage(updated), reloaded.columns().get(0).comment());
+    clearInvocations(entityStore);
     Assertions.assertEquals(
         updated, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    String changedSuffix = updated + "different suffix";
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          ((TestCatalogOperations) c.ops())
+              .alterTable(
+                  ident, TableChange.updateColumnComment(new String[] {"c"}, changedSuffix));
+          return null;
+        });
+    Assertions.assertEquals(
+        changedSuffix, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    verify(entityStore, never()).update(eq(ident), eq(TableEntity.class), eq(TABLE), any());
   }
 
   /** Checks invalid request comments cannot partially apply source DDL. */
@@ -234,29 +287,35 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
     NameIdentifier ident = NameIdentifier.of(ns, "t");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableOperationDispatcher.createTable(
-                ident,
-                new Column[] {Column.of("c", Types.StringType.get(), "bad\0comment")},
-                "comment",
-                Map.of("k1", "v1", "k2", "v2"),
-                new Transform[0]));
+    IllegalArgumentException createError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    ident,
+                    new Column[] {Column.of("c", Types.StringType.get(), "bad\0comment")},
+                    "comment",
+                    Map.of("k1", "v1", "k2", "v2"),
+                    new Transform[0]));
+    Assertions.assertTrue(createError.getMessage().contains("Column comment for c"));
     Assertions.assertFalse(tableOperationDispatcher.tableExists(ident));
     createTable(ident);
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableOperationDispatcher.alterTable(
-                ident,
-                TableChange.addColumn(
-                    new String[] {"added"}, Types.StringType.get(), "bad\0comment")));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableOperationDispatcher.alterTable(
-                ident, TableChange.updateColumnComment(new String[] {"col1"}, "bad\0comment")));
+    IllegalArgumentException addError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), "bad\0comment")));
+    Assertions.assertTrue(addError.getMessage().contains("Column comment for added"));
+    IllegalArgumentException alterError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, "bad\0comment")));
+    Assertions.assertTrue(alterError.getMessage().contains("Column comment for col1"));
     Assertions.assertEquals(1, tableOperationDispatcher.loadTable(ident).columns().length);
   }
 

@@ -484,14 +484,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             });
     if (!result.getRight()) {
       // Run even after a false drop result: out-of-band drops can leave orphaned schemas.
-      // Release the table lock before taking the schema write lock to avoid a lock upgrade.
-      TreeLockUtils.doWithTreeLock(
-          schemaIdentifier,
-          LockType.WRITE,
-          () -> {
-            OrphanedSchemaCleanup.cleanUp(this, getCatalogIdentifier(ident), schemaIdentifier);
-            return null;
-          });
+      // Release the table lock before cleanup to avoid a lock upgrade.
+      cleanUpOrphanedSchema(getCatalogIdentifier(ident), schemaIdentifier);
     }
     return result.getLeft();
   }
@@ -1232,17 +1226,47 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 combinedTable.tableFromGravitino().id()));
   }
 
-  private static void validateColumnComment(String comment) {
+  private void cleanUpOrphanedSchema(NameIdentifier catalogIdent, NameIdentifier schemaIdent) {
+    try {
+      // A queued schema writer also blocks new readers. Avoid queuing one behind another table's
+      // source DDL when the schema still exists and there is nothing to clean up.
+      boolean schemaExists =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent,
+              LockType.READ,
+              () ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                      RuntimeException.class));
+      if (schemaExists) {
+        return;
+      }
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            // Recheck under the write lock before deleting any registration.
+            OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdent);
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.warn("Failed to clean up orphaned schema entities starting from {}", schemaIdent, e);
+    }
+  }
+
+  private static void validateColumnComment(String columnName, @Nullable String comment) {
     Preconditions.checkArgument(
         comment == null || comment.indexOf('\0') < 0,
-        "Column comments must not contain NUL characters");
+        "Column comment for %s must not contain NUL characters",
+        columnName);
     ColumnEntity.COMMENT.validate(comment, COLUMN);
   }
 
   private static void validateColumns(Column[] columns) {
     for (Column column : columns) {
       ColumnEntity.NAME.validate(column.name(), COLUMN);
-      validateColumnComment(column.comment());
+      validateColumnComment(column.name(), column.comment());
     }
   }
 
@@ -1251,7 +1275,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       if (addColumn.getFieldName().length == 1) {
         ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
-        validateColumnComment(addColumn.getComment());
+        validateColumnComment(addColumn.getFieldName()[0], addColumn.getComment());
       }
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -1261,7 +1285,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } else if (change instanceof TableChange.UpdateColumnComment) {
       TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
       if (updateComment.getFieldName().length == 1) {
-        validateColumnComment(updateComment.getNewComment());
+        validateColumnComment(updateComment.getFieldName()[0], updateComment.getNewComment());
       }
     }
   }
