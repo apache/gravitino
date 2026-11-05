@@ -552,6 +552,33 @@ class TestGlueIcebergTableHelper {
   }
 
   @Test
+  void testDefaultPositionLeavesAddedColumnLast() throws IOException {
+    assertColumnsAfterAlter(
+        List.of("name", "id", "added"),
+        TableChange.addColumn(new String[] {"added"}, Types.IntegerType.get()),
+        TableChange.updateColumnPosition(
+            new String[] {"id"}, TableChange.ColumnPosition.after("name")));
+  }
+
+  @Test
+  void testDefaultPositionLeavesReaddedColumnLast() throws IOException {
+    assertColumnsAfterAlter(
+        List.of("name", "added", "id"),
+        TableChange.deleteColumn(new String[] {"id"}, false),
+        TableChange.addColumn(new String[] {"added"}, Types.IntegerType.get()),
+        TableChange.addColumn(new String[] {"id"}, Types.LongType.get()));
+  }
+
+  @Test
+  void testExistingColumnCannotMoveToDefaultPosition() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TableChange.updateColumnPosition(
+                new String[] {"id"}, TableChange.ColumnPosition.defaultPos()));
+  }
+
+  @Test
   void testAlterTableIsAppliedAsAWhole() throws IOException {
     try (InMemoryCatalog catalog = newCatalog()) {
       Table table = catalog.createTable(TableIdentifier.of("db", "t"), partitionTestSchema());
@@ -580,6 +607,21 @@ class TestGlueIcebergTableHelper {
                   "db",
                   "t",
                   TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    }
+  }
+
+  private static void assertColumnsAfterAlter(List<String> expected, TableChange... changes)
+      throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      catalog.createTable(TableIdentifier.of("db", "t"), partitionTestSchema());
+
+      GlueIcebergTableHelper.alterTable(catalog, "db", "t", changes);
+
+      List<String> names =
+          catalog.loadTable(TableIdentifier.of("db", "t")).schema().columns().stream()
+              .map(NestedField::name)
+              .collect(Collectors.toList());
+      assertEquals(expected, names);
     }
   }
 

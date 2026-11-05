@@ -551,10 +551,10 @@ final class GlueIcebergTableHelper {
           if (!add.isNullable()) {
             update.requireColumn(name);
           }
-          moveColumn(update, table.schema(), name, add.getPosition());
+          moveColumn(update, name, add.getPosition());
         } else if (change instanceof TableChange.UpdateColumnPosition) {
           TableChange.UpdateColumnPosition move = (TableChange.UpdateColumnPosition) change;
-          moveColumn(update, table.schema(), move.fieldName()[0], move.getPosition());
+          moveColumn(update, move.fieldName()[0], move.getPosition());
         } else if (change instanceof TableChange.DeleteColumn) {
           TableChange.DeleteColumn del = (TableChange.DeleteColumn) change;
           Preconditions.checkArgument(
@@ -659,21 +659,15 @@ final class GlueIcebergTableHelper {
   }
 
   /**
-   * Moves a column to the requested position. The default position leaves an added column at the
-   * end and moves an existing column after the last column.
+   * Moves a column to the requested position. The default position applies only to added columns,
+   * which Iceberg already places at the end.
    */
   private static void moveColumn(
-      UpdateSchema update, Schema schema, String name, TableChange.ColumnPosition position) {
+      UpdateSchema update, String name, TableChange.ColumnPosition position) {
     if (position instanceof TableChange.First) {
       update.moveFirst(name);
     } else if (position instanceof TableChange.After) {
       update.moveAfter(name, ((TableChange.After) position).getColumn());
-    } else if (schema.findField(name) != null) {
-      List<Types.NestedField> columns = schema.columns();
-      String last = columns.get(columns.size() - 1).name();
-      if (!last.equals(name)) {
-        update.moveAfter(name, last);
-      }
     }
   }
 

@@ -1020,6 +1020,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           e, String.format("registering table %s from %s", ident.name(), metadataLocation));
     }
 
+    // Iceberg writes only its own Glue parameters during registration, so the marker takes a second
+    // update. A process stopped between the two leaves an unmarked table, which has to be marked by
+    // hand.
     try {
       checkRegisteredColumns(columns, registered.schema(), metadataLocation);
       Table raw = getRawTable(dbName, ident.name());

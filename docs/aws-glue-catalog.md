@@ -250,6 +250,8 @@ The columns, location, partitioning and sort order of a registered table come fr
 
 A registered table shares its metadata and data files with the table it was registered from, so Gravitino marks it with the Glue parameter `gravitino.iceberg.registered=true` and changes only its Glue parameters afterwards: property changes are stored in Glue, and column, partition and other schema changes are refused. A registered table cannot be purged.
 
+A table registered by an earlier Gravitino version, or by a registration that stopped before the parameter was written, has no marker. Gravitino treats it as the owner of its metadata, so an alter through Gravitino writes new metadata files and forks the history it shares with the source table. Gravitino cannot detect such tables, and the parameter cannot be set through Gravitino; to protect one, add the parameter to the table directly in AWS Glue.
+
 ### Iceberg Column Types
 
 Iceberg tables use the Iceberg type system, which differs from Hive types. The following table lists the Gravitino types supported for Iceberg tables and how they map to Iceberg types:

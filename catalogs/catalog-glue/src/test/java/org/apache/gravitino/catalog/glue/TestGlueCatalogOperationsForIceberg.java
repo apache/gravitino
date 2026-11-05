@@ -56,6 +56,7 @@ import org.mockito.Mockito;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
@@ -243,6 +244,23 @@ class TestGlueCatalogOperationsForIceberg {
             NotFoundException.class,
             () -> ops.loadTable(NameIdentifier.of("cat", "ns", DB, TABLE)));
     assertTrue(e.getMessage().contains(metadataLocation), e.getMessage());
+  }
+
+  @Test
+  void testDropTableDoesNotNeedIcebergMetadata() {
+    stubGlueTable(
+        Map.of(
+            TABLE_TYPE_PARAM,
+            ICEBERG_TABLE_TYPE_VALUE,
+            METADATA_LOCATION,
+            LOCATION + "/metadata/00001.metadata.json"));
+    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+        .thenThrow(new org.apache.iceberg.exceptions.NotFoundException("Location does not exist"));
+
+    assertTrue(ops.dropTable(NameIdentifier.of("cat", "ns", DB, TABLE)));
+
+    verify(mockClient).deleteTable(any(DeleteTableRequest.class));
+    verify(mockIcebergCatalog, never()).loadTable(any(TableIdentifier.class));
   }
 
   @Test
