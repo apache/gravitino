@@ -55,6 +55,8 @@ public class HudiColumn extends BaseColumn {
       hudiColumn.dataType = dataType;
       hudiColumn.nullable = nullable;
       hudiColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      hudiColumn.initialDefaultValue =
+          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       return hudiColumn;
     }
   }

@@ -48,6 +48,8 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.nullable = nullable;
       hiveColumn.autoIncrement = autoIncrement;
       hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      hiveColumn.initialDefaultValue =
+          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       return hiveColumn;
     }
   }

@@ -375,9 +375,10 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
 ### Table Capabilities
 
 - Does not support setting column default values through the Gravitino API.
-- For format-version 3 tables, Iceberg `write-default` values (falling back to
-  `initial-default`) present in table metadata are reported as column
-  `defaultValue` when the table is loaded.
+- For format-version 3 tables, Iceberg defaults present in table metadata are
+  reported when the table is loaded:
+  - `write-default` → column `defaultValue`
+  - `initial-default` → column `initialDefaultValue`
 
 ### Table Partitions
 

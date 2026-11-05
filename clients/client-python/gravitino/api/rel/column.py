@@ -97,13 +97,27 @@ class Column(ABC):
 
     @abstractmethod
     def default_value(self) -> Expression:
-        """Get the default value of this column
+        """Get the write-time default value of this column.
+
+        For Iceberg format-version 3, this corresponds to ``write-default``.
 
         Returns:
             Expression:
                 The default value of this column, `Column.DEFAULT_VALUE_NOT_SET` if not specified.
         """
         pass
+
+    def initial_default_value(self) -> Expression:
+        """Get the initial default value of this column.
+
+        For Iceberg format-version 3, this corresponds to ``initial-default``. Catalogs that do
+        not distinguish an initial default may leave this unset.
+
+        Returns:
+            Expression:
+                The initial default value, `Column.DEFAULT_VALUE_NOT_SET` if not specified.
+        """
+        return Column.DEFAULT_VALUE_NOT_SET
 
     def supports_tags(self) -> SupportsTags:
         """Return the `SupportsTags` if the column supports tag operations.
@@ -124,6 +138,7 @@ class Column(ABC):
         nullable: bool = True,
         auto_increment: bool = False,
         default_value: Optional[Expression] = None,
+        initial_default_value: Optional[Expression] = None,
     ) -> ColumnImpl:
         """Create a `Column` instance.
 
@@ -140,6 +155,9 @@ class Column(ABC):
                 `True` if the column is an auto-increment column. Defaults to `False`.
             default_value (Optional[Expression], optional):
                 The default value of this column, `Column.DEFAULT_VALUE_NOT_SET` if `None`. Defaults to `None`.
+            initial_default_value (Optional[Expression], optional):
+                The initial default value of this column, `Column.DEFAULT_VALUE_NOT_SET` if `None`.
+                Defaults to `None`.
 
         Returns:
             ColumnImpl: A `Column` instance.
@@ -152,6 +170,11 @@ class Column(ABC):
             auto_increment=auto_increment,
             default_value=(
                 Column.DEFAULT_VALUE_NOT_SET if default_value is None else default_value
+            ),
+            initial_default_value=(
+                Column.DEFAULT_VALUE_NOT_SET
+                if initial_default_value is None
+                else initial_default_value
             ),
         )
 
@@ -167,6 +190,7 @@ class ColumnImpl(Column):
         nullable: bool,
         auto_increment: bool,
         default_value: Optional[Expression],
+        initial_default_value: Optional[Expression] = None,
     ):
         Precondition.check_string_not_empty(name, "Column name cannot be null")
         Precondition.check_argument(
@@ -178,6 +202,11 @@ class ColumnImpl(Column):
         self._nullable = nullable
         self._auto_increment = auto_increment
         self._default_value = default_value
+        self._initial_default_value = (
+            Column.DEFAULT_VALUE_NOT_SET
+            if initial_default_value is None
+            else initial_default_value
+        )
 
     def name(self) -> str:
         return self._name
@@ -197,6 +226,9 @@ class ColumnImpl(Column):
     def default_value(self) -> Expression:
         return self._default_value
 
+    def initial_default_value(self) -> Expression:
+        return self._initial_default_value
+
     def __eq__(self, other: ColumnImpl) -> bool:
         if not isinstance(other, ColumnImpl):
             return False
@@ -208,6 +240,7 @@ class ColumnImpl(Column):
                 self._nullable == other.nullable(),
                 self._auto_increment == other.auto_increment(),
                 self._default_value == other.default_value(),
+                self._initial_default_value == other.initial_default_value(),
             ]
         )
 
@@ -223,6 +256,11 @@ class ColumnImpl(Column):
                     tuple(self._default_value)
                     if self._default_value is Column.DEFAULT_VALUE_NOT_SET
                     else self._default_value
+                ),
+                (
+                    tuple(self._initial_default_value)
+                    if self._initial_default_value is Column.DEFAULT_VALUE_NOT_SET
+                    else self._initial_default_value
                 ),
             )
         )

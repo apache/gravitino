@@ -47,6 +47,8 @@ public class JdbcColumn extends BaseColumn {
       // DEFAULT_VALUE_NOT_SET if it is null in JSONSerde. But in case of the JdbcColumn is created
       // by other ways(e.g. integration test), we still need to handle the null case.
       jdbcColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      jdbcColumn.initialDefaultValue =
+          initialDefaultValue == null ? DEFAULT_VALUE_NOT_SET : initialDefaultValue;
       jdbcColumn.autoIncrement = autoIncrement;
       return jdbcColumn;
     }

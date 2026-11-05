@@ -41,8 +41,8 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Column {
 
   /**
-   * A default value that indicates the default value is not set. This is used in {@link
-   * #defaultValue()}.
+   * A sentinel that indicates a column default is not set. Used by {@link #defaultValue()} and
+   * {@link #initialDefaultValue()}.
    */
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
 
@@ -78,9 +78,27 @@ public interface Column {
   boolean autoIncrement();
 
   /**
+   * Returns the write-time default value of this column.
+   *
+   * <p>For Iceberg format-version 3, this corresponds to {@code write-default}: the value writers
+   * fill in when a field is not supplied.
+   *
    * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
    */
   Expression defaultValue();
+
+  /**
+   * Returns the initial default value of this column.
+   *
+   * <p>For Iceberg format-version 3, this corresponds to {@code initial-default}: the value assumed
+   * for rows written before the field was added. Catalogs that do not distinguish an initial
+   * default may leave this unset.
+   *
+   * @return The initial default value, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
+   */
+  default Expression initialDefaultValue() {
+    return DEFAULT_VALUE_NOT_SET;
+  }
 
   /**
    * @return the {@link SupportsTags} if the column supports tag operations.

@@ -390,6 +390,13 @@ components:
           default: true
         defaultValue:
           $ref: "#/components/schemas/ColumnDefaultValue"
+        initialDefaultValue:
+          allOf:
+            - $ref: "#/components/schemas/ColumnDefaultValue"
+          description: >
+            The initial default value of the column. For Iceberg format-version 3,
+            this maps to initial-default (assumed for rows written before the field
+            was added). defaultValue maps to write-default.
         autoIncrement:
           type: boolean
           description: Whether the column is auto increment
