@@ -59,9 +59,17 @@ older servers do not decode this representation.
 Spark timestamp defaults are converted to the target column type in the Spark session time zone.
 An LTZ literal assigned to an NTZ column keeps the local fields produced by Spark's timestamp cast;
 an NTZ literal assigned to an LTZ column is interpreted in the Spark session zone before it is sent
-as an instant. These updates load the current table schema once through Gravitino and require table
-load permission. Batches combining timestamp defaults with column additions, deletions, renames, or
-type changes are rejected before writing because they require sequential schema evolution.
+as an instant. DATE defaults assigned to timestamp columns become midnight in the Spark session
+zone for LTZ targets, or local midnight for NTZ targets. String defaults for timestamp columns are
+explicitly rejected in both Spark 3.5 and 4.0; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
+of relying on implicit database conversion. Date and string defaults for non-timestamp columns
+retain their literal values and types.
+
+Timestamp, date, and string defaults load the current table schema once through Gravitino and
+require table load permission, including date/string defaults for non-timestamp columns. Other
+literal defaults do not add a schema read. Batches combining any of these schema-dependent defaults
+with column additions, deletions, renames, or type changes are rejected before writing because they
+require sequential schema evolution.
 
 JDBC timestamp defaults include seconds even for whole-minute and midnight values.
 Zoned timestamp defaults use numeric UTC offsets in JDBC SQL. MySQL requires 8.0.19 or later

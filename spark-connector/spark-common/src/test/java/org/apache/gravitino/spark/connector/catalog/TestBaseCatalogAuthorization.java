@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Catalog;
@@ -58,6 +59,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -182,8 +185,10 @@ public class TestBaseCatalogAuthorization {
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
   }
 
-  @Test
-  void testTimestampDefaultRejectsSchemaChangingBatchBeforeWriting() {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"TIMESTAMP_LTZ '2026-11-04 12:34:00'", "DATE '2026-11-04'", "'2026-11-04'"})
+  void testTemporalDefaultRejectsSchemaChangingBatchBeforeWriting(String sql) {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     IllegalArgumentException error =
         Assertions.assertThrows(
@@ -191,15 +196,16 @@ public class TestBaseCatalogAuthorization {
             () ->
                 catalog.alterTable(
                     identifier,
-                    TableChange.updateColumnDefaultValue(
-                        new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:00'"),
+                    TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql),
                     TableChange.updateColumnType(new String[] {"ts"}, DataTypes.TimestampNTZType)));
     Assertions.assertTrue(error.getMessage().contains("cannot be combined"));
     Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
   }
 
-  @Test
-  void testTimestampSchemaReadFailurePreventsWritingAndPreservesCause() {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"TIMESTAMP_LTZ '2026-11-04 12:34:00'", "DATE '2026-11-04'", "'2026-11-04'"})
+  void testTemporalSchemaReadFailurePreventsWritingAndPreservesCause(String sql) {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
     ForbiddenException denied = new ForbiddenException("denied schema read");
@@ -210,16 +216,68 @@ public class TestBaseCatalogAuthorization {
             ForbiddenException.class,
             () ->
                 catalog.alterTable(
-                    identifier,
-                    TableChange.updateColumnDefaultValue(
-                        new String[] {"ts"}, "TIMESTAMP_LTZ '2026-11-04 12:34:00'"))));
+                    identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, sql))));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
     Mockito.verifyNoInteractions(sparkCatalog);
   }
 
   @Test
-  void testNonTimestampDefaultDoesNotReadSchema() throws Exception {
+  void testDateDefaultUsesSessionZoneBeforeWriting() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withTimeZone(), null)});
+    SQLConf conf = new SQLConf();
+    conf.setConfString("spark.sql.session.timeZone", "Asia/Shanghai");
+    SQLConf.withExistingConf(
+        conf,
+        () -> {
+          Assertions.assertDoesNotThrow(
+              () ->
+                  catalog.alterTable(
+                      identifier,
+                      TableChange.updateColumnDefaultValue(
+                          new String[] {"ts"}, "DATE '2026-11-04'")));
+          return null;
+        });
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> change =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(gravitinoTableCatalog).alterTable(eq(gravitinoIdentifier), change.capture());
+    Assertions.assertEquals(
+        Literals.of(
+            OffsetDateTime.parse("2026-11-03T16:00:00Z"), Types.TimestampType.withTimeZone()),
+        ((org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) change.getValue())
+            .getNewDefaultValue());
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testStringTimestampDefaultRejectedBeforeWriting() {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
+    when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
+    when(table.columns())
+        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withTimeZone(), null)});
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    TableChange.updateColumnDefaultValue(
+                        new String[] {"ts"}, "'2026-11-04 12:34:56.123456'")));
+    Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
+    verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
+    Mockito.verifyNoMoreInteractions(gravitinoTableCatalog);
+    Mockito.verifyNoInteractions(sparkCatalog);
+  }
+
+  @Test
+  void testNumericDefaultDoesNotReadSchema() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
     catalog.alterTable(identifier, TableChange.updateColumnDefaultValue(new String[] {"ts"}, "42"));
@@ -227,19 +285,25 @@ public class TestBaseCatalogAuthorization {
   }
 
   @Test
-  void testTimestampDefaultsShareOneSchemaRead() throws Exception {
+  void testTemporalDefaultsShareOneSchemaRead() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
     org.apache.gravitino.rel.Table table = mock(org.apache.gravitino.rel.Table.class);
     when(gravitinoTableCatalog.loadTable(gravitinoIdentifier)).thenReturn(table);
     when(table.columns())
-        .thenReturn(new Column[] {Column.of("ts", Types.TimestampType.withoutTimeZone(), null)});
+        .thenReturn(
+            new Column[] {
+              Column.of("ts", Types.TimestampType.withoutTimeZone(), null),
+              Column.of("label", Types.StringType.get(), null)
+            });
     catalog.alterTable(
         identifier,
         TableChange.updateColumnDefaultValue(
             new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 12:34:00'"),
         TableChange.updateColumnDefaultValue(
-            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"));
+            new String[] {"ts"}, "TIMESTAMP_NTZ '2026-11-04 00:00:00'"),
+        TableChange.updateColumnDefaultValue(new String[] {"ts"}, "DATE '2026-11-04'"),
+        TableChange.updateColumnDefaultValue(new String[] {"label"}, "'label'"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     verify(table).columns();
   }

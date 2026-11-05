@@ -19,6 +19,7 @@
 package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -38,6 +39,8 @@ import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.BinaryType;
+import org.apache.spark.sql.types.DateType;
+import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 
@@ -53,25 +56,28 @@ public class SparkTableChangeConverter {
    *
    * @param change the Spark table change
    * @return the converted Gravitino table change
-   * @throws IllegalArgumentException if a timestamp literal requires the target column schema
+   * @throws IllegalArgumentException if a timestamp, date, or string literal requires the target
+   *     column schema
    */
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
     return toGravitinoTableChange(
         change,
         () -> {
-          throw new IllegalArgumentException("Timestamp defaults require the target column schema");
+          throw new IllegalArgumentException(
+              "Timestamp, date, and string defaults require the target column schema");
         });
   }
 
   /**
-   * Converts a Spark table change, coercing timestamp literals to the target column's time
-   * semantics.
+   * Converts a Spark table change, coercing timestamp and date literals to the target column's time
+   * semantics. String defaults for timestamp columns are rejected; use a typed timestamp literal.
    *
    * @param change the Spark table change
-   * @param columns supplies the current table columns, loaded only for timestamp literals
+   * @param columns supplies the current table columns, loaded only for timestamp, date, or string
+   *     literals
    * @return the converted Gravitino table change
-   * @throws IllegalArgumentException if the default is not a supported literal or a timestamp's
-   *     target column is missing or is not a timestamp
+   * @throws IllegalArgumentException if the default is unsupported, a required target column is
+   *     missing, or a timestamp literal targets a non-timestamp column
    * @throws UnsupportedOperationException if the table change or DROP DEFAULT is unsupported
    */
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(
@@ -173,30 +179,49 @@ public class SparkTableChangeConverter {
     } catch (Exception e) {
       throw new IllegalArgumentException("Unsupported column default SQL: " + sql, e);
     }
-    if (parsed.dataType() instanceof TimestampType
-        || parsed.dataType() instanceof TimestampNTZType) {
+    boolean timestampLiteral =
+        parsed.dataType() instanceof TimestampType || parsed.dataType() instanceof TimestampNTZType;
+    if (timestampLiteral
+        || parsed.dataType() instanceof DateType
+        || parsed.dataType() instanceof StringType) {
       Type target = columnType(columns.get(), fieldNames);
       Preconditions.checkArgument(
-          target instanceof Types.TimestampType,
+          !timestampLiteral || target instanceof Types.TimestampType,
           "Timestamp defaults require a timestamp target column: %s",
           String.join(".", fieldNames));
-      // Coerce in Spark's session zone before JDBC sees the value. A database connection's
-      // zone must not decide how a local timestamp is assigned to an instant, or vice versa.
-      ZoneId zone = DateTimeUtils.getZoneId(SQLConf.get().sessionLocalTimeZone());
-      boolean sourceZoned = parsed.dataType() instanceof TimestampType;
-      if (((Types.TimestampType) target).hasTimeZone()) {
-        return Literals.of(
-            (sourceZoned
-                    ? DateTimeUtils.microsToInstant((long) value)
-                    : DateTimeUtils.microsToLocalDateTime((long) value).atZone(zone).toInstant())
-                .atOffset(ZoneOffset.UTC),
-            Types.TimestampType.withTimeZone());
+      if (target instanceof Types.TimestampType) {
+        Preconditions.checkArgument(
+            !(parsed.dataType() instanceof StringType),
+            "String defaults for timestamp column %s are unsupported; use a TIMESTAMP_LTZ or TIMESTAMP_NTZ literal",
+            String.join(".", fieldNames));
+        // Coerce in Spark's session zone before JDBC sees the value. A database connection's
+        // zone must not decide how a date or local timestamp is assigned to an instant.
+        ZoneId zone = DateTimeUtils.getZoneId(SQLConf.get().sessionLocalTimeZone());
+        boolean targetZoned = ((Types.TimestampType) target).hasTimeZone();
+        if (parsed.dataType() instanceof DateType) {
+          return targetZoned
+              ? Literals.of(
+                  DateTimeUtils.microsToInstant(DateTimeUtils.daysToMicros((int) value, zone))
+                      .atOffset(ZoneOffset.UTC),
+                  Types.TimestampType.withTimeZone())
+              : Literals.timestampLiteral(LocalDate.ofEpochDay((int) value).atStartOfDay());
+        }
+        boolean sourceZoned = parsed.dataType() instanceof TimestampType;
+        if (targetZoned) {
+          return Literals.of(
+              (sourceZoned
+                      ? DateTimeUtils.microsToInstant((long) value)
+                      : DateTimeUtils.microsToLocalDateTime((long) value).atZone(zone).toInstant())
+                  .atOffset(ZoneOffset.UTC),
+              Types.TimestampType.withTimeZone());
+        }
+        return Literals.timestampLiteral(
+            sourceZoned
+                ? DateTimeUtils.microsToInstant((long) value).atZone(zone).toLocalDateTime()
+                : DateTimeUtils.microsToLocalDateTime((long) value));
       }
-      return Literals.timestampLiteral(
-          sourceZoned
-              ? DateTimeUtils.microsToInstant((long) value).atZone(zone).toLocalDateTime()
-              : DateTimeUtils.microsToLocalDateTime((long) value));
-    } else if (parsed.dataType() instanceof BinaryType) {
+    }
+    if (parsed.dataType() instanceof BinaryType) {
       return Literals.of((byte[]) value, Types.BinaryType.get());
     }
     return SparkPartitionUtils.toGravitinoLiteral(

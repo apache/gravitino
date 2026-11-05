@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -75,7 +76,8 @@ public class TestTransformTableChange {
             TableChange.updateColumnDefaultValue(fieldNames, defaultValue);
 
     org.apache.gravitino.rel.TableChange gravitinoChange =
-        sparkTableChangeConverter.toGravitinoTableChange(sparkChange);
+        sparkTableChangeConverter.toGravitinoTableChange(
+            sparkChange, () -> new Column[] {Column.of("col", Types.StringType.get(), null)});
 
     Assertions.assertInstanceOf(
         org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue.class, gravitinoChange);
@@ -236,6 +238,90 @@ public class TestTransformTableChange {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"UTC", "Asia/Shanghai", "America/Los_Angeles", "Pacific/Apia"})
+  void testDateDefaultsAreCoercedToTimestampTarget(String timeZone) {
+    for (String timestampType : new String[] {"TIMESTAMP_LTZ", "TIMESTAMP_NTZ"}) {
+      withSessionConfig(
+          timeZone,
+          timestampType,
+          () -> {
+            for (String date : new String[] {"2026-11-04", "1969-12-31", "2011-12-30"}) {
+              String sql = "DATE '" + date + "'";
+              for (String target : new String[] {"TIMESTAMP_LTZ", "TIMESTAMP_NTZ"}) {
+                try {
+                  Cast cast =
+                      (Cast)
+                          CatalystSqlParser$.MODULE$.parseExpression(
+                              "CAST(" + sql + " AS " + target + ")");
+                  long micros = (long) ((Cast) cast.withTimeZone(timeZone)).eval(null);
+                  Expression expected =
+                      target.equals("TIMESTAMP_LTZ")
+                          ? Literals.of(
+                              DateTimeUtils.microsToInstant(micros).atOffset(ZoneOffset.UTC),
+                              Types.TimestampType.withTimeZone())
+                          : Literals.timestampLiteral(DateTimeUtils.microsToLocalDateTime(micros));
+                  Expression converted = assertDefault(sql, expected);
+                  UpdateTableColumnDefaultValueRequest request =
+                      new UpdateTableColumnDefaultValueRequest(
+                          new String[] {"col"}, DTOConverters.toFunctionArg(converted));
+                  UpdateTableColumnDefaultValueRequest restored =
+                      JsonUtils.objectMapper()
+                          .readValue(
+                              JsonUtils.objectMapper().writeValueAsString(request),
+                              UpdateTableColumnDefaultValueRequest.class);
+                  String expectedSql =
+                      target.equals("TIMESTAMP_LTZ")
+                          ? "'"
+                              + LocalDate.parse(date)
+                                  .atStartOfDay(ZoneId.of(timeZone))
+                                  .toInstant()
+                                  .atOffset(ZoneOffset.UTC)
+                                  .toString()
+                                  .replace("T", " ")
+                                  .replace("Z", "+00:00")
+                                  .replaceFirst(
+                                      "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})(?=[+-])", "$1:00")
+                              + "'"
+                          : "'" + date + " 00:00:00'";
+                  Assertions.assertEquals(
+                      expectedSql,
+                      new JdbcColumnDefaultValueConverter()
+                          .fromGravitino(restored.getNewDefaultValue()));
+                } catch (Exception e) {
+                  throw new AssertionError(e);
+                }
+              }
+            }
+          });
+    }
+  }
+
+  @Test
+  void testStringDefaultsRejectTimestampTargets() {
+    for (Types.TimestampType target :
+        new Types.TimestampType[] {
+          Types.TimestampType.withTimeZone(), Types.TimestampType.withoutTimeZone()
+        }) {
+      for (String sql :
+          new String[] {"'2026-11-04'", "'2026-11-04 12:34:56.123456'", "'now'", "''"}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    sparkTableChangeConverter.toGravitinoTableChange(
+                        TableChange.updateColumnDefaultValue(new String[] {"col"}, sql),
+                        () -> new Column[] {Column.of("col", target, null)}));
+        Assertions.assertTrue(error.getMessage().contains("col"));
+        Assertions.assertTrue(error.getMessage().contains("TIMESTAMP_LTZ or TIMESTAMP_NTZ"));
+      }
+    }
+    assertDefault(
+        "'2026-11-04 12:34:56.123456'", Literals.stringLiteral("2026-11-04 12:34:56.123456"));
+    assertDefault("''", Literals.stringLiteral(""));
+    assertDefault("DATE '2026-11-04'", Literals.dateLiteral("2026-11-04"));
+  }
+
   @Test
   void testNestedTimestampTargetAndInvalidColumnPaths() {
     Column[] columns =
@@ -266,14 +352,14 @@ public class TestTransformTableChange {
     }
   }
 
-  @Test
-  void testTimestampDefaultRequiresTargetSchema() {
+  @ParameterizedTest
+  @ValueSource(strings = {"TIMESTAMP '2026-11-04 12:34:56'", "DATE '2026-11-04'", "'2026-11-04'"})
+  void testTemporalDefaultRequiresTargetSchema(String sql) {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             sparkTableChangeConverter.toGravitinoTableChange(
-                TableChange.updateColumnDefaultValue(
-                    new String[] {"col"}, "TIMESTAMP '2026-11-04 12:34:56'")));
+                TableChange.updateColumnDefaultValue(new String[] {"col"}, sql)));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> assertDefault("TIMESTAMP '2026-11-04 12:34:56'", Literals.stringLiteral("unused")));

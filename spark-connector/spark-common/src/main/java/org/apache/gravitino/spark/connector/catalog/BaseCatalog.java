@@ -322,7 +322,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                                         || change instanceof TableChange.DeleteColumn
                                         || change instanceof TableChange.RenameColumn
                                         || change instanceof TableChange.UpdateColumnType),
-                        "Timestamp defaults cannot be combined with column schema changes");
+                        "Timestamp, date, and string defaults cannot be combined with column schema changes");
                     return gravitinoCatalogClient
                         .asTableCatalog()
                         .loadTable(NameIdentifier.of(getDatabase(ident), ident.name()))
