@@ -402,7 +402,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-        alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
+        alterSql.add(updateColumnTypeFieldDefinition(schemaName, updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnComment) {
         alterSql.add(
             updateColumnCommentFieldDefinition(
@@ -604,7 +604,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   }
 
   private String updateColumnTypeFieldDefinition(
-      TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
+      String schemaName, TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
@@ -618,13 +618,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (null == column) {
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
+    Type newType = updateColumnType.getNewDataType();
     StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + quotedIdentifier(jdbcTable.name()));
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
         .append(quotedIdentifier(col))
         .append(" SET DATA TYPE ")
-        .append(typeConverter.fromGravitino(updateColumnType.getNewDataType()));
+        .append(typeConverter.fromGravitino(newType));
+    // SET DATA TYPE resets the column to the new type's default collation. When the column has an
+    // explicit non-default collation and the new type is still collatable text, re-apply it so a
+    // type change does not silently drop the collation. Non-text targets must not carry COLLATE;
+    // PostgreSQL rejects it.
+    if (isCollatableTextType(newType)) {
+      String collation = explicitColumnCollation(schemaName, jdbcTable.name(), col);
+      if (collation != null) {
+        sqlBuilder.append(" COLLATE ").append(quotedIdentifier(collation));
+      }
+    }
     if (!column.nullable()) {
       sqlBuilder
           .append(",\n")
@@ -633,6 +644,43 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           .append(" SET NOT NULL");
     }
     return sqlBuilder.append(";").toString();
+  }
+
+  private static boolean isCollatableTextType(Type type) {
+    return type instanceof Types.StringType
+        || type instanceof Types.VarCharType
+        || type instanceof Types.FixedCharType;
+  }
+
+  /**
+   * Returns the explicit collation of a column, or null when the column uses the type's default
+   * collation. {@code information_schema.columns.collation_name} reports null for the default, so a
+   * non-null value is always an explicit collation worth preserving across a type change.
+   */
+  @Nullable
+  private String explicitColumnCollation(String schemaName, String tableName, String columnName) {
+    // No data source means SQL generation without a live connection (for example unit tests that
+    // only assert the generated statement); there is nothing to look up.
+    if (dataSource == null) {
+      return null;
+    }
+    String sql =
+        "SELECT collation_name FROM information_schema.columns "
+            + "WHERE table_schema = ? AND table_name = ? AND column_name = ?";
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      statement.setString(3, columnName);
+      try (ResultSet rows = statement.executeQuery()) {
+        if (rows.next()) {
+          return rows.getString("collation_name");
+        }
+        return null;
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   private String renameColumnFieldDefinition(

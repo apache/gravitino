@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -157,6 +158,69 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     } finally {
       TABLE_OPERATIONS.drop(TEST_DB_NAME, first);
       TABLE_OPERATIONS.drop(TEST_DB_NAME, second);
+    }
+  }
+
+  @Test
+  void testUpdateColumnTypeKeepsExplicitCollation() throws SQLException {
+    String table = RandomNameUtils.genRandomName("collation_type_change");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + table
+              + "(name varchar(10) COLLATE \"C\" NOT NULL)");
+      try {
+        Assertions.assertEquals("C", readCollation(connection, table, "name"));
+
+        // Widen the type; the explicit "C" collation must survive the change.
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.updateColumnType(new String[] {"name"}, Types.VarCharType.of(50)));
+        Assertions.assertEquals("C", readCollation(connection, table, "name"));
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      }
+    }
+  }
+
+  @Test
+  void testUpdateColumnTypeWithoutExplicitCollationStaysDefault() throws SQLException {
+    String table = RandomNameUtils.genRandomName("default_collation_type_change");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE TABLE " + TEST_DB_NAME + "." + table + "(name varchar(10))");
+      try {
+        // A column on the database default collation reports no explicit collation.
+        Assertions.assertNull(readCollation(connection, table, "name"));
+
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.updateColumnType(new String[] {"name"}, Types.VarCharType.of(50)));
+        Assertions.assertNull(readCollation(connection, table, "name"));
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+      }
+    }
+  }
+
+  private static String readCollation(Connection connection, String table, String column)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT collation_name FROM information_schema.columns "
+                + "WHERE table_schema = ? AND table_name = ? AND column_name = ?")) {
+      statement.setString(1, TEST_DB_NAME);
+      statement.setString(2, table);
+      statement.setString(3, column);
+      try (ResultSet rows = statement.executeQuery()) {
+        Assertions.assertTrue(rows.next());
+        return rows.getString("collation_name");
+      }
     }
   }
 
