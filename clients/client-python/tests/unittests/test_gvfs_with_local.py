@@ -52,13 +52,16 @@ from tests.unittests.auth.mock_base import (
 # pylint: disable=protected-access,too-many-lines,too-many-locals
 
 
-# pylint: disable=C0302
 def generate_unique_random_string(length):
     characters = string.ascii_letters + string.digits
     random_string = "".join(random.sample(characters, length))
     return random_string
 
 
+@patch(
+    "gravitino.client.fileset_catalog.FilesetCatalog.get_credentials",
+    return_value=[],
+)
 @patch(
     "gravitino.client.generic_fileset.GenericFileset.get_credentials",
     return_value=[],

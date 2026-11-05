@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -16,7 +16,6 @@
 # under the License.
 
 from gravitino.constants.error import ErrorConstants
-from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
     GroupAlreadyExistsException,
     IllegalArgumentException,
@@ -24,44 +23,24 @@ from gravitino.exceptions.base import (
     NoSuchGroupException,
     NoSuchMetalakeException,
     NoSuchRoleException,
-    NotFoundException,
 )
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class GroupErrorHandler(RestErrorHandler):
+class GroupErrorHandler(CodeMappingErrorHandler):
     """Error handler specific to Group operations."""
 
-    def handle(self, error_response: ErrorResponse):
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-            raise IllegalArgumentException(error_message)
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            if exception_type == NoSuchMetalakeException.__name__:
-                raise NoSuchMetalakeException(error_message)
-
-            if exception_type == NoSuchGroupException.__name__:
-                raise NoSuchGroupException(error_message)
-
-            if exception_type == NoSuchRoleException.__name__:
-                raise NoSuchRoleException(error_message)
-
-            raise NotFoundException(error_message)
-
-        if code == ErrorConstants.ALREADY_EXISTS_CODE:
-            raise GroupAlreadyExistsException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            raise MetalakeNotInUseException(error_message)
-
-        if code == ErrorConstants.INTERNAL_ERROR_CODE:
-            raise RuntimeError(error_message)
-
-        super().handle(error_response)
+    _code_exception_map = {
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: IllegalArgumentException,
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchMetalakeException.__name__: NoSuchMetalakeException,
+            NoSuchGroupException.__name__: NoSuchGroupException,
+            NoSuchRoleException.__name__: NoSuchRoleException,
+        },
+        ErrorConstants.ALREADY_EXISTS_CODE: GroupAlreadyExistsException,
+        ErrorConstants.NOT_IN_USE_CODE: MetalakeNotInUseException,
+        ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,
+    }
 
 
 GROUP_ERROR_HANDLER = GroupErrorHandler()

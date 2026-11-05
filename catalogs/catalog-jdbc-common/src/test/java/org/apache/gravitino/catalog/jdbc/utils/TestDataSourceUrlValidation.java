@@ -179,6 +179,23 @@ public class TestDataSourceUrlValidation {
   }
 
   @Test
+  public void testRejectH2UrlWithMalformedPercent() {
+    // A malformed percent escape in an H2 URL must not derail the URL-decoding scan (it falls back
+    // instead of throwing), so the H2 guard still fires on the untouched "jdbc:h2" prefix.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:h2:mem:test?applicationName=100%");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC URL is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
   public void testRejectH2Driver() {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.h2.Driver");
@@ -436,9 +453,9 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
-    GravitinoRuntimeException gre =
+    IllegalArgumentException gre =
         Assertions.assertThrows(
-            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+            IllegalArgumentException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertTrue(
         gre.getMessage().contains(missingDriver),
         "message should name the missing driver: " + gre.getMessage());

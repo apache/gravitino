@@ -28,6 +28,7 @@ import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -139,6 +140,12 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     Entity.super.validate();
     Preconditions.checkArgument(
         !uris.isEmpty(), "The uri of the model version entity must not be empty.");
+    if (aliases != null) {
+      aliases.forEach(
+          alias ->
+              EntityFieldLimits.checkMaxLength(
+                  alias, EntityFieldLimits.MAX_NAME_LENGTH, "alias", type()));
+    }
   }
 
   @Override
@@ -163,7 +170,10 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(modelIdent, version, comment, aliases, uris, properties, auditInfo);
+    // aliases are compared as an unordered collection in equals, so their hash
+    // contribution must not depend on element order either.
+    int hash = Objects.hash(modelIdent, version, comment, uris, properties, auditInfo);
+    return 31 * hash + CollectionUtils.unorderedHashCode(aliases);
   }
 
   public static Builder builder() {

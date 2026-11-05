@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -34,6 +36,13 @@ public abstract class JdbcPropertiesConverter
     implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
 
   private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
+
+  private static final Set<String> INJECTED_TABLE_OPTIONS =
+      ImmutableSet.of(
+          JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
+          JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME,
+          JdbcPropertiesConstants.FLINK_JDBC_USER,
+          JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
 
   @Override
   public Map<String, String> toGravitinoCatalogProperties(Configuration flinkConf) {
@@ -84,6 +93,18 @@ public abstract class JdbcPropertiesConverter
   @Override
   public String transformPropertyToFlinkCatalog(String configKey) {
     return JdbcPropertiesConstants.gravitinoToFlinkMap.get(configKey);
+  }
+
+  /**
+   * Drops the connection options that {@link #toFlinkTableProperties} injects for scans. Flink
+   * copies them into the options of {@code CREATE TABLE ... LIKE}, but they describe the catalog
+   * connection rather than the table, and must not reach the server as table properties.
+   */
+  @Override
+  public Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
+    Map<String, String> gravitinoProperties = new HashMap<>(flinkProperties);
+    gravitinoProperties.keySet().removeAll(INJECTED_TABLE_OPTIONS);
+    return gravitinoProperties;
   }
 
   @Override

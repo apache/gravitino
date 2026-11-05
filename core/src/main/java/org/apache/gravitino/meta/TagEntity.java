@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
@@ -42,10 +43,11 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
       Field.required("id", Long.class, "The unique id of the tag entity.");
 
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the tag entity.");
+      Field.required("name", "The name of the tag entity.", EntityFieldLimits.MAX_NAME_LENGTH);
 
   public static final Field COMMENT =
-      Field.optional("comment", String.class, "The comment of the tag entity.");
+      Field.optional(
+          "comment", "The comment of the tag entity.", EntityFieldLimits.MAX_COMMENT_LENGTH);
 
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the tag entity.");
@@ -63,6 +65,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private Map<String, String> properties;
   private String[] allowedValues;
   @Nullable private TagAssignment assignment;
+  @Nullable private Boolean inherited;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -128,7 +131,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
   @Override
   public Optional<Boolean> inherited() {
-    return Optional.empty();
+    return Optional.ofNullable(inherited);
   }
 
   @Override
@@ -172,16 +175,34 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
    * @return The copied tag entity with the assignment context.
    */
   public TagEntity copyWithAssignment(@Nullable TagAssignment assignment) {
-    return TagEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withComment(comment)
-        .withProperties(properties)
-        .withAllowedValues(allowedValues)
-        .withAssignment(assignment)
-        .withAuditInfo(auditInfo)
-        .build();
+    TagEntity copy =
+        TagEntity.builder()
+            .withId(id)
+            .withName(name)
+            .withNamespace(namespace)
+            .withComment(comment)
+            .withProperties(properties)
+            .withAllowedValues(allowedValues)
+            .withAssignment(assignment)
+            .withAuditInfo(auditInfo)
+            .build();
+    copy.inherited = inherited;
+    return copy;
+  }
+
+  /**
+   * Returns a copy of this tag entity with the given inheritance context.
+   *
+   * <p>The inheritance context is used only when the tag is resolved for a metadata object; it is
+   * not part of the tag definition fields.
+   *
+   * @param inherited Whether the tag assignment is inherited from an ancestor object.
+   * @return The copied tag entity with the inheritance context.
+   */
+  public TagEntity copyWithInherited(boolean inherited) {
+    TagEntity copy = copyWithAssignment(assignment);
+    copy.inherited = inherited;
+    return copy;
   }
 
   public static Builder builder() {

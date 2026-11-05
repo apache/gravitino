@@ -21,6 +21,9 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -31,6 +34,14 @@ import org.junit.jupiter.api.io.TempDir;
 public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG = "test_flink_paimon_jdbc_catalog";
+
+  // Paimon's JdbcCatalog bootstraps a paimon_table_properties system table whose 4-column
+  // composite VARCHAR(255) primary key exceeds MySQL InnoDB's 3072-byte index length limit under
+  // the utf8mb4 charset (4 bytes/char): 4 * 255 * 4 = 4080 bytes. utf8mb3 (3 bytes/char) fits:
+  // 4 * 255 * 3 = 3060 bytes. Use a dedicated database with that charset instead of the shared
+  // MYSQL_CATALOG_MYSQL_IT one (which defaults to utf8mb4) to avoid touching shared test
+  // infrastructure.
+  private static final String PAIMON_JDBC_BACKEND_DATABASE = "paimon_jdbc_backend_it";
 
   @TempDir private static Path warehouseDir;
 
@@ -60,12 +71,24 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
   @Override
   protected void initCatalogEnv() throws Exception {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
+    // Only used to ensure the MySQL container itself is up; this test uses its own database
+    // (see PAIMON_JDBC_BACKEND_DATABASE) rather than the shared MYSQL_CATALOG_MYSQL_IT one.
     containerSuite.startMySQLContainer(MYSQL_CATALOG_MYSQL_IT);
     String mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
     mysqlUsername = containerSuite.getMySQLContainer().getUsername();
     mysqlPassword = containerSuite.getMySQLContainer().getPassword();
     mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
-    databaseUrl = mysqlUrl + "/" + MYSQL_CATALOG_MYSQL_IT.name();
+
+    Class.forName(mysqlDriver);
+    try (Connection connection =
+            DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+        Statement statement = connection.createStatement()) {
+      statement.execute(
+          String.format(
+              "CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci;",
+              PAIMON_JDBC_BACKEND_DATABASE));
+    }
+    databaseUrl = mysqlUrl + "/" + PAIMON_JDBC_BACKEND_DATABASE;
   }
 
   @Override

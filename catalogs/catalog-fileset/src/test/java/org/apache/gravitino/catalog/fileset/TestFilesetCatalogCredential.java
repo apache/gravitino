@@ -109,8 +109,7 @@ public class TestFilesetCatalogCredential {
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE,
-        masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+        "abs-account", masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
@@ -133,5 +132,15 @@ public class TestFilesetCatalogCredential {
             .propertiesWithCredentialProviders()
             .get(CredentialConstants.CREDENTIAL_PROVIDERS)
             .contains(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersAllowed() {
+    FilesetCatalogImpl catalog = newCatalog(Maps.newHashMap());
+    Assertions.assertTrue(catalog.supportsPathBasedCredentials());
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateCredentialProviders(
+                ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token,gcs-token")));
   }
 }

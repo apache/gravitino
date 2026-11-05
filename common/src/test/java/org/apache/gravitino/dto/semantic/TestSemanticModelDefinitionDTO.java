@@ -420,6 +420,69 @@ public class TestSemanticModelDefinitionDTO {
     assertArrayEquals(new String[] {"external_id", "source"}, dataset.getUniqueKeys()[0]);
   }
 
+  @Test
+  public void testDefinitionValidationMatchesConversionValidation() throws JsonProcessingException {
+    SemanticModelDefinitionDTO valid = SemanticModelDefinitionDTO.fromDefinition(definition());
+    valid.validate();
+
+    Map<String, String> invalidDefinitions = new LinkedHashMap<>();
+    invalidDefinitions.put("{\"datasets\":[]}", "datasets must not be null or empty");
+    invalidDefinitions.put("{\"datasets\":[null]}", "datasets[0] must not be null");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"}}]}",
+        "name must not be null or empty");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"},"
+            + "\"primaryKey\":[null]}]}",
+        "primaryKey[0] must not be null or empty");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"},"
+            + "\"uniqueKeys\":[[]]}]}",
+        "uniqueKeys[0] must not be null or empty");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"},"
+            + "\"fields\":[{\"name\":\"id\"}]}]}",
+        "expression must not be null");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"},"
+            + "\"fields\":[{\"name\":\"id\",\"expression\":{\"dialects\":["
+            + "{\"dialect\":\"ANSI_SQL\",\"expression\":\"id\"},"
+            + "{\"dialect\":\"ANSI_SQL\",\"expression\":\"id\"}]}}]}]}",
+        "dialects must not contain duplicate dialect: ANSI_SQL");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"}}],"
+            + "\"relationships\":[{\"name\":\"self\",\"from\":\"orders\","
+            + "\"to\":\"orders\",\"fromColumns\":[\"id\"],"
+            + "\"toColumns\":[\"id\",\"other_id\"]}]}",
+        "fromColumns and toColumns must have the same length");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"}}],"
+            + "\"metrics\":[{\"name\":\"count\"}]}",
+        "expression must not be null");
+    invalidDefinitions.put(
+        "{\"datasets\":[{\"name\":\"orders\","
+            + "\"source\":{\"namespace\":[\"sales\"],\"name\":\"orders\"}}],"
+            + "\"customExtensions\":[{\"vendorName\":\"example\"}]}",
+        "data must not be null");
+
+    for (Map.Entry<String, String> entry : invalidDefinitions.entrySet()) {
+      SemanticModelDefinitionDTO invalid =
+          objectMapper.readValue(entry.getKey(), SemanticModelDefinitionDTO.class);
+      IllegalArgumentException validationException =
+          assertThrows(IllegalArgumentException.class, invalid::validate);
+      IllegalArgumentException conversionException =
+          assertThrows(IllegalArgumentException.class, invalid::toDefinition);
+      assertEquals(entry.getValue(), validationException.getMessage());
+      assertEquals(conversionException.getMessage(), validationException.getMessage());
+    }
+  }
+
   private static SemanticModelDefinition definition() {
     Map<String, Object> semanticHints = new LinkedHashMap<>();
     semanticHints.put("first", "prefer certified metrics");

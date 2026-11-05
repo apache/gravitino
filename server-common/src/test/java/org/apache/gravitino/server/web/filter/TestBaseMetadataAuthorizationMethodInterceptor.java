@@ -19,8 +19,10 @@
 package org.apache.gravitino.server.web.filter;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,7 +40,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
@@ -48,13 +60,24 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
+import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /** Tests for {@link BaseMetadataAuthorizationMethodInterceptor}. */
@@ -161,6 +184,77 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  public void testExpressionDenialIsRecordedAgainstTheTarget() throws Throwable {
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+
+      assertInstanceOf(
+          ForbiddenException.class,
+          interceptor.invoke(invocation("canAccessMetadata", "authorized")));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      AuthorizationDenialFailureEvent denial =
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue());
+      assertEquals("tester", denial.user());
+      assertEquals(
+          NameIdentifierUtil.ofSchema("metalake", "catalog", "schema"), denial.identifier());
+      assertEquals("canAccessMetadata", denial.methodName());
+      assertEquals(CAN_ACCESS_METADATA, denial.expression());
+      assertEquals(EventSource.GRAVITINO_ICEBERG_REST_SERVER, denial.eventSource());
+    }
+  }
+
+  @Test
+  public void testUserValidationDenialIsRecordedAgainstTheMetalake() throws Throwable {
+    authorizationUtils
+        .when(
+            () ->
+                AuthorizationUtils.checkCurrentUser(
+                    eq("metalake"), eq("tester"), any(AuthorizationRequestContext.class)))
+        .thenThrow(new ForbiddenException("not a metalake user"));
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+
+      interceptor.invoke(invocation("canAccessMetadata", "authorized"));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      assertEquals(
+          NameIdentifierUtil.ofMetalake("metalake"),
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
+  }
+
+  @Test
+  public void testNoDenialEventWithoutEventSourceOrForOtherFailures() throws Throwable {
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      new TestInterceptor(Entity.EntityType.SCHEMA)
+          .invoke(invocation("canAccessMetadata", "authorized"));
+
+      TestInterceptor failing = new TestInterceptor(Entity.EntityType.SCHEMA);
+      failing.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+      failing.resolutionFailure = new IllegalStateException("resolver failed");
+      failing.invoke(invocation("canAccessMetadata", "authorized"));
+
+      verify(eventBus, never()).dispatchEvent(any());
+    }
+  }
+
+  private static MockedStatic<GravitinoEnv> mockGravitinoEnv(EventBus eventBus) {
+    MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+    when(env.eventBus()).thenReturn(eventBus);
+    return envStatic;
+  }
+
+  @Test
   public void testUnheldActiveRoleUsesProtocolMapper() throws Throwable {
     principal = principal.withActiveRoles(ActiveRoles.of(List.of("admin")));
     principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
@@ -204,6 +298,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               @Override
               public boolean authorizationCompleted() {
                 return true;
+              }
+
+              @Override
+              public Entity.EntityType entityType() {
+                return Entity.EntityType.SCHEMA;
               }
             });
     TestInvocation invocation = invocation("alwaysDenied", "authorized by handler");
@@ -264,6 +363,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               public boolean authorizationCompleted() {
                 return false;
               }
+
+              @Override
+              public Entity.EntityType entityType() {
+                return Entity.EntityType.SCHEMA;
+              }
             });
     TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
@@ -289,10 +393,194 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testOperationFailureUsesProtocolMapper() throws Throwable {
     IllegalStateException failure = new IllegalStateException("operation failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    TestInvocation invocation = invocation("unannotated", null);
+    TestInvocation invocation = invocation("operationFails", null);
     when(invocation.proceed()).thenThrow(failure);
 
     assertSame(failure, interceptor.invoke(invocation));
+  }
+
+  @Test
+  public void testMissingAuthorizationExpressionIsDenied() throws Throwable {
+    TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
+    TestInvocation invocation = invocation("unannotated", "authorized");
+
+    ForbiddenException response =
+        assertInstanceOf(ForbiddenException.class, interceptor.invoke(invocation));
+    assertTrue(response.getMessage().contains("unannotated"));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testUnannotatedHelperProceeds() throws Throwable {
+    TestInvocation invocation = invocation("helper", "helper result");
+
+    assertEquals("helper result", new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    verify(invocation).proceed();
+  }
+
+  @Test
+  public void testHandlerDenialIsRecordedAgainstHandlerTarget() throws Throwable {
+    NameIdentifier table = NameIdentifierUtil.ofTable("metalake", "catalog", "schema", "table");
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor =
+          new TestInterceptor(Entity.EntityType.SCHEMA) {
+            @Override
+            protected AuthorizationTarget resolveAuthorizationTarget(
+                Method method,
+                AuthorizationExpression annotation,
+                Parameter[] parameters,
+                Object[] args) {
+              AuthorizationTarget target =
+                  super.resolveAuthorizationTarget(method, annotation, parameters, args);
+              // Bound before process so denial attribution can use handler.entityType().
+              target.nameIdentifiers().put(Entity.EntityType.TABLE, table);
+              return target;
+            }
+          };
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+      interceptor.handler =
+          Optional.of(
+              new BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler() {
+                @Override
+                public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+                  throw new ForbiddenException("denied by handler");
+                }
+
+                @Override
+                public boolean authorizationCompleted() {
+                  return true;
+                }
+
+                @Override
+                public Entity.EntityType entityType() {
+                  return Entity.EntityType.TABLE;
+                }
+              });
+
+      assertInstanceOf(
+          ForbiddenException.class,
+          interceptor.invoke(invocation("canAccessMetadata", "authorized")));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      assertEquals(
+          table,
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
+  }
+
+  /** Entry authorization, parent checks and worker filtering share one user lookup. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testReadListReusesEntryContext(boolean hasDeny) throws Throwable {
+    AtomicInteger userLoads = new AtomicInteger();
+    Set<AuthorizationRequestContext> contexts = ConcurrentHashMap.newKeySet();
+    AtomicBoolean perObjectLoopRan = new AtomicBoolean();
+    AtomicReference<AuthorizationRequestContext> entryContext = new AtomicReference<>();
+    Function<String, Optional<UserUpdatedAt>> loadUser =
+        key -> {
+          userLoads.incrementAndGet();
+          return Optional.of(new UserUpdatedAt(1L, 1L));
+        };
+    try (MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class)) {
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      Config config = mock(Config.class);
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.config()).thenReturn(config);
+      when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
+      when(config.get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE)).thenReturn(2);
+      principalUtils.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      authorizationUtils
+          .when(() -> AuthorizationUtils.checkCurrentUser(any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                AuthorizationRequestContext context = invocation.getArgument(2);
+                entryContext.set(context);
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
+                return null;
+              });
+      when(authorizer.authorize(any(), any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                AuthorizationRequestContext context = invocation.getArgument(4);
+                contexts.add(context);
+                context.computeUserInfoIfAbsent("metalake::tester", loadUser);
+                return true;
+              });
+      when(authorizer.hasDenyPolicy(any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                contexts.add(invocation.getArgument(3));
+                return hasDeny;
+              });
+      when(authorizer.deny(any(), any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                MetadataObject object = invocation.getArgument(2);
+                contexts.add(invocation.getArgument(4));
+                if (object.type() == MetadataObject.Type.TABLE) {
+                  perObjectLoopRan.set(true);
+                }
+                return hasDeny && object.name().equals("hidden");
+              });
+      NameIdentifier visible = NameIdentifier.of("metalake", "catalog", "schema", "visible");
+      NameIdentifier hidden = NameIdentifier.of("metalake", "catalog", "schema", "hidden");
+      TestInvocation invocation = invocation("listTables", null);
+      when(invocation.proceed())
+          .thenAnswer(
+              unused ->
+                  MetadataAuthzHelper.filterByExpression(
+                      "metalake",
+                      AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.TABLE,
+                      new NameIdentifier[] {visible, hidden}));
+
+      Object result = new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation);
+
+      assertArrayEquals(
+          hasDeny ? new NameIdentifier[] {visible} : new NameIdentifier[] {visible, hidden},
+          (NameIdentifier[]) result);
+      assertEquals(Set.of(entryContext.get()), contexts);
+      assertEquals(1, userLoads.get());
+      assertEquals(hasDeny, perObjectLoopRan.get());
+      assertNotSame(entryContext.get(), AuthorizationRequestScope.getOrCreate("metalake"));
+    }
+  }
+
+  /** An endpoint failure must not retain a request's permission cache on a reused thread. */
+  @Test
+  public void testReadContextIsClearedAfterOperationFailure() throws Throwable {
+    when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+    AtomicReference<AuthorizationRequestContext> context = new AtomicReference<>();
+    TestInvocation invocation = invocation("listTables", null);
+    IllegalStateException failure = new IllegalStateException("list failed");
+    when(invocation.proceed())
+        .thenAnswer(
+            unused -> {
+              context.set(AuthorizationRequestScope.getOrCreate("metalake"));
+              throw failure;
+            });
+    assertSame(failure, new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
+    assertNotSame(context.get(), AuthorizationRequestScope.getOrCreate("metalake"));
+  }
+
+  /** Write operations must not expose pre-mutation authorization decisions to later filtering. */
+  @Test
+  public void testWriteDoesNotReuseEntryContext() throws Throwable {
+    AtomicReference<AuthorizationRequestContext> entryContext = new AtomicReference<>();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              entryContext.set(invocation.getArgument(4));
+              return true;
+            });
+    TestInvocation invocation = invocation("writeTables", null);
+    when(invocation.proceed())
+        .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake"));
+    Object result = new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation);
+    assertInstanceOf(AuthorizationRequestContext.class, result);
+    assertNotSame(entryContext.get(), result);
   }
 
   private static TestInvocation invocation(String methodName, Object result) throws Throwable {
@@ -312,6 +600,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     private boolean includeMetalake = true;
     private boolean skipAuthorization;
     private boolean skipExpressionEvaluation;
+    private Optional<EventSource> denialEventSource = Optional.empty();
 
     private TestInterceptor(Entity.EntityType targetType) {
       this.targetType = targetType;
@@ -346,11 +635,19 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     }
 
     @Override
+    protected Optional<EventSource> authorizationDenialEventSource() {
+      return denialEventSource;
+    }
+
+    @Override
     protected Optional<AuthorizationHandler> createAuthorizationHandler(
-        Method method, Parameter[] parameters, Object[] args) {
+        Method method,
+        Parameter[] parameters,
+        Object[] args,
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
       return handler.isPresent()
           ? handler
-          : super.createAuthorizationHandler(method, parameters, args);
+          : super.createAuthorizationHandler(method, parameters, args, nameIdentifierMap);
     }
 
     @Override
@@ -385,6 +682,18 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   }
 
   private static class TestOperations {
+    @GET
+    @AuthorizationExpression(expression = "CATALOG::USE_CATALOG")
+    private String listTables() {
+      return "unused";
+    }
+
+    @POST
+    @AuthorizationExpression(expression = "CATALOG::USE_CATALOG")
+    private String writeTables() {
+      return "unused";
+    }
+
     @AuthorizationExpression(
         expression = CAN_ACCESS_METADATA,
         accessMetadataType = MetadataObject.Type.METALAKE)
@@ -397,7 +706,17 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
       return "unused";
     }
 
+    @GET
     private String unannotated() {
+      return "unused";
+    }
+
+    private String helper() {
+      return "unused";
+    }
+
+    @AuthorizationExpression(expression = "true")
+    private String operationFails() {
       return "unused";
     }
   }

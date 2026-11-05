@@ -33,7 +33,6 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
@@ -54,9 +53,8 @@ import org.slf4j.LoggerFactory;
  * RequestContextFilter} (so the remote address is already populated) but <em>before</em> both
  * custom filters and {@link org.apache.gravitino.server.authentication.AuthenticationFilter} (so it
  * wraps every downstream filter and observes 401 authentication failures, custom-filter 403s, and
- * other downstream 4xx/5xx responses). It is safe to install on servers that do not use {@code
- * RequestContextFilter} (Iceberg REST, Lance REST) because it resolves the client address
- * independently.
+ * other downstream 4xx/5xx responses). If {@code RequestContextFilter} did not run, it resolves the
+ * client address itself with the same {@link ClientAddressResolver} rules.
  *
  * <p><strong>DispatcherType.ERROR skip:</strong> when an uncaught exception escapes the filter
  * chain, this filter fires an {@link HttpRequestFailureEvent} (status 500) in its {@code finally}
@@ -94,11 +92,11 @@ import org.slf4j.LoggerFactory;
 public class HttpAuditFilter implements Filter {
 
   private static final Logger LOG = LoggerFactory.getLogger(HttpAuditFilter.class);
-  private static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
   private final Optional<EventBus> eventBus;
   private final EventSource eventSource;
   private final HealthCheckPathMatcher healthCheckMatcher;
+  private final ClientAddressResolver clientAddressResolver;
 
   /**
    * Constructs an {@code HttpAuditFilter} using the default {@link HealthCheckPathMatcher}.
@@ -126,9 +124,30 @@ public class HttpAuditFilter implements Filter {
       @Nullable EventBus eventBus,
       EventSource eventSource,
       HealthCheckPathMatcher healthCheckMatcher) {
+    this(eventBus, eventSource, healthCheckMatcher, ClientAddressResolver.noTrustedProxies());
+  }
+
+  /**
+   * Constructs an {@code HttpAuditFilter} with a custom {@link HealthCheckPathMatcher} and {@link
+   * ClientAddressResolver}.
+   *
+   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s and {@link
+   *     HttpRequestEvent}s; may be {@code null}, in which case the filter is a pass-through no-op.
+   * @param eventSource identifies which server this filter instance is installed on.
+   * @param healthCheckMatcher determines which URI paths are health check probes; those paths are
+   *     excluded from audit logging to avoid polluting the audit log with probe traffic.
+   * @param clientAddressResolver resolves the client address when {@link RequestContextFilter} has
+   *     not already stored one, honoring {@code X-Forwarded-For} only from trusted proxies.
+   */
+  public HttpAuditFilter(
+      @Nullable EventBus eventBus,
+      EventSource eventSource,
+      HealthCheckPathMatcher healthCheckMatcher,
+      ClientAddressResolver clientAddressResolver) {
     this.eventBus = Optional.ofNullable(eventBus);
     this.eventSource = eventSource;
     this.healthCheckMatcher = healthCheckMatcher;
+    this.clientAddressResolver = clientAddressResolver;
   }
 
   @Override
@@ -251,18 +270,14 @@ public class HttpAuditFilter implements Filter {
   }
 
   private String resolveClientAddress(HttpServletRequest request) {
-    // Prefer the address already resolved by RequestContextFilter (installed on GravitinoServer).
-    // For servers that do not install RequestContextFilter (Iceberg REST, Lance REST), fall back to
-    // independent header parsing so the event still carries a meaningful client address.
+    // Prefer the address already resolved by RequestContextFilter, which every server installs
+    // ahead of this filter. Fall back to resolving it here, with the same trusted-proxy rules, in
+    // case this filter is ever installed on a path without RequestContextFilter.
     String contextAddress = RequestContext.getRemoteAddress();
     if (contextAddress != null) {
       return contextAddress;
     }
-    String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
-    if (StringUtils.isNotBlank(xForwardedFor)) {
-      return xForwardedFor.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
+    return clientAddressResolver.resolve(request);
   }
 
   /**

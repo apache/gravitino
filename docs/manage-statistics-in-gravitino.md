@@ -24,6 +24,19 @@ may reserve later.
 Updating creates a statistic that does not exist and overwrites one that does. Reserved statistics
 maintained by the system are not modifiable and the request is rejected.
 
+Concurrent creation, modification or deletion of the same statistic can return HTTP 409, as can a
+write that times out waiting for a concurrent writer. The entire update batch is rolled back on a
+conflict. If the client chooses to retry, it should retry against the current state. If the target
+table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
+On a MySQL backend, whose collation ignores trailing spaces, a name that differs only in trailing
+spaces from an existing statistic, or from another name in the same request, is rejected with
+HTTP 400.
+
+OCC conflicts are an expected result of concurrent writes. Clients decide whether to abort or
+retry according to their application semantics. Gravitino does not automatically retry a
+conflicting write. The built-in statistics updater propagates the exception to its caller; a
+maintenance job can therefore fail on a conflict under its existing failure handling.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
@@ -73,6 +86,11 @@ List<Statistic> statistics = orders.supportsStatistics().listStatistics();
 </Tabs>
 
 ### Drop Statistics
+
+Dropping a statistic that another request has already removed is not a conflict. If a statistic
+was updated or deleted and recreated after the drop read it, the request can return HTTP 409 and
+the entire drop batch is rolled back. Retry against the current state. If the target table was
+deleted or replaced while dropping existing statistics, the request fails with HTTP 404.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -274,7 +292,6 @@ For Lance remote storage, you can refer to the document [here](https://lancedb.g
 | `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                | `104857600`                          | No       |
 | `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                | `1000000`                            | No       |
 | `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                      | `10000`                              | No       |
-| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                           | `0`, It means we don't use the cache | No       |
 | `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                      | `102400`                             | No       |
 | `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                              | `102400`                             | No       |
 | `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation | `100`                                | No       |

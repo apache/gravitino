@@ -20,12 +20,16 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Many;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -56,6 +60,17 @@ public interface GroupMetaMapper {
   /** Returns and locks an active group by ID for the current transaction. */
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForUpdate")
   GroupPO selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId);
+
+  /**
+   * Returns an active group by ID and holds its lock for the current transaction.
+   *
+   * <p>The lock is shared on MySQL/PostgreSQL and exclusive on H2.
+   *
+   * @return the active group, or null if it does not exist
+   */
+  @Nullable
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForShare")
+  GroupPO selectGroupMetaByIdForShare(@Param("groupId") Long groupId);
 
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
@@ -125,4 +140,34 @@ public interface GroupMetaMapper {
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupUpdatedAt")
   GroupUpdatedAt getGroupUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
+  /**
+   * Reads a principal and its live role memberships from one statement snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param groupName the principal name
+   * @return the principal snapshot, or null when it does not exist
+   */
+  @Nullable
+  @Results({
+    @Result(property = "groupId", column = "groupId", id = true),
+    @Result(property = "groupName", column = "groupName"),
+    @Result(property = "metalakeId", column = "metalakeId"),
+    @Result(property = "auditInfo", column = "auditInfo"),
+    @Result(property = "currentVersion", column = "currentVersion"),
+    @Result(property = "lastVersion", column = "lastVersion"),
+    @Result(property = "deletedAt", column = "deletedAt"),
+    @Result(
+        property = "rolePOs",
+        javaType = List.class,
+        many =
+            @Many(
+                resultMap =
+                    "org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.membershipRoleSnapshot",
+                columnPrefix = "role_"))
+  })
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "selectGroupWithRolesByMetalakeIdAndName")
+  GroupPO selectGroupWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("groupName") String groupName);
 }

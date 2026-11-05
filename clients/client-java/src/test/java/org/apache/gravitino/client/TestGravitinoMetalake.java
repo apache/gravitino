@@ -37,18 +37,22 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.policy.PolicyDTO;
+import org.apache.gravitino.dto.policy.PolicyForTagAssociationDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -56,22 +60,30 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
+import org.apache.gravitino.dto.tag.TagForPolicyAssociationDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyTagAssociation;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagValueConstraint;
@@ -755,6 +767,104 @@ public class TestGravitinoMetalake extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteTag(tagName));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testPolicyTagAssociations() throws JsonProcessingException {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    String tagPath = "/api/metalakes/" + metalakeName + "/tags/" + tagName;
+    String policyPath = "/api/metalakes/" + metalakeName + "/policies/" + policyName;
+    String tagPolicyPath = tagPath + "/policies";
+    String policyTagPath = policyPath + "/tags";
+    Map<String, String> details = Collections.singletonMap("details", "true");
+
+    TagDTO tag =
+        TagDTO.builder()
+            .withName(tagName)
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    PolicyDTO policy =
+        PolicyDTO.builder()
+            .withName(policyName)
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(ImmutableSet.of(MetadataObject.Type.TABLE))
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    PolicyAssociationSelectorDTO selector =
+        PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance"));
+
+    buildMockResource(
+        Method.GET,
+        tagPolicyPath,
+        details,
+        null,
+        new PolicyForTagAssociationListResponse(
+            new PolicyForTagAssociationDTO[] {new PolicyForTagAssociationDTO(policy, selector)}),
+        HttpStatus.SC_OK);
+    buildMockResource(Method.GET, tagPath, null, new TagResponse(tag), HttpStatus.SC_OK);
+
+    PolicyTagAssociation[] policies = gravitinoClient.listPolicyAssociationsForTag(tagName);
+    Assertions.assertEquals(1, policies.length);
+    Assertions.assertEquals(policyName, policies[0].policy().name());
+    Assertions.assertEquals(tagName, policies[0].tag().name());
+    Assertions.assertEquals(TagValueSelector.of("finance"), policies[0].selector());
+
+    buildMockResource(
+        Method.GET,
+        policyTagPath,
+        details,
+        null,
+        new TagForPolicyAssociationListResponse(
+            new TagForPolicyAssociationDTO[] {new TagForPolicyAssociationDTO(tag, selector)}),
+        HttpStatus.SC_OK);
+    buildMockResource(Method.GET, policyPath, null, new PolicyResponse(policy), HttpStatus.SC_OK);
+
+    PolicyTagAssociation[] tags = gravitinoClient.listTagAssociationsForPolicy(policyName);
+    Assertions.assertEquals(1, tags.length);
+    Assertions.assertEquals(policyName, tags[0].policy().name());
+    Assertions.assertEquals(tagName, tags[0].tag().name());
+    Assertions.assertEquals(TagValueSelector.of("finance"), tags[0].selector());
+
+    PolicyAssociationSelectorDTO allValues =
+        PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get());
+    buildMockResource(
+        Method.POST,
+        tagPolicyPath + "/" + policyName,
+        new PolicyTagAddRequest(allValues),
+        new PolicyTagAssociationResponse(policyName, tagName, allValues),
+        HttpStatus.SC_OK);
+    buildMockResource(Method.GET, policyPath, null, new PolicyResponse(policy), HttpStatus.SC_OK);
+    buildMockResource(Method.GET, tagPath, null, new TagResponse(tag), HttpStatus.SC_OK);
+
+    PolicyTagAssociation added = gravitinoClient.addPolicyForTag(tagName, policyName);
+    Assertions.assertEquals(AllValuesSelector.get(), added.selector());
+
+    ErrorResponse alreadyAssociated =
+        ErrorResponse.alreadyExists(
+            PolicyAlreadyAssociatedException.class.getSimpleName(), "mock error");
+    buildMockResource(
+        Method.POST,
+        tagPolicyPath + "/" + policyName,
+        new PolicyTagAddRequest(allValues),
+        alreadyAssociated,
+        HttpStatus.SC_CONFLICT);
+    Assertions.assertThrows(
+        PolicyAlreadyAssociatedException.class,
+        () -> gravitinoClient.addPolicyForTag(tagName, policyName));
+
+    buildMockResource(
+        Method.DELETE,
+        tagPolicyPath + "/" + policyName,
+        null,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(() -> gravitinoClient.removePolicyFromTag(tagName, policyName));
   }
 
   @Test

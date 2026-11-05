@@ -18,26 +18,33 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.COLUMN;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -48,6 +55,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -61,7 +70,9 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -72,6 +83,7 @@ import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,6 +136,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   /**
+   * Checks whether a table exists, treating catalogs without table operations as empty.
+   *
+   * @param ident the table identifier
+   * @return whether the table exists
+   */
+  @Override
+  public boolean tableExists(NameIdentifier ident) {
+    boolean supportsTables =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+            RuntimeException.class);
+    return supportsTables && TableDispatcher.super.tableExists(ident);
+  }
+
+  /**
    * Lists the tables within a schema.
    *
    * @param namespace The namespace of the schema containing the tables.
@@ -149,22 +177,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to load.
    * @return The loaded {@link Table} object representing the requested table.
    * @throws NoSuchTableException If the specified table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
 
-    if (!entityCombinedTable.imported()) {
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the table.
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
       try {
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
         // HA race: another Gravitino node concurrently imported this table. Reload from the
         // entity store to pick up the entity stored by the winning node.
@@ -201,6 +244,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadTable to import it.
    */
   @Override
   public Table createTable(
@@ -214,6 +259,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
+    TableEntity.NAME.validate(ident.name(), TABLE);
+    WritableDataTypeValidator.validateTable(columns, partitions, distribution, sortOrders);
+    validateColumns(columns);
+
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
@@ -222,8 +271,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Lock the table node, not the schema, so tables in the same schema can be created
     // concurrently. The connector call and the entity-store write otherwise run under one
     // schema-wide lock, which serialized all creates in a schema. Ancestors are still read-locked,
-    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop/import
-    // (schema WRITE); a same-name create, load or alter contends on the table node.
+    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop
+    // (schema WRITE); a same-name create, load/import or alter contends on the table node.
     // Trade-off: listTables may briefly observe a table whose creation has not committed yet.
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -266,11 +315,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // at the same time.
     // 2. if the TableChange.RenameTable only change the table name, we need to acquire write lock
     // to on the schema.
+    //
+    // The read lock on the table does not order this alter against a concurrent load or another
+    // alter of the same table, and no tree lock orders them across servers. Either of them can
+    // write a stale column list over this alter and turn a column rename into a drop plus an add,
+    // which removes the renamed column's tags. See updateColumnsIfNecessaryWhenLoad and #14279.
     NameIdentifier nameIdentifierForLock = ident;
     String schemaName = ident.namespace().level(2);
+    Arrays.stream(changes).forEach(TableOperationDispatcher::validateColumnChange);
+    for (int i = 0; i < changes.length; i++) {
+      WritableDataTypeValidator.validateTableChange(changes[i], "updates[" + i + "]");
+    }
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        TableEntity.NAME.validate(rename.getNewName(), TABLE);
         if (rename.getNewSchemaName().isPresent()
             && !rename.getNewSchemaName().get().equals(schemaName)) {
           nameIdentifierForLock = getCatalogIdentifier(ident);
@@ -296,21 +355,28 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                         isRenameTable && !managed
                             ? getTableEntityBeforeRename(ident)
                             : Optional.empty();
+                    // TableNormalizeDispatcher already normalized the changes. Normalization can
+                    // depend on quoting and must not be repeated on canonical physical names.
                     Table table =
-                        catalog.doWithTableOps(
-                            tableOps ->
-                                tableOps.alterTable(
-                                    ident, applyCapabilities(catalog.capabilities(), changes)));
+                        catalog.doWithTableOps(tableOps -> tableOps.alterTable(ident, changes));
                     return new AlterTableCatalogResult(
-                        snapshotTable(catalog, table, managed), tableEntityBeforeRename);
+                        snapshotTable(catalog, table, managed),
+                        tableEntityBeforeRename,
+                        resolveColumnNameChanges(changes));
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
           Table alteredTable = catalogResult.table;
 
+          // The change is already applied in the catalog. If the result has no column list and
+          // Gravitino has no stored columns to report instead, the alter fails, because clients
+          // require one. The hook's authorization rename and the success event are then skipped,
+          // and a retried rename fails because the table already has its new name.
           if (catalogResult.managed) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(catalogResult.hiddenProperties);
+            return checkColumnsReported(
+                ident,
+                EntityCombinedTable.of(alteredTable)
+                    .withHiddenProperties(catalogResult.hiddenProperties));
           }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
@@ -321,8 +387,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               te = getEntity(ident, TABLE, TableEntity.class);
             }
             if (te == null) {
-              return EntityCombinedTable.of(alteredTable)
-                  .withHiddenProperties(catalogResult.hiddenProperties);
+              return checkColumnsReported(
+                  ident,
+                  EntityCombinedTable.of(alteredTable)
+                      .withHiddenProperties(catalogResult.hiddenProperties));
             }
           }
 
@@ -346,7 +414,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
-                                updateColumnsIfNecessary(alteredTable, tableEntity);
+                                updateColumnsIfNecessary(
+                                    alteredTable,
+                                    tableEntity,
+                                    alignNameChangesWithCatalogColumns(
+                                        alignNameChangesWithStoredColumns(
+                                            catalogResult.columnNameChanges, tableEntity.columns()),
+                                        alteredTable.columns()));
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
@@ -377,8 +451,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 ident, newIdent);
           }
 
-          return EntityCombinedTable.of(alteredTable, updatedTableEntity)
-              .withHiddenProperties(catalogResult.hiddenProperties);
+          EntityCombinedTable result =
+              EntityCombinedTable.of(alteredTable, updatedTableEntity)
+                  .withHiddenProperties(catalogResult.hiddenProperties);
+          // The store kept the columns it had before this alter (see updateColumnsIfNecessary).
+          // Report them, so the alter completes, including the hook's authorization rename,
+          // instead of failing after the catalog has already applied it. A column drop or rename
+          // in this alter is not reflected in them.
+          if (alteredTable.columns() == null && updatedTableEntity != null) {
+            LOG.warn(
+                "Catalog {} returned altered table {} without a column list, reporting the stored "
+                    + "columns",
+                getCatalogIdentifier(ident),
+                ident);
+            result.withColumns(toColumns(updatedTableEntity.columns()));
+          }
+          return checkColumnsReported(ident, result);
         });
   }
 
@@ -563,8 +651,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(tableEntity, true);
+      // Overwrite only with the id stored in the catalog: it identifies the table, so a row under
+      // the same name with another id is stale and gets replaced. A generated id identifies
+      // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
+      // must win. The plain insert then conflicts, and loadTable reloads that row.
+      store.put(tableEntity, stringId != null);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
@@ -595,6 +690,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             },
             NoSuchTableException.class);
     Table table = catalogResult.table;
+    // Fail before importing the table or updating its stored columns.
+    checkColumnsReported(ident, table);
 
     if (catalogResult.managed) {
       return EntityCombinedTable.of(table)
@@ -684,6 +781,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
     Table table = catalogResult.table;
+    // Fail before storing the table, as a missing column list failed the snapshot before.
+    checkColumnsReported(ident, table);
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
@@ -696,9 +795,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withCreateTime(Instant.now())
             .build();
     List<ColumnEntity> columnEntityList =
-        IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
-            .collect(Collectors.toList());
+        toColumnEntities(withCatalogColumnNames(columns, table.columns()), audit);
 
     TableEntity tableEntity =
         TableEntity.builder()
@@ -711,14 +808,59 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     try {
       store.put(tableEntity, true /* overwrite */);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table %s was created in the external catalog, but its registration conflicts with an "
+              + "existing entity. Verify and reconcile the registered and source identities before "
+              + "continuing; loading the table does not resolve this conflict.",
+          ident);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      throw new GravitinoRuntimeException(
+          e,
+          "Table %s was created in the external catalog, but its registration in Gravitino "
+              + "failed. Resolve the entity-store error, verify the source identity, and use "
+              + "loadTable to import it. Do not repeat createTable; it will report already exists.",
+          ident);
     }
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(catalogResult.hiddenProperties);
+  }
+
+  /**
+   * Returns the requested columns under the names the catalog reports for them. A catalog may store
+   * a name in another case than requested, and the stored entity has to carry the name the catalog
+   * reports on later loads. A column whose name differs by more than case keeps the requested name.
+   *
+   * @param columns the columns of the create request
+   * @param catalogColumns the columns the catalog reports for the created table
+   * @return the columns to store
+   */
+  @VisibleForTesting
+  static Column[] withCatalogColumnNames(Column[] columns, Column[] catalogColumns) {
+    if (columns.length != catalogColumns.length) {
+      return columns;
+    }
+
+    Column[] named = columns.clone();
+    for (int i = 0; i < columns.length; i++) {
+      Column column = columns[i];
+      String catalogName = catalogColumns[i].name();
+      if (!catalogName.equals(column.name()) && catalogName.equalsIgnoreCase(column.name())) {
+        named[i] =
+            Column.of(
+                catalogName,
+                column.dataType(),
+                column.comment(),
+                column.nullable(),
+                column.autoIncrement(),
+                column.defaultValue());
+      }
+    }
+    return named;
   }
 
   private TableCatalogResult snapshotTable(
@@ -733,6 +875,34 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private TableCatalogResult snapshotTable(CatalogManager.CatalogWrapper catalog, Table table)
       throws Exception {
     return snapshotTable(catalog, table, isManagedEntity(catalog, Capability.Scope.TABLE));
+  }
+
+  private <T extends Table> T checkColumnsReported(NameIdentifier ident, T table) {
+    if (table.columns() == null) {
+      throw new IllegalStateException(
+          String.format(
+              "Catalog %s returned table %s without a column list",
+              getCatalogIdentifier(ident), ident));
+    }
+    return table;
+  }
+
+  private static Column[] toColumns(@Nullable List<ColumnEntity> columnEntities) {
+    if (columnEntities == null) {
+      return new Column[0];
+    }
+    return columnEntities.stream()
+        .sorted(Comparator.comparing(ColumnEntity::position))
+        .map(
+            c ->
+                Column.of(
+                    c.name(),
+                    c.dataType(),
+                    c.comment(),
+                    c.nullable(),
+                    c.autoIncrement(),
+                    c.defaultValue()))
+        .toArray(Column[]::new);
   }
 
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
@@ -750,7 +920,32 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         && Objects.equal(left.comment(), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
-        && Objects.equal(left.defaultValue(), right.defaultValue());
+        && isSameDefaultValue(left.defaultValue(), right.defaultValue());
+  }
+
+  @VisibleForTesting
+  static boolean isSameDefaultValue(@Nullable Expression left, @Nullable Expression right) {
+    if (Objects.equal(left, right)) {
+      return true;
+    }
+
+    // Connector snapshots use DTOs, while relational storage restores API expressions. Compare
+    // their persisted representation rather than implementation-specific equals methods.
+    try {
+      return Objects.equal(toDefaultValueArg(left), toDefaultValueArg(right));
+    } catch (IllegalArgumentException e) {
+      // A default value that cannot be converted is treated as changed instead of failing the
+      // comparison.
+      LOG.debug("Failed to compare column default values {} and {}", left, right, e);
+      return false;
+    }
+  }
+
+  @Nullable
+  private static FunctionArg toDefaultValueArg(@Nullable Expression expression) {
+    return expression == null || expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+        ? null
+        : DTOConverters.toFunctionArg(expression);
   }
 
   private String columnDifferenceContent(
@@ -786,7 +981,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               "autoIncrement[catalog=%s, store=%s]",
               catalogColumn.autoIncrement(), entityColumn.autoIncrement()));
     }
-    if (!Objects.equal(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
+    if (!isSameDefaultValue(catalogColumn.defaultValue(), entityColumn.defaultValue())) {
       differences.add(
           String.format(
               "defaultValue[catalog=%s, store=%s]",
@@ -795,8 +990,163 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return String.join(", ", differences);
   }
 
+  /**
+   * Works out what each top-level column that existed before an alter is called after it.
+   *
+   * <p>Stored columns are matched to the catalog's columns by name, so without this a renamed
+   * column would look like a dropped column plus a new one, and lose its id and everything attached
+   * to it. The changes are replayed in order, so chained renames resolve to the final name. A
+   * column that is not in the returned map keeps its name, and a column mapped to {@code null} was
+   * dropped, so a new column that reuses its name is not mistaken for it.
+   *
+   * @param changes the changes applied to the table, after capability normalization
+   * @return the new name of each renamed column, or {@code null} for each dropped column, keyed by
+   *     the column's name before the alter
+   */
+  @VisibleForTesting
+  static Map<String, String> resolveColumnNameChanges(TableChange... changes) {
+    // Original name -> current name, or null once the original column is dropped.
+    Map<String, String> originalToCurrent = new HashMap<>();
+    // Current names of columns added by these changes.
+    Set<String> addedColumns = new HashSet<>();
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn) {
+        String[] fieldName = ((TableChange.AddColumn) change).fieldName();
+        if (fieldName.length == 1) {
+          addedColumns.add(fieldName[0]);
+        }
+
+      } else if (change instanceof TableChange.RenameColumn) {
+        TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+        if (rename.fieldName().length != 1) {
+          continue;
+        }
+        String from = rename.fieldName()[0];
+        String to = rename.getNewName();
+        String original = originalColumnNamed(originalToCurrent, addedColumns, from);
+        if (original != null) {
+          originalToCurrent.put(original, to);
+        } else if (addedColumns.remove(from)) {
+          addedColumns.add(to);
+        }
+
+      } else if (change instanceof TableChange.DeleteColumn) {
+        String[] fieldName = ((TableChange.DeleteColumn) change).fieldName();
+        if (fieldName.length != 1) {
+          continue;
+        }
+        String original = originalColumnNamed(originalToCurrent, addedColumns, fieldName[0]);
+        if (original != null) {
+          originalToCurrent.put(original, null);
+        } else {
+          addedColumns.remove(fieldName[0]);
+        }
+      }
+    }
+
+    originalToCurrent.entrySet().removeIf(e -> e.getKey().equals(e.getValue()));
+    return originalToCurrent;
+  }
+
+  /**
+   * Keys the column renames and drops by the names of the stored columns.
+   *
+   * <p>Some catalogs, such as MySQL, match column names case-insensitively while reporting
+   * case-sensitive names, so they accept a change whose column name differs in case from the stored
+   * one. Such a name is mapped to the stored column it matches when exactly one does, so a rename
+   * keeps the column id instead of being stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops returned by {@link #resolveColumnNameChanges}
+   * @param storedColumns the columns of the stored table entity, or {@code null} if it has none
+   * @return the renames and drops keyed by the stored column names
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithStoredColumns(
+      Map<String, String> nameChanges, @Nullable List<ColumnEntity> storedColumns) {
+    if (nameChanges.isEmpty() || storedColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> storedNames =
+        storedColumns.stream().map(ColumnEntity::name).collect(Collectors.toSet());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String name = change.getKey();
+      if (!storedNames.contains(name)) {
+        List<String> matches =
+            storedNames.stream()
+                .filter(stored -> stored.equalsIgnoreCase(change.getKey()))
+                .filter(stored -> !nameChanges.containsKey(stored))
+                .collect(Collectors.toList());
+        if (matches.size() == 1 && !aligned.containsKey(matches.get(0))) {
+          name = matches.get(0);
+        }
+      }
+      aligned.put(name, change.getValue());
+    }
+    return aligned;
+  }
+
+  /**
+   * Points column renames at the names the catalog reports.
+   *
+   * <p>A catalog may store a name in another case than requested, such as Glue for Hive-format
+   * tables. A rename target the catalog does not report is mapped to the catalog column it matches
+   * when exactly one unclaimed column does, so the rename keeps the column id instead of being
+   * stored as a drop plus an add.
+   *
+   * @param nameChanges the renames and drops keyed by the stored column names
+   * @param catalogColumns the columns the catalog reports, or {@code null} if it reports none
+   * @return the renames and drops with targets the catalog reports
+   */
+  @VisibleForTesting
+  static Map<String, String> alignNameChangesWithCatalogColumns(
+      Map<String, String> nameChanges, @Nullable Column[] catalogColumns) {
+    if (nameChanges.isEmpty() || catalogColumns == null) {
+      return nameChanges;
+    }
+
+    Set<String> catalogNames =
+        Arrays.stream(catalogColumns).map(Column::name).collect(Collectors.toSet());
+    Set<String> claimed = new HashSet<>(nameChanges.values());
+    Map<String, String> aligned = new HashMap<>();
+    for (Map.Entry<String, String> change : nameChanges.entrySet()) {
+      String target = change.getValue();
+      if (target != null && !catalogNames.contains(target)) {
+        List<String> matches =
+            catalogNames.stream()
+                .filter(target::equalsIgnoreCase)
+                .filter(name -> !claimed.contains(name))
+                .collect(Collectors.toList());
+        if (matches.size() == 1) {
+          target = matches.get(0);
+          claimed.add(target);
+        }
+      }
+      aligned.put(change.getKey(), target);
+    }
+    return aligned;
+  }
+
+  /** Returns the original name of the pre-existing column currently called {@code name}. */
+  @Nullable
+  private static String originalColumnNamed(
+      Map<String, String> originalToCurrent, Set<String> addedColumns, String name) {
+    for (Map.Entry<String, String> entry : originalToCurrent.entrySet()) {
+      if (name.equals(entry.getValue())) {
+        return entry.getKey();
+      }
+    }
+    // A name no change has touched yet still belongs to the pre-existing column of that name.
+    if (!originalToCurrent.containsKey(name) && !addedColumns.contains(name)) {
+      return name;
+    }
+    return null;
+  }
+
   private Pair<Boolean, List<ColumnEntity>> updateColumnsIfNecessary(
-      Table tableFromCatalog, TableEntity tableFromGravitino) {
+      Table tableFromCatalog, TableEntity tableFromGravitino, Map<String, String> nameChanges) {
     if (tableFromCatalog == null || tableFromGravitino == null) {
       LOG.warn(
           "Cannot update columns for table when altering because table or table entity is "
@@ -804,12 +1154,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return Pair.of(false, Collections.emptyList());
     }
 
+    // A catalog that reports no column list says nothing about the columns, so keep the stored
+    // ones. Treating it as "all columns dropped" would delete their tags, policies and owners. Load
+    // rejects such a table before getting here, and alter keeps the columns as they were before it.
+    if (tableFromCatalog.columns() == null) {
+      LOG.warn(
+          "Table {} from the underlying source has no column list, keeping the stored columns",
+          tableFromCatalog.name());
+      return Pair.of(
+          false,
+          tableFromGravitino.columns() == null
+              ? Collections.emptyList()
+              : tableFromGravitino.columns());
+    }
+
     Map<String, Pair<Integer, Column>> columnsFromCatalogTable =
-        tableFromCatalog.columns() == null
-            ? Collections.emptyMap()
-            : IntStream.range(0, tableFromCatalog.columns().length)
-                .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
-                .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
+        IntStream.range(0, tableFromCatalog.columns().length)
+            .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
+            .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
     Map<String, ColumnEntity> columnsFromTableEntity =
         tableFromGravitino.columns() == null
             ? Collections.emptyMap()
@@ -818,9 +1180,28 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Check if columns need to be updated in Gravitino store
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();
+    Set<String> matchedCatalogColumns = new HashSet<>();
     boolean columnsNeedsUpdate = false;
-    for (Map.Entry<String, ColumnEntity> entry : columnsFromTableEntity.entrySet()) {
-      Pair<Integer, Column> columnPair = columnsFromCatalogTable.get(entry.getKey());
+    // Renamed and dropped columns claim their catalog names first. Otherwise a stale stored column
+    // (e.g. dropped outside Gravitino) that has the same name as a rename target could be visited
+    // first and take that name, and the renamed column would lose its id.
+    List<Map.Entry<String, ColumnEntity>> storedColumns =
+        new ArrayList<>(columnsFromTableEntity.entrySet());
+    storedColumns.sort(Comparator.comparing(e -> !nameChanges.containsKey(e.getKey())));
+    for (Map.Entry<String, ColumnEntity> entry : storedColumns) {
+      // Follow renames so the stored column keeps its id under its new name.
+      String catalogColumnName =
+          nameChanges.containsKey(entry.getKey())
+              ? nameChanges.get(entry.getKey())
+              : entry.getKey();
+      Pair<Integer, Column> columnPair =
+          catalogColumnName == null || matchedCatalogColumns.contains(catalogColumnName)
+              ? null
+              : columnsFromCatalogTable.get(catalogColumnName);
+      if (columnPair != null) {
+        matchedCatalogColumns.add(catalogColumnName);
+      }
+
       if (columnPair == null) {
         LOG.debug(
             "Column {} is not found in the table from underlying source, it will be removed"
@@ -867,7 +1248,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Check if there are new columns in the table from the underlying source
     for (Map.Entry<String, Pair<Integer, Column>> entry : columnsFromCatalogTable.entrySet()) {
-      if (!columnsFromTableEntity.containsKey(entry.getKey())) {
+      if (!matchedCatalogColumns.contains(entry.getKey())) {
         LOG.debug(
             "Column {} of table: {} is found in the table from underlying source but not in the table "
                 + "entity, it will be added to the table entity",
@@ -895,14 +1276,30 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
     Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
         updateColumnsIfNecessary(
-            combinedTable.tableFromCatalog(), combinedTable.tableFromGravitino());
+            combinedTable.tableFromCatalog(),
+            combinedTable.tableFromGravitino(),
+            Collections.emptyMap());
 
     // No need to update the columns
     if (!columnsUpdateResult.getLeft()) {
       return combinedTable.tableFromGravitino();
     }
 
-    // Update the columns in the Gravitino store
+    // Update the columns in the Gravitino store. The diff above only decides whether a write is
+    // needed: it was computed before taking the lock, and a concurrent alter may have changed the
+    // stored columns since, e.g. renamed a column while keeping its id. So the columns are matched
+    // again against the entity being updated, which is the latest stored one. This narrows the
+    // load/alter race but does not close it: if this load read the catalog before a concurrent
+    // alter and the store after it, the catalog snapshot is the stale side, and a column that the
+    // alter renamed is stored as dropped plus added, so it loses its id and its tags.
+    //
+    // A tree lock cannot close this, because tree locks are local to one server. Closing it needs
+    // the alter to record in the store that it is in progress before it calls the catalog, and
+    // the load to read the stored version, operation epoch and in-progress mark before it reads
+    // the catalog, skipping the store write while the mark is set. The load may write only if the
+    // version and epoch are unchanged and no in-progress mark is set. That needs a new EntityStore
+    // API and is tracked in #14279.
+    Table tableFromCatalog = combinedTable.tableFromCatalog();
     return TreeLockUtils.doWithTreeLock(
         tableIdent,
         LockType.WRITE,
@@ -921,7 +1318,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withNamespace(entity.namespace())
                                 .withComment(entity.comment())
                                 .withProperties(entity.properties())
-                                .withColumns(columnsUpdateResult.getRight())
+                                .withColumns(
+                                    updateColumnsIfNecessary(
+                                            tableFromCatalog, entity, Collections.emptyMap())
+                                        .getRight())
                                 .withPartitioning(entity.partitioning())
                                 .withDistribution(entity.distribution())
                                 .withSortOrders(entity.sortOrders())
@@ -937,6 +1337,33 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .build()),
                 "UPDATE",
                 combinedTable.tableFromGravitino().id()));
+  }
+
+  private static void validateColumns(Column[] columns) {
+    for (Column column : columns) {
+      ColumnEntity.NAME.validate(column.name(), COLUMN);
+      ColumnEntity.COMMENT.validate(column.comment(), COLUMN);
+    }
+  }
+
+  private static void validateColumnChange(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      if (addColumn.getFieldName().length == 1) {
+        ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
+        ColumnEntity.COMMENT.validate(addColumn.getComment(), COLUMN);
+      }
+    } else if (change instanceof TableChange.RenameColumn) {
+      TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
+      if (renameColumn.getFieldName().length == 1) {
+        ColumnEntity.NAME.validate(renameColumn.getNewName(), COLUMN);
+      }
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
+      if (updateComment.getFieldName().length == 1) {
+        ColumnEntity.COMMENT.validate(updateComment.getNewComment(), COLUMN);
+      }
+    }
   }
 
   private static class TableCatalogResult {
@@ -955,11 +1382,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private static final class AlterTableCatalogResult extends TableCatalogResult {
 
     private final Optional<TableEntity> tableEntityBeforeRename;
+    private final Map<String, String> columnNameChanges;
 
     private AlterTableCatalogResult(
-        TableCatalogResult tableResult, Optional<TableEntity> tableEntityBeforeRename) {
+        TableCatalogResult tableResult,
+        Optional<TableEntity> tableEntityBeforeRename,
+        Map<String, String> columnNameChanges) {
       super(tableResult.table, tableResult.managed, tableResult.hiddenProperties);
       this.tableEntityBeforeRename = tableEntityBeforeRename;
+      this.columnNameChanges = columnNameChanges;
     }
   }
 

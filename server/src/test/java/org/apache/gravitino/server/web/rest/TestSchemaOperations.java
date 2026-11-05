@@ -72,6 +72,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestSchemaOperations extends BaseOperationsTest {
@@ -375,6 +377,23 @@ public class TestSchemaOperations extends BaseOperationsTest {
     assertNullRequestBodyRejected(resp);
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 256, 257})
+  void testAlterSchemaRejectsCommentUpdatesBeforeDispatch(int commentLength) {
+    String json =
+        "{\"updates\":[{\"@type\":\"updateComment\",\"newComment\":\""
+            + "c".repeat(commentLength)
+            + "\"}]}";
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
+  }
+
   @Test
   public void testAlterSchema() {
     SchemaUpdateRequest setReq = new SchemaUpdateRequest.SetSchemaPropertyRequest("key2", "value2");
@@ -455,6 +474,27 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
+  void testDropNonEmptySchemaWithoutCascadeReturnsConflict() {
+    NameIdentifier identifier = NameIdentifier.of(metalake, catalog, "schema1");
+    doThrow(new NonEmptySchemaException("Schema schema1 is not empty"))
+        .when(dispatcher)
+        .dropSchema(identifier, false);
+
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .queryParam("cascade", false)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+      Assertions.assertEquals(NonEmptySchemaException.class.getSimpleName(), error.getType());
+      verify(dispatcher).dropSchema(identifier, false);
+    }
   }
 
   @Test

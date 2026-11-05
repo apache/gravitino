@@ -48,6 +48,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -635,6 +636,91 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         TableChange.deleteIndex("idx_token_alter", false));
   }
 
+  @Test
+  public void testVectorSimilarityIndexOnCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_vector_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    String vectorColumn = "embedding";
+    String customVectorColumn = "embedding_custom";
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> defaultProperties =
+        Map.of("type", "hnsw", "distance_function", "L2Distance", "dimensions", "3");
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              vectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              customVectorColumn,
+              Types.ExternalType.of("Array(Float32)"),
+              "custom embedding",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        },
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+              "idx_vector_default",
+              new String[][] {{vectorColumn}},
+              defaultProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index defaultIndex =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_default"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, defaultIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{vectorColumn}}, defaultIndex.fieldNames());
+    Assertions.assertEquals(defaultProperties, defaultIndex.properties());
+
+    Map<String, String> customProperties =
+        Map.of(
+            "type", "hnsw",
+            "distance_function", "cosineDistance",
+            "dimensions", "3",
+            "quantization", "f16",
+            "hnsw_max_connections_per_layer", "16",
+            "hnsw_candidate_list_size_for_construction", "64",
+            "granularity", "7");
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY,
+            "idx_vector_custom",
+            new String[][] {{customVectorColumn}},
+            customProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index customIndex =
+        Arrays.stream(altered.index())
+            .filter(index -> Objects.equals(index.name(), "idx_vector_custom"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY, customIndex.type());
+    Assertions.assertArrayEquals(new String[][] {{customVectorColumn}}, customIndex.fieldNames());
+    Assertions.assertEquals(customProperties, customIndex.properties());
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_vector_default", false),
+        TableChange.deleteIndex("idx_vector_custom", false));
+  }
+
   private void assertIndexMetadata(
       Index[] indexes, String name, Index.IndexType type, Map<String, String> properties) {
     Index index =
@@ -1005,6 +1091,48 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     }
   }
 
+  @Test
+  public void testAlterTableSettingsOnCluster() throws Exception {
+    String tableName = GravitinoITUtils.genRandomName("ck_alter_settings_cluster");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.setProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout", "3600"));
+    Table modified = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        "3600",
+        modified.properties().get(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.removeProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+    Table reset = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        reset.properties().containsKey(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+                clickHouseClusterContainer.getUsername(),
+                clickHouseClusterContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.execute("SYSTEM FLUSH LOGS");
+      assertSettingAlterUsesOnCluster(statement, tableName, "MODIFY SETTING");
+      assertSettingAlterUsesOnCluster(statement, tableName, "RESET SETTING");
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Shard key validation IT tests
   // ---------------------------------------------------------------------------
@@ -1254,6 +1382,25 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     } finally {
       tableCatalog.dropTable(distIdent);
       tableCatalog.dropTable(localIdent);
+    }
+  }
+
+  private static void assertSettingAlterUsesOnCluster(
+      Statement statement, String tableName, String command) throws SQLException {
+    try (ResultSet resultSet =
+        statement.executeQuery(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND query_kind = 'Alter' "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "AND query LIKE '%%%s%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                tableName, command))) {
+      Assertions.assertTrue(resultSet.next(), "Should find " + command + " query");
+      String sql = resultSet.getString("query");
+      Assertions.assertTrue(
+          sql.contains("ON CLUSTER"), command + " must include ON CLUSTER, actual: " + sql);
     }
   }
 

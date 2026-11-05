@@ -132,6 +132,9 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":server:jar")
+    // Embedded optimizer integration tests load the Iceberg catalog in an isolated classloader.
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
+    dependsOn(":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   }
 }
 

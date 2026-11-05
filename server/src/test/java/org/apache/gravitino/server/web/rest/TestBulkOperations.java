@@ -402,6 +402,28 @@ public class TestBulkOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testBulkAddRolesWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/roles/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testBulkRemoveRolesWithNullRequest() {
+    Response response =
+        target("/bulk/metalakes/metalake1/roles/remove")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
   public void testBulkRejectsEmptyAndExceededRequest() {
     Response emptyResponse =
         target("/bulk/metalakes/metalake1/users/add")

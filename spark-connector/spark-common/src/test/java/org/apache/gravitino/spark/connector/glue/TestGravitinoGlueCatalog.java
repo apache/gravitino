@@ -32,6 +32,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
@@ -210,6 +211,24 @@ public class TestGravitinoGlueCatalog {
         "test-access-key", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
     Assertions.assertEquals(
         "test-secret-key", vended.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testApplyS3CredentialUsesAwsForGlueAndS3ForStorage() {
+    Catalog mockCatalog = mock(Catalog.class);
+    AwsSecretKeyCredential awsCred = new AwsSecretKeyCredential("glue-ak", "glue-sk");
+    S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("s3-ak", "s3-sk");
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {awsCred, s3Cred});
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+
+    Assertions.assertEquals("s3-ak", props.get("hadoop.fs.s3a.access.key"));
+    Assertions.assertEquals("s3-sk", props.get("hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals("glue-ak", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
+    Assertions.assertEquals("glue-sk", vended.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
   }
 
   @Test

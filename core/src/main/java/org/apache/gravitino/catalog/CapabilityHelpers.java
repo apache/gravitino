@@ -26,9 +26,12 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -50,6 +53,48 @@ import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 
 public class CapabilityHelpers {
+
+  /**
+   * Maps a normalized table identifier to the identifier under which the table is physically stored
+   * by the catalog's backend, when the catalog implements the connector-side {@link
+   * SupportsTableNameResolution} capability; otherwise returns {@code normalizedIdent} unchanged.
+   *
+   * <p>This is the single resolution path shared by the authorization layer (so a request is
+   * authorized against the physical name) and the table dispatcher (so the operation runs on the
+   * same physical name), which keeps the authorized identifier and the operated-on identifier
+   * identical.
+   *
+   * <p>For the vast majority of catalogs — those that do not implement the capability — this is a
+   * pure identity call: no differently-cased object is consulted, no extra source access is made
+   * beyond the single {@code doWithCatalog} used to reach the catalog's operations. Resolution is
+   * best-effort and takes no lock; a concurrent rename/recreate surfaces as the normal {@code
+   * NoSuchTableException} from the subsequent locked operation.
+   *
+   * @param normalizedIdent the case-normalized table identifier
+   * @param catalogManager the catalog manager used to reach the catalog operations
+   * @return the identifier under which the table is physically stored, or {@code normalizedIdent}
+   *     unchanged when the catalog does not opt in or no unambiguous mapping applies
+   */
+  public static NameIdentifier resolvePhysicalTableName(
+      NameIdentifier normalizedIdent, CatalogManager catalogManager) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(normalizedIdent);
+    try {
+      return catalogManager.doWithCatalog(
+          catalogIdent,
+          catalog -> {
+            CatalogOperations catalogOps = catalog.ops();
+            if (catalogOps instanceof SupportsTableNameResolution) {
+              return ((SupportsTableNameResolution) catalogOps).resolveTableName(normalizedIdent);
+            }
+            return normalizedIdent;
+          });
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new RuntimeException(
+          "Failed to resolve physical table name for: " + normalizedIdent, e);
+    }
+  }
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -94,6 +139,18 @@ public class CapabilityHelpers {
               return change;
             })
         .toArray(FilesetChange[]::new);
+  }
+
+  public static ModelChange[] applyCapabilities(Capability capabilities, ModelChange... changes) {
+    return Arrays.stream(changes)
+        .map(
+            change -> {
+              if (change instanceof ModelChange.RenameModel) {
+                return applyCapabilities((ModelChange.RenameModel) change, capabilities);
+              }
+              return change;
+            })
+        .toArray(ModelChange[]::new);
   }
 
   public static ViewChange[] applyCapabilities(Capability capabilities, ViewChange... changes) {
@@ -358,6 +415,14 @@ public class CapabilityHelpers {
         applyCaseSensitiveOnName(
             Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
     return FilesetChange.rename(newName);
+  }
+
+  private static ModelChange applyCapabilities(
+      ModelChange.RenameModel renameModel, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    String newName =
+        applyCaseSensitiveOnName(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    return ModelChange.rename(newName);
   }
 
   private static ViewChange applyCapabilities(

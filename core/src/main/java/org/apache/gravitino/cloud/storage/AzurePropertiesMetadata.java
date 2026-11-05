@@ -32,6 +32,7 @@ public class AzurePropertiesMetadata {
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
               AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              // Intentionally non-hidden: the account name already appears in abfss:// URIs.
               stringOptionalPropertyEntry(
                   AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
                   "Azure storage account name",
@@ -46,6 +47,22 @@ public class AzurePropertiesMetadata {
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_TENANT_ID,
+                  "Azure Active Directory tenant ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+              stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_CLIENT_ID,
+                  "Azure Active Directory client ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               AzureProperties.GRAVITINO_AZURE_CLIENT_SECRET,
               stringOptionalPropertyEntry(

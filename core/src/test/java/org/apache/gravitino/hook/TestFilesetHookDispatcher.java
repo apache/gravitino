@@ -19,12 +19,19 @@
 package org.apache.gravitino.hook;
 
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
@@ -43,9 +50,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -238,11 +247,19 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
           Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
               .thenReturn("org.h2.Driver");
           Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+          Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS))
+              .thenReturn(10);
           Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
               .thenReturn(1000L);
           Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
           Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
           Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
+          Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
+              .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+          Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+              .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+          Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+              .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
           Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
           Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
           Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -258,6 +275,32 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
           }
           schemaHookDispatcher.dropSchema(NameIdentifier.of(filesetNs.levels()), true);
         });
+  }
+
+  @Test
+  public void testDropFilesetShouldNotRemovePrivilegesWhenDropReturnsFalse() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    FilesetDispatcher delegate = Mockito.mock(FilesetDispatcher.class);
+    FilesetHookDispatcher hookDispatcher = new FilesetHookDispatcher(delegate);
+    List<String> locations = Lists.newArrayList("/tmp/fileset");
+
+    Mockito.when(delegate.dropFileset(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> mockedAuthz =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      mockedAuthz
+          .when(
+              () -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET))
+          .thenReturn(locations);
+
+      Assertions.assertFalse(hookDispatcher.dropFileset(ident));
+
+      mockedAuthz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.FILESET, locations),
+          Mockito.never());
+    }
   }
 
   @Test

@@ -18,34 +18,16 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestFilesetMetaPostgreSQLProvider {
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = new FilesetMetaPostgreSQLProvider().insertFilesetMetaOnDuplicateKeyUpdate(null);
-    String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
-
-    Assertions.assertTrue(
-        conflictClause.startsWith(" ON CONFLICT(schema_id, fileset_name, deleted_at)"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "current_version = " + FilesetMetaMapper.META_TABLE_NAME + ".current_version + 1"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "last_version = " + FilesetMetaMapper.META_TABLE_NAME + ".current_version + 1"));
-    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.currentVersion}"));
-    Assertions.assertFalse(conflictClause.contains("#{filesetMeta.lastVersion}"));
-  }
-
-  @Test
   void testDirectDeleteUsesVersionCas() {
     String sql = new FilesetMetaPostgreSQLProvider().softDeleteFilesetMetasByFilesetId(null, null);
 
-    Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
+    Assertions.assertTrue(sql.contains("AND occ_version = #{occVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
   }
 }

@@ -118,6 +118,12 @@ public class ViewHookDispatcher implements ViewDispatcher {
 
   @Override
   public boolean dropView(NameIdentifier ident) {
-    return dispatcher.dropView(ident);
+    boolean dropped = dispatcher.dropView(ident);
+    if (dropped) {
+      // A view created later under the same name gets a new id, so drop the cached mapping. Views
+      // have no catalog authorization plugin privileges to remove.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.VIEW);
+    }
+    return dropped;
   }
 }

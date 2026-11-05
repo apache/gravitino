@@ -250,8 +250,14 @@ public final class HiveClientClassLoader extends URLClassLoader {
       return true;
     }
 
-    // Gravitino classes
-    if (name.startsWith("org.apache.gravitino.")) {
+    // Gravitino classes, except the version-specific shim implementations (HiveShimV2/HiveShimV3):
+    // those are compiled only into their own hive-metastore{2,3}-libs module and are not on the
+    // base classloader's classpath, so sharing them would always miss and fall through to the
+    // isolated classloader anyway; excluding them here makes that isolated loading deterministic
+    // instead of relying on the ClassNotFoundException fallback in loadSharedClass.
+    if (name.startsWith("org.apache.gravitino.")
+        && !name.startsWith("org.apache.gravitino.hive.client.hive2.")
+        && !name.startsWith("org.apache.gravitino.hive.client.hive3.")) {
       return true;
     }
 

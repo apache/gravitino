@@ -14,6 +14,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), [Jdbc catalog](spark-catalog-jdbc.md), and [AWS Glue catalog](spark-catalog-glue.md).
 2. Supports federation query.
 3. Supports most DDL and DML SQLs.
+4. Supports automatic [lakehouse REST catalog discovery](spark-rest-catalog-discovery.md).
 
 ## Requirement
 
@@ -143,3 +144,11 @@ Gravitino spark connector support the following datatype mapping between Spark a
 For Gravitino `UUID` type, Spark connector represents it as `StringType` because Spark has no native UUID type.
 This behavior is consistent with Spark built-in PostgreSQL JDBC mapping (`uuid` -> `StringType`).
 :::
+
+### PostgreSQL write limitations
+
+Spark JDBC reads PostgreSQL UUID and External columns as strings. Writes to tables containing
+these columns are rejected before JDBC execution, including writes of NULL values and
+INSERT OVERWRITE. The error identifies the unsupported column. Spark binds these columns
+as VARCHAR, which does not preserve the PostgreSQL target type. Use a native PostgreSQL
+writer for these tables. Other PostgreSQL column types retain their existing write behavior.

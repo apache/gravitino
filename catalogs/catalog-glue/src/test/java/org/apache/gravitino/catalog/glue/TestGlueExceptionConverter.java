@@ -24,19 +24,27 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
+import software.amazon.awssdk.services.glue.model.ConcurrentModificationException;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
+import software.amazon.awssdk.services.glue.model.ThrottlingException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /** Tests for {@link GlueExceptionConverter}. */
 public class TestGlueExceptionConverter {
@@ -72,6 +80,23 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
+  public void testIsAuthenticationFailureMatchesAwsErrorCode() {
+    GlueException e = invalidCredentialsException();
+
+    assertTrue(GlueExceptionConverter.isAuthenticationFailure(e));
+  }
+
+  @Test
+  public void testIsAuthenticationFailureRejectsAuthorizationError() {
+    AccessDeniedException e =
+        AccessDeniedException.builder()
+            .awsErrorDetails(AwsErrorDetails.builder().errorCode("AccessDeniedException").build())
+            .build();
+
+    assertFalse(GlueExceptionConverter.isAuthenticationFailure(e));
+  }
+
+  @Test
   public void testToCredentialExceptionIncludesContextAndPropertyNames() {
     SdkClientException cause =
         SdkClientException.create("Unable to load credentials from any of the providers");
@@ -82,6 +107,21 @@ public class TestGlueExceptionConverter {
     assertTrue(ex.getMessage().contains("table mydb.mytbl"));
     assertTrue(ex.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
     assertTrue(ex.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  public void testRejectedCredentialsIncludePropertyNamesAndAwsError() {
+    GlueException cause = invalidCredentialsException();
+
+    RuntimeException converted = GlueExceptionConverter.toSchemaException(cause, "listing schemas");
+
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertInstanceOf(
+        ForbiddenException.class, GlueExceptionConverter.toTableException(cause, "table t"));
+    assertSame(cause, converted.getCause());
+    assertTrue(converted.getMessage().contains(GlueConstants.AWS_ACCESS_KEY_ID));
+    assertTrue(converted.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+    assertTrue(converted.getMessage().contains("UnrecognizedClientException"));
   }
 
   @Test
@@ -217,5 +257,299 @@ public class TestGlueExceptionConverter {
     assertInstanceOf(
         IllegalArgumentException.class,
         GlueExceptionConverter.toTableException(invalid, "table ctas_test"));
+  }
+
+  private static GlueException invalidCredentialsException() {
+    return (GlueException)
+        GlueException.builder()
+            .message("The security token included in the request is invalid")
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("UnrecognizedClientException")
+                    .errorMessage("The security token included in the request is invalid")
+                    .build())
+            .build();
+  }
+
+  @Test
+  public void testIcebergForbiddenWithNonGlueCauseStaysForbidden() {
+    AwsServiceException s3Denial =
+        AwsServiceException.builder()
+            .message("Access Denied")
+            .statusCode(403)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .serviceName("S3")
+                    .errorCode("AccessDenied")
+                    .errorMessage("Access Denied")
+                    .build())
+            .build();
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.ForbiddenException(
+            s3Denial, "Cannot commit db.t because S3 denied access");
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertTrue(converted.getMessage().contains("Access Denied"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergRawGlueNotFoundIsNotFound() {
+    RuntimeException raw =
+        new RuntimeException(
+            EntityNotFoundException.builder().message("Database db not found").build());
+
+    assertInstanceOf(
+        NotFoundException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergRenameOntoExistingTableIsAlreadyExists() {
+    RuntimeException raw =
+        new RuntimeException(
+            AlreadyExistsException.builder()
+                .message("Table already exists.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("AlreadyExistsException")
+                        .errorMessage("Table already exists.")
+                        .build())
+                .build());
+
+    assertInstanceOf(
+        TableAlreadyExistsException.class,
+        GlueExceptionConverter.toIcebergException(raw, "altering table t1"));
+  }
+
+  @Test
+  public void testIcebergMissingNamespaceIsNoSuchSchema() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new org.apache.iceberg.exceptions.NoSuchNamespaceException(
+                "Cannot rename db.t to nodb.t because namespace nodb does not exist"),
+            "altering table t");
+
+    assertInstanceOf(NoSuchSchemaException.class, converted);
+  }
+
+  @Test
+  public void testIcebergForbiddenKeepsAwsDenialWithoutCatalogName() {
+    AccessDeniedException denial =
+        AccessDeniedException.builder()
+            .message(IAM_MESSAGE)
+            .awsErrorDetails(
+                AwsErrorDetails.builder()
+                    .errorCode("AccessDeniedException")
+                    .errorMessage(IAM_MESSAGE)
+                    .build())
+            .build();
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.ForbiddenException(
+            denial,
+            "Cannot commit %s.db.t because Glue cannot access the requested resources",
+            GlueIcebergTableHelper.ICEBERG_CATALOG_NAME);
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(ForbiddenException.class, converted);
+    assertTrue(converted.getMessage().contains("glue:CreateDatabase"), converted.getMessage());
+    assertFalse(
+        converted.getMessage().contains(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+        converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergValidationUnderCommitFailureIsIllegalArgument() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitStateUnknownException(
+            new org.apache.iceberg.exceptions.ValidationException(
+                "Invalid S3 URI, cannot determine scheme: /tmp/wh/db/t/metadata/0.json"));
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertInstanceOf(IllegalArgumentException.class, converted);
+    assertTrue(converted.getMessage().contains("/tmp/wh/db/t"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergCommitStateUnknownIsNotConnectionFailure() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitStateUnknownException(
+            SdkClientException.create("Read timed out"));
+
+    RuntimeException converted = GlueExceptionConverter.toIcebergException(raw, "table t");
+
+    assertFalse(converted instanceof ConnectionFailedException, converted.toString());
+    assertTrue(converted.getMessage().contains("commit state is unknown"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("Read timed out"), converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergConcurrentCommitIsConflict() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.CommitFailedException(
+            ConcurrentModificationException.builder().message("concurrent update").build(),
+            "Cannot commit db.t because Glue detected concurrent update");
+
+    assertInstanceOf(
+        OptimisticLockException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergNotFoundIsNotFound() {
+    RuntimeException raw =
+        new org.apache.iceberg.exceptions.NotFoundException(
+            EntityNotFoundException.builder().message("Database db not found").build(),
+            "Cannot commit db.t because Glue cannot find the requested entity");
+
+    assertInstanceOf(
+        NotFoundException.class, GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergAlreadyExistsIsTableAlreadyExists() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new org.apache.iceberg.exceptions.AlreadyExistsException(
+                "Table already exists: %s.db.t", GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+            "table t");
+
+    assertInstanceOf(TableAlreadyExistsException.class, converted);
+    assertFalse(
+        converted.getMessage().contains(GlueIcebergTableHelper.ICEBERG_CATALOG_NAME),
+        converted.getMessage());
+  }
+
+  @Test
+  public void testIcebergThrottlingCauseIsServiceUnavailable() {
+    RuntimeException raw =
+        new RuntimeException(ThrottlingException.builder().message("Rate exceeded").build());
+
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toIcebergException(raw, "table t"));
+  }
+
+  @Test
+  public void testIcebergUnknownFailureFallsBackWithoutNullMessage() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(new IllegalStateException(), "table t");
+
+    assertEquals(RuntimeException.class, converted.getClass());
+    assertTrue(converted.getMessage().contains("IllegalStateException"), converted.getMessage());
+    assertFalse(converted.getMessage().contains("null"), converted.getMessage());
+  }
+
+  @Test
+  public void testUnmodeledThrottlingStatusIsServiceUnavailable() {
+    GlueException tooMany =
+        (GlueException)
+            GlueException.builder()
+                .message("Too many requests")
+                .statusCode(429)
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("TooManyRequestsException")
+                        .errorMessage("Too many requests")
+                        .build())
+                .build();
+
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toClientException(tooMany, "table t", null));
+  }
+
+  @Test
+  public void testIcebergGravitinoExceptionsPassThrough() {
+    NoSuchTableException original = new NoSuchTableException("gone");
+    assertSame(original, GlueExceptionConverter.toIcebergException(original, "table t"));
+    UnsupportedOperationException unsupported =
+        new UnsupportedOperationException("Transform is not supported: bucket");
+    assertSame(unsupported, GlueExceptionConverter.toIcebergException(unsupported, "table t"));
+  }
+
+  @Test
+  public void testServiceScopeErrorIsNotRegionMismatch() {
+    GlueException serviceError =
+        (GlueException)
+            GlueException.builder()
+                .message("Credential should be scoped to correct service: 'glue'.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("InvalidSignatureException")
+                        .errorMessage("Credential should be scoped to correct service: 'glue'.")
+                        .build())
+                .build();
+
+    assertFalse(GlueExceptionConverter.isRegionScopeFailure(serviceError));
+  }
+
+  @Test
+  public void testRegionScopeErrorIsNotReportedAsRejectedCredentials() {
+    GlueException regionError =
+        (GlueException)
+            GlueException.builder()
+                .message("Credential should be scoped to a valid region.")
+                .awsErrorDetails(
+                    AwsErrorDetails.builder()
+                        .errorCode("InvalidSignatureException")
+                        .errorMessage("Credential should be scoped to a valid region.")
+                        .build())
+                .build();
+
+    assertFalse(GlueExceptionConverter.isAuthenticationFailure(regionError));
+    String message = GlueExceptionConverter.toConnectionException(regionError).getMessage();
+    assertTrue(message.contains(GlueConstants.AWS_REGION), message);
+    assertFalse(message.contains("rejected the configured credentials"), message);
+  }
+
+  @Test
+  void testIcebergS3FailuresMapByStatus() {
+    assertInstanceOf(
+        NotFoundException.class,
+        GlueExceptionConverter.toIcebergException(s3Exception(404, "NoSuchBucket"), "table t"));
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toIcebergException(s3Exception(503, "SlowDown"), "table t"));
+    assertInstanceOf(
+        IllegalArgumentException.class,
+        GlueExceptionConverter.toIcebergException(
+            s3Exception(301, "PermanentRedirect"), "table t"));
+    RuntimeException other =
+        GlueExceptionConverter.toIcebergException(s3Exception(500, "InternalError"), "table t");
+    assertTrue(other.getMessage().startsWith("S3 error"), other.getMessage());
+    assertTrue(other.getMessage().contains("[InternalError]"), other.getMessage());
+  }
+
+  @Test
+  void testIcebergS3RedirectPointsAtBucketRegion() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(s3Exception(301, "PermanentRedirect"), "table t");
+    assertInstanceOf(IllegalArgumentException.class, converted);
+    assertTrue(converted.getMessage().contains("different region"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("table t"), converted.getMessage());
+  }
+
+  @Test
+  void testIcebergClientFailureDoesNotBlameGlue() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new RuntimeException(
+                "wrapped",
+                SdkClientException.create("Unable to execute HTTP request: Read timed out")),
+            "Iceberg metadata of table t");
+    assertInstanceOf(ConnectionFailedException.class, converted);
+    assertTrue(converted.getMessage().contains("AWS (Glue or S3)"), converted.getMessage());
+  }
+
+  private static RuntimeException s3Exception(int status, String code) {
+    return new RuntimeException(
+        "wrapped",
+        S3Exception.builder()
+            .statusCode(status)
+            .awsErrorDetails(
+                AwsErrorDetails.builder().errorCode(code).errorMessage("message").build())
+            .build());
   }
 }

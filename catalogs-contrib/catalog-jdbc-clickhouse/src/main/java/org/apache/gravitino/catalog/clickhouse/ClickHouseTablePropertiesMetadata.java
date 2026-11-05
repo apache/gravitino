@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.clickhouse;
 
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
 import java.util.Collections;
@@ -36,6 +37,8 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String GRAVITINO_ENGINE_KEY = TableConstants.ENGINE;
   public static final String CLICKHOUSE_ENGINE_KEY = TableConstants.ENGINE_UPPER;
+  /** Property key for the structured ClickHouse projection definitions. */
+  public static final String CLICKHOUSE_PROJECTIONS_KEY = "clickhouse.projections";
 
   // The following two properties are mapped to ClickHouse table properties and can be used by
   // tables with different engines.
@@ -110,6 +113,33 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           "",
           false);
 
+  /**
+   * ClickHouse's canonical native partition expression as returned by system.tables.partition_key.
+   * Read-only: populated when loading a table, exposing an empty string for unpartitioned tables so
+   * that the property key is always present.
+   */
+  public static final PropertyEntry<String> PARTITION_KEY_PROPERTY_ENTRY =
+      stringPropertyEntry(
+          TableConstants.PARTITION_KEY,
+          "The canonical native partition expression of a ClickHouse table",
+          false,
+          true,
+          "",
+          false,
+          true);
+
+  /**
+   * Structured ClickHouse projection definitions. This property is immutable because this connector
+   * supports projection metadata round-tripping during table creation, not ALTER.
+   */
+  public static final PropertyEntry<String> CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY =
+      stringOptionalPropertyEntry(
+          CLICKHOUSE_PROJECTIONS_KEY,
+          "Structured ClickHouse projection definitions for table creation",
+          true,
+          null,
+          false);
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
 
@@ -137,6 +167,8 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     map.put(CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY);
     map.put(CLUSTER_SHARDING_KEY_PROPERTY_ENTRY.getName(), CLUSTER_SHARDING_KEY_PROPERTY_ENTRY);
     map.put(ENGINE_PARAMETERS_PROPERTY_ENTRY.getName(), ENGINE_PARAMETERS_PROPERTY_ENTRY);
+    map.put(PARTITION_KEY_PROPERTY_ENTRY.getName(), PARTITION_KEY_PROPERTY_ENTRY);
+    map.put(CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY.getName(), CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY);
 
     return Collections.unmodifiableMap(map);
   }
@@ -237,33 +269,25 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
 
   @Override
   public Map<String, String> transformToJdbcProperties(Map<String, String> properties) {
-    return Collections.unmodifiableMap(
-        new HashMap<String, String>() {
-          {
-            properties.forEach(
-                (key, value) -> {
-                  if (GRAVITINO_CONFIG_TO_CLICKHOUSE.containsKey(key)) {
-                    put(GRAVITINO_CONFIG_TO_CLICKHOUSE.get(key), value);
-                  }
-                });
-          }
-        });
+    // Reuse the parent implementation to filter out the internal gravitino.identifier property.
+    Map<String, String> transformed = new HashMap<>(super.transformToJdbcProperties(properties));
+    // partition-key is read-only metadata; never write it back to ClickHouse.
+    transformed.remove(TableConstants.PARTITION_KEY);
+    // Rename the engine key to the ClickHouse-specific form.
+    String engine = transformed.remove(GRAVITINO_ENGINE_KEY);
+    if (engine != null) {
+      transformed.put(CLICKHOUSE_ENGINE_KEY, engine);
+    }
+    return Collections.unmodifiableMap(transformed);
   }
 
   @Override
   public Map<String, String> convertFromJdbcProperties(Map<String, String> properties) {
     BidiMap<String, String> clickhouseConfigToGravitino =
         GRAVITINO_CONFIG_TO_CLICKHOUSE.inverseBidiMap();
-    return Collections.unmodifiableMap(
-        new HashMap<String, String>() {
-          {
-            properties.forEach(
-                (key, value) -> {
-                  if (clickhouseConfigToGravitino.containsKey(key)) {
-                    put(clickhouseConfigToGravitino.get(key), value);
-                  }
-                });
-          }
-        });
+    Map<String, String> converted = new HashMap<>();
+    properties.forEach(
+        (key, value) -> converted.put(clickhouseConfigToGravitino.getOrDefault(key, key), value));
+    return Collections.unmodifiableMap(converted);
   }
 }

@@ -26,14 +26,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,5 +140,31 @@ public class TestMetalakeHookDispatcher {
     Assertions.assertEquals("Add user failed", thrown.getMessage());
     verify(mockAccessControlDispatcher).addUser(any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateMetalakeRejectsTooLongCreatorName() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    String tooLongName = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH + 1);
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal(tooLongName),
+                    () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap())));
+    Assertions.assertEquals(
+        "The name of the user must not exceed 128 characters", thrown.getMessage());
+    // The metalake must not be created when its creator cannot be added as a user.
+    verify(mockDispatcher, never()).createMetalake(any(), any(), any());
+    verify(mockAccessControlDispatcher, never()).addUser(any(), any());
+
+    String maxLengthName = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH);
+    PrincipalUtils.doAs(
+        new UserPrincipal(maxLengthName),
+        () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
+    verify(mockDispatcher).createMetalake(any(), any(), any());
+    verify(mockAccessControlDispatcher).addUser("test_metalake", maxLengthName);
   }
 }

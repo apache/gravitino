@@ -167,7 +167,6 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType(DATE, Types.DateType.get());
     checkGravitinoTypeToJdbcType(DATETIME, Types.TimestampType.withoutTimeZone(0));
     checkGravitinoTypeToJdbcType(DECIMAL + "(10,2)", Types.DecimalType.of(10, 2));
-    checkGravitinoTypeToJdbcType(STRING, Types.VarCharType.of(20));
     checkGravitinoTypeToJdbcType(FIXEDSTRING + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(STRING, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BOOL, Types.BooleanType.get());
@@ -195,6 +194,18 @@ public class TestClickHouseTypeConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+  }
+
+  @Test
+  public void testRejectVarcharWithoutLengthSupport() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.VarCharType.of(64)));
+    Assertions.assertTrue(exception.getMessage().contains("ClickHouse"));
+    Assertions.assertTrue(exception.getMessage().contains("varchar(n)"));
+    Assertions.assertTrue(exception.getMessage().contains("string"));
+    Assertions.assertTrue(exception.getMessage().contains("fixedchar(n)"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

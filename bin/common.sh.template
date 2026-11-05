@@ -107,6 +107,43 @@ function addDirToClasspath(){
   fi
 }
 
+# Rotate a launch script's .out file before the process starts, so the file does not grow across
+# restarts. The previous files are kept as <file>.1 (newest) to <file>.N (oldest), where N is
+# GRAVITINO_OUT_FILE_KEEP (default 5). Set it to 0 to keep no previous file.
+function rotate_out_file() {
+  local out_file="$1"
+  local keep="${GRAVITINO_OUT_FILE_KEEP:-5}"
+  local rotated index
+
+  if ! [[ "${keep}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid GRAVITINO_OUT_FILE_KEEP '${keep}', use 5 instead"
+    keep=5
+  fi
+
+  # Remove files beyond the limit, including those left by a larger earlier limit.
+  for rotated in "${out_file}".*; do
+    index="${rotated##*.}"
+    if [[ -f "${rotated}" && "${index}" =~ ^[0-9]+$ ]] && (( 10#${index} >= keep )); then
+      rm -f "${rotated}"
+    fi
+  done
+
+  if [[ ! -f "${out_file}" ]]; then
+    return 0
+  fi
+  if (( keep == 0 )); then
+    rm -f "${out_file}"
+    return 0
+  fi
+
+  for (( index = keep - 1; index >= 1; index-- )); do
+    if [[ -f "${out_file}.${index}" ]]; then
+      mv -f "${out_file}.${index}" "${out_file}.$((index + 1))"
+    fi
+  done
+  mv -f "${out_file}" "${out_file}.1"
+}
+
 if [[ -z "${GRAVITINO_MEM}" ]]; then
   export GRAVITINO_MEM="-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 fi

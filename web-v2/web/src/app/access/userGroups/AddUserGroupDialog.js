@@ -82,7 +82,6 @@ export default function AddUserGroupDialog({ ...props }) {
         confirmLoading={confirmLoading}
         onCancel={handleCancel}
       >
-        <Paragraph type='secondary'>Add a user group.</Paragraph>
         <Form
           form={form}
           initialValues={defaultValues}

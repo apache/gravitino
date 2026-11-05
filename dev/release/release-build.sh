@@ -136,6 +136,7 @@ if [[ "$1" == "finalize" ]]; then
   echo "Uploading Gravitino to PyPi"
   twine upload -u __token__  -p $PYPI_API_TOKEN \
     --repository-url https://upload.pypi.org/legacy/ \
+    --skip-existing \
     "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
   echo "Python Gravitino package uploaded"
   rm -fr gravitino
@@ -203,19 +204,6 @@ if [[ "$1" == "package" ]]; then
   # Source and binary tarballs
   echo "Packaging release source tarballs"
   cp -r gravitino gravitino-$GRAVITINO_VERSION-src
-
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.iceberg
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.iceberg
-  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.lance
-  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.lance
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/NOTICE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/web-v2/web/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/web-v2/web/NOTICE.bin
 
   rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src
@@ -287,6 +275,7 @@ if [[ "$1" == "package" ]]; then
     echo "Uploading Gravitino Python package $RC_PYGRAVITINO_VERSION to PyPi"
     twine upload -u __token__  -p $PYPI_API_TOKEN \
       --repository-url https://upload.pypi.org/legacy/ \
+      --skip-existing \
       "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz"
 
     svn co --depth=empty $RELEASE_STAGING_LOCATION svn-gravitino

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -112,10 +113,10 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   /**
-   * Obtains S3 credentials via Gravitino credential vending and injects them into {@code props} as
-   * {@code hadoop.fs.s3a.*} for the non-Iceberg (Hive) path's S3 data access. Returns the vended
-   * credentials keyed by Gravitino catalog property names for reuse in the Iceberg path. Returns an
-   * empty map if credential vending is unavailable.
+   * Obtains credentials via Gravitino credential vending. {@link AwsSecretKeyCredential} supplies
+   * Glue API keys (returned for the Iceberg path). {@link S3SecretKeyCredential} supplies {@code
+   * hadoop.fs.s3a.*} for Hive-path S3 data access. When only {@link S3SecretKeyCredential} is
+   * present (legacy remap), it also fills Glue API keys for backward compatibility.
    *
    * @return map of vended AWS credentials (Gravitino key names), or empty map if none vended
    */
@@ -130,18 +131,26 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           "Failed to obtain credentials from Glue catalog, S3 credential injection skipped", e);
       return vended;
     }
+    S3SecretKeyCredential s3SecretKey = null;
     for (Credential credential : credentials) {
-      if (credential instanceof S3SecretKeyCredential) {
-        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
-        props.put("hadoop.fs.s3a.access.key", s3.accessKeyId());
-        props.put("hadoop.fs.s3a.secret.key", s3.secretAccessKey());
-        vended.put(GluePropertiesConverter.AWS_ACCESS_KEY_ID, s3.accessKeyId());
-        vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, s3.secretAccessKey());
+      if (credential instanceof AwsSecretKeyCredential) {
+        AwsSecretKeyCredential aws = (AwsSecretKeyCredential) credential;
+        vended.put(GluePropertiesConverter.AWS_ACCESS_KEY_ID, aws.accessKeyId());
+        vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, aws.secretAccessKey());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        s3SecretKey = (S3SecretKeyCredential) credential;
+        props.put("hadoop.fs.s3a.access.key", s3SecretKey.accessKeyId());
+        props.put("hadoop.fs.s3a.secret.key", s3SecretKey.secretAccessKey());
       } else {
         LOG.warn(
             "Received unrecognized credential type '{}' for Glue catalog, skipping",
             credential.getClass().getName());
       }
+    }
+    // Legacy catalogs that only vend remapped S3SecretKeyCredential still need Glue API keys.
+    if (vended.isEmpty() && s3SecretKey != null) {
+      vended.put(GluePropertiesConverter.AWS_ACCESS_KEY_ID, s3SecretKey.accessKeyId());
+      vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, s3SecretKey.secretAccessKey());
     }
     return vended;
   }

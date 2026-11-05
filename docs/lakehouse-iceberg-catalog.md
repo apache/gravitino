@@ -87,6 +87,12 @@ The following properties tune REST backend behavior:
 | `data-access`                       | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       |
 | `rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       |
 | `rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       |
+| `rest-backend-auth-type`           | How the REST backend authenticates to the remote catalog: `user-token` forwards the calling user's token, `service-account` connects with `rest-backend-token` or `rest-backend-credential` and authorizes every request in Gravitino. | user-token    | No       |
+| `rest-backend-token`               | Static bearer token for a `service-account` connection. Hidden from catalog responses.                     | (none)        | No       |
+| `rest-backend-credential`          | OAuth2 client credential (`client_id:client_secret`) for a `service-account` connection. Hidden from catalog responses. | (none)        | No       |
+| `rest-backend-oauth2-server-uri`   | OAuth2 token endpoint for `rest-backend-credential`.                                                       | (none)        | No       |
+| `rest-backend-scope`               | OAuth2 scope requested with `rest-backend-credential`.                                                     | (none)        | No       |
+| `rest-backend-storage-credential-source`  | Who issues storage credentials through the Iceberg REST service: `remote` passes through the remote catalog's credentials, `local` issues them through this catalog's `credential-providers`. A `service-account` connection always uses `local`, regardless of this setting. | remote        | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -258,7 +264,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-password` and cloud credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
+Sensitive catalog properties such as `jdbc-password` and cloud credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC and cloud credential fields via the [credential vending API](security/credential-vending.md) (`getCredentials`). Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -473,6 +479,7 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 | `comment`                 | The table comment; use the `comment` field in table meta instead.                                                                                                                                                                                                                   | (none)        | No       | Yes      | No        |
 | `creator`                 | The table creator.                                                                                                                                                                                                                                                                  | (none)        | No       | Yes      | No        |
 | `current-snapshot-id`     | The snapshot represents the current state of the table.                                                                                                                                                                                                                             | (none)        | No       | Yes      | No        |
+| `default-spec-id`         | The current default partition spec ID projected from Iceberg metadata. Read-only; cannot be set or removed.                                                                                                                                                                         | (none)        | No       | Yes      | No        |
 | `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                                                                                                                                                                                                                 | (none)        | No       | Yes      | No        |
 | `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                                                                                                                                                                                                                    | (none)        | No       | Yes      | No        |
 | `identifier-fields`       | The identifier fields for defining the table.                                                                                                                                                                                                                                       | (none)        | No       | Yes      | No        |

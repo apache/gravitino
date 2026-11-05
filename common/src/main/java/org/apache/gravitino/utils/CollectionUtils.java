@@ -20,6 +20,7 @@
 package org.apache.gravitino.utils;
 
 import java.util.Collection;
+import java.util.Objects;
 
 /** Utility class for working with collection. */
 public class CollectionUtils {
@@ -40,5 +41,24 @@ public class CollectionUtils {
       return false;
     }
     return org.apache.commons.collections4.CollectionUtils.isEqualCollection(c1, c2);
+  }
+
+  /**
+   * Computes an order-independent hash code for a collection, so that two collections equal under
+   * {@link #isEqualCollection} produce the same value. The element hashes are summed, which is
+   * commutative, and null elements are treated as zero. A null collection hashes to zero.
+   *
+   * @param collection the collection to hash, may be null and may contain null elements
+   * @return an order-independent hash code consistent with {@link #isEqualCollection}
+   */
+  public static int unorderedHashCode(Collection<?> collection) {
+    if (collection == null) {
+      return 0;
+    }
+    int hash = 0;
+    for (Object element : collection) {
+      hash += Objects.hashCode(element);
+    }
+    return hash;
   }
 }

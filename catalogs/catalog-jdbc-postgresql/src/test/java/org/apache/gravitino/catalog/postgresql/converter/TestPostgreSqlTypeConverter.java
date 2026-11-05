@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIME
 import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.TIMESTAMP;
 import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.ARRAY_TOKEN;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BIGSERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
@@ -34,6 +35,8 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SERIAL;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.SMALLSERIAL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -52,7 +55,18 @@ public class TestPostgreSqlTypeConverter {
   private static final String USER_DEFINED_TYPE = "user-defined";
 
   @Test
+  void testUnboundedVarcharDriverSentinelMapsToString() {
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, Integer.MAX_VALUE, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), VARCHAR, 0, null, 0);
+    checkJdbcTypeToGravitinoType(Types.VarCharType.of(255), VARCHAR, 255, null, 0);
+  }
+
+  @Test
   public void testToGravitinoType() {
+    checkJdbcTypeToGravitinoType(Types.ShortType.get(), SMALLSERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.IntegerType.get(), SERIAL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.LongType.get(), BIGSERIAL, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT_4, null, null, 0);
@@ -102,6 +116,98 @@ public class TestPostgreSqlTypeConverter {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list2));
+  }
+
+  @Test
+  public void testCharArrayArrayType() {
+    // CHAR(n)[] (type name "_bpchar") carries its element length through the column size; the
+    // element bean must keep it or toGravitino unboxes a null column size and fails with an NPE.
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.FixedCharType.of(5)),
+        JDBC_ARRAY_PREFIX + BPCHAR,
+        5,
+        null,
+        null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.VarCharType.of(20)),
+        JDBC_ARRAY_PREFIX + VARCHAR,
+        20,
+        null,
+        null);
+  }
+
+  @Test
+  void testCharArrayWithoutLengthMetadataStillLoads() {
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")), "_bpchar", null, null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")), "_bpchar", 0, null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("bpchar")),
+        "_bpchar",
+        Integer.MAX_VALUE,
+        null,
+        null);
+    checkJdbcTypeToGravitinoType(
+        Types.ExternalType.of("bpchar"), BPCHAR, Integer.MAX_VALUE, null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.StringType.get()), "_varchar", Integer.MAX_VALUE, null, null);
+  }
+
+  @Test
+  void testNumericArrayElementMetadata() {
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.DecimalType.of(10, 2)), "_numeric", 10, 2, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric")), "_numeric", 0, 0, null);
+    // pgjdbc getColumns reports display width rather than precision for unconstrained arrays.
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric")), "_numeric", 131089, 0, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(1000,0)")),
+        "_numeric",
+        1000,
+        0,
+        null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(39,0)")), "_numeric", 39, 0, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ListType.nullable(Types.ExternalType.of("numeric(2,-3)")), "_numeric", 2, 2045, null);
+  }
+
+  @Test
+  void testTemporalArrayElementMetadata() {
+    for (int precision : new int[] {0, 3, 6}) {
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimeType.of(precision)), "_time", null, null, precision);
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimestampType.withoutTimeZone(precision)),
+          "_timestamp",
+          null,
+          null,
+          precision);
+      checkJdbcTypeToGravitinoType(
+          Types.ListType.nullable(Types.TimestampType.withTimeZone(precision)),
+          "_timestamptz",
+          null,
+          null,
+          precision);
+    }
+  }
+
+  @Test
+  public void testConstrainedNumericOutsideDecimalLimits() {
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(39,0)"), NUMERIC, 39, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(1000,0)"), NUMERIC, 1000, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, -3, 0);
+    // PostgreSQL JDBC metadata can expose a negative scale as an unsigned 11-bit value.
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(2,-3)"), NUMERIC, 2, 2045, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("numeric(3,5)"), NUMERIC, 3, 5, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 38), NUMERIC, 38, 38, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 0), NUMERIC, 38, null, 0);
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      checkGravitinoTypeToJdbcType(declaration, Types.ExternalType.of(declaration));
+    }
   }
 
   @Test

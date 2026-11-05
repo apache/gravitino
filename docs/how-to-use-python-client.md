@@ -29,8 +29,58 @@ install it in your local.
 pip install apache-gravitino
 ```
 
+The base installation provides the Gravitino metadata client. For GVFS with local `file://` paths
+and no remote backend, install only the shared GVFS dependencies:
+
+```shell
+pip install "apache-gravitino[gvfs]"
+```
+
+For a remote storage backend, install its extra, for example:
+
+```shell
+pip install "apache-gravitino[hdfs]"
+pip install "apache-gravitino[s3]"
+pip install "apache-gravitino[gcs]"
+pip install "apache-gravitino[oss]"
+pip install "apache-gravitino[azure]"
+```
+
+To preserve the previous installation profile that included all GVFS backends, install
+`apache-gravitino[storage]`. Ray Data applications that only use Gravitino for metadata can install
+the base Gravitino client alongside their Ray Data dependencies without installing these storage
+extras.
+
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
+3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+
+### HTTP Error Handling
+
+Valid Gravitino and OAuth2 error responses retain their existing domain exceptions.
+When an HTTP error has an empty, unreadable or invalid error response, the client raises
+`gravitino.exceptions.base.HTTPResponseException`, a subclass of `RESTException`.
+Its `status_code`, `request_method` and `endpoint` attributes describe the HTTP status,
+the original client request method and its origin (scheme, hostname and optional port).
+Applications can catch `RESTException` to include these fallback failures.
+
+Fallback diagnostics omit URL credentials, paths, query parameters, fragments, request data,
+response headers and response bodies. The default traceback suppresses the underlying
+HTTP and decoding exception chain. Existing domain error messages are unchanged.
+This replaces the decoding or validation exceptions previously exposed for invalid HTTP
+error responses, and bypasses custom error handlers for empty or invalid error responses.
+Connection failures and timeouts before an HTTP error response retain their existing behavior.
+The client does not retry requests as part of this error handling.
+
+### Semantic Model Ossie Import and Export
+
+Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.
+The [Semantic Model guide](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+includes Python examples for native creation, list/load, alteration, deletion, and Apache Ossie
+YAML/JSON import and export, along with the source and permission requirements.
+
+The SDK transfers Ossie document text directly and requires no YAML parser. Import and export
+default to `document_format="yaml"`; use `"json"` for JSON documents.
 
 ### Fileset Example
 
@@ -47,7 +97,7 @@ contains the following code snippets:
 
 1. Install HDFS Python client.
 2. Create a HDFS client to connect HDFS and to do some test operations.
-3. Install Gravitino Python client.
+3. Install the Gravitino Python client with HDFS support: `pip install "apache-gravitino[hdfs]"`.
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is

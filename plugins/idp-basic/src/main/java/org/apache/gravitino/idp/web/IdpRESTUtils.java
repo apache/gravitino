@@ -19,6 +19,7 @@
 package org.apache.gravitino.idp.web;
 
 import java.security.PrivilegedExceptionAction;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -30,6 +31,7 @@ import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -81,6 +83,22 @@ public final class IdpRESTUtils {
     return toErrorResponse(errorMsg, e);
   }
 
+  /**
+   * Returns a 400 response when {@code request} is null; otherwise {@code null}.
+   *
+   * @param request the deserialized request body, which may be null
+   * @return a bad-request response if {@code request} is null, otherwise {@code null}
+   */
+  @Nullable
+  public static Response rejectNullRequestBody(Object request) {
+    if (request != null) {
+      return null;
+    }
+    LOG.warn("Received IdP request with null request body");
+    return illegalArguments(
+        "Request body cannot be null", new IllegalArgumentException("Request body cannot be null"));
+  }
+
   public static Response illegalArguments(String message, Throwable throwable) {
     return json(
         Response.Status.BAD_REQUEST,
@@ -105,6 +123,13 @@ public final class IdpRESTUtils {
     return json(Response.Status.FORBIDDEN, ErrorResponse.forbidden(message, throwable));
   }
 
+  public static Response unauthorized(String message, Throwable throwable) {
+    return json(
+        Response.Status.UNAUTHORIZED,
+        ErrorResponse.unauthorized(
+            exceptionType(throwable, "UnauthorizedException"), message, throwable));
+  }
+
   public static Response unsupportedOperation(String message, Throwable throwable) {
     return json(
         Response.Status.NOT_IMPLEMENTED, ErrorResponse.unsupportedOperation(message, throwable));
@@ -122,6 +147,9 @@ public final class IdpRESTUtils {
     }
     if (e instanceof ForbiddenException) {
       return forbidden(errorMsg, e);
+    }
+    if (e instanceof UnauthorizedException) {
+      return unauthorized(errorMsg, e);
     }
     if (e instanceof NotFoundException) {
       return notFound(errorMsg, e);
