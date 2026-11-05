@@ -77,6 +77,10 @@ public class IdpGroupOperations {
   @Timed(name = "add-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-group", absolute = true)
   public Response addGroup(AddGroupRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
@@ -112,6 +116,10 @@ public class IdpGroupOperations {
   @ResponseMetered(name = "change-idp-group-users", absolute = true)
   public Response changeGroupMembership(
       @PathParam("group") String group, GroupMembershipChangeRequest request) {
+    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
+    if (rejection != null) {
+      return rejection;
+    }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {

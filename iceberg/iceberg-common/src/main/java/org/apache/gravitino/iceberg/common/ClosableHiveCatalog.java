@@ -124,6 +124,11 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
           "Kerberos is configured but KerberosClient is not initialized");
     }
 
+    if (!authenticationConfig.isImpersonationEnabled()) {
+      // The login user is shared by all requests, so it must not carry any user's token.
+      return KerberosCatalogUtils.executeAs(kerberosClient.getLoginUser(), executable);
+    }
+
     String finalPrincipalName = KerberosCatalogUtils.resolveProxyPrincipal(kerberosClient);
     UserGroupInformation realUser =
         KerberosCatalogUtils.createRealUser(

@@ -38,19 +38,13 @@ public class TableSnapshotMetricsBaseSQLProvider {
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @param snapshotId Iceberg snapshot id
+   * @param metricsId metrics row id
    * @return SELECT statement
    */
-  public String selectMetrics(
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("snapshotId") long snapshotId) {
-    return "SELECT id, table_id AS tableId, policy_id AS policyId, snapshot_id AS snapshotId,"
-        + " metrics_value AS metricsValue, created_at AS createdAt FROM "
+  public String selectById(@Param("metricsId") long metricsId) {
+    return "SELECT metrics_id AS metricsId, table_id AS tableId, policy_id AS policyId,"
+        + " snapshot_id AS snapshotId, metrics_value AS metricsValue, created_at AS createdAt FROM "
         + TableSnapshotMetricsMapper.TABLE_NAME
-        + " WHERE table_id = #{tableId} AND policy_id = #{policyId} AND snapshot_id ="
-        + " #{snapshotId}";
+        + " WHERE metrics_id = #{metricsId}";
   }
 }

@@ -30,10 +30,13 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -42,7 +45,9 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.aws.AwsClientProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.DateType;
 import org.apache.iceberg.types.Types.DecimalType;
@@ -335,5 +340,55 @@ class TestGlueIcebergTableHelper {
                 IllegalArgumentException.class,
                 () -> GlueIcebergTableHelper.buildIcebergCatalogProperties(config))
             .getMessage());
+  }
+
+  @Test
+  void testBuildIcebergCatalogPropertiesAppliesHttpTimeouts() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS, "2500");
+
+    Map<String, String> icebergProps = GlueIcebergTableHelper.buildIcebergCatalogProperties(config);
+
+    assertEquals("apache", icebergProps.get("http-client.type"));
+    assertEquals("2500", icebergProps.get("http-client.apache.connection-timeout-ms"));
+    assertEquals("2500", icebergProps.get("http-client.apache.socket-timeout-ms"));
+  }
+
+  @Test
+  void testAlterTableKeepsTheCaseOfColumnNames() throws IOException {
+    try (InMemoryCatalog catalog = new InMemoryCatalog()) {
+      catalog.initialize("test", new HashMap<>());
+      catalog.createNamespace(Namespace.of("db"));
+      catalog.createTable(
+          TableIdentifier.of("db", "events"),
+          new Schema(
+              NestedField.optional(1, "UserId", LongType.get()),
+              NestedField.optional(2, "EventTime", TimestampType.withoutZone())));
+
+      GlueIcebergTableHelper.alterTable(
+          catalog,
+          "db",
+          "events",
+          TableChange.deleteColumn(new String[] {"UserId"}, false),
+          TableChange.renameColumn(new String[] {"EventTime"}, "eventAt"),
+          TableChange.addColumn(new String[] {"newCol"}, Types.StringType.get()));
+
+      Schema schema = catalog.loadTable(TableIdentifier.of("db", "events")).schema();
+      assertEquals(
+          List.of("eventAt", "newCol"),
+          schema.columns().stream().map(NestedField::name).collect(Collectors.toList()));
+
+      // Column names match exactly, so a name in another case is not found.
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              GlueIcebergTableHelper.alterTable(
+                  catalog,
+                  "db",
+                  "events",
+                  TableChange.deleteColumn(new String[] {"eventat"}, false)));
+    }
   }
 }

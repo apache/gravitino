@@ -65,7 +65,7 @@ it, and closes it. If it fails, the create is rejected and rolled back (the cata
 persisted), and the caller receives a connection error that names the backend `host:port` and the
 underlying driver message.
 
-To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
+To register a catalog whose backend is temporarily unavailable, set the catalog property
 `verify-on-create` to `false`, which skips the create-time check:
 
 ```json
@@ -73,6 +73,11 @@ To register a catalog whose backend is temporarily unavailable, set the hidden c
   "verify-on-create": "false"
 }
 ```
+
+This setting skips only the backend connection probe. Driver/URL compatibility, boolean values,
+and pool bounds are still checked on catalog creation and alteration, without opening a database
+connection. Invalid alterations leave the stored configuration unchanged.
+
 
 The default is `true` (verify on create). The connection is still opened lazily on first use when
 the check is skipped.
@@ -105,3 +110,34 @@ A timeout value you set directly on the connection or in the `jdbc-url` query st
 overridden; drivers whose family is not recognized are left unbounded by Gravitino. The pooled
 timeout is applied as a per-connection bound, so the pool stays lazy and no connection is opened
 until the first real round trip.
+
+## Driver adapter for physical connection deadlines
+
+Connector implementations can opt into `org.apache.gravitino.utils.BoundedConnectionDriver`
+when their JDBC driver does not enforce a login timeout. Wrap the driver with a positive
+timeout in milliseconds and pass the wrapper to the connection pool as its driver. No
+existing connector is automatically switched to this adapter by this addition.
+
+Only `Driver.connect` runs on a worker. Metadata, validation and SQL remain on the caller;
+this does not introduce delayed DDL or an automatic retry. A connection returned after
+timeout/interruption is closed by the worker and never handed to the caller or pool.
+While an abandoned attempt is still connecting or closing, new attempts through that wrapper
+fail immediately. Pool waits, connection validation, SQL and total request duration retain
+their own budgets.
+
+The core-loaded adapter shares at most 64 daemon workers per server JVM, with no queue.
+Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
+healthy connects. Cancellation is best effort: an uninterruptible driver or close can retain
+a worker and its driver resources until it returns or the server restarts. Completed workers
+restore their context class loader. The adapter does not bound arbitrary driver constructor
+work or clean up driver-owned global threads.
+
+Each attempt and its late connection cleanup use the submitting caller's access-control
+context and JAAS subject. Shared workers are created without inheriting the first caller's
+subject, so reusing a worker does not reuse that caller's JAAS subject.
+
+This guarantee covers access-control contexts and JAAS subjects, not arbitrary `ThreadLocal`
+or `InheritableThreadLocal` state. Drivers using the shared workers must clean up their own
+thread-local state and must not depend on inherited thread locals for caller authentication.
+Drivers that cannot meet these requirements must not opt into this adapter. Isolating workers
+by catalog alone would not isolate different users of the same catalog.

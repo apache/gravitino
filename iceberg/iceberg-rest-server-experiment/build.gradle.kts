@@ -51,6 +51,7 @@ configurations.configureEach {
 }
 
 dependencies {
+  compileOnly(libs.jsr305)
   implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")
@@ -66,6 +67,7 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testCompileOnly(libs.jsr305)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

@@ -78,10 +78,7 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.MetricsReport;
-import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
@@ -187,6 +184,7 @@ public class IcebergTableOperations {
           String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -229,6 +227,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
       UpdateTableRequest updateTableRequest) {
+    IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -430,6 +429,7 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
+    IcebergRESTUtils.validateRequest(request, "ReportMetricsRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -446,26 +446,8 @@ public class IcebergTableOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
-            if (!tableOperationDispatcher.tableExists(context, tableIdentifier)) {
-              throw new NoSuchTableException("Table %s not found", tableIdentifier);
-            }
             MetricsReport report = request.report();
-            String reportedTableName;
-            if (report instanceof CommitReport) {
-              reportedTableName = ((CommitReport) report).tableName();
-            } else if (report instanceof ScanReport) {
-              reportedTableName = ((ScanReport) report).tableName();
-            } else {
-              throw new IllegalArgumentException("Unsupported metrics report type");
-            }
-            String qualifiedTableName = tableIdentifier.toString();
-            if (reportedTableName == null
-                || (!tableName.equals(reportedTableName)
-                    && !qualifiedTableName.equals(reportedTableName)
-                    && !reportedTableName.endsWith("." + qualifiedTableName))) {
-              throw new IllegalArgumentException(
-                  "Metrics report table name does not match the requested table");
-            }
+            tableOperationDispatcher.checkTableMetricsReport(context, tableIdentifier, report);
             boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();
@@ -562,6 +544,7 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       PlanTableScanRequest scanRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(scanRequest, "PlanTableScanRequest");
     if (scanRequest == null) {
       return missingRequestBody("plan table scan");
     }
@@ -627,6 +610,7 @@ public class IcebergTableOperations {
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       FetchScanTasksRequest request) {
+    IcebergRESTUtils.validateRequest(request, "FetchScanTasksRequest");
     if (request == null) {
       return missingRequestBody("fetch scan tasks");
     }
@@ -754,25 +738,21 @@ public class IcebergTableOperations {
    * requesting credential vending. Package-private and static so that {@link
    * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
    * package.
+   *
+   * <p>The header is a comma-separated list of the mechanisms the client supports, and the server
+   * may serve the request with any or none of them, so mechanisms this server does not offer (such
+   * as remote-signing) are ignored.
    */
   static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
+    for (String mechanism : accessDelegation.split(",")) {
+      if ("vended-credentials".equalsIgnoreCase(mechanism.trim())) {
+        return true;
+      }
     }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
-    }
+    return false;
   }
 
   private NameIdentifier[] toNameIdentifiers(

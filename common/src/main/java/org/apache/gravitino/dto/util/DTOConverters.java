@@ -298,8 +298,14 @@ public class DTOConverters {
     return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
+        // Connector results are snapshotted through here before the table dispatcher rejects a
+        // missing column list with a clear error, so a null list must not throw here.
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            table.columns() == null
+                ? null
+                : Arrays.stream(table.columns())
+                    .map(DTOConverters::toDTO)
+                    .toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(toDTOs(table.sortOrder()))
         .withDistribution(toDTO(table.distribution()))

@@ -26,16 +26,18 @@ import java.util.Map;
 import java.util.Optional;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
@@ -92,7 +94,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         String value = String.valueOf(args[i]);
         switch (type) {
           case CATALOG:
-            catalog = IcebergRESTUtils.getCatalogName(value);
+            // A path prefix ends with '/'; the config endpoint's warehouse is a plain catalog name.
+            catalog =
+                StringUtils.isBlank(value) || value.endsWith("/")
+                    ? IcebergRESTUtils.getCatalogName(value)
+                    : value;
             nameIdentifierMap.put(
                 Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
             break;
@@ -100,6 +106,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             rawNamespace =
                 RESTUtil.decodeNamespace(
                     value, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+            IcebergRESTUtils.checkNamespaceLevels(rawNamespace);
             schema = String.join(separator, rawNamespace.levels());
             nameIdentifierMap.put(
                 Entity.EntityType.SCHEMA,
@@ -143,7 +150,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
@@ -162,12 +172,19 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case REGISTER_TABLE:
+            return Optional.of(new RegisterTableAuthzHandler(parameters, args, nameIdentifierMap));
           default:
             break;
         }
       }
     }
     return Optional.empty();
+  }
+
+  @Override
+  protected Optional<EventSource> authorizationDenialEventSource() {
+    return Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
   }
 
   @Override
@@ -197,15 +214,19 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
 
-    IcebergCatalogWrapper catalogWrapper;
+    CatalogWrapperForREST catalogWrapper;
     try {
       catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
-    } catch (NoSuchCatalogException e) {
+    } catch (NoSuchCatalogException | IllegalArgumentException e) {
+      // A missing catalog, or a catalog that is not an Iceberg catalog, is not a REST backend:
+      // authorize the request normally. A caller without access gets 403 whatever the name
+      // refers to, and an authorized caller gets the operation's own error.
       return false;
     }
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
-    // authorization. IRC2 handles authorization.
-    return catalogWrapper.isRESTCatalog();
+    // authorization. IRC2 handles authorization. A REST backend connected as a service account is
+    // never skipped: the remote catalog sees only the service account, so IRC1 must authorize.
+    return catalogWrapper.forwardsUserToken();
   }
 
   /** Metrics are stored locally, so a downstream REST catalog cannot authorize the report. */

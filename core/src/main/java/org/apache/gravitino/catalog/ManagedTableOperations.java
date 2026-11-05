@@ -304,6 +304,12 @@ public abstract class ManagedTableOperations implements TableCatalog {
             .collect(Collectors.toList());
 
     for (TableChange.ColumnChange change : columnChanges) {
+      // Columns are stored by their top-level name only. A nested field name would otherwise be
+      // joined into a new top-level column such as "a.b", or not found at all.
+      Preconditions.checkArgument(
+          change.fieldName().length == 1,
+          "Managed tables only support changes to top-level columns: %s",
+          DOT.join(change.fieldName()));
       if (change instanceof TableChange.AddColumn addColumn) {
         String columnName = DOT.join(addColumn.getFieldName());
         boolean exists = newColumns.stream().anyMatch(col -> col.name().equals(columnName));

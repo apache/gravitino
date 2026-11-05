@@ -87,7 +87,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         Policy.BuiltInType.ROW_FILTER.policyType(),
         null,
         true,
-        PolicyContents.rowFilter("filter := col(\"col_1\") == 1"));
+        PolicyContents.rowFilter("(col_1 INTEGER) RETURNS BOOLEAN -> col_1 = 1"));
     metalakeClientWithAllPrivilege.addPolicyForTag(rowFilterTag, rowFilterPolicy);
 
     String columnMaskTag = "column_mask_tag_" + suffix;
@@ -98,7 +98,7 @@ public class IcebergReadRestrictionIT extends IcebergAuthorizationIT {
         Policy.BuiltInType.COLUMN_MASK.policyType(),
         null,
         true,
-        PolicyContents.columnMask("mask := action(\"replace-with-null\")"));
+        PolicyContents.columnMask("(value INTEGER) RETURNS INTEGER -> replace_with_null(value)"));
     metalakeClientWithAllPrivilege.addPolicyForTag(columnMaskTag, columnMaskPolicy);
 
     Table gravitinoTable =
