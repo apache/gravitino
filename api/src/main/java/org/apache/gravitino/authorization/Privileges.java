@@ -1445,10 +1445,11 @@ public class Privileges {
    * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecrets},
    * cloud access-key pairs are omitted from the result.
    *
-   * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
-   * recover cloud access keys via {@code getCredentials} (which requires no privilege). Callers
-   * that are not the metalake owner and lack this privilege receive an empty {@code getSecrets}
-   * result rather than a forbidden error, once they can already access the metadata object.
+   * <p>Catalog {@code getCredentials} requires both this privilege and {@link
+   * IncludeCredentialSecrets}, or metalake ownership, in addition to metadata access. Fileset
+   * credential authorization is path-based. Callers that are not the metalake owner and lack this
+   * privilege receive an empty {@code getSecrets} result rather than a forbidden error, once they
+   * can already access the metadata object.
    */
   public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
 
@@ -1483,7 +1484,8 @@ public class Privileges {
 
   /**
    * When held together with {@link UseSecrets}, includes cloud access-key pairs and other
-   * credential secrets in the {@code getSecrets} result.
+   * credential secrets in the {@code getSecrets} result. Both privileges are also required for
+   * catalog {@code getCredentials}, unless the caller is the metalake owner.
    *
    * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
    * and holders of both privileges receive the full secrets map; holders of only {@link UseSecrets}

@@ -53,8 +53,7 @@ public final class GlueConstants {
 
   /**
    * Upper bound in milliseconds for one Glue API call made by the catalog, including all retries
-   * (optional). The AWS clients used for Iceberg tables only take the attempt timeout. Defaults to
-   * {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
+   * (optional). Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_TIMEOUT_MS = "aws-glue-api-call-timeout-ms";
 
@@ -63,8 +62,8 @@ public final class GlueConstants {
 
   /**
    * Upper bound in milliseconds for a single attempt of a Glue API call (optional). Also used as
-   * the HTTP connection and socket timeout of the AWS clients (Glue and S3) used for Iceberg
-   * tables. Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
+   * the HTTP connection and socket timeout of the S3 client used for Iceberg tables. Defaults to
+   * {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
    */
   public static final String AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS =
       "aws-glue-api-call-attempt-timeout-ms";
@@ -74,8 +73,8 @@ public final class GlueConstants {
 
   /**
    * Maximum number of attempts of a Glue API call made by the catalog, including the first one
-   * (optional). Retries apply to throttling and transient failures. The AWS clients used for
-   * Iceberg tables keep the AWS SDK default. Defaults to {@link #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
+   * (optional). Retries apply to throttling and transient failures. Defaults to {@link
+   * #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
    */
   public static final String AWS_GLUE_MAX_ATTEMPTS = "aws-glue-max-attempts";
 
@@ -114,14 +113,17 @@ public final class GlueConstants {
   // -------------------------------------------------------------------------
 
   /**
-   * Glue table format parameter key stored in {@code Table.parameters()}. Common values: {@code
-   * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
-   * internally to determine the table format when reading Glue tables.
+   * Table property that chooses the format of a table at create: {@code HIVE} or {@code ICEBERG}.
+   * It is not stored; a loaded table reports it from its {@link #TABLE_TYPE_PARAM} parameter, and
+   * it cannot be changed.
    */
   public static final String TABLE_FORMAT = "table-format";
 
-  /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
+  /** Value of {@link #TABLE_FORMAT} for an Iceberg table. */
   public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
+
+  /** Value of {@link #TABLE_FORMAT} for a Hive-format table. */
+  public static final String TABLE_FORMAT_HIVE = "HIVE";
 
   /**
    * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
@@ -131,6 +133,13 @@ public final class GlueConstants {
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
+
+  /**
+   * Key of the {@code Table.parameters()} entry, set to {@code true}, that marks an Iceberg table
+   * registered through Gravitino from an existing metadata file. Such a table shares its files with
+   * the table it was registered from, so Gravitino changes only its Glue parameters.
+   */
+  public static final String REGISTERED_ICEBERG_TABLE_PARAM = "gravitino.iceberg.registered";
 
   /**
    * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table

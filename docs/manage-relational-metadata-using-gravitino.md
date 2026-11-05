@@ -116,6 +116,17 @@ order, and indexes](./table-partitioning-distribution-sort-order-indexes.md).
 
 ### Load a Table
 
+If table creation reports that the source table was created but Gravitino registration failed,
+resolve the entity-store error and verify the source table's identity, then use `loadTable` (or
+the load-table REST API below) to import it. Repeating `createTable` returns an already-exists
+error; Gravitino does not automatically replay the DDL. Resolve any conflicting registration
+before importing the table.
+
+A cold table load reports `NoSuchSchemaException` when its containing schema is missing. A
+missing table in an existing schema reports `NoSuchTableException`. The Java `tableExists` and
+Python `table_exists` helpers return false for either missing-object signal and propagate other
+failures.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
