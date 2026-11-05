@@ -123,6 +123,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
      *     standard expression-based authorization
      */
     boolean authorizationCompleted();
+
+    /**
+     * Entity type used to attribute denials and audit events for this handler. Called before {@link
+     * #process}.
+     *
+     * @return the access entity type this handler authorizes against
+     */
+    Entity.EntityType entityType();
   }
 
   /** Invokes the protocol operation after authorization succeeds. */
@@ -171,11 +179,16 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    * @param method REST method being invoked
    * @param parameters Method parameters
    * @param args Method arguments
+   * @param nameIdentifierMap identifiers resolved for this request; handlers may add to it before
+   *     {@link AuthorizationHandler#process} for denial attribution
    * @return Optional handler for custom authorization processing, or empty if standard
    *     authorization is sufficient
    */
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     return Optional.empty();
   }
 
@@ -328,11 +341,11 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
           }
         }
 
-        if (nameIdentifierMap.get(target.entityType()) != null) {
-          deniedObject = nameIdentifierMap.get(target.entityType());
-        }
         Optional<AuthorizationHandler> handler =
-            createAuthorizationHandler(method, parameters, args);
+            createAuthorizationHandler(method, parameters, args, nameIdentifierMap);
+        Entity.EntityType entityType =
+            handler.isPresent() ? handler.get().entityType() : target.entityType();
+        deniedObject = nameIdentifierMap.get(entityType);
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();

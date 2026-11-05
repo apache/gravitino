@@ -814,6 +814,17 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(tableId));
     Assertions.assertTrue(ex.getMessage().contains("table not found"));
+    buildMockResource(Method.GET, tablePath, null, errorResp, SC_NOT_FOUND);
+    Assertions.assertFalse(tableCatalog.tableExists(tableId));
+
+    ErrorResponse missingSchema =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(Method.GET, tablePath, null, missingSchema, SC_NOT_FOUND);
+    NoSuchSchemaException schemaError =
+        Assertions.assertThrows(NoSuchSchemaException.class, () -> tableCatalog.loadTable(tableId));
+    Assertions.assertTrue(schemaError.getMessage().contains("schema not found"));
+    buildMockResource(Method.GET, tablePath, null, missingSchema, SC_NOT_FOUND);
+    Assertions.assertFalse(tableCatalog.tableExists(tableId));
   }
 
   @Test

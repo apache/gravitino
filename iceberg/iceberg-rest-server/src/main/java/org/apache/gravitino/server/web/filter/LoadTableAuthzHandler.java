@@ -110,6 +110,11 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     return true;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.TABLE;
+  }
+
   /**
    * Perform TABLE-level authorization aligned with {@link
    * org.apache.gravitino.iceberg.service.rest.IcebergTableOperations#loadTable}: evaluate the

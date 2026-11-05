@@ -117,6 +117,11 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
     return crossNamespaceRename;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.TABLE;
+  }
+
   /**
    * Validates authorization for cross-namespace renames following MySQL privilege model: - Requires
    * ownership on source table (equivalent to DROP privilege) - Requires CREATE_TABLE privilege on
