@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -694,7 +695,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
-  private void validateNamespaceProperties(Map<String, String> properties) {
+  @VisibleForTesting
+  void validateNamespaceProperties(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
     if (getCatalog() instanceof JdbcCatalog) {
       properties.forEach(
           (key, value) ->

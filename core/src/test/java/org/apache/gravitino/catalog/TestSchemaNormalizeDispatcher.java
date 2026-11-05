@@ -62,6 +62,11 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
         schemaNormalizeDispatcher.createSchema(
             ident, comment, ImmutableMap.of("k1", "v1", "k2", "v2"));
     Assertions.assertEquals(comment, schema.comment());
+    Schema altered =
+        schemaNormalizeDispatcher.alterSchema(ident, SchemaChange.setProperty("k1", "updated"));
+    Assertions.assertEquals("updated", altered.properties().get("k1"));
+    Assertions.assertEquals(comment, altered.comment());
+    Assertions.assertEquals(comment, schemaNormalizeDispatcher.loadSchema(ident).comment());
     Assertions.assertTrue(schemaNormalizeDispatcher.dropSchema(ident, false));
   }
 

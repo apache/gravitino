@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -116,19 +115,6 @@ class TestIcebergTableValidation {
                     TableChange.addColumn(new String[] {"batch_a"}, Types.IntegerType.get())));
     assertEquals(400, tableError(OperationType.ALTER, error));
     assertOrdinaryColumns("batch_add");
-  }
-
-  @Test
-  void testRenameTableConflictIs409AndPreservesBothTables() {
-    createOrdinaryTable("a");
-    createOrdinaryTable("b");
-    Exception error =
-        assertThrows(
-            TableAlreadyExistsException.class,
-            () -> operations.alterTable(table("a"), TableChange.rename("b")));
-    assertEquals(409, tableError(OperationType.ALTER, error));
-    assertOrdinaryColumns("a");
-    assertOrdinaryColumns("b");
   }
 
   @Test

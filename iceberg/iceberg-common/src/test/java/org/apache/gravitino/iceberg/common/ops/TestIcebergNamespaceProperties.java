@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTSerializers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.junit.jupiter.api.Assertions;
@@ -33,7 +37,49 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class TestIcebergNamespaceProperties {
 
+  private static final ObjectMapper MAPPER = createObjectMapper();
+
   @TempDir Path warehouse;
+
+  @Test
+  void testNullNamespacePropertiesRequireNoValidation() throws Exception {
+    try (IcebergCatalogWrapper wrapper = jdbcWrapper()) {
+      Assertions.assertDoesNotThrow(() -> wrapper.validateNamespaceProperties(null));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", ",\"properties\":null"})
+  void testCreateNamespaceWithoutProperties(String propertiesJson) throws Exception {
+    try (IcebergCatalogWrapper wrapper = jdbcWrapper()) {
+      CreateNamespaceRequest request =
+          MAPPER.readValue(
+              "{\"namespace\":[\"empty\"]" + propertiesJson + "}", CreateNamespaceRequest.class);
+      wrapper.createNamespace(request);
+      Assertions.assertTrue(wrapper.namespaceExists(request.namespace()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", ",\"updates\":null"})
+  void testRemovalOnlyUpdateWithoutProperties(String updatesJson) throws Exception {
+    try (IcebergCatalogWrapper wrapper = jdbcWrapper()) {
+      Namespace namespace = Namespace.of("removals");
+      wrapper.createNamespace(
+          CreateNamespaceRequest.builder()
+              .withNamespace(namespace)
+              .setProperties(ImmutableMap.of("remove", "value", "keep", "original"))
+              .build());
+      UpdateNamespacePropertiesRequest request =
+          MAPPER.readValue(
+              "{\"removals\":[\"remove\"]" + updatesJson + "}",
+              UpdateNamespacePropertiesRequest.class);
+      wrapper.updateNamespaceProperties(namespace, request);
+      Map<String, String> properties = wrapper.loadNamespace(namespace).properties();
+      Assertions.assertFalse(properties.containsKey("remove"));
+      Assertions.assertEquals("original", properties.get("keep"));
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"x", "\uD83D\uDE80"})
@@ -111,6 +157,13 @@ class TestIcebergNamespaceProperties {
       Assertions.assertEquals(
           2000, wrapper.loadNamespace(namespace).properties().get("big").length());
     }
+  }
+
+  private static ObjectMapper createObjectMapper() {
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+    RESTSerializers.registerAll(mapper);
+    return mapper;
   }
 
   private IcebergCatalogWrapper jdbcWrapper() {

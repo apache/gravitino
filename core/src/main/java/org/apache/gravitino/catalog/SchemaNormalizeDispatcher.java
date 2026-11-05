@@ -105,6 +105,8 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    // SchemaChange supports property and secret changes only; schema comments cannot be updated.
+    // Comment length is therefore validated on createSchema, the only API that accepts a comment.
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     return dispatcher.alterSchema(normalizeCaseSensitive(ident), changes);
