@@ -67,6 +67,9 @@ public class ConvertUtil {
   /**
    * Convert the nested field of Iceberg to the Iceberg column.
    *
+   * <p>For format-version 3 fields, Iceberg {@code write-default} (falling back to {@code
+   * initial-default}) is mapped to {@link Column#defaultValue()}.
+   *
    * @param nestedField Iceberg nested field.
    * @return Gravitino Iceberg column
    */
@@ -76,6 +79,7 @@ public class ConvertUtil {
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
         .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
+        .withDefaultValue(FromIcebergColumnDefault.fromNestedField(nestedField))
         .build();
   }
 

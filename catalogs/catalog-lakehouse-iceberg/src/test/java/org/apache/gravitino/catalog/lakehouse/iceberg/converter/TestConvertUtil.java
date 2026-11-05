@@ -32,10 +32,12 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.types.Types.ByteType;
 import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -660,6 +662,50 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.MapType);
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, icebergColumn.defaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldMapsWriteDefault() {
+    Types.NestedField region =
+        Types.NestedField.builder()
+            .withId(2)
+            .withName("region")
+            .asRequired()
+            .ofType(Types.StringType.get())
+            .withInitialDefault(Literal.of("US"))
+            .withWriteDefault(Literal.of("EU"))
+            .build();
+    Types.NestedField n =
+        Types.NestedField.builder()
+            .withId(3)
+            .withName("n")
+            .asRequired()
+            .ofType(Types.IntegerType.get())
+            .withInitialDefault(Literal.of(7))
+            .withWriteDefault(Literal.of(8))
+            .build();
+
+    IcebergColumn regionColumn = ConvertUtil.fromNestedField(region);
+    Assertions.assertEquals(Literals.stringLiteral("EU"), regionColumn.defaultValue());
+
+    IcebergColumn nColumn = ConvertUtil.fromNestedField(n);
+    Assertions.assertEquals(Literals.integerLiteral(8), nColumn.defaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldFallsBackToInitialDefault() {
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("region")
+            .asRequired()
+            .ofType(Types.StringType.get())
+            .withInitialDefault(Literal.of("US"))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertEquals(Literals.stringLiteral("US"), column.defaultValue());
   }
 
   private static void checkType(Type type, org.apache.gravitino.rel.types.Type expected) {
