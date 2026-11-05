@@ -25,16 +25,42 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
 
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+
+  /**
+   * Renders defaults using numeric literals for MySQL BOOLEAN columns, which are stored as BIT.
+   *
+   * @param defaultValue the Gravitino default expression
+   * @return the SQL expression, or null when no default is set
+   * @throws IllegalArgumentException if a boolean default is not true, false, 1 or 0
+   */
+  @Override
+  @Nullable
+  public String fromGravitino(Expression defaultValue) {
+    if (defaultValue instanceof Literal
+        && ((Literal<?>) defaultValue).dataType() instanceof Types.BooleanType) {
+      String value = String.valueOf(((Literal<?>) defaultValue).value()).trim();
+      if ("true".equalsIgnoreCase(value) || "1".equals(value)) {
+        return "1";
+      }
+      if ("false".equalsIgnoreCase(value) || "0".equals(value)) {
+        return "0";
+      }
+      throw new IllegalArgumentException("Invalid boolean column default; use true, false, 1 or 0");
+    }
+    return super.fromGravitino(defaultValue);
+  }
 
   @Override
   public Expression toGravitino(
@@ -60,6 +86,16 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     }
 
     switch (type.getTypeName().toLowerCase()) {
+      case MysqlTypeConverter.BIT:
+        if (type.getColumnSize() == null || type.getColumnSize() == 1) {
+          if ("b'1'".equalsIgnoreCase(columnDefaultValue) || "1".equals(columnDefaultValue)) {
+            return Literals.booleanLiteral(true);
+          }
+          if ("b'0'".equalsIgnoreCase(columnDefaultValue) || "0".equals(columnDefaultValue)) {
+            return Literals.booleanLiteral(false);
+          }
+        }
+        return UnparsedExpression.of(columnDefaultValue);
       case MysqlTypeConverter.TINYINT:
         return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
       case MysqlTypeConverter.TINYINT_UNSIGNED:

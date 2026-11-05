@@ -26,7 +26,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -537,6 +541,50 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(
         Literals.varcharLiteral(255, "current_timestamp"),
         createdTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testBooleanDefaultValues() throws SQLException {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("bool_defaults"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            new Column[] {
+              Column.of(
+                  "enabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("true", Types.BooleanType.get())),
+              Column.of(
+                  "disabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("false", Types.BooleanType.get()))
+            },
+            null,
+            ImmutableMap.of());
+    Table created = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(true), created.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(false), created.columns()[1].defaultValue());
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            ident,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"enabled"}, Literals.of("0", Types.BooleanType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {"disabled"}, Literals.of("1", Types.BooleanType.get())));
+    Table altered = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(false), altered.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(true), altered.columns()[1].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
   }
 
   @Test
@@ -2585,6 +2633,26 @@ public class CatalogMysqlIT extends BaseIT {
           "loadTable must succeed for table that appeared in listTables");
     } finally {
       mysqlService.executeQuery("DROP DATABASE IF EXISTS `" + dottedSchemaName + "`");
+    }
+  }
+
+  private void assertBooleanDefaultInsert(NameIdentifier ident, boolean enabled, boolean disabled)
+      throws SQLException {
+    String qualified = "`" + schemaName + "`.`" + ident.name() + "`";
+    try (Connection connection =
+            DriverManager.getConnection(
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                MYSQL_CONTAINER.getUsername(),
+                MYSQL_CONTAINER.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM " + qualified);
+      statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+      try (ResultSet rows = statement.executeQuery("SELECT enabled, disabled FROM " + qualified)) {
+        Assertions.assertTrue(rows.next());
+        Assertions.assertEquals(enabled, rows.getBoolean("enabled"));
+        Assertions.assertEquals(disabled, rows.getBoolean("disabled"));
+        Assertions.assertFalse(rows.next());
+      }
     }
   }
 }
