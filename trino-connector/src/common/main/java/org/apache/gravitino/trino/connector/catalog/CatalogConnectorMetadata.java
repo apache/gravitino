@@ -312,8 +312,11 @@ public class CatalogConnectorMetadata {
     try {
       success = schemaCatalog.dropSchema(schemaName, cascade);
     } catch (NonEmptySchemaException e) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, "Schema does not empty", e);
+      // Keep the server's reason (for example a blocking dependency on a cascade drop) instead of a
+      // fixed text, so the user sees why the drop was refused.
+      String reason =
+          Strings.isNullOrEmpty(e.getMessage()) ? "Schema is not empty" : e.getMessage();
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, reason, e);
     } catch (RuntimeException e) {
       throw GravitinoErrorCode.toTrinoException(e);
     }

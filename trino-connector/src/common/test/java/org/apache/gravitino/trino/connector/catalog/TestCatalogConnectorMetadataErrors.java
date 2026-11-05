@@ -23,6 +23,7 @@ import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
@@ -209,6 +211,30 @@ public class TestCatalogConnectorMetadataErrors {
         assertThrows(
             TrinoException.class, () -> metadata.createSchema(mock(GravitinoSchema.class)));
     assertEquals(GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), e.getErrorCode());
+  }
+
+  @Test
+  public void testDropNonEmptySchemaKeepsServerReason() {
+    String reason = "Table db.orders depends on a table in this schema";
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.dropSchema(anyString(), anyBoolean()))
+        .thenThrow(new NonEmptySchemaException(reason));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.dropSchema("s", true));
+    assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+    assertEquals(reason, e.getMessage());
+  }
+
+  @Test
+  public void testDropNonEmptySchemaWithoutReasonFallsBack() {
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    when(schemas.dropSchema(anyString(), anyBoolean())).thenThrow(new NonEmptySchemaException(""));
+    CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
+
+    TrinoException e = assertThrows(TrinoException.class, () -> metadata.dropSchema("s", false));
+    assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+    assertEquals("Schema is not empty", e.getMessage());
   }
 
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {
