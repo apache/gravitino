@@ -633,7 +633,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (isCollatableTextType(newType)) {
       String collation = explicitColumnCollation(schemaName, jdbcTable.name(), col);
       if (collation != null) {
-        sqlBuilder.append(" COLLATE ").append(quotedIdentifier(collation));
+        sqlBuilder.append(" COLLATE ").append(collation);
       }
     }
     if (!column.nullable()) {
@@ -653,9 +653,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   }
 
   /**
-   * Returns the explicit collation of a column, or null when the column uses the type's default
-   * collation. {@code information_schema.columns.collation_name} reports null for the default, so a
-   * non-null value is always an explicit collation worth preserving across a type change.
+   * Returns the explicit collation of a column as a schema-qualified, quoted identifier (for
+   * example {@code "pg_catalog"."C"}), or null when the column uses the type's default collation.
+   *
+   * <p>A collation is a schema object, so both its schema and name are read and quoted separately.
+   * An unqualified name would fail when the collation's schema is not on the connection's search
+   * path, and would silently rebind the column to a same-named collation in another schema. {@code
+   * information_schema.columns.collation_name} is null for the type default, so a non-null value is
+   * always an explicit collation worth preserving across a type change.
    */
   @Nullable
   private String explicitColumnCollation(String schemaName, String tableName, String columnName) {
@@ -665,7 +670,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       return null;
     }
     String sql =
-        "SELECT collation_name FROM information_schema.columns "
+        "SELECT collation_schema, collation_name FROM information_schema.columns "
             + "WHERE table_schema = ? AND table_name = ? AND column_name = ?";
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -673,10 +678,19 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       statement.setString(2, tableName);
       statement.setString(3, columnName);
       try (ResultSet rows = statement.executeQuery()) {
-        if (rows.next()) {
-          return rows.getString("collation_name");
+        if (!rows.next()) {
+          return null;
         }
-        return null;
+        String collationName = rows.getString("collation_name");
+        if (collationName == null) {
+          return null;
+        }
+        String collationSchema = rows.getString("collation_schema");
+        // collation_schema is non-null whenever collation_name is, but quote defensively and fall
+        // back to the bare name if it is ever absent.
+        return collationSchema == null
+            ? quotedIdentifier(collationName)
+            : quotedIdentifier(collationSchema) + "." + quotedIdentifier(collationName);
       }
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);

@@ -173,14 +173,16 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
               + table
               + "(name varchar(10) COLLATE \"C\" NOT NULL)");
       try {
-        Assertions.assertEquals("C", readCollation(connection, table, "name"));
+        Assertions.assertArrayEquals(
+            new String[] {"pg_catalog", "C"}, readCollation(connection, table, "name"));
 
         // Widen the type; the explicit "C" collation must survive the change.
         TABLE_OPERATIONS.alterTable(
             TEST_DB_NAME,
             table,
             TableChange.updateColumnType(new String[] {"name"}, Types.VarCharType.of(50)));
-        Assertions.assertEquals("C", readCollation(connection, table, "name"));
+        Assertions.assertArrayEquals(
+            new String[] {"pg_catalog", "C"}, readCollation(connection, table, "name"));
       } finally {
         TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
       }
@@ -208,18 +210,103 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     }
   }
 
-  private static String readCollation(Connection connection, String table, String column)
+  @Test
+  void testUpdateColumnTypeKeepsCollationFromAnotherSchema() throws SQLException {
+    String collationSchema = RandomNameUtils.genRandomName("coll_schema");
+    String table = RandomNameUtils.genRandomName("cross_schema_collation");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      // A collation that lives outside the table's schema, so it is not on the search path when the
+      // column type is altered. An unqualified COLLATE would fail to resolve it.
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA \"" + collationSchema + "\"");
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE COLLATION \"" + collationSchema + "\".c_copy FROM \"C\"");
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + table
+              + "(name varchar(10) COLLATE \""
+              + collationSchema
+              + "\".c_copy NOT NULL)");
+      try {
+        Assertions.assertArrayEquals(
+            new String[] {collationSchema, "c_copy"}, readCollation(connection, table, "name"));
+
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.updateColumnType(new String[] {"name"}, Types.VarCharType.of(50)));
+
+        Assertions.assertArrayEquals(
+            new String[] {collationSchema, "c_copy"}, readCollation(connection, table, "name"));
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA \"" + collationSchema + "\" CASCADE");
+      }
+    }
+  }
+
+  @Test
+  void testUpdateColumnTypeKeepsCollationIdentityOnNameClash() throws SQLException {
+    String collationSchema = RandomNameUtils.genRandomName("coll_schema");
+    String table = RandomNameUtils.genRandomName("clash_collation");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      // Two collations share the simple name "und_ci": one in another schema (used by the column)
+      // and one in the table's schema. An unqualified COLLATE would silently rebind the column to
+      // the table-schema collation, changing the collation identity without any error.
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA \"" + collationSchema + "\"");
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE COLLATION \"" + collationSchema + "\".clash FROM \"C\"");
+      JdbcConnectorUtils.executeUpdate(
+          connection, "CREATE COLLATION " + TEST_DB_NAME + ".clash FROM \"POSIX\"");
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + table
+              + "(name varchar(10) COLLATE \""
+              + collationSchema
+              + "\".clash NOT NULL)");
+      try {
+        Assertions.assertArrayEquals(
+            new String[] {collationSchema, "clash"}, readCollation(connection, table, "name"));
+
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            table,
+            TableChange.updateColumnType(new String[] {"name"}, Types.VarCharType.of(50)));
+
+        // The collation schema must still be the original one, not the table's schema.
+        Assertions.assertArrayEquals(
+            new String[] {collationSchema, "clash"}, readCollation(connection, table, "name"));
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+        JdbcConnectorUtils.executeUpdate(connection, "DROP COLLATION " + TEST_DB_NAME + ".clash");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA \"" + collationSchema + "\" CASCADE");
+      }
+    }
+  }
+
+  private static String[] readCollation(Connection connection, String table, String column)
       throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
-            "SELECT collation_name FROM information_schema.columns "
+            "SELECT collation_schema, collation_name FROM information_schema.columns "
                 + "WHERE table_schema = ? AND table_name = ? AND column_name = ?")) {
       statement.setString(1, TEST_DB_NAME);
       statement.setString(2, table);
       statement.setString(3, column);
       try (ResultSet rows = statement.executeQuery()) {
         Assertions.assertTrue(rows.next());
-        return rows.getString("collation_name");
+        String name = rows.getString("collation_name");
+        if (name == null) {
+          return null;
+        }
+        return new String[] {rows.getString("collation_schema"), name};
       }
     }
   }
