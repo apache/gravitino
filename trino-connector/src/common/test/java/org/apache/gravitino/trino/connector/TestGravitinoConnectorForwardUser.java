@@ -438,9 +438,12 @@ class TestGravitinoConnectorForwardUser {
       CatalogConnectorContext ctx =
           mockContextWithConfig(
               ImmutableMap.of(
-                  GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
-                  GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
-                  key, "0"));
+                  GravitinoAuthProvider.FORWARD_SESSION_USER_KEY,
+                  "true",
+                  GravitinoAuthProvider.AUTH_TYPE_KEY,
+                  "simple",
+                  key,
+                  "0"));
 
       TrinoException ex = assertThrows(TrinoException.class, () -> new GravitinoConnector(ctx));
       assertEquals(

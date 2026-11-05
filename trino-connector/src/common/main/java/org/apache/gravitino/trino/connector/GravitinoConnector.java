@@ -374,28 +374,28 @@ public class GravitinoConnector implements Connector {
     String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(
-              credKey,
-              () -> {
-                GravitinoAdminClient userClient;
-                try {
-                  userClient = buildAuthClient(session);
-                } catch (IllegalArgumentException | UnsupportedOperationException e) {
-                  // buildAuthClient raises these for an invalid or unsupported credential.
-                  throw new TrinoException(
-                      PERMISSION_DENIED,
-                      "Failed to authenticate user '"
-                          + session.getUser()
-                          + "' with Gravitino: "
-                          + e.getMessage(),
-                      e);
-                }
-                GravitinoMetalake userMetalake =
-                    userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
-                return new UserSession(
-                    userClient,
-                    new CatalogConnectorMetadata(
-                        userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
-              });
+          credKey,
+          () -> {
+            GravitinoAdminClient userClient;
+            try {
+              userClient = buildAuthClient(session);
+            } catch (IllegalArgumentException | UnsupportedOperationException e) {
+              // buildAuthClient raises these for an invalid or unsupported credential.
+              throw new TrinoException(
+                  PERMISSION_DENIED,
+                  "Failed to authenticate user '"
+                      + session.getUser()
+                      + "' with Gravitino: "
+                      + e.getMessage(),
+                  e);
+            }
+            GravitinoMetalake userMetalake =
+                userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
+            return new UserSession(
+                userClient,
+                new CatalogConnectorMetadata(
+                    userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
+          });
     } catch (ExecutionException | UncheckedExecutionException e) {
       Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
