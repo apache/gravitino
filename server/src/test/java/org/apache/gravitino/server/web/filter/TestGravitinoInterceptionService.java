@@ -121,6 +121,8 @@ import org.glassfish.hk2.api.Descriptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
@@ -645,8 +647,9 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  /** Verifies that an unhandled argument error retains its details in a bad-request response. */
   @Test
-  public void testUnexpectedIllegalArgumentExceptionRemainsInternalError() throws Throwable {
+  public void testIllegalArgumentExceptionReturnsBadRequest() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -672,10 +675,50 @@ public class TestGravitinoInterceptionService {
       Response response = (Response) methodInterceptor.invoke(methodInvocation);
 
       ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-      assertEquals(
-          "Authorization failed due to system internal error. Please contact administrator.",
-          errorResponse.getMessage());
-      assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      assertEquals("Invalid authorizer configuration", errorResponse.getMessage());
+      assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+      assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      verify(methodInvocation, never()).proceed();
+    }
+  }
+
+  /**
+   * Verifies that blank Catalog names are rejected before the resource method is invoked.
+   *
+   * @param catalogName the whitespace-only Catalog name
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\t", "\n", " \t\n"})
+  public void testBlankCatalogNameReturnsBadRequest(String catalogName) throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class)) {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(mock(GravitinoAuthorizer.class));
+
+      Method method = CatalogOperations.class.getMethod("loadCatalog", String.class, String.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake", catalogName});
+
+      Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation);
+
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+      assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+      assertEquals("Metadata object full name cannot be blank", errorResponse.getMessage());
+      verify(invocation, never()).proceed();
     }
   }
 
