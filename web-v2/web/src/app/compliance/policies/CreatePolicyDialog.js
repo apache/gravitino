@@ -55,6 +55,7 @@ export default function CreatePolicyDialog({ ...props }) {
   const values = Form.useWatch([], form)
   const dispatch = useAppDispatch()
   const roles = useAppSelector(state => state.roles)
+  const anthEnable = useAppSelector(state => state.auth.anthEnable)
   const isAccessControl = values?.policyType === 'system_access_control'
 
   useResetFormOnCloseModal({
@@ -98,8 +99,8 @@ export default function CreatePolicyDialog({ ...props }) {
   }, [open, editPolicy, metalake, dispatch, form])
 
   useEffect(() => {
-    if (open && isAccessControl) dispatch(fetchRoles({ metalake }))
-  }, [open, isAccessControl, metalake, dispatch])
+    if (open && isAccessControl && anthEnable) dispatch(fetchRoles({ metalake }))
+  }, [open, isAccessControl, anthEnable, metalake, dispatch])
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -187,7 +188,9 @@ export default function CreatePolicyDialog({ ...props }) {
             <Form.Item name='policyType' label='Policy Type'>
               <Select disabled={!!editPolicy}>
                 <Select.Option value='custom'>Custom</Select.Option>
-                <Select.Option value='system_access_control'>System Access Control</Select.Option>
+                <Select.Option value='system_access_control' disabled={!anthEnable}>
+                  System Access Control
+                </Select.Option>
               </Select>
             </Form.Item>
             {isAccessControl ? (
