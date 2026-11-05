@@ -48,6 +48,20 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
+### Topic Naming Rules
+
+When creating a topic through Gravitino, its name must contain 1 to 128 characters and use only
+ASCII letters, digits, underscores (`_`), and hyphens (`-`). A leading hyphen is allowed. For example,
+`orders`, `order_events`, and `-orders` are valid names; `a/b`, `a=b`, and `a.b` are not.
+
+Gravitino excludes dots for authorization compatibility and limits names to 128 characters to fit
+its metadata storage. These restrictions are stricter than Kafka's native naming rules.
+
+Invalid names return HTTP `400 Bad Request` before reaching Kafka. A name that passes these checks
+can still be rejected by Kafka, for example when `a_b` collides with an existing `a.b` in
+ZooKeeper-mode Kafka. These broker-side name rejections also return HTTP `400 Bad Request`, with
+Kafka's rejection reason included in the error message.
+
 ### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required |
