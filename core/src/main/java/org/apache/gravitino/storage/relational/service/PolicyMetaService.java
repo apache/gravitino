@@ -583,6 +583,16 @@ public class PolicyMetaService {
     SessionUtils.doWithoutCommit(
         TagMetadataObjectRelMapper.class,
         mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tag.getTagId()));
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                tag.getTagId(), MetadataObject.Type.TAG.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(
+                tag.getTagId(), MetadataObject.Type.TAG.name()));
     EntityChangeLogWriter.append(
         NameIdentifierUtil.ofTag(metalake, tag.getTagName()),
         Entity.EntityType.TAG,

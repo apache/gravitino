@@ -408,6 +408,7 @@ class PermissionManager {
 
   Role grantPrivilegesToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges) {
+    AuthorizationUtils.checkVisibleTag(store, metalake, object);
     try {
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper =
           new AuthorizationPluginCallbackWrapper();

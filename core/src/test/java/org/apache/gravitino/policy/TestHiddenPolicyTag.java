@@ -37,6 +37,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -135,24 +136,23 @@ public class TestHiddenPolicyTag {
               return update.apply(hidden);
             });
     TagManager tags = new TagManager(RandomIdGenerator.INSTANCE, store);
-    assertThrows(IllegalArgumentException.class, () -> tags.getTag("m", alias));
-    assertThrows(IllegalArgumentException.class, () -> tags.deleteTag("m", alias));
+    assertThrows(NoSuchTagException.class, () -> tags.getTag("m", alias));
+    assertThrows(NoSuchTagException.class, () -> tags.deleteTag("m", alias));
     assertThrows(
-        IllegalArgumentException.class,
+        NoSuchTagException.class,
         () -> tags.alterTag("m", alias, TagChange.updateComment("changed")));
-    assertThrows(IllegalArgumentException.class, () -> tags.listMetadataObjectsForTag("m", alias));
+    assertThrows(NoSuchTagException.class, () -> tags.listMetadataObjectsForTag("m", alias));
+    assertThrows(NoSuchTagException.class, () -> tags.listPolicyAssociationsForTag("m", alias));
     assertThrows(
-        IllegalArgumentException.class, () -> tags.listPolicyAssociationsForTag("m", alias));
-    assertThrows(
-        IllegalArgumentException.class,
+        NoSuchTagException.class,
         () -> tags.addPolicyForTag("m", alias, "p", AllValuesSelector.get()));
-    assertThrows(IllegalArgumentException.class, () -> tags.removePolicyFromTag("m", alias, "p"));
+    assertThrows(NoSuchTagException.class, () -> tags.removePolicyFromTag("m", alias, "p"));
     MetadataObject object = MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG);
     assertThrows(
-        IllegalArgumentException.class,
+        NoSuchTagException.class,
         () -> tags.associateTagsForMetadataObject("m", object, new String[] {alias}, null));
     assertThrows(
-        IllegalArgumentException.class,
+        NoSuchTagException.class,
         () -> tags.associateTagsForMetadataObject("m", object, null, new String[] {alias}));
     verify(store, never()).delete(any(NameIdentifier.class), eq(Entity.EntityType.TAG));
   }

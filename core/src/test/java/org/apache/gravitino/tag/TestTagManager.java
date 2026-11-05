@@ -1330,15 +1330,13 @@ public class TestTagManager {
               new NameIdentifier[0]);
       Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
       Assertions.assertEquals(0, tagManager.listTagsForMetadataObject(METALAKE, object).length);
+      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, name));
       Assertions.assertThrows(
-          IllegalArgumentException.class, () -> tagManager.getTag(METALAKE, name));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
+          NoSuchTagException.class,
           () -> tagManager.getTagForMetadataObject(METALAKE, object, name));
+      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.deleteTag(METALAKE, name));
       Assertions.assertThrows(
-          IllegalArgumentException.class, () -> tagManager.deleteTag(METALAKE, name));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
+          NoSuchTagException.class,
           () -> tagManager.alterTag(METALAKE, name, TagChange.updateComment("changed")));
       Assertions.assertTrue(
           entityStore

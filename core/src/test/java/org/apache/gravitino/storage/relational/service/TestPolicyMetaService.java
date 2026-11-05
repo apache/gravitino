@@ -300,6 +300,31 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     NameIdentifier tagIdentifier =
         NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
     TagEntity tag = store.get(tagIdentifier, Entity.EntityType.TAG, TagEntity.class);
+    // Seed authorization rows that could have been written before hidden-tag checks existed.
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "legacy_hidden_tag_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(tagIdentifier, Entity.EntityType.TAG, user.nameIdentifier(), user.type());
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "legacy_hidden_tag_grant",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofTag(
+                    tag.name(), Lists.newArrayList(Privileges.ApplyTag.allow()))),
+            null);
+    backend.insert(role, false);
+    String tagOwner = "metadata_object_id = " + tag.id() + " AND metadata_object_type = 'TAG'";
+    String tagGrant = "metadata_object_id = " + tag.id() + " AND type = 'TAG'";
+    assertEquals(1, countActiveRows("owner_meta", tagOwner));
+    assertEquals(1, countActiveRows("role_meta_securable_object", tagGrant));
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
         PreparedStatement statement =
@@ -324,6 +349,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           () -> store.get(tagIdentifier, Entity.EntityType.TAG, TagEntity.class));
       assertEquals(0, countActiveRows("tag_meta", "tag_id = " + tag.id()));
       assertEquals(0, countActiveRows("tag_relation_meta", "tag_id = " + tag.id()));
+      assertEquals(0, countActiveRows("owner_meta", tagOwner));
+      assertEquals(0, countActiveRows("role_meta_securable_object", tagGrant));
       assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
       Awaitility.await()
           .atMost(10, TimeUnit.SECONDS)

@@ -620,11 +620,19 @@ public class TagManager implements TagDispatcher {
   }
 
   private void checkVisibleTagIfExists(String metalake, String name) {
+    TagEntity tag;
     try {
-      loadTagEntity(metalake, name);
-    } catch (NoSuchTagException e) {
+      tag =
+          entityStore.get(
+              NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
       // Missing names retain the existing idempotent delete and association behavior.
+      return;
+    } catch (IOException e) {
+      LOG.error("Failed to get tag {} under metalake {}", name, metalake, e);
+      throw new RuntimeException(e);
     }
+    HiddenPolicyTag.checkVisible(tag);
   }
 
   private TagEntity loadTagEntity(String metalake, String name) {

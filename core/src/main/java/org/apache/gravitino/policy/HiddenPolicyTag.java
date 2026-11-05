@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -116,9 +117,14 @@ public final class HiddenPolicyTag {
    * Rejects an ordinary operation on a persisted hidden tag.
    *
    * @param tag The resolved tag entity.
+   * @throws NoSuchTagException If the tag is hidden.
    */
   public static void checkVisible(TagEntity tag) {
-    Preconditions.checkArgument(!tag.hidden(), "Hidden tags are reserved for internal use");
+    if (tag.hidden()) {
+      throw new NoSuchTagException(
+          "Tag with name %s under metalake %s does not exist",
+          tag.name(), tag.namespace().level(0));
+    }
   }
 
   /**

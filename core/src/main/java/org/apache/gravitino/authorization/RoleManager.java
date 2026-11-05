@@ -64,6 +64,9 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
+    for (SecurableObject object : securableObjects) {
+      AuthorizationUtils.checkVisibleTag(store, metalake, object);
+    }
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(idGenerator.nextId())

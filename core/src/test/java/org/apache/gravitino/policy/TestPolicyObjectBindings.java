@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +47,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -168,6 +170,62 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
       writers.shutdownNow();
       assertTrue(writers.awaitTermination(15, TimeUnit.SECONDS));
     }
+  }
+
+  /** An optimistic first-link conflict accepts the competing selector-free policy link. */
+  @TestTemplate
+  public void testOptimisticFirstLinkConflict() throws Exception {
+    TagEntity tag = HiddenPolicyTag.create(policy, 100L);
+    store.put(tag, false);
+    RelationalEntityStore competingStore = spy((RelationalEntityStore) store);
+    doAnswer(
+            invocation -> {
+              RelationUpdate update = invocation.getArgument(0);
+              if (update.relationType() == SupportsRelationOperations.Type.POLICY_TAG_REL) {
+                invocation.callRealMethod();
+                throw new OptimisticLockException("Competing first policy link");
+              }
+              return invocation.callRealMethod();
+            })
+        .when(competingStore)
+        .updateEntityRelations(any(RelationUpdate.class));
+    PolicyManager competingManager = new PolicyManager(RandomIdGenerator.INSTANCE, competingStore);
+    assertEquals(
+        tag.id(),
+        competingManager.addPolicyToObject(
+            METALAKE,
+            policy.name(),
+            MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
+            AUDIT_INFO));
+    assertEquals(1, count("policy_tag_relation_meta"));
+    assertEquals(1, count("tag_relation_meta"));
+  }
+
+  /** An optimistic conflict with no visible competing link still fails before binding. */
+  @TestTemplate
+  public void testOptimisticFirstLinkConflictWithoutRelation() throws Exception {
+    store.put(HiddenPolicyTag.create(policy, 100L), false);
+    RelationalEntityStore competingStore = spy((RelationalEntityStore) store);
+    OptimisticLockException conflict = new OptimisticLockException("No visible competing link");
+    doAnswer(
+            invocation -> {
+              throw conflict;
+            })
+        .when(competingStore)
+        .updateEntityRelations(any(RelationUpdate.class));
+    PolicyManager competingManager = new PolicyManager(RandomIdGenerator.INSTANCE, competingStore);
+    assertSame(
+        conflict,
+        assertThrows(
+            OptimisticLockException.class,
+            () ->
+                competingManager.addPolicyToObject(
+                    METALAKE,
+                    policy.name(),
+                    MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
+                    AUDIT_INFO)));
+    assertEquals(0, count("policy_tag_relation_meta"));
+    assertEquals(0, count("tag_relation_meta"));
   }
 
   /** Policy-created tags are reused and remain when only the new assignment rolls back. */

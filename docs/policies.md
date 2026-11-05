@@ -389,8 +389,10 @@ Creating a policy also creates its server-managed hidden tag (`hidden=true` in `
 in the same metadata transaction. The hidden tag starts without object assignments, so creating
 a policy does not apply it to any object. Renaming or updating the policy preserves this tag;
 deleting the policy removes it and its assignments in the same transaction.
-Hidden tags participate in policy resolution but do not appear in ordinary tag listings and
-cannot be changed with tag APIs. The `reserved_` tag name prefix is reserved for internal use,
+Hidden tags participate in policy resolution but do not appear in ordinary tag listings.
+Tag API requests for hidden tags return not-found, and hidden tags cannot receive owners or user grants.
+Deleting their policy also removes any existing ownership and grant rows for the hidden tag.
+The `reserved_` tag name prefix is reserved for internal use,
 including alternate casing, for new tags and rename targets. Ordinary tags have `hidden=false`;
 existing tags retain that default and remain accessible even if their names use the reserved prefix.
 Existing policies without hidden tags receive them when first bound through the internal binding

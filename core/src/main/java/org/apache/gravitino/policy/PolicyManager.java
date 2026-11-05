@@ -43,6 +43,7 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -150,7 +151,7 @@ public class PolicyManager implements PolicyDispatcher {
                         },
                         null)
                     .withAuditInfo(auditInfo));
-      } catch (EntityAlreadyExistsException concurrentCreate) {
+      } catch (EntityAlreadyExistsException | OptimisticLockException concurrentCreate) {
         policies =
             entityStore
                 .relationOperations()
