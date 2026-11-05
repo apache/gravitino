@@ -67,11 +67,11 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   private Table tableMetadata;
   private NameIdentifier nameIdentifier;
   /**
-   * Shared expression inputs for every evaluation: table metadata fields and numeric policy rules.
-   * Table-level statistics are intentionally excluded so partition-aware strategies cannot be
-   * driven by stale {@code statistic_meta} values after partition stats are refreshed.
+   * Expression inputs from table metadata and numeric policy rules. Table-level statistics are
+   * intentionally excluded so partition-aware strategies cannot be driven by stale {@code
+   * statistic_meta} values after partition stats are refreshed.
    */
-  private Map<String, Object> sharedContext;
+  private Map<String, Object> metadataAndRulesContext;
 
   /** Create a handler that evaluates expressions with the default QL evaluator. */
   protected BaseExpressionStrategyHandler() {
@@ -86,7 +86,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     this.strategy = context.strategy();
     this.tableStatistics = context.tableStatistics();
     this.partitionStatistics = context.partitionStatistics();
-    this.sharedContext = buildSharedContext();
+    this.metadataAndRulesContext = buildMetadataAndRulesContext();
   }
 
   @Override
@@ -238,15 +238,16 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   /**
    * Builds the expression context for one evaluation unit.
    *
-   * <p>Partition-aware handlers on partitioned tables receive only {@link #sharedContext} plus the
-   * partition's statistics. Non-partitioned evaluation also includes table-level statistics.
+   * <p>Partition-aware handlers on partitioned tables receive only {@link #metadataAndRulesContext}
+   * plus the partition's statistics. Non-partitioned evaluation also includes table-level
+   * statistics.
    *
    * @param statistics statistics of the unit being evaluated (a single partition, or empty for
    *     non-partitioned table-level evaluation)
    * @return combined context
    */
   private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = new HashMap<>(sharedContext);
+    Map<String, Object> context = new HashMap<>(metadataAndRulesContext);
     if (!isPartitionTable()) {
       context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
     }
@@ -254,8 +255,8 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     return context;
   }
 
-  /** Precomputes metadata and rule inputs shared by table-level and partition evaluations. */
-  private Map<String, Object> buildSharedContext() {
+  /** Precomputes table-metadata and rule inputs for expression evaluation. */
+  private Map<String, Object> buildMetadataAndRulesContext() {
     Map<String, Object> context = new HashMap<>();
     context.putAll(TableMetadataTriggerExpressionUtils.buildTableMetadataContext(tableMetadata));
     context.putAll(getRulesExpressionContext(strategy));
