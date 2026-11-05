@@ -88,6 +88,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
+import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.slf4j.Logger;
@@ -295,6 +296,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
       } else if (e.getCause() instanceof InvalidPartitionsException) {
         throw ExceptionMessages.illegalArgument("Invalid partition count for topic " + ident, e);
+
+      } else if (e.getCause() instanceof InvalidTopicException) {
+        throw ExceptionMessages.illegalArgument("Invalid topic name " + ident, e);
 
       } else if (e.getCause() instanceof InvalidReplicationFactorException) {
         throw ExceptionMessages.illegalArgument("Invalid replication factor for topic " + ident, e);

@@ -28,8 +28,8 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
  * <p>AWS Glue constraints that deviate from Gravitino defaults:
  *
  * <ul>
- *   <li><b>Case-insensitive names</b>: Glue folds database and table names to lowercase on storage.
- *       See <a
+ *   <li><b>Case-insensitive schema and table names</b>: Glue folds database and table names to
+ *       lowercase on storage. See <a
  *       href="https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html">Database
  *       API</a> and <a
  *       href="https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html">Table
@@ -65,7 +65,7 @@ public class GlueCatalogCapability implements Capability {
     switch (scope) {
       case SCHEMA:
       case TABLE:
-        // Glue folds database/table names to lowercase on storage.
+        // Glue folds database and table names to lowercase on storage.
         // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
         // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
         return CapabilityResult.unsupported(
@@ -73,6 +73,8 @@ public class GlueCatalogCapability implements Capability {
                 + scope.name().toLowerCase(Locale.ROOT)
                 + " names.");
       default:
+        // Column names depend on the table format, which this check cannot see: Iceberg keeps their
+        // case in its metadata, and GlueCatalogOperations folds those of Hive-format tables.
         return CapabilityResult.SUPPORTED;
     }
   }
