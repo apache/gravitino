@@ -38,6 +38,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.utils.IcebergTableProperti
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -108,10 +110,9 @@ public class IcebergTable extends BaseTable {
         IcebergTablePropertiesMetadata.DISTRIBUTION_MODE, transformDistribution(distribution));
     Map<String, String> createProperties = rebuildCreateProperties(properties);
     // Column defaults require Iceberg format-version 3+; do not silently upgrade.
-    boolean hasDefaults =
-        schema.columns().stream()
-            .anyMatch(f -> f.writeDefaultLiteral() != null || f.initialDefaultLiteral() != null);
-    if (hasDefaults) {
+    // Use Gravitino columns: NestedField default APIs are unnecessary here and may be missing
+    // when an older Iceberg jar is shared onto the catalog classpath.
+    if (columnsHaveDefaults(columns)) {
       String formatVersion = createProperties.get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
       int version =
           StringUtils.isBlank(formatVersion)
@@ -129,6 +130,23 @@ public class IcebergTable extends BaseTable {
             .withPartitionSpec(ToIcebergPartitionSpec.toPartitionSpec(schema, partitioning))
             .withWriteOrder(ToIcebergSortOrder.toSortOrder(schema, sortOrders));
     return builder.build();
+  }
+
+  private static boolean columnsHaveDefaults(Column[] columns) {
+    if (columns == null) {
+      return false;
+    }
+    for (Column column : columns) {
+      if (isDefaultSet(column.defaultValue(), Column.DEFAULT_VALUE_NOT_SET)
+          || isDefaultSet(column.initialDefaultValue(), Column.INITIAL_DEFAULT_VALUE_NOT_SET)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean isDefaultSet(Expression value, Expression unset) {
+    return value != null && !value.equals(unset);
   }
 
   /**
