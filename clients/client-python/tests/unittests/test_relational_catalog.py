@@ -233,6 +233,26 @@ class TestRelationalCatalog(unittest.TestCase):
             with self.assertRaises(NoSuchTableException):
                 self.catalog.load_table(self.table_identifier)
 
+    def test_table_exists_with_missing_schema_or_table(self):
+        for failure in (
+            NoSuchSchemaException("Schema not found"),
+            NoSuchTableException("Table not found"),
+        ):
+            with self.subTest(failure=type(failure).__name__):
+                with patch(
+                    "gravitino.utils.http_client.HTTPClient.get",
+                    side_effect=failure,
+                ):
+                    with self.assertRaises(type(failure)):
+                        self.catalog.load_table(self.table_identifier)
+                    self.assertFalse(self.catalog.table_exists(self.table_identifier))
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=RuntimeError("Backend unavailable"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.catalog.table_exists(self.table_identifier)
+
     def test_create_table_already_exists(self):
         with patch(
             "gravitino.utils.http_client.HTTPClient.post",

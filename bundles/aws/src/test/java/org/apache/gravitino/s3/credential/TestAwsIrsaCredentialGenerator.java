@@ -19,7 +19,7 @@
 package org.apache.gravitino.s3.credential;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -66,26 +66,16 @@ class TestAwsIrsaCredentialGenerator {
   }
 
   @Test
-  void basicModeUsesConfiguredTokenSourceWithoutSessionPolicy(@TempDir Path dir)
-      throws IOException {
+  void catalogRequestDoesNotVendUnscopedCredentials(@TempDir Path dir) throws IOException {
     try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
       generator.initialize(createProperties(dir));
-
-      AwsIrsaCredential credential = generator.generate(() -> "test-user");
-
-      assertEquals("access-key", credential.accessKeyId());
-      assertEquals("secret-key", credential.secretAccessKey());
-      assertEquals("session-token", credential.sessionToken());
+      assertNull(generator.generate(() -> "test-user"));
     }
-
-    String body = URLDecoder.decode(requestBody.get(), StandardCharsets.UTF_8.name());
-    assertTrue(body.contains("WebIdentityToken=configured-token"));
-    assertTrue(body.contains("RoleSessionName=gravitino_irsa_session_test-user"));
-    assertFalse(body.contains("Policy="));
+    assertEquals(0, requestCount.get());
   }
 
   @Test
-  void basicModeFallsBackToEnvironmentRoleArnWhenConfiguredRoleIsBlank(@TempDir Path dir)
+  void pathModeFallsBackToEnvironmentRoleArnWhenConfiguredRoleIsBlank(@TempDir Path dir)
       throws IOException {
     Map<String, String> properties = createProperties(dir);
     properties.put("s3-role-arn", " ");
@@ -94,7 +84,7 @@ class TestAwsIrsaCredentialGenerator {
         new AwsIrsaCredentialGenerator(() -> "arn:aws:iam::123456789012:role/environment-role")) {
       generator.initialize(properties);
 
-      AwsIrsaCredential credential = generator.generate(() -> "test-user");
+      AwsIrsaCredential credential = generator.generate(pathContext());
 
       assertEquals("access-key", credential.accessKeyId());
     }
@@ -126,7 +116,7 @@ class TestAwsIrsaCredentialGenerator {
   }
 
   @Test
-  void basicModeFailsWhenNoRoleArnIsAvailable(@TempDir Path dir) throws IOException {
+  void pathModeFailsWhenNoRoleArnIsAvailable(@TempDir Path dir) throws IOException {
     Map<String, String> properties = createProperties(dir);
     properties.remove("s3-role-arn");
 
@@ -134,21 +124,23 @@ class TestAwsIrsaCredentialGenerator {
       generator.initialize(properties);
 
       IllegalStateException exception =
-          assertThrows(IllegalStateException.class, () -> generator.generate(() -> "test-user"));
+          assertThrows(IllegalStateException.class, () -> generator.generate(pathContext()));
 
       assertTrue(exception.getMessage().contains("No role ARN available"));
     }
   }
 
   @Test
-  void basicModeReusesCachedStsCredentials(@TempDir Path dir) throws IOException {
+  void pathRequestUsesSessionPolicy(@TempDir Path dir) throws IOException {
     try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
       generator.initialize(createProperties(dir));
-
-      generator.generate(() -> "test-user");
-      generator.generate(() -> "test-user");
+      AwsIrsaCredential credential = generator.generate(pathContext());
+      assertEquals("access-key", credential.accessKeyId());
     }
-
+    String body = URLDecoder.decode(requestBody.get(), StandardCharsets.UTF_8.name());
+    assertTrue(body.contains("WebIdentityToken=configured-token"));
+    assertTrue(body.contains("RoleSessionName=gravitino_irsa_session_test-user"));
+    assertTrue(body.contains("Policy="));
     assertEquals(1, requestCount.get());
   }
 
@@ -160,7 +152,7 @@ class TestAwsIrsaCredentialGenerator {
     try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
       generator.initialize(properties);
 
-      AwsIrsaCredential credential = generator.generate(() -> "test-user");
+      AwsIrsaCredential credential = generator.generate(pathContext());
 
       assertEquals("access-key", credential.accessKeyId());
       assertEquals("secret-key", credential.secretAccessKey());
@@ -198,6 +190,11 @@ class TestAwsIrsaCredentialGenerator {
         "s3-token-service-endpoint",
         String.format("http://127.0.0.1:%s", server.getAddress().getPort()));
     return properties;
+  }
+
+  private PathBasedCredentialContext pathContext() {
+    return new PathBasedCredentialContext(
+        "test-user", Collections.emptySet(), Collections.singleton("s3://bucket/object"));
   }
 
   private void handleAssumeRoleWithWebIdentity(HttpExchange exchange) throws IOException {

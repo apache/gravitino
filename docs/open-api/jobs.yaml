@@ -293,6 +293,15 @@ paths:
               examples:
                 JobResponse:
                   $ref: "#/components/examples/JobResponse"
+        "400":
+          description: Bad Request - A query parameter is malformed or invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobQueryIllegalArgumentException:
+                  $ref: "#/components/examples/JobQueryIllegalArgumentException"
         "404":
           description: Not Found - The specified job does not exist in the specified metalake
           content:
@@ -395,7 +404,7 @@ components:
       name: outputMaxBytes
       in: query
       description: >
-        The maximum number of (most recent) output bytes to read, when includeOutput is true.
+        The maximum number of (most recent) output bytes to return, when includeOutput is true.
         Ignored otherwise. Can only narrow the globally configured gravitino.job.outputMaxBytes
         cap, never widen it - a value larger than the global cap is clamped down to it. Omit to
         use the global default.
@@ -1208,6 +1217,13 @@ components:
           "java.lang.IllegalArgumentException: Invalid argument xxx",
           "..."
         ]
+      }
+
+    JobQueryIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Invalid value for QueryParam parameter 'outputMaxLines': For input string: \"abc\""
       }
 
     JobRunIllegalArgumentException:

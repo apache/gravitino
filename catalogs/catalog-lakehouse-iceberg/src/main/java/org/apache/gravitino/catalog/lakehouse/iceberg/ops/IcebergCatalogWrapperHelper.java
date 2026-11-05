@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.lakehouse.iceberg.ops;
 
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.DEFAULT_SPEC_ID;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -64,6 +66,7 @@ public class IcebergCatalogWrapperHelper {
           "location",
           "comment",
           "current-snapshot-id",
+          DEFAULT_SPEC_ID,
           "cherry-pick-snapshot-id",
           "sort-order",
           "identifier-fields");

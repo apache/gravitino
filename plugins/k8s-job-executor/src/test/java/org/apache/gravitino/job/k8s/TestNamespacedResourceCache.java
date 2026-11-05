@@ -19,6 +19,7 @@
 package org.apache.gravitino.job.k8s;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import java.time.Duration;
@@ -95,11 +96,39 @@ public class TestNamespacedResourceCache {
             now::get);
 
     Assertions.assertFalse(cache.find("ns1", "a").isPresent());
-    // The namespace isn't listed again until the failure expires.
+    // The namespace isn't listed again until the failure expires, which takes longer than the TTL
+    // of a listing.
+    Assertions.assertFalse(cache.find("ns1", "b").isPresent());
+    now.addAndGet(100L);
     Assertions.assertFalse(cache.find("ns1", "b").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1"), listed);
 
-    now.addAndGet(100L);
+    now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS - 100L);
+    Assertions.assertFalse(cache.find("ns1", "a").isPresent());
+    Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
+  }
+
+  @Test
+  public void testSlowListFailureIsCachedFromWhenItFailed() {
+    NamespacedResourceCache<ConfigMap> cache =
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              listed.add(namespace);
+              // The listing times out after longer than a failure is cached.
+              now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS + 50L);
+              throw new IllegalStateException("timed out");
+            },
+            e -> false,
+            now::get);
+
+    Assertions.assertFalse(cache.find("ns1", "a").isPresent());
+    // The failure isn't expired as soon as it is cached, so the next query doesn't wait for
+    // another listing.
+    Assertions.assertFalse(cache.find("ns1", "b").isPresent());
+    Assertions.assertEquals(ImmutableList.of("ns1"), listed);
+
+    now.addAndGet(NamespacedResourceCache.FAILED_LIST_TTL_MS);
     Assertions.assertFalse(cache.find("ns1", "a").isPresent());
     Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
   }
@@ -141,6 +170,37 @@ public class TestNamespacedResourceCache {
     // Not cached as an empty listing, so the next query fails the same way.
     Assertions.assertThrows(IllegalStateException.class, () -> cache.find("ns1", "a"));
     Assertions.assertEquals(ImmutableList.of("ns1", "ns1"), listed);
+  }
+
+  @Test
+  public void testExpiredListingsAreEvicted() {
+    NamespacedResourceCache<ConfigMap> cache =
+        new NamespacedResourceCache<>(
+            100L,
+            namespace -> {
+              listed.add(namespace);
+              return ImmutableList.of(resource(namespace, "a"));
+            },
+            e -> false,
+            now::get);
+    Assertions.assertTrue(cache.find("ns1", "a").isPresent());
+    now.addAndGet(50L);
+    Assertions.assertTrue(cache.find("ns2", "a").isPresent());
+    Assertions.assertEquals(ImmutableSet.of("ns1", "ns2"), cache.getCachedNamespaces());
+
+    // Listing another namespace drops the expired listings, also of the namespaces no longer
+    // queried, and keeps the others.
+    now.addAndGet(50L);
+    Assertions.assertTrue(cache.find("ns3", "a").isPresent());
+    Assertions.assertEquals(ImmutableSet.of("ns2", "ns3"), cache.getCachedNamespaces());
+    // A cached listing is found without listing again, so nothing is evicted.
+    Assertions.assertTrue(cache.find("ns2", "a").isPresent());
+    Assertions.assertEquals(ImmutableSet.of("ns2", "ns3"), cache.getCachedNamespaces());
+
+    now.addAndGet(100L);
+    Assertions.assertTrue(cache.find("ns2", "a").isPresent());
+    Assertions.assertEquals(ImmutableSet.of("ns2"), cache.getCachedNamespaces());
+    Assertions.assertEquals(ImmutableList.of("ns1", "ns2", "ns3", "ns2"), listed);
   }
 
   @Test

@@ -93,6 +93,15 @@ public class TestOceanBaseTableOperationsSqlGeneration {
     Assertions.assertEquals("ALTER TABLE `test_table`\nCOMMENT '" + escaped + "';", sql);
   }
 
+  @Test
+  void testClearTableCommentWithNull() {
+    TestableOceanBaseTableOperations ops = operationsWithTable();
+    String sql =
+        ops.generateAlterTableSql("database", "test_table", TableChange.updateComment(null));
+
+    Assertions.assertEquals("ALTER TABLE `test_table`\nCOMMENT '';", sql);
+  }
+
   @ParameterizedTest
   @MethodSource("comments")
   void testAddColumnEscapesComment(String comment, String escaped) {

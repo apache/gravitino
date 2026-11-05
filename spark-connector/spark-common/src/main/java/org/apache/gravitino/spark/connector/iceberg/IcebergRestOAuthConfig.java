@@ -29,6 +29,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin;
 import org.apache.spark.SparkConf;
 
 /**
@@ -83,13 +84,25 @@ class IcebergRestOAuthConfig {
     if (AuthProperties.isBasic(authType)) {
       return applyBasicCredentials(sparkConf, result);
     }
+    boolean hasExplicitLegacyOAuth2 =
+        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
+            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
+    // An explicit legacy OAuth2 configuration already decides how IRC is authenticated.
+    if (!hasExplicitLegacyOAuth2) {
+      if (AuthProperties.isToken(authType)) {
+        return applyBearerToken(sparkConf, result);
+      }
+      // The Iceberg REST client has no SPNEGO support, so Kerberos can't be carried over.
+      Preconditions.checkArgument(
+          !AuthProperties.isKerberos(authType),
+          "Iceberg REST service can't be accessed with %s=kerberos; set"
+              + " spark.sql.gravitino.iceberg.rest.* to configure its authentication explicitly",
+          GravitinoSparkConfig.GRAVITINO_AUTH_TYPE);
+    }
 
     boolean reuseOAuth2 =
         sparkConf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_REUSE_OAUTH2, true)
             && AuthProperties.isOAuth2(authType);
-    boolean hasExplicitLegacyOAuth2 =
-        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
-            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     if (!reuseOAuth2 && !hasExplicitLegacyOAuth2) {
       return result;
     }
@@ -132,6 +145,14 @@ class IcebergRestOAuthConfig {
     config.put(AUTH_TYPE, AUTH_TYPE_BASIC);
     config.put(BASIC_USERNAME, username);
     config.put(BASIC_PASSWORD, password);
+    return config;
+  }
+
+  // Reuses the bearer token of the Gravitino client. The token is captured when the catalog is
+  // initialized, so it isn't refreshed when the token source changes afterwards.
+  private static Map<String, String> applyBearerToken(
+      SparkConf sparkConf, Map<String, String> config) {
+    config.put(TOKEN, GravitinoDriverPlugin.resolveToken(sparkConf));
     return config;
   }
 

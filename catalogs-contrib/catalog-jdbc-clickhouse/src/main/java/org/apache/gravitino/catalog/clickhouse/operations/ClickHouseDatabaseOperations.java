@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 
 public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
@@ -196,10 +197,8 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
           checkStmt.setString(1, databaseName);
           try (ResultSet rs = checkStmt.executeQuery()) {
             if (rs.next()) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Database %s is not empty, you can drop it with CASCADE option.",
-                      databaseName));
+              throw new NonEmptySchemaException(
+                  "Database %s is not empty, you can drop it with CASCADE option.", databaseName);
             }
           }
         }

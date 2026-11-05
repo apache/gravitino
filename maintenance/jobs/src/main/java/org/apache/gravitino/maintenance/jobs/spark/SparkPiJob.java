@@ -40,7 +40,7 @@ public class SparkPiJob implements BuiltInJob {
 
   private static final String NAME = JobTemplateProvider.BUILTIN_NAME_PREFIX + "sparkpi";
   // Bump VERSION whenever SparkPi template behavior changes (name/executable/class/args/configs).
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -94,7 +94,9 @@ public class SparkPiJob implements BuiltInJob {
 
   private Map<String, String> buildSparkConfigs() {
     Map<String, String> configs = new HashMap<>();
-    configs.put("spark.master", "{{spark_master:-local[*]}}");
+    // An empty value leaves the Spark configuration unset, see
+    // IcebergSparkConfigUtils#buildTemplateSparkConfigs.
+    configs.put("spark.master", "{{spark_master:-}}");
     configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
     configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
     configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");
