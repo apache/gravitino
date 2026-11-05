@@ -116,7 +116,12 @@ dependencies {
   testImplementation(project(":spark-connector:spark-3.5"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common", "testArtifacts"))
-  testImplementation(libs.lance)
+  // The distribution excludes io.opentelemetry from lance-core (see core/build.gradle.kts),
+  // so exclude it here too: a test classpath that still carries it would hide a new reference
+  // to org.lance.otel.* that then fails at runtime with NoClassDefFoundError.
+  testImplementation(libs.lance) {
+    exclude(group = "io.opentelemetry", module = "*")
+  }
   testImplementation(libs.lance.namespace.apache.client)
 
   lanceSparkBundleVersions.forEach { version ->

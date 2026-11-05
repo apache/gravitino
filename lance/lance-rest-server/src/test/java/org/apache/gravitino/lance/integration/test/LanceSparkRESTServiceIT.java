@@ -86,8 +86,10 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   private static final String HISTORY_CATALOG_NAME =
       GravitinoITUtils.genRandomName("lance_history_catalog");
   private static final String TABLE_COLUMNS = "(id INT, score FLOAT)";
-  // lance-spark bundles whose bundled Lance cannot write to a file format version 2.2 dataset.
-  private static final Set<String> PRE_BLOB_V2_BUNDLE_VERSIONS = Set.of("0.2.0");
+  // lance-spark bundles that write at their own Lance's default file format version instead of
+  // the target dataset's, so they cannot write to a dataset Gravitino created. See
+  // testSparkWritesToGravitinoCreatedTable.
+  private static final Set<String> BUNDLES_IGNORING_DATASET_FORMAT_VERSION = Set.of("0.2.0");
   private static final Pattern BUNDLE_VERSION_PATTERN =
       Pattern.compile("lance-spark-bundle-[^/]*?-(\\d+\\.\\d+\\.\\d+(?:-[\\w.]+)?)\\.jar$");
   private static final String LANCE_CLASS_PREFIX = "org.lance.";
@@ -308,32 +310,17 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
   @Test
   public void testSparkReadsTableCreatedThroughGravitino() {
-    // Creating through Gravitino's own API is the only path that reaches
-    // LanceTableOperations#createDataset, which leaves the Lance file format version at
-    // lance-core's
-    // default whenever the table has no blob column - 2.2 as of lance-core 12.0.0, where earlier
-    // releases defaulted lower. Spark's CREATE TABLE goes through `declare` instead, where
-    // Gravitino
-    // writes no dataset at all and the bundle writes it at its own version. So this is the one
-    // combination that puts a Gravitino-written dataset in front of the bundle's Lance, which in
-    // this matrix goes back to lance-core 2.0.0.
     String schemaName = createSchema("spark_gravitino_created");
     String tableName = newTableName("orders");
+    String location = createTableThroughGravitinoApi(schemaName, tableName);
 
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(schemaName, tableName),
-            new Column[] {
-              Column.of("id", Types.IntegerType.get()), Column.of("score", Types.FloatType.get())
-            },
-            "created through the Gravitino API",
-            // Deliberately no LANCE_TABLE_DECLARED: that is the `declare` path, where Gravitino
-            // writes no dataset and the point of this test is lost.
-            ImmutableMap.of("format", "lance"),
-            Transforms.EMPTY_TRANSFORM,
-            null,
-            null);
+    // Anchor the matrix to the lance-core this build embeds: a dataset created with no blob
+    // column keeps lance-core's own default file format version, which is 2.2 as of 12.0.0 and
+    // was 2.1 on the 6.0.0 this release upgrades from. Without this assertion nothing in the
+    // test would notice a downgrade of the server's Lance.
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
 
     // First the manifest on its own: a freshly created dataset holds no data files, so this only
     // proves the bundle can open a manifest written by lance-core 12.0.0.
@@ -344,25 +331,38 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     // Then the data files. Gravitino's API never writes rows, so seed them here with the same
     // lance-core the server runs - 12.0.0, at file format version 2.2 - and read them back
     // through the bundle. Without this the SELECT above would be the only read in the test and
-    // the matrix would never decode a byte written by the new writer.
-    Table createdTable =
-        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
-    appendRowsWithServerLance(createdTable.properties().get(Table.PROPERTY_LOCATION));
+    // the matrix would never decode a byte written by the new writer. Every bundle in the matrix
+    // reaches this point, including the ones that cannot write such a dataset.
+    appendRowsWithServerLance(location);
 
     List<Row> seededRows = sql("SELECT id, score FROM %s.%s ORDER BY id", schemaName, tableName);
     Assertions.assertEquals(2, seededRows.size());
     assertRow(seededRows.get(0), 1, 1.5f);
     assertRow(seededRows.get(1), 2, 2.5f);
+  }
 
-    // Writes are a different matter. A bundle whose Lance predates file format version 2.2 has
-    // its commit rejected with
-    // "added files with version 2.0. However, the data storage version is 2.2."
-    // Only lance-spark 0.2.0 (lance-core 2.0.0) is affected; 0.4.0 (lance-core 4.0.0) and later
-    // write fine. This is a behaviour change from Gravitino's previous lance-core 6.0.0, whose
-    // default was below 2.2, and it is tracked as a separate issue rather than worked around here.
+  @Test
+  public void testSparkWritesToGravitinoCreatedTable() {
+    // Writing into a Gravitino-created dataset is where the bundles differ. lance-spark 0.2.0
+    // passes no data storage version to Lance, so every write goes out at its own lance-core's
+    // default - 2.0 for lance-core 2.0.0 - whatever the dataset says, and the commit is refused:
+    // "All data files must have the same version.  Detected both 2.2 and 2.0" once the dataset
+    // holds rows, or "The operation added files with version 2.0.  However, the data storage
+    // version is 2.2." while it is still empty. This is not a change in this release: the
+    // previous lance-core 6.0.0 pinned the same datasets at 2.1 and refused the same write.
+    // lance-spark 0.4.0 reads the dataset's version first (LanceDataset#newWriteBuilder) and is
+    // unaffected, which is why only 0.2.0 is listed below.
     Assumptions.assumeFalse(
-        PRE_BLOB_V2_BUNDLE_VERSIONS.contains(lanceSparkBundleVersion()),
-        "lance-spark bundles older than 0.4.0 cannot write to a file format version 2.2 dataset");
+        BUNDLES_IGNORING_DATASET_FORMAT_VERSION.contains(lanceSparkBundleVersion()),
+        "lance-spark "
+            + lanceSparkBundleVersion()
+            + " writes at its own Lance's default file format version instead of the dataset's, "
+            + "so it cannot write to a dataset created through the Gravitino table API");
+
+    String schemaName = createSchema("spark_gravitino_created_write");
+    String tableName = newTableName("orders");
+    String location = createTableThroughGravitinoApi(schemaName, tableName);
+    appendRowsWithServerLance(location);
 
     sql("INSERT INTO %s.%s VALUES (3, CAST(3.5 AS FLOAT))", schemaName, tableName);
 
@@ -636,6 +636,35 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     String jarPath = System.getProperty(LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY, "");
     Matcher matcher = BUNDLE_VERSION_PATTERN.matcher(jarPath);
     return matcher.find() ? matcher.group(1) : "";
+  }
+
+  /**
+   * Creates a table through Gravitino's own table API and returns its dataset location. Of the
+   * paths that reach {@code LanceTableOperations#createDataset}, this is the only one a Spark
+   * bundle can be pointed at afterwards: Spark's own CREATE TABLE goes through `declare`, where
+   * Gravitino writes no dataset at all and the bundle creates it at its own file format version.
+   */
+  private String createTableThroughGravitinoApi(String schemaName, String tableName) {
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, tableName),
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("score", Types.FloatType.get())
+            },
+            "created through the Gravitino API",
+            // Deliberately no LANCE_TABLE_DECLARED: that is the `declare` path, where Gravitino
+            // writes no dataset and the point of these tests is lost.
+            ImmutableMap.of("format", "lance"),
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    Table createdTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    String location = createdTable.properties().get(Table.PROPERTY_LOCATION);
+    Assertions.assertNotNull(location, "Expected Gravitino to persist a table location");
+    return location;
   }
 
   private String createSchema(String schemaNamePrefix) {

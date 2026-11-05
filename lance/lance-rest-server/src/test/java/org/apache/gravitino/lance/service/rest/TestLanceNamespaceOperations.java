@@ -829,6 +829,35 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   }
 
   @Test
+  void testBlankVersionSelectorsAreAccepted() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.describe_table_blank_selectors";
+    String delimiter = ".";
+
+    DescribeTableResponse describeTableResponse = new DescribeTableResponse();
+    describeTableResponse.setLocation("/path/to/describe_table_blank_selectors");
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
+        .thenReturn(describeTableResponse);
+
+    // A client that serializes unset optional fields as empty strings is not asking for a branch
+    // or a tag, so the selector guard must let it through rather than answer 400. Raw JSON,
+    // because the point is the wire payload: a built request object would leave the fields null
+    // and never exercise the blank case.
+    String blankSelectors =
+        "{\"id\":[\"catalog\",\"scheme\",\"describe_table_blank_selectors\"],"
+            + "\"branch\":\"\",\"tag\":\"\"}";
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(blankSelectors, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps)
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.empty()), eq(false), eq(true));
+  }
+
+  @Test
   void testAlterRequestsRejectBranchSelector() {
     Mockito.reset(tableOps);
     String tableIds = "catalog.scheme.alter_table_branch_selector";

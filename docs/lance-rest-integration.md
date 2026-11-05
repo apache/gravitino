@@ -20,10 +20,10 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
-| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
-| ------------------------------ | ------------------------------ | --------------------------------------------- |
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
-| 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| Gravitino Version (Lance REST) | Supported lance-spark Versions           | Supported lance-ray Versions                                             |
+| ------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------ |
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                          | 0.0.6 - 0.0.8                                                            |
+| 1.3.0                          | 0.2.0, 0.4.0, 0.5.1                      | 0.3.0 - 0.4.2 (0.2.0 conditionally supported)                            |
 | 2.0.0                          | 0.2.0, 0.4.0, 0.5.1, 0.6.1, 0.7.1, 0.8.0 | 0.2.0 + `lance-namespace` 0.4.5; 0.3.0 and 0.4.2 + 0.7.5; 0.5.0 + 0.11.1 |
 
 :::note
@@ -60,6 +60,13 @@ The following table outlines the tested compatibility between Gravitino versions
   reaches the endpoints Gravitino serves, and responses only gained an empty `context` map, which
   older clients ignore. Lance branches and tags are not implemented, so a request setting `branch`
   or `tag` is rejected with `400`.
+- **`lance-spark` 0.2.0 cannot write to a table created through the Gravitino table API**, on
+  2.0.0 and on every earlier release alike. It passes no data storage version to Lance, so it
+  writes at its own `lance-core` 2.0.0 default of file format version 2.0 while such a dataset is
+  pinned at the server's `lance-core` default — 2.2 on 2.0.0, 2.1 on 1.3.0 — and Lance refuses the
+  commit. Reads are unaffected, and so are tables a connector created itself through
+  `POST /lance/v1/table/{id}/declare`, which the connector writes at its own version.
+  `lance-spark` 0.4.0 and later read the dataset's version before writing and have no such limit.
 - **An unimplemented endpoint answers `500`, not `404`**, because `LanceExceptionMapper` matches
   only Gravitino's own `NotFoundException`. A call to a removed endpoint therefore looks like an
   internal error.

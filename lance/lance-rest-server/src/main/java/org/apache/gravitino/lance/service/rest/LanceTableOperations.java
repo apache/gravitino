@@ -399,6 +399,14 @@ public class LanceTableOperations {
   // request naming one is rejected: ignoring it would silently apply a mutation meant for a branch
   // to the table itself, and answer a tag-pinned read with the table's current state. The 0.7.5
   // models had no such fields, so these payloads used to fail deserialization instead.
+  //
+  // The alter requests are called with a null tag because in 0.11.1 only DescribeTableRequest
+  // declares `tag`; AlterTableDropColumnsRequest and AlterTableAlterColumnsRequest carry `branch`
+  // alone. If a later spec adds `tag` to them, pass it here instead of null, or the selector goes
+  // through unchecked.
+  //
+  // A present but blank selector is accepted: it names no branch or tag, so there is nothing to
+  // refuse, and rejecting it would break clients that serialize empty strings for unset fields.
   private static void validateVersionSelectors(@Nullable String branch, @Nullable String tag) {
     Preconditions.checkArgument(
         StringUtils.isBlank(branch),
