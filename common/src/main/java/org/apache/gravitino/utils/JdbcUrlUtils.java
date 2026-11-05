@@ -94,8 +94,12 @@ public class JdbcUrlUtils {
    * @return whether the URL must not be exposed as a public catalog property
    */
   public static boolean containsCredentials(@Nullable String url) {
+    // Decoding a password can introduce '/', '?' or '#' and change the authority boundaries.
+    // Inspect raw user information before scanning decoded parameter names.
     return url != null
-        && decodedFormsForScan(url).stream().anyMatch(JdbcUrlUtils::containsCredentialParameters);
+        && (USER_INFO.matcher(url).find()
+            || decodedFormsForScan(url).stream()
+                .anyMatch(JdbcUrlUtils::containsCredentialParameters));
   }
 
   /**
