@@ -112,9 +112,9 @@ public class ConvertUtil {
     for (int i = 0; i < icebergFields.size(); i++) {
       Types.NestedField field = icebergFields.get(i);
       Literal<?> write =
-          FromIcebergColumnDefault.toIceberg(columns[i].defaultValue(), field.type());
+          ToIcebergColumnDefault.fromGravitino(columns[i].defaultValue(), field.type());
       Literal<?> initial =
-          FromIcebergColumnDefault.toIceberg(columns[i].initialDefaultValue(), field.type());
+          ToIcebergColumnDefault.fromGravitino(columns[i].initialDefaultValue(), field.type());
       if (write == null && initial == null) {
         withDefaults.add(field);
       } else {
