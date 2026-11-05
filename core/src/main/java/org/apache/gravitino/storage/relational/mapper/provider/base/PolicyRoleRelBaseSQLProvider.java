@@ -60,7 +60,7 @@ public class PolicyRoleRelBaseSQLProvider {
         + " #{relation.currentVersion}, #{relation.lastVersion}, #{relation.deletedAt})";
   }
 
-  /** Returns SQL for deleting one superseded reference with a version CAS. */
+  /** Returns SQL for deleting one superseded reference. */
   public String deleteByIdAndVersion(@Param("relation") PolicyRoleRelPO relation) {
     return "DELETE FROM "
         + POLICY_ROLE_RELATION_TABLE_NAME

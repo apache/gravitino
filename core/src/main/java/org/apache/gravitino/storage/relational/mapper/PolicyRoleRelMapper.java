@@ -61,13 +61,16 @@ public interface PolicyRoleRelMapper {
   int insert(@Param("relation") PolicyRoleRelPO relation);
 
   /**
-   * Removes one active reference the content no longer names, guarded by its observed version.
+   * Removes one active reference the content no longer names.
    *
    * <p>The row is deleted rather than soft-deleted. A superseded reference has no reader: the
    * record is derived, carries no audit info, and the content of every policy version is kept in
    * the policy version table. Leaving no tombstone also keeps the table's uniqueness over (policy,
    * role, deleted_at) free of the deletion timestamp, which two removals of one role can otherwise
    * share.
+   *
+   * <p>Nothing updates these rows, so the version in the WHERE clause never changes. Writers to one
+   * policy are serialised by the policy row they lock first.
    *
    * @param relation The observed reference and version.
    * @return The number of deleted rows.
