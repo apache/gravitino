@@ -24,6 +24,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.function.function_dto import FunctionDTO
@@ -90,9 +91,17 @@ class GenericFunction(Function, SupportsTags):
         """List the tag names associated with the function."""
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        """List visible tag names and authorization-filtering status."""
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         """List the tags associated with the function."""
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        """List visible tag details and authorization-filtering status."""
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         """Get an associated tag by name."""

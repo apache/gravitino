@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.starrocks.utils;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.unescapeSqlLiteral;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.sql.ResultSet;
@@ -30,7 +33,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -102,7 +104,13 @@ public class StarRocksUtils {
     StringBuilder sqlBuilder = new StringBuilder(" PROPERTIES (\n");
     sqlBuilder.append(
         properties.entrySet().stream()
-            .map(entry -> "\"" + entry.getKey() + "\"=\"" + entry.getValue() + "\"")
+            .map(
+                entry ->
+                    "\""
+                        + escapeSqlLiteral(entry.getKey(), '"')
+                        + "\"=\""
+                        + escapeSqlLiteral(entry.getValue(), '"')
+                        + "\"")
             .collect(Collectors.joining(",\n")));
     sqlBuilder.append("\n)");
     return sqlBuilder.toString();
@@ -113,7 +121,9 @@ public class StarRocksUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
+    // Escape alternatives exclude the closing delimiter, so no backtracking is needed.
+    final String sProperties =
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*+)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*+)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
@@ -124,8 +134,10 @@ public class StarRocksUtils {
       if (isProperties) {
         final Matcher matcherProperties = patternProperties.matcher(line);
         if (matcherProperties.find()) {
-          final String key = matcherProperties.group(1).trim();
-          String value = matcherProperties.group(2).trim();
+          // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
+          // CREATE echoes them escaped; unescape both so callers observe the original text.
+          final String key = unescapeSqlLiteral(matcherProperties.group(1), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2), '"');
           properties.put(key, value);
         }
       }
@@ -199,7 +211,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
+      return unescapeSqlLiteral(matcher.group(1), '"');
     }
     return "";
   }
@@ -239,7 +251,8 @@ public class StarRocksUtils {
     if (Literals.NULL.equals(upper)) {
       partitionValues = "LESS THAN MAXVALUE";
     } else {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+      partitionValues =
+          String.format("LESS THAN (\"%s\")", escapeSqlLiteral(String.valueOf(upper.value()), '"'));
     }
     return partitionValues;
   }
@@ -254,10 +267,10 @@ public class StarRocksUtils {
             String.format(
                 "(%s)",
                 Arrays.stream(part)
-                    .map(p -> "\"" + p.value() + "\"")
+                    .map(p -> "\"" + escapeSqlLiteral(String.valueOf(p.value()), '"') + "\"")
                     .collect(Collectors.joining(",")));
       } else {
-        values = String.format("\"%s\"", part[0].value());
+        values = String.format("\"%s\"", escapeSqlLiteral(String.valueOf(part[0].value()), '"'));
       }
       listValues.add(values);
     }

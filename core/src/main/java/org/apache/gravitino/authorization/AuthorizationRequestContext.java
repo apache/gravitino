@@ -32,12 +32,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -80,6 +84,13 @@ public class AuthorizationRequestContext {
   /** Per-request group identity cache. Key: {@code metalake::groupName}. */
   private final Map<String, Optional<GroupUpdatedAt>> groupInfoCache = new ConcurrentHashMap<>();
 
+  /** Per-request raw-name → canonical metadata object cache. */
+  private final Map<String, MetadataObject> normalizedMetadataObjects = new ConcurrentHashMap<>();
+
+  /** Serializes normalization per catalog and retains capability failures for this request. */
+  private final Map<NameIdentifier, CatalogNormalizationState> catalogNormalizationStates =
+      new ConcurrentHashMap<>();
+
   /** Per-request name→id cache. Deduplicates resolveMetadataId within a single request. */
   private final Map<String, Long> metadataIdCache = new ConcurrentHashMap<>();
 
@@ -92,6 +103,12 @@ public class AuthorizationRequestContext {
    * {@code batchGetRoleUpdatedAt} round trip.
    */
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
+
+  /** Completed auth-subject prefetch result, including a missing user, for this request only. */
+  @Nullable private volatile Optional<UserUpdatedAt> authSubjectPrefetchResult;
+
+  /** Failed prefetch attempts are shared by all workers of this request. */
+  @Nullable private volatile RuntimeException authSubjectPrefetchFailure;
 
   private volatile String originalAuthorizationExpression;
 
@@ -188,6 +205,46 @@ public class AuthorizationRequestContext {
   }
 
   /**
+   * Runs auth-subject prefetch at most once for this request, sharing its result or failure.
+   *
+   * <p>The loader may populate the request's user, group and role-version caches before returning
+   * the user identity, or {@link Optional#empty()} when the user is absent. Waiting workers reuse
+   * the same outcome. A runtime failure is retained for the request so later checks cannot repeat
+   * the failed query; a fresh request can try again. Fatal {@link Error}s are not cached.
+   *
+   * @param loader the non-null prefetch operation, which must return a non-null optional
+   * @return the prefetched user identity, or empty when the user is absent
+   * @throws RuntimeException if the loader failed, including on subsequent calls in this request
+   */
+  public Optional<UserUpdatedAt> computeAuthSubjectPrefetchIfAbsent(
+      Supplier<Optional<UserUpdatedAt>> loader) {
+    Objects.requireNonNull(loader, "Prefetch loader must not be null");
+    RuntimeException failure = authSubjectPrefetchFailure;
+    if (failure != null) {
+      throw failure;
+    }
+    Optional<UserUpdatedAt> result = authSubjectPrefetchResult;
+    if (result != null) {
+      return result;
+    }
+    synchronized (this) {
+      if (authSubjectPrefetchFailure != null) {
+        throw authSubjectPrefetchFailure;
+      }
+      if (authSubjectPrefetchResult == null) {
+        try {
+          authSubjectPrefetchResult =
+              Objects.requireNonNull(loader.get(), "Prefetch loader must not return null");
+        } catch (RuntimeException e) {
+          authSubjectPrefetchFailure = e;
+          throw e;
+        }
+      }
+      return authSubjectPrefetchResult;
+    }
+  }
+
+  /**
    * Per-request {@link UserUpdatedAt} dedup. Loader may return {@link Optional#empty()} to cache
    * the "user not found" outcome and avoid repeated DB lookups within a single request.
    */
@@ -206,6 +263,56 @@ public class AuthorizationRequestContext {
     return groupInfoCache.computeIfAbsent(
         key,
         k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
+  }
+
+  /**
+   * Normalizes each raw metadata name at most once per request.
+   *
+   * <p>The key must include the metalake, object type and raw name. Successful results are a
+   * request-local snapshot; failures are not cached, so a later lookup may retry. A fresh request
+   * must resolve current catalog rules again. This map must not be shared across mutations.
+   *
+   * @param key the raw metadata object's cache key
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, Function<String, MetadataObject> loader) {
+    return normalizedMetadataObjects.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Normalization loader must not return null"));
+  }
+
+  /**
+   * Normalizes a raw name while remembering capability failures for its catalog in this request.
+   *
+   * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
+   * Missing catalogs are not memoized; a fresh request can retry any capability failure.
+   *
+   * @param key the raw metadata object's cache key
+   * @param catalogIdentifier the containing catalog, including its metalake
+   * @param loader the normalization function, which must return a non-null object or throw
+   * @return the canonical metadata object
+   * @throws RuntimeException if normalization failed for this catalog
+   */
+  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
+      String key, NameIdentifier catalogIdentifier, Function<String, MetadataObject> loader) {
+    CatalogNormalizationState state =
+        catalogNormalizationStates.computeIfAbsent(
+            catalogIdentifier, ignored -> new CatalogNormalizationState());
+    synchronized (state) {
+      if (state.failure != null) {
+        throw state.failure;
+      }
+      try {
+        return computeNormalizedMetadataObjectIfAbsent(key, loader);
+      } catch (NotFoundException e) {
+        throw e;
+      } catch (RuntimeException e) {
+        state.failure = e;
+        throw e;
+      }
+    }
   }
 
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */
@@ -347,5 +454,9 @@ public class AuthorizationRequestContext {
     private final String metalake;
     private final MetadataObject metadataObject;
     private final Privilege.Name privilege;
+  }
+
+  private static class CatalogNormalizationState {
+    @Nullable private RuntimeException failure;
   }
 }

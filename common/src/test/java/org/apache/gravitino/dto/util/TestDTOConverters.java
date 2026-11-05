@@ -19,16 +19,19 @@
 
 package org.apache.gravitino.dto.util;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import org.apache.gravitino.dto.rel.partitioning.RangePartitioningDTO;
@@ -39,6 +42,9 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -367,5 +373,27 @@ public class TestDTOConverters {
             () -> DTOConverters.fromRuntimeJobTemplateJson(malformedJson, "job-1"));
     Assertions.assertTrue(exception.getMessage().contains("job-1"));
     Assertions.assertFalse(exception.getMessage().contains(malformedJson));
+  }
+
+  @Test
+  public void testAccessControlPolicyContentConvert() {
+    PolicyContent content =
+        PolicyContents.accessControl(
+            ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.READ_FILESET),
+            ImmutableList.of("analyst"));
+
+    PolicyContentDTO contentDTO = DTOConverters.toDTO(content);
+    Assertions.assertInstanceOf(PolicyContentDTO.AccessControlContentDTO.class, contentDTO);
+
+    PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+        (PolicyContentDTO.AccessControlContentDTO) contentDTO;
+    Assertions.assertEquals(
+        ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.READ_FILESET),
+        accessControlContentDTO.privileges());
+    Assertions.assertEquals(ImmutableList.of("analyst"), accessControlContentDTO.applicableRoles());
+
+    PolicyContent roundTripped = DTOConverters.fromDTO(contentDTO);
+    Assertions.assertInstanceOf(AccessControlContent.class, roundTripped);
+    Assertions.assertEquals(content, roundTripped);
   }
 }

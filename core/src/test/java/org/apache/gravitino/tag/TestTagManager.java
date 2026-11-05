@@ -19,10 +19,14 @@
 package org.apache.gravitino.tag;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -49,6 +53,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -60,11 +65,13 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -72,6 +79,7 @@ import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -89,6 +97,7 @@ import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -111,6 +120,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -167,7 +177,9 @@ public class TestTagManager {
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(
+            String.format(
+                "jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL;LOCK_TIMEOUT=30000", DB_DIR));
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
@@ -177,6 +189,10 @@ public class TestTagManager {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -521,6 +537,37 @@ public class TestTagManager {
 
     Assertions.assertEquals("tag1", tagManager.getTag(METALAKE, "tag1").name());
     Assertions.assertEquals("tag2", tagManager.getTag(METALAKE, "tag2").name());
+  }
+
+  @Test
+  void testAlterTagMultipleRenamesToExistingTag() {
+    Tag source = tagManager.createTag(METALAKE, "tag1", "source", ImmutableMap.of("key", "source"));
+    Tag target = tagManager.createTag(METALAKE, "tag2", "target", ImmutableMap.of("key", "target"));
+
+    TagAlreadyExistsException exception =
+        Assertions.assertThrows(
+            TagAlreadyExistsException.class,
+            () ->
+                tagManager.alterTag(
+                    METALAKE,
+                    "tag1",
+                    TagChange.rename("intermediate"),
+                    TagChange.updateComment("changed"),
+                    TagChange.setProperty("key", "changed"),
+                    TagChange.rename("tag2")));
+
+    Assertions.assertEquals(
+        "Tag with name tag2 under metalake metalake_for_tag_test already exists",
+        exception.getMessage());
+    Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+    for (Tag original : new Tag[] {source, target}) {
+      Tag unchanged = tagManager.getTag(METALAKE, original.name());
+      Assertions.assertEquals(original.name(), unchanged.name());
+      Assertions.assertEquals(original.comment(), unchanged.comment());
+      Assertions.assertEquals(original.properties(), unchanged.properties());
+    }
+    Assertions.assertThrows(
+        NoSuchTagException.class, () -> tagManager.getTag(METALAKE, "intermediate"));
   }
 
   @Test
@@ -1256,6 +1303,114 @@ public class TestTagManager {
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
+  }
+
+  @Test
+  public void testTagOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+    String policyName = "lock_free_policy";
+    entityStore.put(
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(policyName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.custom(
+                    ImmutableMap.of("rule", "value"),
+                    ImmutableSet.of(MetadataObject.Type.TABLE),
+                    null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build(),
+        false);
+
+    // A metalake WRITE lock covers every tag, policy and metadata object below it. Tag operations
+    // are fenced by the entity store, so none of them may wait for it.
+    try (TreeLockTestSupport.HeldLock metalakeWriter =
+        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.createTag(METALAKE, "lock_free_tag", null, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.getTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listTagsInfo(METALAKE));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.alterTag(METALAKE, "lock_free_tag", TagChange.updateComment("changed")));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, "lock_free_tag", policyName, AllValuesSelector.get()));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listPolicyAssociationsForTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.removePolicyFromTag(METALAKE, "lock_free_tag", policyName));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, tableObject, new String[] {"lock_free_tag"}, null));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listTagsForMetadataObject(METALAKE, tableObject));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter,
+          () -> tagManager.getTagForMetadataObject(METALAKE, tableObject, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.listMetadataObjectsForTag(METALAKE, "lock_free_tag"));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          metalakeWriter, () -> tagManager.deleteTag(METALAKE, "lock_free_tag"));
+    } finally {
+      entityStore.delete(
+          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
+  }
+
+  @Test
+  public void testConcurrentCreateTagHasOneWinner() throws Exception {
+    List<Object> outcomes =
+        RaceTestUtils.runTogether(8, () -> tagManager.createTag(METALAKE, "race_tag", null, null));
+
+    Assertions.assertEquals(1, outcomes.stream().filter(o -> o instanceof Tag).count());
+    outcomes.stream()
+        .filter(o -> !(o instanceof Tag))
+        .forEach(o -> Assertions.assertInstanceOf(TagAlreadyExistsException.class, o));
+    Assertions.assertEquals("race_tag", tagManager.getTag(METALAKE, "race_tag").name());
+  }
+
+  @Test
+  public void testConcurrentDeleteTagAndAssociateLeavesNoAssignment() throws Exception {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    for (int i = 0; i < 10; i++) {
+      String tagName = "race_delete_tag_" + i;
+      tagManager.createTag(METALAKE, tagName, null, null);
+
+      List<Object> outcomes =
+          RaceTestUtils.runTogether(
+              Arrays.asList(
+                  () -> tagManager.deleteTag(METALAKE, tagName),
+                  () ->
+                      tagManager.associateTagsForMetadataObject(
+                          METALAKE, tableObject, new String[] {tagName}, null)));
+
+      Assertions.assertEquals(Boolean.TRUE, outcomes.get(0));
+      Object associate = outcomes.get(1);
+      // A tag dropped while the association runs is ignored like a tag that never existed, so the
+      // association always succeeds, whichever change commits first.
+      Assertions.assertInstanceOf(String[].class, associate);
+      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, tagName));
+      Assertions.assertFalse(
+          Arrays.asList(tagManager.listTagsForMetadataObject(METALAKE, tableObject))
+              .contains(tagName));
     }
   }
 

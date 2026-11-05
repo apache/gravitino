@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.dto.policy;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
@@ -29,6 +31,9 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestOrphanFileRemovalPolicyDTO {
   @Test
@@ -83,6 +88,113 @@ class TestOrphanFileRemovalPolicyDTO {
             .readValue(JsonUtils.objectMapper().writeValueAsString(dto), PolicyDTO.class);
     Assertions.assertEquals(dto, restored);
     Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
+  }
+
+  @Test
+  void responseRoundTripWithExecutionPeers() throws Exception {
+    PolicyContent domain =
+        PolicyContents.icebergOrphanFileRemoval(
+            7L,
+            "s3://bucket/table/data",
+            true,
+            "0 0 3 * * ?",
+            null,
+            1_800_000L,
+            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of("metalake", "ml"));
+    PolicyDTO dto =
+        PolicyDTO.builder()
+            .withName("cleanup")
+            .withPolicyType("system_iceberg_orphan_file_removal")
+            .withEnabled(true)
+            .withContent(DTOConverters.toDTO(domain))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.EPOCH).build())
+            .build();
+    String json = JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains("\"timeTrigger\""));
+    Assertions.assertFalse(json.contains("\"executionSpec\""));
+    PolicyDTO restored = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    Assertions.assertEquals(dto, restored);
+    Assertions.assertEquals(domain, DTOConverters.fromDTO(restored.content()));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "olderThanDays,3.7",
+    "olderThanDays,\"3\"",
+    "olderThanDays,true",
+    "dryRun,1",
+    "dryRun,0",
+    "dryRun,\"true\"",
+    "minIntervalMs,1.9",
+    "minIntervalMs,\"100\"",
+    "commitTrigger,1",
+    "commitTrigger,\"false\"",
+    "location,123",
+    "location,true",
+    "timeTrigger,1",
+    "timeTrigger,true",
+    "jobOptions,1",
+    "updaterOptions,true"
+  })
+  void rejectInvalidValuesInCreateAndUpdate(String field, String value) {
+    assertRejected("{\"" + field + "\":" + value + "}");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"jobOptions\":{\"k\":1}}", "{\"updaterOptions\":{\"metalake\":true}}"})
+  void rejectNonStringMapEntryValues(String content) {
+    assertRejected(content);
+  }
+
+  private static void assertRejected(String content) {
+    String create =
+        "{\"name\":\"cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+            + "\"enabled\":true,\"content\":"
+            + content
+            + "}";
+    String update =
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+            + "\"newContent\":"
+            + content
+            + "}";
+    Assertions.assertThrows(
+        JsonProcessingException.class,
+        () -> JsonUtils.objectMapper().readValue(create, PolicyCreateRequest.class));
+    Assertions.assertThrows(
+        JsonProcessingException.class,
+        () ->
+            JsonUtils.objectMapper()
+                .readValue(update, PolicyUpdateRequest.UpdatePolicyContentRequest.class));
+  }
+
+  @Test
+  void rejectNonUriLocationInCreateAndUpdate() throws Exception {
+    String content = "{\"olderThanDays\":3,\"location\":\"s3://bucket/tbl/da ta\"}";
+    PolicyCreateRequest create =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"name\":\"cleanup\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+                    + "\"enabled\":true,\"content\":"
+                    + content
+                    + "}",
+                PolicyCreateRequest.class);
+    PolicyUpdateRequest update =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_orphan_file_removal\","
+                    + "\"newContent\":"
+                    + content
+                    + "}",
+                PolicyUpdateRequest.class);
+    Assertions.assertTrue(
+        Assertions.assertThrows(IllegalArgumentException.class, create::validate)
+            .getMessage()
+            .contains("location"));
+    Assertions.assertTrue(
+        Assertions.assertThrows(IllegalArgumentException.class, update::validate)
+            .getMessage()
+            .contains("location"));
   }
 
   @Test

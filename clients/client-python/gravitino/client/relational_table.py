@@ -21,6 +21,9 @@ from gravitino.api.audit import Audit
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
@@ -34,7 +37,11 @@ from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
@@ -68,8 +75,9 @@ class RelationalTable(
     SupportsRoles,
     SupportsStatistics,
     SupportsTags,
+    SupportsPolicies,
     SupportsSecrets,
-):
+):  # pylint: disable=too-many-ancestors,too-many-instance-attributes
     """Represents a relational table."""
 
     def __init__(
@@ -83,6 +91,9 @@ class RelationalTable(
             MetadataObject.Type.TABLE,
         )
         self._object_tag_operations = MetadataObjectTagOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_policy_operations = MetadataObjectPolicyOperations(
             namespace.level(0), table_object, rest_client
         )
         self._object_role_operations = MetadataObjectRoleOperations(
@@ -262,8 +273,14 @@ class RelationalTable(
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)
@@ -281,6 +298,21 @@ class RelationalTable(
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> list[str]:
+        return self._object_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._object_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> list[Policy]:
+        return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._object_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def supports_roles(self) -> SupportsRoles:

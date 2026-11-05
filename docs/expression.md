@@ -46,6 +46,13 @@ NamedReference field = NamedReference.field("student");
 ## Literal
 
 Literal is a constant value.
+
+When writing table or function defaults, partition values, partitioning, distribution, or sort
+expressions, each literal must declare a recognized Gravitino type or an explicit
+[external type](./tables-and-views.md#external-type) with a nonblank `catalogString`.
+This applies recursively inside function arguments and nested types, even when the literal value
+is null. `UnparsedType` is retained for reading existing metadata and cannot be used for these writes.
+
 The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
 
 <Tabs groupId='language' queryString>
@@ -143,7 +150,9 @@ FunctionExpression[] functionExpressions =
 
 ## Unparsed Expression
 
-Unparsed expression is a special type of expression, serves exclusively for presenting the default value of a column when it's unsolvable.
+An unparsed expression preserves SQL text that Gravitino cannot represent as a structured expression.
+It can be used for column defaults when supported by the target catalog. Unlike `UnparsedType`,
+it does not declare a data type and remains accepted in write requests.
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>

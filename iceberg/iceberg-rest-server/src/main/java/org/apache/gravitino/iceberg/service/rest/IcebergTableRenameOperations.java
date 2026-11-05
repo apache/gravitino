@@ -75,6 +75,7 @@ public class IcebergTableRenameOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @IcebergAuthorizationMetadata(type = RequestType.RENAME_TABLE)
           RenameTableRequest renameTableRequest) {
+    IcebergRESTUtils.validateRequest(renameTableRequest, "RenameTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Rename Iceberg tables, catalog: {}, source: {}, destination: {}.",

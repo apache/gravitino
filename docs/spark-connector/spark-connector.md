@@ -144,3 +144,11 @@ Gravitino spark connector support the following datatype mapping between Spark a
 For Gravitino `UUID` type, Spark connector represents it as `StringType` because Spark has no native UUID type.
 This behavior is consistent with Spark built-in PostgreSQL JDBC mapping (`uuid` -> `StringType`).
 :::
+
+### PostgreSQL write limitations
+
+Spark JDBC reads PostgreSQL UUID and External columns as strings. Writes to tables containing
+these columns are rejected before JDBC execution, including writes of NULL values and
+INSERT OVERWRITE. The error identifies the unsupported column. Spark binds these columns
+as VARCHAR, which does not preserve the PostgreSQL target type. Use a native PostgreSQL
+writer for these tables. Other PostgreSQL column types retain their existing write behavior.

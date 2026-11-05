@@ -35,9 +35,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -63,6 +65,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +88,16 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   protected JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
+  // The driver version is fixed for a data source. It is cached so that column parsing in load,
+  // which holds a connection, does not borrow another one to read it. A driver may report a null
+  // version, so a separate flag records that it was read; written after the version, it publishes
+  // it.
+  private String driverVersion;
+  private volatile boolean driverVersionCached;
+  // Even a failed attempt must prevent a fallback borrow while load holds its connection.
+  // cacheDriverVersion retries failures using the connection held by a later load.
+  private volatile boolean driverVersionAttempted;
+
   @Override
   public void initialize(
       DataSource dataSource,
@@ -93,6 +106,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       JdbcColumnDefaultValueConverter jdbcColumnDefaultValueConverter,
       Map<String, String> conf) {
     this.dataSource = dataSource;
+    driverVersion = null;
+    driverVersionCached = false;
+    driverVersionAttempted = false;
     this.exceptionMapper = exceptionMapper;
     this.typeConverter = jdbcTypeConverter;
     this.columnDefaultValueConverter = jdbcColumnDefaultValueConverter;
@@ -102,8 +118,20 @@ public abstract class JdbcTableOperations implements TableOperation {
     if (DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       return;
     }
-    String defaultValue = columnDefaultValueConverter.fromGravitino(column.defaultValue());
+    String defaultValue = renderDefaultValue(column.dataType(), column.defaultValue());
     sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
+  }
+
+  /**
+   * Renders a column default value for DDL. Subclasses override it when the rendering depends on
+   * the column type.
+   *
+   * @param type the column type.
+   * @param defaultValue the default value, never {@link Column#DEFAULT_VALUE_NOT_SET}.
+   * @return the default value as it appears after the DEFAULT keyword.
+   */
+  protected String renderDefaultValue(Type type, Expression defaultValue) {
+    return columnDefaultValueConverter.fromGravitino(defaultValue);
   }
 
   @Override
@@ -142,18 +170,19 @@ public abstract class JdbcTableOperations implements TableOperation {
       SortOrder[] sortOrders)
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
+    // Generate the SQL before borrowing the connection that executes it, as generators may query
+    // the server through another connection (for example, Doris checks its backends and version).
+    String sql =
+        generateCreateTableSql(
+            tableName,
+            columns,
+            comment,
+            properties,
+            partitioning,
+            distribution,
+            indexes,
+            sortOrders);
     try (Connection connection = getConnection(databaseName)) {
-      String sql =
-          generateCreateTableSql(
-              tableName,
-              columns,
-              comment,
-              properties,
-              partitioning,
-              distribution,
-              indexes,
-              sortOrders);
-
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Created table {} in database {} with SQL:\n{}", tableName, databaseName, sql);
     } catch (final SQLException se) {
@@ -239,8 +268,44 @@ public abstract class JdbcTableOperations implements TableOperation {
     return false;
   }
 
+  /**
+   * Returns the user-facing reason that this connector rejects table sort orders.
+   *
+   * <p>Called by the catalog before database access when {@link #supportsTableSortOrder()} is false
+   * and a create request contains sort orders. Connectors may override this method to name the
+   * catalog type and suggest a supported alternative. The message must not contain internal
+   * implementation class names.
+   *
+   * @return the rejection message, without the table identifier
+   */
+  public String unsupportedTableSortOrderMessage() {
+    return "The catalog does not support sort orders";
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    return load(databaseName, tableName, null);
+  }
+
+  /**
+   * Loads JDBC metadata, optionally enriching the builder from one caller-owned metadata snapshot.
+   * The enricher runs while the JDBC connection is open and is never retained between requests. It
+   * replaces the partitioning, properties and field-correction hooks; JDBC columns, indexes and
+   * distribution are still loaded normally. It may overwrite builder fields with snapshot data. The
+   * callback must not close or retain the borrowed connection. Runtime failures propagate, and the
+   * connection is closed before they reach the caller.
+   *
+   * @param databaseName database name
+   * @param tableName table name
+   * @param metadataEnricher replacement for partitioning, properties and field correction, or null
+   *     to use the standard JDBC hooks
+   * @return loaded table
+   * @throws NoSuchTableException if the table is absent
+   */
+  protected JdbcTable load(
+      String databaseName,
+      String tableName,
+      @Nullable BiConsumer<Connection, JdbcTable.Builder> metadataEnricher) {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
     // tables, for example.
     // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
@@ -248,6 +313,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     // 2. MySQL treats 'a_b' as a wildcard, matching any table name that begins with 'a', followed
     // by any character, and ending with 'b'.
     try (Connection connection = getConnection(databaseName)) {
+      cacheDriverVersion(connection);
       // 1. Get table information, The result of tables may be more than one due to the reason
       // above, so we need to check the result.
       ResultSet tables = getTable(connection, databaseName, tableName);
@@ -272,20 +338,17 @@ public abstract class JdbcTableOperations implements TableOperation {
       List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
-      // 4.Get partitioning
-      Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
-      jdbcTableBuilder.withPartitioning(tablePartitioning);
-
-      // 5.Get distribution information
-      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
-      jdbcTableBuilder.withDistribution(distribution);
-
-      // 6.Get table properties
-      Map<String, String> tableProperties = getTableProperties(connection, tableName);
-      jdbcTableBuilder.withProperties(tableProperties);
-
-      // 7.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+      if (metadataEnricher == null) {
+        jdbcTableBuilder.withPartitioning(
+            getTablePartitioning(connection, databaseName, tableName));
+      }
+      jdbcTableBuilder.withDistribution(getDistributionInfo(connection, databaseName, tableName));
+      if (metadataEnricher == null) {
+        jdbcTableBuilder.withProperties(getTableProperties(connection, tableName));
+        correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+      } else {
+        metadataEnricher.accept(connection, jdbcTableBuilder);
+      }
 
       return jdbcTableBuilder.withTableOperation(this).build();
     } catch (SQLException e) {
@@ -353,18 +416,35 @@ public abstract class JdbcTableOperations implements TableOperation {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
+    // Generate the SQL before borrowing the connection that executes it. Generators may load the
+    // table, which borrows another connection; holding both lets concurrent alters on distinct
+    // tables exhaust the pool and wait for each other until the borrow timeout.
+    String sql = generateAlterTableSql(databaseName, tableName, changes);
+    if (StringUtils.isEmpty(sql)) {
+      LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+      return;
+    }
+    validateAlterTableTarget(databaseName, tableName);
     try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
-      if (StringUtils.isEmpty(sql)) {
-        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-        return;
-      }
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
   }
+
+  /**
+   * Validates backend-specific target capabilities after SQL validation but before executing DDL.
+   *
+   * <p>The default implementation does nothing. Overrides should throw a runtime exception to
+   * reject the operation and must not perform DDL. The hook is not called for empty generated SQL
+   * and runs before borrowing the execution connection; SQL generation itself may have borrowed
+   * connections. This check is not atomic with an out-of-band target replacement.
+   *
+   * @param databaseName database name
+   * @param tableName table name
+   */
+  protected void validateAlterTableTarget(String databaseName, String tableName) {}
 
   @Override
   public boolean purge(String databaseName, String tableName) {
@@ -511,6 +591,21 @@ public abstract class JdbcTableOperations implements TableOperation {
     return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
+  /**
+   * Generates the SQL statement that creates a table without sort orders.
+   *
+   * <p>Implementations may borrow connections from {@link #dataSource}, so callers must not hold
+   * one while calling this method.
+   *
+   * @param tableName the name of the table
+   * @param columns the columns of the table
+   * @param comment the comment of the table
+   * @param properties the properties of the table
+   * @param partitioning the partitioning of the table
+   * @param distribution the distribution of the table
+   * @param indexes the indexes of the table
+   * @return the SQL statement to create the table
+   */
   protected abstract String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -520,6 +615,22 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes);
 
+  /**
+   * Generates the SQL statement that creates a table.
+   *
+   * <p>Implementations may borrow connections from {@link #dataSource}, so callers must not hold
+   * one while calling this method.
+   *
+   * @param tableName the name of the table
+   * @param columns the columns of the table
+   * @param comment the comment of the table
+   * @param properties the properties of the table
+   * @param partitioning the partitioning of the table
+   * @param distribution the distribution of the table
+   * @param indexes the indexes of the table
+   * @param sortOrders the sort orders of the table
+   * @return the SQL statement to create the table
+   */
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
@@ -567,6 +678,17 @@ public abstract class JdbcTableOperations implements TableOperation {
     return generatePurgeTableSql(tableName);
   }
 
+  /**
+   * Generates the SQL statement that applies the given changes to a table.
+   *
+   * <p>Implementations may load the table, which borrows a connection from {@link #dataSource}, so
+   * callers must not hold one while calling this method.
+   *
+   * @param databaseName the name of the database
+   * @param tableName the name of the table
+   * @param changes the changes to apply
+   * @return the SQL statement, or null or an empty string if nothing needs to be executed
+   */
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
@@ -584,17 +706,70 @@ public abstract class JdbcTableOperations implements TableOperation {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
 
-  protected void validateUpdateColumnNullable(
+  /**
+   * Validates a nullability change and returns the column it applies to.
+   *
+   * @param change the nullability change
+   * @param table the table that contains the column
+   * @return the current column
+   */
+  protected JdbcColumn validateUpdateColumnNullable(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
     if (change.fieldName().length > 1) {
       throw new UnsupportedOperationException("Nested column names are not supported");
     }
-    String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    if (!change.nullable() && column.defaultValue().equals(Literals.NULL)) {
-      throw new IllegalArgumentException(
-          "column " + col + " with null default value cannot be changed to not null");
+    return getJdbcColumnFromTable(table, change.fieldName()[0]);
+  }
+
+  /**
+   * Returns a copy of the column with the default value and nullability it has after all default
+   * value and nullability changes to it in the same alter request are applied. Dialects that
+   * regenerate the whole column definition for one change use it, so that the regenerated
+   * definition does not revert another change to the same column. A NULL default conflicts with NOT
+   * NULL: the existing NULL default is dropped when the column ends up non-nullable, while a NULL
+   * default requested in the same alter request is rejected.
+   *
+   * @param column the current column
+   * @param changes all changes in the alter request
+   * @return the column with the pending default value and nullability
+   * @throws IllegalArgumentException if the request sets a NULL default on a column that ends up
+   *     non-nullable
+   */
+  protected static JdbcColumn withPendingDefaultValueAndNullability(
+      JdbcColumn column, TableChange... changes) {
+    Expression defaultValue = column.defaultValue();
+    boolean defaultValueChanged = false;
+    boolean nullable = column.nullable();
+    for (TableChange change : changes) {
+      if (!(change instanceof TableChange.ColumnChange)) {
+        continue;
+      }
+      String[] fieldName = ((TableChange.ColumnChange) change).fieldName();
+      if (fieldName.length != 1 || !fieldName[0].equals(column.name())) {
+        continue;
+      }
+      if (change instanceof TableChange.UpdateColumnDefaultValue) {
+        defaultValue = ((TableChange.UpdateColumnDefaultValue) change).getNewDefaultValue();
+        defaultValueChanged = true;
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        nullable = ((TableChange.UpdateColumnNullability) change).nullable();
+      }
     }
+    if (!nullable && Literals.NULL.equals(defaultValue)) {
+      Preconditions.checkArgument(
+          !defaultValueChanged,
+          "Column %s cannot have a NULL default value because it is not nullable",
+          column.name());
+      defaultValue = DEFAULT_VALUE_NOT_SET;
+    }
+    return JdbcColumn.builder()
+        .withName(column.name())
+        .withType(column.dataType())
+        .withComment(column.comment())
+        .withNullable(nullable)
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(defaultValue)
+        .build();
   }
 
   /**
@@ -754,21 +929,49 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   /**
-   * Get MySQL driver version from DatabaseMetaData
+   * Get MySQL driver version from DatabaseMetaData.
+   *
+   * <p>The version is cached once read. {@link #load} caches it from the connection it holds before
+   * parsing columns (see {@link #cacheDriverVersion}), so this method borrows a connection only
+   * before the first version-read attempt. Failed reads return null until a later load retries
+   * using its own connection, avoiding a nested borrow during column parsing.
    *
    * @return the driver version string, or null if not available
    */
   protected String getMySQLDriverVersion() {
-    try {
-      if (dataSource != null) {
-        try (Connection connection = dataSource.getConnection()) {
-          return connection.getMetaData().getDriverVersion();
-        }
-      }
+    if (driverVersionCached || driverVersionAttempted || dataSource == null) {
+      return driverVersion;
+    }
+    try (Connection connection = dataSource.getConnection()) {
+      cacheDriverVersion(connection);
     } catch (SQLException e) {
       LOG.debug("Failed to get driver version", e);
     }
-    return null;
+    return driverVersion;
+  }
+
+  /**
+   * Caches the driver version from a connection the caller already holds.
+   *
+   * <p>Overrides of {@link #load} that parse columns must call this first, so that {@link
+   * #getMySQLDriverVersion()} does not borrow another connection while theirs is held.
+   *
+   * @param connection the connection held by the caller
+   */
+  protected void cacheDriverVersion(Connection connection) {
+    if (driverVersionCached) {
+      return;
+    }
+    try {
+      driverVersion = connection.getMetaData().getDriverVersion();
+      driverVersionCached = true;
+    } catch (SQLException e) {
+      // A later load retries on its held connection; column parsing must not retry by borrowing
+      // another connection. Until recovery, preserve the existing null-version precision fallback.
+      LOG.debug("Failed to get driver version", e);
+    } finally {
+      driverVersionAttempted = true;
+    }
   }
 
   /**

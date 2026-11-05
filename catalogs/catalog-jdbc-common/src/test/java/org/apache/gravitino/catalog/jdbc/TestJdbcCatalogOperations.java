@@ -41,10 +41,57 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJdbcCatalogOperations {
+
+  @Test
+  public void testRejectedChangesHaveReadableMessages() {
+    try (JdbcCatalogOperations operations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/unused"),
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      IllegalArgumentException rename =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.alterTable(
+                      table,
+                      TableChange.rename("new_table"),
+                      TableChange.addColumn(new String[] {"nested", "c"}, Types.StringType.get()),
+                      TableChange.deleteColumn(new String[] {"old"}, true)));
+      Assertions.assertEquals(
+          "A table rename cannot be combined with other changes: ADDCOLUMN nested.c string, DELETECOLUMN old",
+          rename.getMessage());
+      IllegalArgumentException sort =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  operations.createTable(
+                      table,
+                      new Column[0],
+                      null,
+                      Collections.emptyMap(),
+                      new Transform[0],
+                      null,
+                      new SortOrder[] {null},
+                      new Index[0]));
+      Assertions.assertEquals(
+          "Cannot create table metalake.catalog.schema.table: The catalog does not support sort orders",
+          sort.getMessage());
+    }
+  }
 
   @Test
   public void testExistingCatalogConnectionFailure() {
@@ -183,5 +230,37 @@ public class TestJdbcCatalogOperations {
             new SqliteColumnDefaultValueConverter());
 
     Assertions.assertDoesNotThrow(catalogOperations::close);
+  }
+
+  @Test
+  public void testResolveTableNameDelegatesToTableOperationAndPreservesNamespace() {
+    // A backend TableOperation that maps the normalized name to a differently-cased stored name.
+    SqliteTableOperations resolvingTableOps =
+        new SqliteTableOperations() {
+          @Override
+          public String resolveTableName(String databaseName, String normalizedName) {
+            Assertions.assertEquals("db", databaseName);
+            return "PHYSICAL_NAME".equals(normalizedName) ? "physical_Name" : normalizedName;
+          }
+        };
+    try (JdbcCatalogOperations catalogOperations =
+        new JdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/illegal/path"),
+            resolvingTableOps,
+            new SqliteColumnDefaultValueConverter())) {
+      NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "db", "PHYSICAL_NAME");
+
+      NameIdentifier resolved = catalogOperations.resolveTableName(normalized);
+
+      // Delegates the leaf name to TableOperation and keeps the original namespace.
+      Assertions.assertEquals("physical_Name", resolved.name());
+      Assertions.assertEquals(normalized.namespace(), resolved.namespace());
+
+      // When the backend returns the name unchanged, the same normalized identifier is returned.
+      NameIdentifier unchanged = NameIdentifier.of("metalake", "catalog", "db", "ALREADY_PHYSICAL");
+      Assertions.assertSame(unchanged, catalogOperations.resolveTableName(unchanged));
+    }
   }
 }

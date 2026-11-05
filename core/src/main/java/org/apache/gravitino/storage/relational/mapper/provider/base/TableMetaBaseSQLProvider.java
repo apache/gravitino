@@ -20,12 +20,15 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -425,5 +428,84 @@ public class TableMetaBaseSQLProvider {
              </script>
             """
         .formatted(TABLE_NAME, TableVersionMapper.TABLE_NAME);
+  }
+  /**
+   * Builds a single-statement table and column snapshot by schema ID and name.
+   *
+   * @param schemaId the schema ID
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public String selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName) {
+    return withColumns(selectTableMetaBySchemaIdAndName(schemaId, tableName));
+  }
+
+  /**
+   * Builds a single-statement table and column snapshot by full name.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public String selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return withColumns(
+        selectTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName));
+  }
+
+  private String withColumns(String tableSql) {
+    // One statement gives the root, version and columns a common snapshot. Overwrite retires old
+    // columns, so a second SELECT cannot reconstruct them. Aggregate history once and join by the
+    // existing (table_id, table_version, column_id, deleted_at) unique key. Correlated scans for
+    // each column would be quadratic for long histories. Root subqueries have independent bound
+    // parameters on all supported backends. Exclude DELETE markers only after resolving history,
+    // otherwise a dropped column would reappear through its earlier CREATE/UPDATE row.
+    // Derived tables accept static SELECTs only. MyBatis handles <script> only at the start of
+    // the complete statement, so a dynamic provider cannot be embedded here.
+    Preconditions.checkArgument(
+        !tableSql.stripLeading().startsWith("<script>"),
+        "Aggregate table reads require static root SQL, not a MyBatis <script>");
+    String rootSql = tableSql.strip().replaceFirst(";\\s*$", "");
+    return "SELECT t.*, "
+        + "c.column_id AS col_columnId, "
+        + "c.column_name AS col_columnName, "
+        + "c.column_position AS col_columnPosition, "
+        + "c.metalake_id AS col_metalakeId, "
+        + "c.catalog_id AS col_catalogId, "
+        + "c.schema_id AS col_schemaId, "
+        + "c.table_id AS col_tableId, "
+        + "c.table_version AS col_tableVersion, "
+        + "c.column_type AS col_columnType, "
+        + "c.column_comment AS col_columnComment, "
+        + "c.column_nullable AS col_nullable, "
+        + "c.column_auto_increment AS col_autoIncrement, "
+        + "c.column_default_value AS col_defaultValue, "
+        + "c.column_op_type AS col_columnOpType, "
+        + "c.deleted_at AS col_deletedAt, "
+        + "c.audit_info AS col_auditInfo "
+        + "FROM ("
+        + rootSql
+        + ") t LEFT JOIN ("
+        + " SELECT history.table_id, history.column_id, MAX(history.table_version) AS max_version"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " history JOIN ("
+        + rootSql
+        + ") observed"
+        + " ON history.table_id = observed.tableId AND history.table_version <= observed.currentVersion"
+        + " WHERE history.deleted_at = 0 GROUP BY history.table_id, history.column_id"
+        + ") latest ON latest.table_id = t.tableId LEFT JOIN "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " c"
+        + " ON c.table_id = latest.table_id AND c.column_id = latest.column_id"
+        + " AND c.table_version = latest.max_version AND c.deleted_at = 0"
+        + " AND c.column_op_type != "
+        + ColumnPO.ColumnOpType.DELETE.value();
   }
 }

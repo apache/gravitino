@@ -149,6 +149,33 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /**
+   * One join of policy, metalake, and the current policy version, selected by policy id.
+   *
+   * @param policyId policy id
+   * @return the select statement
+   */
+  public String selectPolicyMetaByPolicyId(@Param("policyId") Long policyId) {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
+        + " pm.deleted_at, mm.metalake_name as metalake_name,"
+        + " pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
+        + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content,"
+        + " pvi.deleted_at as version_deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON pm.metalake_id = mm.metalake_id"
+        + " JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pvi ON pm.policy_id = pvi.policy_id"
+        + " AND pm.current_version = pvi.version"
+        + " WHERE pm.policy_id = #{policyId}"
+        + " AND pm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND pvi.deleted_at = 0";
+  }
+
   public String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
         + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
