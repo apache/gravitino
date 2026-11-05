@@ -523,6 +523,15 @@ public class TestGlueExceptionConverter {
   }
 
   @Test
+  void testIcebergS3RedirectPointsAtBucketRegion() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(s3Exception(301, "PermanentRedirect"), "table t");
+    assertInstanceOf(IllegalArgumentException.class, converted);
+    assertTrue(converted.getMessage().contains("different region"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("table t"), converted.getMessage());
+  }
+
+  @Test
   void testIcebergClientFailureDoesNotBlameGlue() {
     RuntimeException converted =
         GlueExceptionConverter.toIcebergException(

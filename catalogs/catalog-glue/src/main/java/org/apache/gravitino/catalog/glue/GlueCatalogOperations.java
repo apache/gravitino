@@ -1020,8 +1020,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           e, String.format("registering table %s from %s", ident.name(), metadataLocation));
     }
 
+    // Iceberg writes only its own Glue parameters during registration, so the marker takes a second
+    // update. A process stopped between the two leaves an unmarked table, which has to be marked by
+    // hand.
     try {
       checkRegisteredColumns(columns, registered.schema(), metadataLocation);
+      checkRegisteredProperties(props, registered.properties(), metadataLocation);
       Table raw = getRawTable(dbName, ident.name());
       Map<String, String> params = new HashMap<>(raw.parameters());
       props.forEach(params::putIfAbsent);
@@ -1067,29 +1071,48 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         requested.equals(stored),
-        "Columns %s differ from the columns %s in %s; omit the columns to take them from the"
-            + " metadata file",
+        "Columns %s differ from the columns %s in %s; pass an empty column list to take them from"
+            + " the metadata file",
         requested,
         stored,
         metadataLocation);
   }
 
   /**
+   * A load reports the properties of the metadata file, so a request cannot give them new values.
+   */
+  private static void checkRegisteredProperties(
+      Map<String, String> props, Map<String, String> metadataProps, String metadataLocation) {
+    props.forEach(
+        (key, value) ->
+            Preconditions.checkArgument(
+                !metadataProps.containsKey(key) || metadataProps.get(key).equals(value),
+                "Property %s is set to '%s' in %s and cannot be given another value",
+                key,
+                metadataProps.get(key),
+                metadataLocation));
+  }
+
+  /**
    * Alters an Iceberg table registered through Gravitino. Only its Glue parameters change; the
-   * metadata file and the data files belong to the table it was registered from.
+   * metadata file and the data files belong to the table it was registered from. Properties of the
+   * metadata file cannot be changed: Iceberg engines read them from the file, and so does a load.
    */
   private GlueTable alterRegisteredIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
     Map<String, String> newParams = new HashMap<>(rawGlueTable.parameters());
+    Set<String> changedProperties = new HashSet<>();
     for (TableChange change : changes) {
       if (change instanceof TableChange.SetProperty) {
         TableChange.SetProperty sp = (TableChange.SetProperty) change;
         checkIcebergTableParameterKey(sp.getProperty());
         newParams.put(sp.getProperty(), sp.getValue());
+        changedProperties.add(sp.getProperty());
       } else if (change instanceof TableChange.RemoveProperty) {
         String property = ((TableChange.RemoveProperty) change).getProperty();
         checkIcebergTableParameterKey(property);
         newParams.remove(property);
+        changedProperties.add(property);
       } else {
         throw new IllegalArgumentException(
             String.format(
@@ -1097,6 +1120,22 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
                     + " properties can be changed; %s is not supported",
                 ident.name(), change.getClass().getSimpleName()));
       }
+    }
+
+    Map<String, String> metadataProps;
+    try {
+      metadataProps =
+          icebergGlueCatalog.loadTable(TableIdentifier.of(dbName, ident.name())).properties();
+    } catch (RuntimeException e) {
+      throw GlueExceptionConverter.toIcebergException(e, "altering table " + ident.name());
+    }
+    for (String property : changedProperties) {
+      Preconditions.checkArgument(
+          !metadataProps.containsKey(property),
+          "Property %s of registered Iceberg table %s comes from its metadata file and cannot be"
+              + " changed",
+          property,
+          ident.name());
     }
 
     TableInput input = tableInputFrom(rawGlueTable).parameters(newParams).build();

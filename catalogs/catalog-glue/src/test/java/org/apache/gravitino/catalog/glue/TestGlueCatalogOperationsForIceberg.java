@@ -37,6 +37,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -56,6 +57,7 @@ import org.mockito.Mockito;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
@@ -246,6 +248,23 @@ class TestGlueCatalogOperationsForIceberg {
   }
 
   @Test
+  void testDropTableDoesNotNeedIcebergMetadata() {
+    stubGlueTable(
+        Map.of(
+            TABLE_TYPE_PARAM,
+            ICEBERG_TABLE_TYPE_VALUE,
+            METADATA_LOCATION,
+            LOCATION + "/metadata/00001.metadata.json"));
+    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+        .thenThrow(new org.apache.iceberg.exceptions.NotFoundException("Location does not exist"));
+
+    assertTrue(ops.dropTable(NameIdentifier.of("cat", "ns", DB, TABLE)));
+
+    verify(mockClient).deleteTable(any(DeleteTableRequest.class));
+    verify(mockIcebergCatalog, never()).loadTable(any(TableIdentifier.class));
+  }
+
+  @Test
   void testLoadTableFailsWhenS3DeniesIcebergMetadata() {
     stubGlueTable(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE));
     when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
@@ -374,7 +393,59 @@ class TestGlueCatalogOperationsForIceberg {
     assertEquals("v1", captor.getValue().tableInput().parameters().get("k1"));
     assertEquals("3", captor.getValue().versionId());
     verify(mockIcebergCatalog, never()).renameTable(any(), any());
-    verify(mockIcebergCatalog, Mockito.times(1)).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog, Mockito.times(2)).loadTable(any(TableIdentifier.class));
+  }
+
+  @Test
+  void testAlterRegisteredIcebergTableRefusesMetadataProperties() {
+    stubGlueTable(registeredParams());
+    Table table = stubIcebergTable();
+    when(table.properties()).thenReturn(Map.of("write.format.default", "parquet"));
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
+
+    IllegalArgumentException set =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.alterTable(ident, TableChange.setProperty("write.format.default", "orc")));
+    assertTrue(set.getMessage().contains("write.format.default"), set.getMessage());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.alterTable(ident, TableChange.removeProperty("write.format.default")));
+
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+    verify(table, never()).newTransaction();
+  }
+
+  @Test
+  void testRegisterIcebergTableRefusesPropertyThatDiffersFromMetadata() {
+    String metadataLocation = LOCATION + "/metadata/00001.metadata.json";
+    Table registered = mockIcebergTable();
+    when(registered.properties()).thenReturn(Map.of("write.format.default", "parquet"));
+    when(mockIcebergCatalog.registerTable(TableIdentifier.of(DB, TABLE), metadataLocation))
+        .thenReturn(registered);
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTable(
+                    NameIdentifier.of("cat", "ns", DB, TABLE),
+                    new Column[0],
+                    null,
+                    Map.of(
+                        GlueConstants.TABLE_FORMAT,
+                        "iceberg",
+                        METADATA_LOCATION,
+                        metadataLocation,
+                        "write.format.default",
+                        "orc"),
+                    new Transform[0],
+                    Distributions.NONE,
+                    null,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(e.getMessage().contains("write.format.default"), e.getMessage());
+    verify(mockIcebergCatalog).dropTable(TableIdentifier.of(DB, TABLE), false);
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
   }
 
   @Test

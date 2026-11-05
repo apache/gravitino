@@ -278,6 +278,7 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
 
       NotFoundException e = assertThrows(NotFoundException.class, () -> ops.loadTable(ident));
       assertTrue(e.getMessage().contains(metadataLocation), e.getMessage());
+      assertTrue(ops.dropTable(ident));
     } finally {
       ops.dropTable(ident);
       ops.dropSchema(NameIdentifier.of("ml", "cat", schema), true);

@@ -458,7 +458,15 @@ final class GlueExceptionConverter {
       return new ServiceUnavailableException(
           e, "S3 throttled the request for %s; the request can be retried: %s", context, detail);
     }
-    if (status == 301 || (status >= 400 && status < 500)) {
+    if (status == 301) {
+      return new IllegalArgumentException(
+          String.format(
+              "S3 redirected the request for %s; the bucket is likely in a different region than"
+                  + " '%s': %s",
+              context, GlueConstants.AWS_REGION, detail),
+          e);
+    }
+    if (status >= 400 && status < 500) {
       return new IllegalArgumentException(
           String.format("S3 rejected the request for %s: %s", context, detail), e);
     }
