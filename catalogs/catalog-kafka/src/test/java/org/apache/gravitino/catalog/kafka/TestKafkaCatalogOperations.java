@@ -44,7 +44,6 @@ import static org.apache.gravitino.catalog.kafka.KafkaCatalogOperations.CLIENT_I
 import static org.apache.gravitino.catalog.kafka.KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS;
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PARTITION_COUNT;
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -74,12 +73,11 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.storage.relational.helper.CatalogIds;
-import org.apache.gravitino.storage.relational.service.CatalogMetaService;
-import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.common.KafkaFuture;
@@ -89,7 +87,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
@@ -145,7 +142,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static KafkaCatalogOperations kafkaCatalogOperations;
 
   @BeforeAll
-  public static void setUp() throws IllegalAccessException {
+  public static void setUp() throws IllegalAccessException, IOException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
@@ -180,35 +177,22 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
 
-    // Mock
-    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
-    MetalakeMetaService spyMetaservice = Mockito.spy(metalakeMetaService);
-    doReturn(1L).when(spyMetaservice).getMetalakeIdByName(Mockito.anyString());
-
-    CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
-    CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
-    doReturn(1L)
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
-    doReturn(new CatalogIds(1L, 1L))
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
-
-    MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
-        Mockito.mockStatic(MetalakeMetaService.class);
-    MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
-        Mockito.mockStatic(CatalogMetaService.class);
-
-    metalakeMetaServiceMockedStatic
-        .when(MetalakeMetaService::getInstance)
-        .thenReturn(spyMetaservice);
-    catalogMetaServiceMockedStatic
-        .when(CatalogMetaService::getInstance)
-        .thenReturn(spyCatalogMetaService);
-
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
     idGenerator = new RandomIdGenerator();
+    // Initializing Kafka registers its default schema, which locks the persisted catalog row.
+    store.put(
+        BaseMetalake.builder()
+            .withId(1L)
+            .withName(METALAKE_NAME)
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build(),
+        false);
     kafkaCatalogEntity =
         CatalogEntity.builder()
             .withId(1L)
@@ -223,6 +207,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
+    store.put(kafkaCatalogEntity, false);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
@@ -240,7 +225,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   }
 
   @Test
-  public void testKafkaCatalogConfiguration() {
+  public void testKafkaCatalogConfiguration() throws IOException {
     String catalogName = "test_kafka_catalog_configuration";
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
@@ -256,31 +241,33 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
-    KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
-    Assertions.assertNull(ops.adminClientConfig);
+    store.put(catalogEntity, false);
+    try (KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator)) {
+      Assertions.assertNull(ops.adminClientConfig);
 
-    ops.initialize(
-        MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
-    Assertions.assertNotNull(ops.adminClientConfig);
-    Assertions.assertEquals(2, ops.adminClientConfig.size());
-    Assertions.assertEquals(
-        MOCK_CATALOG_PROPERTIES.get(BOOTSTRAP_SERVERS),
-        ops.adminClientConfig.get(BOOTSTRAP_SERVERS));
-    Assertions.assertEquals(
-        String.format(
-            CLIENT_ID_TEMPLATE,
-            MOCK_CATALOG_PROPERTIES.get(ID_KEY),
-            catalogEntity.namespace(),
-            catalogName),
-        ops.adminClientConfig.get("client.id"));
+      ops.initialize(
+          MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+      Assertions.assertNotNull(ops.adminClientConfig);
+      Assertions.assertEquals(2, ops.adminClientConfig.size());
+      Assertions.assertEquals(
+          MOCK_CATALOG_PROPERTIES.get(BOOTSTRAP_SERVERS),
+          ops.adminClientConfig.get(BOOTSTRAP_SERVERS));
+      Assertions.assertEquals(
+          String.format(
+              CLIENT_ID_TEMPLATE,
+              MOCK_CATALOG_PROPERTIES.get(ID_KEY),
+              catalogEntity.namespace(),
+              catalogName),
+          ops.adminClientConfig.get("client.id"));
+    }
   }
 
   @Test
-  public void testInitialization() {
+  public void testInitialization() throws IOException {
     String catalogName = "test_kafka_catalog_initialization";
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
-            .withId(2L)
+            .withId(3L)
             .withName(catalogName)
             .withNamespace(Namespace.of(METALAKE_NAME))
             .withType(MESSAGING)
@@ -292,18 +279,20 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .build())
             .withProperties(MOCK_CATALOG_PROPERTIES)
             .build();
-    KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
-    ops.initialize(
-        MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+    store.put(catalogEntity, false);
+    try (KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator)) {
+      ops.initialize(
+          MOCK_CATALOG_PROPERTIES, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
 
-    Assertions.assertNotNull(ops.defaultSchemaIdent);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, ops.defaultSchemaIdent.name());
-    Assertions.assertEquals(
-        METALAKE_NAME + "." + catalogName, ops.defaultSchemaIdent.namespace().toString());
+      Assertions.assertNotNull(ops.defaultSchemaIdent);
+      Assertions.assertEquals(DEFAULT_SCHEMA_NAME, ops.defaultSchemaIdent.name());
+      Assertions.assertEquals(
+          METALAKE_NAME + "." + catalogName, ops.defaultSchemaIdent.namespace().toString());
 
-    Assertions.assertTrue(ops.schemaExists(ops.defaultSchemaIdent));
-    Schema schema = ops.loadSchema(ops.defaultSchemaIdent);
-    Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
+      Assertions.assertTrue(ops.schemaExists(ops.defaultSchemaIdent));
+      Schema schema = ops.loadSchema(ops.defaultSchemaIdent);
+      Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
+    }
   }
 
   @Test
