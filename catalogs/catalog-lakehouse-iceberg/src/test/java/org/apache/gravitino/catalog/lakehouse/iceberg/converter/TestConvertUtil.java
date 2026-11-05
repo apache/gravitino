@@ -739,7 +739,6 @@ public class TestConvertUtil extends TestBaseConvert {
     // When only write-default is supplied, seed both (Iceberg addColumn behavior).
     Assertions.assertEquals(8, n.writeDefault());
     Assertions.assertEquals(8, n.initialDefault());
-    Assertions.assertTrue(ConvertUtil.hasColumnDefaults(columns));
   }
 
   private static void checkType(Type type, org.apache.gravitino.rel.types.Type expected) {

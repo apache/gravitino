@@ -54,8 +54,7 @@ public class ConvertUtil {
   }
 
   /**
-   * Convert an array of Gravitino columns to an Iceberg Schema, including format-version 3 column
-   * defaults when present.
+   * Convert Gravitino columns to an Iceberg Schema, including format-version 3 column defaults.
    *
    * @param columns Gravitino columns.
    * @return Iceberg schema.
@@ -75,43 +74,36 @@ public class ConvertUtil {
     List<Types.NestedField> icebergFields = converted.asNestedType().asStructType().fields();
     List<Types.NestedField> withDefaults = new ArrayList<>(icebergFields.size());
     for (int i = 0; i < icebergFields.size(); i++) {
-      withDefaults.add(applyColumnDefaults(icebergFields.get(i), columns[i]));
+      Types.NestedField field = icebergFields.get(i);
+      Literal<?> write = toIcebergLiteral(columns[i].defaultValue(), field.type());
+      Literal<?> initial = toIcebergLiteral(columns[i].initialDefaultValue(), field.type());
+      if (write == null && initial == null) {
+        withDefaults.add(field);
+      } else {
+        // Seed both when only one side is set (Iceberg addColumn behavior for new fields).
+        withDefaults.add(
+            Types.NestedField.from(field)
+                .withWriteDefault(write != null ? write : initial)
+                .withInitialDefault(initial != null ? initial : write)
+                .build());
+      }
     }
     return new Schema(withDefaults);
   }
 
   /**
-   * Returns {@code true} if any column carries a write or initial default.
-   *
-   * @param columns the columns to inspect
-   * @return whether any column default is set
-   */
-  public static boolean hasColumnDefaults(Column[] columns) {
-    if (columns == null) {
-      return false;
-    }
-    for (Column column : columns) {
-      if (!isUnsetDefault(column.defaultValue())
-          || !isUnsetInitialDefault(column.initialDefaultValue())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Converts a Gravitino default expression to an Iceberg {@link Literal}, or {@code null} when the
-   * expression is unset.
+   * Converts a Gravitino default expression to an Iceberg {@link Literal}, or {@code null} when
+   * unset / NULL.
    *
    * @param expression the Gravitino expression
    * @param icebergType the target Iceberg field type
    * @return the Iceberg literal, or null when unset
    */
   public static Literal<?> toIcebergLiteral(Expression expression, Type icebergType) {
-    if (isUnsetDefault(expression) || isUnsetInitialDefault(expression)) {
-      return null;
-    }
-    if (Literals.NULL.equals(expression)) {
+    if (expression == null
+        || expression.equals(Column.DEFAULT_VALUE_NOT_SET)
+        || expression.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET)
+        || Literals.NULL.equals(expression)) {
       return null;
     }
     Preconditions.checkArgument(
@@ -119,29 +111,41 @@ public class ConvertUtil {
         "Iceberg column defaults must be literals, got: %s",
         expression);
     Object value = ((org.apache.gravitino.rel.expressions.literals.Literal<?>) expression).value();
-    Literal<?> icebergLiteral = literalFromJavaValue(value, icebergType);
-    Literal<?> typed = icebergLiteral.to(icebergType);
+    Literal<?> typed = toIcebergLiteralValue(value, icebergType).to(icebergType);
     Preconditions.checkArgument(
         typed != null, "Cannot cast column default %s to Iceberg type %s", value, icebergType);
     return typed;
   }
 
-  private static Types.NestedField applyColumnDefaults(Types.NestedField field, Column column) {
-    Literal<?> writeDefault = toIcebergLiteral(column.defaultValue(), field.type());
-    Literal<?> initialDefault = toIcebergLiteral(column.initialDefaultValue(), field.type());
-    if (writeDefault == null && initialDefault == null) {
-      return field;
-    }
-    // When only one side is supplied, seed both (Iceberg addColumn behavior for new fields).
-    Literal<?> effectiveWrite = writeDefault != null ? writeDefault : initialDefault;
-    Literal<?> effectiveInitial = initialDefault != null ? initialDefault : writeDefault;
-    return Types.NestedField.from(field)
-        .withWriteDefault(effectiveWrite)
-        .withInitialDefault(effectiveInitial)
+  /**
+   * Convert the nested field of Iceberg to the Iceberg column.
+   *
+   * <p>Iceberg {@code write-default} maps to {@link Column#defaultValue()} and {@code
+   * initial-default} maps to {@link Column#initialDefaultValue()}.
+   *
+   * @param nestedField Iceberg nested field.
+   * @return Gravitino Iceberg column
+   */
+  public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
+    return IcebergColumn.builder()
+        .withName(nestedField.name())
+        .withNullable(nestedField.isOptional())
+        .withComment(nestedField.doc())
+        .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
+        .withDefaultValue(
+            toGravitinoLiteral(
+                nestedField.writeDefaultLiteral(),
+                nestedField.type(),
+                Column.DEFAULT_VALUE_NOT_SET))
+        .withInitialDefaultValue(
+            toGravitinoLiteral(
+                nestedField.initialDefaultLiteral(),
+                nestedField.type(),
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET))
         .build();
   }
 
-  private static Literal<?> literalFromJavaValue(Object value, Type icebergType) {
+  private static Literal<?> toIcebergLiteralValue(Object value, Type icebergType) {
     switch (icebergType.typeId()) {
       case BOOLEAN:
         return Literal.of((Boolean) value);
@@ -163,22 +167,19 @@ public class ConvertUtil {
         {
           Types.TimestampType timestampType = (Types.TimestampType) icebergType;
           long micros = DateTimeUtil.microsFromTimestamp((LocalDateTime) value);
-          if (timestampType.shouldAdjustToUTC()) {
-            return Literal.of(micros).to(timestampType);
-          }
-          return Literal.of(micros);
+          return timestampType.shouldAdjustToUTC()
+              ? Literal.of(micros).to(timestampType)
+              : Literal.of(micros);
         }
       case TIMESTAMP_NANO:
         {
           Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) icebergType;
-          long nanos = DateTimeUtil.nanosFromTimestamp((LocalDateTime) value);
-          return Literal.of(nanos).to(timestampNanoType);
+          return Literal.of(DateTimeUtil.nanosFromTimestamp((LocalDateTime) value))
+              .to(timestampNanoType);
         }
       case DECIMAL:
-        if (value instanceof Decimal) {
-          return Literal.of(((Decimal) value).value());
-        }
-        return Literal.of((BigDecimal) value);
+        return Literal.of(
+            value instanceof Decimal ? ((Decimal) value).value() : (BigDecimal) value);
       case UUID:
         return Literal.of(UUID.fromString(String.valueOf(value)));
       case FIXED:
@@ -190,53 +191,11 @@ public class ConvertUtil {
     }
   }
 
-  private static boolean isUnsetDefault(Expression expression) {
-    return expression == null || expression.equals(Column.DEFAULT_VALUE_NOT_SET);
-  }
-
-  private static boolean isUnsetInitialDefault(Expression expression) {
-    return expression == null || expression.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
-  }
-
-  /**
-   * Convert the nested field of Iceberg to the Iceberg column.
-   *
-   * <p>For format-version 3 fields, Iceberg {@code write-default} maps to {@link
-   * Column#defaultValue()} and {@code initial-default} maps to {@link
-   * Column#initialDefaultValue()}.
-   *
-   * @param nestedField Iceberg nested field.
-   * @return Gravitino Iceberg column
-   */
-  public static IcebergColumn fromNestedField(Types.NestedField nestedField) {
-    return IcebergColumn.builder()
-        .withName(nestedField.name())
-        .withNullable(nestedField.isOptional())
-        .withComment(nestedField.doc())
-        .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
-        .withDefaultValue(
-            fromIcebergLiteral(
-                nestedField.writeDefaultLiteral(),
-                nestedField.type(),
-                Column.DEFAULT_VALUE_NOT_SET))
-        .withInitialDefaultValue(
-            fromIcebergLiteral(
-                nestedField.initialDefaultLiteral(),
-                nestedField.type(),
-                Column.INITIAL_DEFAULT_VALUE_NOT_SET))
-        .build();
-  }
-
-  private static Expression fromIcebergLiteral(
+  private static Expression toGravitinoLiteral(
       Literal<?> icebergDefault, Type type, Expression unset) {
     if (icebergDefault == null) {
       return unset;
     }
-    return toGravitinoLiteral(icebergDefault, type, unset);
-  }
-
-  private static Expression toGravitinoLiteral(
-      Literal<?> icebergDefault, Type type, Expression unset) {
     Object value = icebergDefault.value();
     if (value == null) {
       return Literals.NULL;
@@ -304,8 +263,7 @@ public class ConvertUtil {
         return Literals.of(
             toByteArray(value), org.apache.gravitino.rel.types.Types.BinaryType.get());
       default:
-        // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
-        // rather than failing table load.
+        // Nested types cannot carry non-null Iceberg defaults; leave unset rather than fail load.
         return unset;
     }
   }
