@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,6 +75,7 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -118,15 +120,16 @@ import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
-import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
-import org.apache.gravitino.storage.relational.service.CatalogMetaService;
-import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -248,7 +251,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @BeforeAll
-  public static void setUp() throws IllegalAccessException {
+  public static void setUp() throws IllegalAccessException, IOException {
     Config config = Mockito.mock(Config.class);
     when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -288,23 +291,30 @@ public class TestFilesetCatalogOperations {
     store.initialize(config);
     idGenerator = new RandomIdGenerator();
 
-    // Mock
-    MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
-    MetalakeMetaService spyMetaService = Mockito.spy(metalakeMetaService);
-    doReturn(1L).when(spyMetaService).getMetalakeIdByName(Mockito.anyString());
-
-    CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
-    CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
-    doReturn(1L)
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
+    // Schema registration locks the persisted catalog row, so parent ID stubs are not sufficient.
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    store.put(
+        BaseMetalake.builder()
+            .withId(1L)
+            .withName("m1")
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(auditInfo)
+            .build(),
+        false);
+    store.put(
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("c1")
+            .withNamespace(Namespace.of("m1"))
+            .withType(Catalog.Type.FILESET)
+            .withProvider("fileset")
+            .withAuditInfo(auditInfo)
+            .build(),
+        false);
 
     SchemaMetaService serviceMetaService = SchemaMetaService.getInstance();
     spySchemaMetaService = Mockito.spy(serviceMetaService);
-
-    doReturn(new CatalogIds(1L, 1L))
-        .when(spyCatalogMetaService)
-        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
 
     Stream<Arguments> argumentsStream = testRenameArguments();
     argumentsStream.forEach(
@@ -355,19 +365,9 @@ public class TestFilesetCatalogOperations {
                       Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
             });
 
-    MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
-        Mockito.mockStatic(MetalakeMetaService.class);
-    MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
-        Mockito.mockStatic(CatalogMetaService.class);
     MockedStatic<SchemaMetaService> schemaMetaServiceMockedStatic =
         Mockito.mockStatic(SchemaMetaService.class, Mockito.CALLS_REAL_METHODS);
 
-    metalakeMetaServiceMockedStatic
-        .when(MetalakeMetaService::getInstance)
-        .thenReturn(spyMetaService);
-    catalogMetaServiceMockedStatic
-        .when(CatalogMetaService::getInstance)
-        .thenReturn(spyCatalogMetaService);
     schemaMetaServiceMockedStatic
         .when(SchemaMetaService::getInstance)
         .thenReturn(spySchemaMetaService);

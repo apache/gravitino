@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.EntityFieldLimits;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -50,6 +51,8 @@ import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 public class TestIcebergTableOperationExecutor {
@@ -233,9 +236,31 @@ public class TestIcebergTableOperationExecutor {
     verifyNoInteractions(mockCatalogWrapper);
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      ints = {EntityFieldLimits.MAX_NAME_LENGTH + 1, EntityFieldLimits.MAX_COLUMN_NAME_LENGTH})
+  void testExpandedColumnNamesReachCreateAndUpdate(int length) {
+    Schema schema = new Schema(NestedField.required(1, "a".repeat(length), StringType.get()));
+    Namespace namespace = Namespace.of("test_namespace");
+    CreateTableRequest createRequest =
+        CreateTableRequest.builder().withName("test_table").withSchema(schema).build();
+    when(mockContext.userName()).thenReturn(AuthConstants.ANONYMOUS_USER);
+
+    executor.createTable(mockContext, namespace, createRequest);
+
+    verify(mockCatalogWrapper).createTable(namespace, createRequest, false);
+
+    TableIdentifier table = TableIdentifier.of(namespace, "test_table");
+    UpdateTableRequest updateRequest = updateRequest(schema);
+
+    executor.updateTable(mockContext, table, updateRequest);
+
+    verify(mockCatalogWrapper).updateTable(table, updateRequest);
+  }
+
   @Test
   public void testRejectsOversizedColumnFieldsBeforeCreate() {
-    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
     Schema oversizedNameSchema =
         new Schema(NestedField.required(1, oversizedName, StringType.get()));
     CreateTableRequest oversizedNameRequest =
@@ -248,7 +273,7 @@ public class TestIcebergTableOperationExecutor {
                 executor.createTable(
                     mockContext, Namespace.of("test_namespace"), oversizedNameRequest));
     Assertions.assertEquals(
-        "The name of the column must not exceed 128 characters", nameException.getMessage());
+        "The name of the column must not exceed 300 characters", nameException.getMessage());
 
     String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     Schema oversizedCommentSchema =
@@ -302,7 +327,7 @@ public class TestIcebergTableOperationExecutor {
 
   @Test
   public void testRejectsOversizedColumnFieldsBeforeUpdate() {
-    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
     UpdateTableRequest oversizedNameRequest =
         updateRequest(new Schema(NestedField.required(1, oversizedName, StringType.get())));
 
@@ -315,7 +340,7 @@ public class TestIcebergTableOperationExecutor {
                     TableIdentifier.of("test_namespace", "test_table"),
                     oversizedNameRequest));
     Assertions.assertEquals(
-        "The name of the column must not exceed 128 characters", nameException.getMessage());
+        "The name of the column must not exceed 300 characters", nameException.getMessage());
 
     String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COMMENT_LENGTH + 1);
     UpdateTableRequest oversizedCommentRequest =

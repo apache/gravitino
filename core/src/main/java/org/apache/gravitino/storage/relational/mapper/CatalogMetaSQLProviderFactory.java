@@ -90,6 +90,18 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName);
   }
 
+  /**
+   * Returns a locking lookup for the named catalog.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @return SQL that locks the catalog row
+   */
+  public static String selectCatalogMetaByNameForUpdate(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return getProvider().selectCatalogMetaByNameForUpdate(metalakeName, catalogName);
+  }
+
   public static String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
     return getProvider().selectCatalogMetaById(catalogId);
   }

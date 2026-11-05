@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -72,6 +73,20 @@ public interface CatalogMetaMapper {
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
+
+  /**
+   * Locks an active catalog by name for a schema registration transaction.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @return the catalog row, or null if it does not exist
+   */
+  @Nullable
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByNameForUpdate")
+  CatalogPO selectCatalogMetaByNameForUpdate(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
 
   @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);

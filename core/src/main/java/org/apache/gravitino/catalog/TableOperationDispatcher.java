@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Entity.EntityType.COLUMN;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.storage.relational.service.TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX;
@@ -56,6 +55,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -147,22 +147,37 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @param ident The identifier of the table to load.
    * @return The loaded {@link Table} object representing the requested table.
    * @throws NoSuchTableException If the specified table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
 
-    if (!entityCombinedTable.imported()) {
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      // Import the table.
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
       try {
         entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
       } catch (EntityAlreadyExistsException e) {
         // HA race: another Gravitino node concurrently imported this table. Reload from the
         // entity store to pick up the entity stored by the winning node.
@@ -199,6 +214,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The newly created {@link Table} object.
    * @throws NoSuchSchemaException If the schema in which to create the table does not exist.
    * @throws TableAlreadyExistsException If a table with the same name already exists in the schema.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadTable to import it.
    */
   @Override
   public Table createTable(
@@ -223,8 +240,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Lock the table node, not the schema, so tables in the same schema can be created
     // concurrently. The connector call and the entity-store write otherwise run under one
     // schema-wide lock, which serialized all creates in a schema. Ancestors are still read-locked,
-    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop/import
-    // (schema WRITE); a same-name create, load or alter contends on the table node.
+    // so create keeps excluding dropSchema/createSchema (catalog WRITE) and rename/drop
+    // (schema WRITE); a same-name create, load/import or alter contends on the table node.
     // Trade-off: listTables may briefly observe a table whose creation has not committed yet.
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -291,14 +308,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     validateAlterProperties(
                         catalog, HasPropertyMetadata::tablePropertiesMetadata, changes);
                     boolean managed = isManagedEntity(catalog, Capability.Scope.TABLE);
-                    TableChange[] normalizedChanges =
-                        applyCapabilities(catalog.capabilities(), changes);
                     Table table =
-                        catalog.doWithTableOps(
-                            tableOps -> tableOps.alterTable(ident, normalizedChanges));
+                        catalog.doWithTableOps(tableOps -> tableOps.alterTable(ident, changes));
                     return new AlterTableCatalogResult(
-                        snapshotTable(catalog, table, managed),
-                        resolveColumnNameChanges(normalizedChanges));
+                        snapshotTable(catalog, table, managed), resolveColumnNameChanges(changes));
                   },
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
@@ -686,9 +699,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     try {
       store.put(tableEntity, true /* overwrite */);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table %s was created in the external catalog, but its registration conflicts with an "
+              + "existing entity. Verify and reconcile the registered and source identities before "
+              + "continuing; loading the table does not resolve this conflict.",
+          ident);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      throw new GravitinoRuntimeException(
+          e,
+          "Table %s was created in the external catalog, but its registration in Gravitino "
+              + "failed. Resolve the entity-store error, verify the source identity, and use "
+              + "loadTable to import it. Do not repeat createTable; it will report already exists.",
+          ident);
     }
 
     // Merge both the metadata from catalog operation and the metadata from entity store.

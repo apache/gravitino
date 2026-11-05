@@ -35,9 +35,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -256,6 +258,28 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
+    return load(databaseName, tableName, null);
+  }
+
+  /**
+   * Loads JDBC metadata, optionally enriching the builder from one caller-owned metadata snapshot.
+   * The enricher runs while the JDBC connection is open and is never retained between requests. It
+   * replaces the partitioning, properties and field-correction hooks; JDBC columns, indexes and
+   * distribution are still loaded normally. It may overwrite builder fields with snapshot data. The
+   * callback must not close or retain the borrowed connection. Runtime failures propagate, and the
+   * connection is closed before they reach the caller.
+   *
+   * @param databaseName database name
+   * @param tableName table name
+   * @param metadataEnricher replacement for partitioning, properties and field correction, or null
+   *     to use the standard JDBC hooks
+   * @return loaded table
+   * @throws NoSuchTableException if the table is absent
+   */
+  protected JdbcTable load(
+      String databaseName,
+      String tableName,
+      @Nullable BiConsumer<Connection, JdbcTable.Builder> metadataEnricher) {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
     // tables, for example.
     // 1. MySQL will get table 'a_b' and 'A_B' when we query 'a_b' in a case-insensitive charset
@@ -287,20 +311,17 @@ public abstract class JdbcTableOperations implements TableOperation {
       List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
-      // 4.Get partitioning
-      Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
-      jdbcTableBuilder.withPartitioning(tablePartitioning);
-
-      // 5.Get distribution information
-      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
-      jdbcTableBuilder.withDistribution(distribution);
-
-      // 6.Get table properties
-      Map<String, String> tableProperties = getTableProperties(connection, tableName);
-      jdbcTableBuilder.withProperties(tableProperties);
-
-      // 7.Leave the information to the bottom layer to append the table
-      correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+      if (metadataEnricher == null) {
+        jdbcTableBuilder.withPartitioning(
+            getTablePartitioning(connection, databaseName, tableName));
+      }
+      jdbcTableBuilder.withDistribution(getDistributionInfo(connection, databaseName, tableName));
+      if (metadataEnricher == null) {
+        jdbcTableBuilder.withProperties(getTableProperties(connection, tableName));
+        correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
+      } else {
+        metadataEnricher.accept(connection, jdbcTableBuilder);
+      }
 
       return jdbcTableBuilder.withTableOperation(this).build();
     } catch (SQLException e) {
@@ -368,18 +389,34 @@ public abstract class JdbcTableOperations implements TableOperation {
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
+    // SQL generation may load the table using its own connection. Do not hold the execution
+    // connection while generating SQL, or concurrent alters can exhaust the pool.
+    String sql = generateAlterTableSql(databaseName, tableName, changes);
+    if (StringUtils.isEmpty(sql)) {
+      LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
+      return;
+    }
+    validateAlterTableTarget(databaseName, tableName);
     try (Connection connection = getConnection(databaseName)) {
-      String sql = generateAlterTableSql(databaseName, tableName, changes);
-      if (StringUtils.isEmpty(sql)) {
-        LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-        return;
-      }
       JdbcConnectorUtils.executeUpdate(connection, sql);
       LOG.info("Alter table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
   }
+
+  /**
+   * Validates backend-specific target capabilities after SQL validation but before executing DDL.
+   *
+   * <p>The default implementation does nothing. Overrides should throw a runtime exception to
+   * reject the operation and must not perform DDL. The hook is not called for empty generated SQL
+   * and runs before borrowing the execution connection; SQL generation itself may have borrowed
+   * connections. This check is not atomic with an out-of-band target replacement.
+   *
+   * @param databaseName database name
+   * @param tableName table name
+   */
+  protected void validateAlterTableTarget(String databaseName, String tableName) {}
 
   @Override
   public boolean purge(String databaseName, String tableName) {

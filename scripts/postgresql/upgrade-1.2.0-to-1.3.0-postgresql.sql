@@ -183,3 +183,6 @@ COMMENT ON COLUMN iceberg_cleanup_job.last_error IS 'truncated reason for the mo
 COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the worker, 0 when not running';
 COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
 COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';
+
+-- Expand top-level table column names to match the current 1.3 entity limit.
+ALTER TABLE table_column_version_info ALTER COLUMN column_name TYPE VARCHAR(300);

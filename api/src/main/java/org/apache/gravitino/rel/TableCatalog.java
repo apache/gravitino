@@ -59,6 +59,8 @@ public interface TableCatalog {
    * @param ident A table identifier.
    * @return The table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   Table loadTable(NameIdentifier ident) throws NoSuchTableException;
 
@@ -69,6 +71,7 @@ public interface TableCatalog {
    * @param requiredPrivilegeNames The required privilege names to access the table.
    * @return The table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   default Table loadTable(NameIdentifier ident, Set<Privilege.Name> requiredPrivilegeNames)
       throws NoSuchTableException {
@@ -84,7 +87,7 @@ public interface TableCatalog {
   default boolean tableExists(NameIdentifier ident) {
     try {
       return loadTable(ident) != null;
-    } catch (NoSuchTableException e) {
+    } catch (NoSuchTableException | NoSuchSchemaException e) {
       return false;
     }
   }
@@ -95,6 +98,11 @@ public interface TableCatalog {
    * <p>This method returns the table as defined by the user without applying all defaults. If you
    * need the table with default values applied, use the {@link #loadTable(NameIdentifier)} method
    * after creation.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -120,6 +128,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -142,6 +155,11 @@ public interface TableCatalog {
 
   /**
    * Create a table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -168,6 +186,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -191,6 +214,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -213,6 +241,11 @@ public interface TableCatalog {
 
   /**
    * Create a partitioned table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -247,6 +280,11 @@ public interface TableCatalog {
 
   /**
    * Create a table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.

@@ -1847,44 +1847,51 @@ public class CatalogMysqlIT extends BaseIT {
     String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
     mysqlService.executeQuery(sql);
 
-    Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
-    Assertions.assertEquals(testSchemaName, schema.name());
+    try {
+      Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
+      Assertions.assertEquals(testSchemaName, schema.name());
 
-    String[] schemaIdents = catalog.asSchemas().listSchemas();
-    Assertions.assertTrue(Arrays.asList(schemaIdents).contains(testSchemaName));
+      String[] schemaIdents = catalog.asSchemas().listSchemas();
+      Assertions.assertTrue(Arrays.asList(schemaIdents).contains(testSchemaName));
 
-    Exception exception =
-        Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> catalog.asSchemas().createSchema(testSchemaName, null, Collections.emptyMap()));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Can't create database '//'; database exists"));
+      SchemaAlreadyExistsException exception =
+          Assertions.assertThrows(
+              SchemaAlreadyExistsException.class,
+              () -> catalog.asSchemas().createSchema(testSchemaName, null, Collections.emptyMap()));
+      // The registration preflight may reject this before MySQL executes CREATE DATABASE.
+      Assertions.assertTrue(
+          exception.getMessage().contains(testSchemaName), exception.getMessage());
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
+      Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
+      Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
 
-    // test operate illegal table name from MySQL
-    mysqlService.executeQuery(sql);
-    String testTableName = "//";
-    sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
-    mysqlService.executeQuery(sql);
-    NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
+      // test operate illegal table name from MySQL
+      mysqlService.executeQuery(sql);
+      String testTableName = "//";
+      sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
+      mysqlService.executeQuery(sql);
+      NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
 
-    Table table = catalog.asTableCatalog().loadTable(tableIdent);
-    Assertions.assertEquals(testTableName, table.name());
+      Table table = catalog.asTableCatalog().loadTable(tableIdent);
+      Assertions.assertEquals(testTableName, table.name());
 
-    NameIdentifier[] tableIdents =
-        catalog.asTableCatalog().listTables(Namespace.of(testSchemaName));
-    Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
+      NameIdentifier[] tableIdents =
+          catalog.asTableCatalog().listTables(Namespace.of(testSchemaName));
+      Assertions.assertTrue(
+          Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
 
-    Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
-    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> {
-          catalog.asTableCatalog().purgeTable(tableIdent);
-        });
-    catalog.asSchemas().dropSchema(testSchemaName, true);
+      Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
+      Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
+      Assertions.assertThrows(
+          UnsupportedOperationException.class,
+          () -> {
+            catalog.asTableCatalog().purgeTable(tableIdent);
+          });
+    } finally {
+      // This name is shared by the inherited MySQL suites. Clean both source and registration
+      // even when an assertion fails, so later suites do not inherit a non-empty catalog.
+      catalog.asSchemas().dropSchema(testSchemaName, true);
+    }
 
     // sql injection
     String schemaName = RandomNameUtils.genRandomName("ct_db");

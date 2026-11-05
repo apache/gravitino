@@ -30,14 +30,24 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
@@ -51,21 +61,274 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_catalog_test";
   private final String catalogName = "catalog_for_catalog_test";
+
+  @TestTemplate
+  void testOverwriteDifferentSchemaIdPreservesRegisteredHierarchy() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity stale = createAndInsertSchema(metalakeName, catalogName, "stale_schema");
+    SchemaEntity nested = createAndInsertSchema(metalakeName, catalogName, "stale_schema:child");
+    TableEntity child =
+        createAndInsertTableEntity(
+            Namespace.of(metalakeName, catalogName, stale.name()), "old_table");
+    TagEntity tag = createAndInsertTagEntity("tag_on_stale_schema", "", metalakeName);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            stale.nameIdentifier(),
+            Entity.EntityType.SCHEMA,
+            new NameIdentifier[] {tag.nameIdentifier()},
+            new NameIdentifier[0]);
+    SchemaEntity replacement =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(), stale.namespace(), stale.name(), AUDIT_INFO);
+    EntityAlreadyExistsException conflict =
+        assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(replacement, true));
+    assertTrue(conflict.getMessage().contains(stale.nameIdentifier().toString()));
+    assertTrue(conflict.getMessage().contains("Reconcile the existing registration"));
+    Assertions.assertEquals(
+        stale.id(),
+        backend.<SchemaEntity>get(stale.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        child.id(), backend.<TableEntity>get(child.nameIdentifier(), Entity.EntityType.TABLE).id());
+    Assertions.assertEquals(
+        nested.id(),
+        backend.<SchemaEntity>get(nested.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rows =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM tag_relation_meta WHERE metadata_object_id = "
+                    + stale.id()
+                    + " AND deleted_at = 0")) {
+      assertTrue(rows.next());
+      Assertions.assertEquals(1, rows.getLong(1));
+    }
+  }
+
+  @TestTemplate
+  void testOverwriteSameSchemaIdKeepsChildren() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity original = createAndInsertSchema(metalakeName, catalogName, "same_schema_id");
+    TableEntity child =
+        createAndInsertTableEntity(
+            Namespace.of(metalakeName, catalogName, original.name()), "retained_table");
+    backend.insert(
+        createSchemaEntity(original.id(), original.namespace(), original.name(), AUDIT_INFO), true);
+    Assertions.assertEquals(
+        original.id(),
+        backend.<SchemaEntity>get(original.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        child.id(), backend.<TableEntity>get(child.nameIdentifier(), Entity.EntityType.TABLE).id());
+  }
+
+  @TestTemplate
+  void testOverwriteDoesNotStealSchemaIdFromAnotherCatalog() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertCatalog(metalakeName, "other_catalog");
+    SchemaEntity original =
+        createAndInsertSchema(metalakeName, catalogName, "schema_identity_conflict");
+    SchemaEntity other = createAndInsertSchema(metalakeName, "other_catalog", "other_schema");
+    TableEntity child =
+        createAndInsertTableEntity(
+            Namespace.of(metalakeName, catalogName, original.name()), "retained_table");
+    SchemaEntity conflicting =
+        createSchemaEntity(other.id(), original.namespace(), original.name(), AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(conflicting, true));
+    Assertions.assertEquals(
+        original.id(),
+        backend.<SchemaEntity>get(original.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        other.id(),
+        backend.<SchemaEntity>get(other.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        child.id(), backend.<TableEntity>get(child.nameIdentifier(), Entity.EntityType.TABLE).id());
+  }
+
+  @TestTemplate
+  void testOverwriteCanReviveRetiredSchemaIdentityInNewCatalog() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity oldCatalog = createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertCatalog(metalakeName, "new_catalog");
+    SchemaEntity retired = createAndInsertSchema(metalakeName, catalogName, "retired_schema");
+    TableEntity child =
+        createAndInsertTableEntity(
+            Namespace.of(metalakeName, catalogName, retired.name()), "old_table");
+    backend.delete(oldCatalog.nameIdentifier(), Entity.EntityType.CATALOG, true);
+    SchemaEntity revived =
+        createSchemaEntity(
+            retired.id(), Namespace.of(metalakeName, "new_catalog"), retired.name(), AUDIT_INFO);
+    backend.insert(revived, true);
+    Assertions.assertEquals(
+        revived.id(),
+        backend.<SchemaEntity>get(revived.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    assertFalse(backend.exists(child.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  void testConcurrentRevivalOfRetiredSchemaIdKeepsOneOwner() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertCatalog(metalakeName, "first_revival_catalog");
+    createAndInsertCatalog(metalakeName, "second_revival_catalog");
+    SchemaEntity retired = createAndInsertSchema(metalakeName, catalogName, "retired_identity");
+    backend.delete(retired.nameIdentifier(), Entity.EntityType.SCHEMA, true);
+    SchemaEntity first =
+        createSchemaEntity(
+            retired.id(),
+            Namespace.of(metalakeName, "first_revival_catalog"),
+            "revived",
+            AUDIT_INFO);
+    SchemaEntity second =
+        createSchemaEntity(
+            retired.id(),
+            Namespace.of(metalakeName, "second_revival_catalog"),
+            "revived",
+            AUDIT_INFO);
+    CountDownLatch lockingReadsStarted = new CountDownLatch(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> firstResult;
+      Future<Throwable> secondResult;
+      try (SqlSession session =
+          SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false)) {
+        SchemaPO locked =
+            session
+                .getMapper(SchemaMetaMapper.class)
+                .selectSchemaMetaByIdIncludingDeletedForUpdate(retired.id());
+        Assertions.assertNotNull(locked);
+        assertTrue(locked.getDeletedAt() > 0);
+        firstResult =
+            executor.submit(() -> reviveSchemaAfterIdentityCheck(first, lockingReadsStarted));
+        secondResult =
+            executor.submit(() -> reviveSchemaAfterIdentityCheck(second, lockingReadsStarted));
+        // Both non-locking checks have observed no active owner. Hold the retired row until both
+        // writers reach the locking read, forcing the loser to revalidate the winner's active ID.
+        assertTrue(lockingReadsStarted.await(30, TimeUnit.SECONDS));
+        session.commit();
+      }
+      Throwable firstFailure = firstResult.get(30, TimeUnit.SECONDS);
+      Throwable secondFailure = secondResult.get(30, TimeUnit.SECONDS);
+      assertTrue((firstFailure == null) != (secondFailure == null), "Exactly one revival must win");
+      Assertions.assertInstanceOf(
+          EntityAlreadyExistsException.class, firstFailure == null ? secondFailure : firstFailure);
+      SchemaEntity winner = firstFailure == null ? first : second;
+      SchemaEntity loser = firstFailure == null ? second : first;
+      Assertions.assertEquals(
+          retired.id(),
+          backend.<SchemaEntity>get(winner.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+      assertFalse(backend.exists(loser.nameIdentifier(), Entity.EntityType.SCHEMA));
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
+  @TestTemplate
+  void testNewSchemaIdCannotOverwriteConcurrentWinnerInAnotherCatalog() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity targetCatalog = createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertCatalog(metalakeName, "winning_catalog");
+    SchemaEntity original =
+        createAndInsertSchema(metalakeName, catalogName, "schema_losing_registration");
+    long sharedId = RandomIdGenerator.INSTANCE.nextId();
+    SchemaEntity losing =
+        createSchemaEntity(sharedId, original.namespace(), "unregistered_schema", AUDIT_INFO);
+    SchemaEntity winner =
+        createSchemaEntity(
+            sharedId, Namespace.of(metalakeName, "winning_catalog"), "winning_schema", AUDIT_INFO);
+    SchemaMetaService service = SchemaMetaService.getInstance();
+    BasePOStorageOps<SchemaPO, SchemaMetaMapper> originalOps = service.ops();
+    BasePOStorageOps<SchemaPO, SchemaMetaMapper> racedOps = Mockito.spy(originalOps);
+    AtomicBoolean insertedWinner = new AtomicBoolean();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Mockito.doAnswer(
+            invocation -> {
+              List<SchemaPO> rows = invocation.getArgument(1);
+              if (rows.size() == 1
+                  && Objects.equals(rows.get(0).getCatalogId(), targetCatalog.id())
+                  && insertedWinner.compareAndSet(false, true)) {
+                executor
+                    .submit(
+                        () -> {
+                          backend.insert(winner, true);
+                          return null;
+                        })
+                    .get(30, TimeUnit.SECONDS);
+              }
+              return invocation.callRealMethod();
+            })
+        .when(racedOps)
+        .batchInsertPOs(Mockito.any(), Mockito.anyList(), Mockito.anyBoolean());
+    FieldUtils.writeField(service, "ops", racedOps, true);
+    try {
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(losing, true));
+    } finally {
+      FieldUtils.writeField(service, "ops", originalOps, true);
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+    assertTrue(insertedWinner.get());
+    assertFalse(backend.exists(losing.nameIdentifier(), Entity.EntityType.SCHEMA));
+    Assertions.assertEquals(
+        original.id(),
+        backend.<SchemaEntity>get(original.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        winner.id(),
+        backend.<SchemaEntity>get(winner.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+  }
+
+  @TestTemplate
+  void testSameIdentityOverwriteRollsBackIfWriteFails() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity original =
+        createAndInsertSchema(metalakeName, catalogName, "schema_replace_rollback");
+    TableEntity child =
+        createAndInsertTableEntity(
+            Namespace.of(metalakeName, catalogName, original.name()), "retained_table");
+    SchemaEntity replacement =
+        createSchemaEntity(original.id(), original.namespace(), original.name(), AUDIT_INFO);
+    SchemaMetaService service = SchemaMetaService.getInstance();
+    BasePOStorageOps<SchemaPO, SchemaMetaMapper> originalOps = service.ops();
+    BasePOStorageOps<SchemaPO, SchemaMetaMapper> failingOps = Mockito.spy(originalOps);
+    Mockito.doThrow(new IllegalStateException("new schema insert failed"))
+        .when(failingOps)
+        .batchInsertPOs(Mockito.any(), Mockito.anyList(), Mockito.anyBoolean());
+    FieldUtils.writeField(service, "ops", failingOps, true);
+    try {
+      assertThrows(IllegalStateException.class, () -> backend.insert(replacement, true));
+    } finally {
+      FieldUtils.writeField(service, "ops", originalOps, true);
+    }
+    Assertions.assertEquals(
+        original.id(),
+        backend.<SchemaEntity>get(original.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+    Assertions.assertEquals(
+        child.id(), backend.<TableEntity>get(child.nameIdentifier(), Entity.EntityType.TABLE).id());
+  }
 
   @TestTemplate
   void testDeleteSchemaAndGetRollsBackWhenCleanupFails() throws IOException {
@@ -764,6 +1027,39 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  @Nullable
+  private Throwable reviveSchemaAfterIdentityCheck(
+      SchemaEntity schema, CountDownLatch lockingReadsStarted) {
+    // Static mocks are thread-local: install this observer in each database writer, and delegate
+    // every mapper call to the real session so the row locks and transaction remain real.
+    try (MockedStatic<SqlSessions> sessions =
+        Mockito.mockStatic(
+            SqlSessions.class,
+            invocation -> {
+              Object result = invocation.callRealMethod();
+              if (!"getMapper".equals(invocation.getMethod().getName())
+                  || invocation.getArgument(0) != SchemaMetaMapper.class) {
+                return result;
+              }
+              SchemaMetaMapper actual = (SchemaMetaMapper) result;
+              SchemaMetaMapper observed =
+                  Mockito.mock(SchemaMetaMapper.class, AdditionalAnswers.delegatesTo(actual));
+              Mockito.doAnswer(
+                      call -> {
+                        lockingReadsStarted.countDown();
+                        return actual.selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
+                      })
+                  .when(observed)
+                  .selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
+              return observed;
+            })) {
+      backend.insert(schema, true);
+      return null;
+    } catch (Throwable failure) {
+      return failure;
     }
   }
 }

@@ -126,6 +126,27 @@ public class CatalogMetaBaseSQLProvider {
         + " AND ca.deleted_at = 0 AND me.deleted_at = 0";
   }
 
+  /**
+   * Returns a locking lookup that does not lock sibling catalogs through a metalake join.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @return SQL that locks the active catalog row
+   */
+  public String selectCatalogMetaByNameForUpdate(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
+        + " metalake_id as metalakeId, type, provider,"
+        + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE catalog_name = #{catalogName} AND deleted_at = 0"
+        + " AND metalake_id = (SELECT metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0) FOR UPDATE";
+  }
+
   public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"

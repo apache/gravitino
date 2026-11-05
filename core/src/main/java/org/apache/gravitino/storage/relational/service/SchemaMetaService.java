@@ -32,7 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -43,13 +45,13 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -68,6 +70,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -134,6 +137,15 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
+  /**
+   * Registers a schema without replacing another active identity at the same name.
+   *
+   * @param schemaEntity the schema to register
+   * @param overwrite whether to update or revive the same schema ID; active cross-catalog IDs and
+   *     different active IDs at the same name are rejected even when true
+   * @throws EntityAlreadyExistsException if the name or identity conflicts with a registration
+   * @throws IOException if the store operation fails
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertSchema")
@@ -171,6 +183,21 @@ public class SchemaMetaService {
       SessionUtils.doWithCommit(
           SchemaMetaMapper.class,
           mapper -> {
+            // Lock before the first snapshot read. Registrations under this catalog then observe
+            // each other's committed identities on MySQL REPEATABLE READ as well as H2/PostgreSQL.
+            CatalogPO parent =
+                SessionUtils.getWithoutCommit(
+                    CatalogMetaMapper.class,
+                    catalogs ->
+                        catalogs.selectCatalogMetaByNameForUpdate(
+                            schemaEntity.namespace().level(0), schemaEntity.namespace().level(1)));
+            if (parent == null) {
+              throw new NoSuchEntityException(
+                  NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                  "catalog",
+                  schemaEntity.namespace().level(1));
+            }
+
             int n = rowsToInsert.size();
             List<SchemaPO> missingAncestorPOs = new ArrayList<>();
             if (n > 1) {
@@ -189,17 +216,21 @@ public class SchemaMetaService {
                   continue;
                 }
                 SchemaPO.Builder builder = SchemaPO.builder();
-                fillSchemaPOBuilderParentEntityId(builder, row.namespace());
+                builder.withMetalakeId(parent.getMetalakeId()).withCatalogId(parent.getCatalogId());
                 missingAncestorPOs.add(POConverters.initializeSchemaPOWithVersion(row, builder));
               }
             }
             SchemaEntity leafRow = rowsToInsert.get(n - 1);
             SchemaPO.Builder leafBuilder = SchemaPO.builder();
-            fillSchemaPOBuilderParentEntityId(leafBuilder, leafRow.namespace());
+            leafBuilder.withMetalakeId(parent.getMetalakeId()).withCatalogId(parent.getCatalogId());
             SchemaPO leafPO = POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder);
-            List<SchemaPO> schemaPosToInsert = new ArrayList<>(missingAncestorPOs);
-            schemaPosToInsert.add(leafPO);
-            ops.batchInsertPOs(mapper, schemaPosToInsert, overwrite);
+            // Ancestors are always fresh registrations. Only an existing leaf ID may upsert.
+            if (!missingAncestorPOs.isEmpty()) {
+              ops.batchInsertPOs(mapper, missingAncestorPOs, false);
+            }
+            boolean updateExistingId =
+                overwrite && prepareSchemaOverwrite(schemaEntity.nameIdentifier(), leafPO, mapper);
+            ops.batchInsertPOs(mapper, Collections.singletonList(leafPO), updateExistingId);
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -507,6 +538,42 @@ public class SchemaMetaService {
         });
   }
 
+  private boolean prepareSchemaOverwrite(
+      NameIdentifier identifier, SchemaPO incoming, SchemaMetaMapper mapper) {
+    // Reject an active foreign identity before taking its row lock. The locking read below
+    // must still revalidate identity because the first check is only a fail-fast optimization.
+    SchemaPO registeredId = mapper.selectSchemaMetaById(incoming.getSchemaId());
+    rejectForeignSchemaIdentity(identifier, incoming, registeredId);
+    // Lock even a retired ID before reviving it. Otherwise two catalogs could both revive the
+    // same marker and the slower upsert would move the winner's newly live registration.
+    registeredId = mapper.selectSchemaMetaByIdIncludingDeletedForUpdate(incoming.getSchemaId());
+    rejectForeignSchemaIdentity(identifier, incoming, registeredId);
+    SchemaPO stored =
+        ops.listPOs(mapper, identifier.namespace(), List.of(identifier.name())).stream()
+            .findFirst()
+            .orElse(null);
+    if (stored != null && !stored.getSchemaId().equals(incoming.getSchemaId())) {
+      // A different ID at this name does not prove that the old source object was deleted: it
+      // may have been renamed externally. The store cannot resolve source identities, so preserve
+      // its children and governance metadata until the caller explicitly reconciles the conflict.
+      throw new EntityAlreadyExistsException(
+          "Schema %s is already registered with a different identifier. Reconcile the existing "
+              + "registration before replacing it; its source object may have been renamed.",
+          identifier);
+    }
+    return registeredId != null;
+  }
+
+  private static void rejectForeignSchemaIdentity(
+      NameIdentifier identifier, SchemaPO incoming, @Nullable SchemaPO registered) {
+    if (registered != null
+        && registered.getDeletedAt() == 0
+        && !Objects.equals(registered.getCatalogId(), incoming.getCatalogId())) {
+      throw new EntityAlreadyExistsException(
+          "Schema %s has an identifier already registered in another catalog", identifier);
+    }
+  }
+
   private SchemaPO getSchemaPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
     SchemaPO schemaPO =
@@ -545,15 +612,6 @@ public class SchemaMetaService {
       return Collections.emptyList();
     }
     return matched.stream().map(SchemaPO::getSchemaId).collect(Collectors.toList());
-  }
-
-  private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
-    NamespaceUtil.checkSchema(namespace);
-    NamespacedEntityId namespacedEntityId =
-        EntityIdService.getEntityIds(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
-    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
-    builder.withCatalogId(namespacedEntityId.entityId());
   }
 
   @Monitored(

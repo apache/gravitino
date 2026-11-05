@@ -104,10 +104,9 @@ public class TestMysqlTableOperationsSqlGeneration {
         () -> ops.alterTable("database", "test_table", TableChange.setProperty(key, value)));
     Assertions.assertTrue(connections.executedSql().isEmpty());
     Assertions.assertEquals(0, connections.borrowed());
-    // branch-1.3 generates ALTER SQL inside the execution connection; validation still prevents
-    // DDL.
-    Assertions.assertEquals(1, connections.peakBorrowed());
-    Assertions.assertEquals(1, connections.totalBorrows());
+    // Invalid options are rejected during SQL generation, before borrowing an execution connection.
+    Assertions.assertEquals(0, connections.peakBorrowed());
+    Assertions.assertEquals(0, connections.totalBorrows());
   }
 
   @Test

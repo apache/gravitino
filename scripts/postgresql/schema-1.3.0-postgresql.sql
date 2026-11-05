@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     table_id BIGINT NOT NULL,
     table_version INT NOT NULL,
     column_id BIGINT NOT NULL,
-    column_name VARCHAR(128) NOT NULL,
+    column_name VARCHAR(300) NOT NULL,
     column_position INT NOT NULL,
     column_type TEXT NOT NULL,
     column_comment VARCHAR(256) DEFAULT '',
