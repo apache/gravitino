@@ -69,7 +69,7 @@ public class ColumnDTO implements Column {
   @JsonSetter(nulls = Nulls.SKIP)
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
-  @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
+  @JsonDeserialize(using = JsonUtils.ColumnInitialDefaultValueDeserializer.class)
   private Expression initialDefaultValue = Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 
   private ColumnDTO() {}

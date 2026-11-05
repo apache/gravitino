@@ -40,14 +40,11 @@ class Column(ABC):
     """
 
     DEFAULT_VALUE_NOT_SET = Expression.EMPTY_EXPRESSION
-    """Sentinel that indicates `default_value()` is not set (or not applicable)."""
+    """A default value that indicates the default value is not set. This is used in `default_value()`"""
 
-    INITIAL_DEFAULT_VALUE_NOT_SET = DEFAULT_VALUE_NOT_SET
-    """Sentinel that indicates `initial_default_value()` is not set (or not applicable).
-
-    Same underlying value as `DEFAULT_VALUE_NOT_SET`; the distinct name makes call sites for
-    initial defaults easier to read.
-    """
+    INITIAL_DEFAULT_VALUE_NOT_SET = Expression.EMPTY_EXPRESSION
+    """A default value that indicates the initial default value is not set. This is used in
+    `initial_default_value()`"""
 
     DEFAULT_VALUE_OF_CURRENT_TIMESTAMP: Expression = FunctionExpression.of(
         "current_timestamp"

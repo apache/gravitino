@@ -41,17 +41,16 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Column {
 
   /**
-   * A sentinel that indicates {@link #defaultValue()} is not set (or not applicable for the
-   * catalog).
+   * A default value that indicates the default value is not set. This is used in {@link
+   * #defaultValue()}.
    */
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
 
   /**
-   * A sentinel that indicates {@link #initialDefaultValue()} is not set (or the catalog does not
-   * provide an initial default). Same underlying value as {@link #DEFAULT_VALUE_NOT_SET}; the
-   * distinct name makes call sites for initial defaults easier to read.
+   * A default value that indicates the initial default value is not set. This is used in {@link
+   * #initialDefaultValue()}.
    */
-  Expression INITIAL_DEFAULT_VALUE_NOT_SET = DEFAULT_VALUE_NOT_SET;
+  Expression INITIAL_DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
 
   /**
    * A default value that indicates the default value will be set to the current timestamp. This is

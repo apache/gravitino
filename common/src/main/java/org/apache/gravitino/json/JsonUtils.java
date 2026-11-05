@@ -1377,12 +1377,18 @@ public class JsonUtils {
     }
   }
 
+  private static boolean isColumnDefaultUnset(Expression value) {
+    return value == null
+        || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+        || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+  }
+
   /** Custom JSON serializer for Column default value. */
   public static class ColumnDefaultValueSerializer extends JsonSerializer<Expression> {
     @Override
     public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      if (value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      if (isColumnDefaultUnset(value)) {
         return;
       }
       writeFunctionArg((FunctionArg) value, gen);
@@ -1390,7 +1396,7 @@ public class JsonUtils {
 
     @Override
     public boolean isEmpty(SerializerProvider provider, Expression value) {
-      return value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET);
+      return isColumnDefaultUnset(value);
     }
   }
 
@@ -1401,6 +1407,18 @@ public class JsonUtils {
       JsonNode node = p.getCodec().readTree(p);
       if (node == null || node.isNull()) {
         return Column.DEFAULT_VALUE_NOT_SET;
+      }
+      return readFunctionArg(node);
+    }
+  }
+
+  /** Custom JSON deserializer for Column initial default value. */
+  public static class ColumnInitialDefaultValueDeserializer extends JsonDeserializer<Expression> {
+    @Override
+    public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return Column.INITIAL_DEFAULT_VALUE_NOT_SET;
       }
       return readFunctionArg(node);
     }
