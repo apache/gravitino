@@ -522,7 +522,14 @@ catalog credentials must receive these privileges explicitly. Catalog credential
 unscoped: they carry the source account's privileges, including access beyond a single
 Gravitino table. Fileset path-based credential authorization is unchanged.
 
-JDBC URLs must not contain passwords, tokens, or inline user information. Put JDBC login
-credentials in `jdbc-user` and `jdbc-password` (or secret references). Legacy URLs containing
-credentials are masked in catalog responses and rejected when used; update those catalog
-configurations before reconnecting. Class-loader diagnostics show property names only.
+For relational JDBC catalogs, `jdbc-url` must not contain passwords, tokens, or inline user
+information. Move login credentials to `jdbc-user` and `jdbc-password` (or secret references)
+**before upgrading**. Legacy credential-bearing `jdbc-url` properties are masked when they
+reach the property read path, but loading a catalog can fail earlier during configuration
+validation. PostgreSQL catalog ALTER also loads the old configuration first, so it cannot
+repair such a URL after upgrading. If already upgraded, use the previous server version to
+migrate the catalog configuration before upgrading again.
+
+This URL validation and masking apply to relational JDBC catalogs' `jdbc-url` property;
+JDBC-backed Iceberg/Paimon `uri` properties are outside this change. Class-loader diagnostics
+show property names only.
