@@ -313,6 +313,19 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  @Test
+  public void testLoadTableMetadataFromMissingLocationIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      String location = warehouseDir.resolve("missing/v1.metadata.json").toUri().toString();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(
