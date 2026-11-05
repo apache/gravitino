@@ -1377,18 +1377,14 @@ public class JsonUtils {
     }
   }
 
-  private static boolean isColumnDefaultUnset(Expression value) {
-    return value == null
-        || value.equals(Column.DEFAULT_VALUE_NOT_SET)
-        || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
-  }
-
   /** Custom JSON serializer for Column default value. */
   public static class ColumnDefaultValueSerializer extends JsonSerializer<Expression> {
     @Override
     public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      if (isColumnDefaultUnset(value)) {
+      if (value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET)) {
         return;
       }
       writeFunctionArg((FunctionArg) value, gen);
@@ -1396,7 +1392,9 @@ public class JsonUtils {
 
     @Override
     public boolean isEmpty(SerializerProvider provider, Expression value) {
-      return isColumnDefaultUnset(value);
+      return value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
     }
   }
 
