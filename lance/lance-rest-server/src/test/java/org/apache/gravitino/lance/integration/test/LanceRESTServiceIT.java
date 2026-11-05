@@ -24,6 +24,10 @@ import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,6 +56,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -64,6 +69,7 @@ import org.lance.namespace.client.apache.ApiException;
 import org.lance.namespace.client.apache.api.TableApi;
 import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.errors.UnsupportedOperationException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -89,6 +95,8 @@ import org.lance.namespace.model.ListNamespacesRequest;
 import org.lance.namespace.model.ListNamespacesResponse;
 import org.lance.namespace.model.ListTablesRequest;
 import org.lance.namespace.model.NamespaceExistsRequest;
+import org.lance.namespace.model.QueryTableRequest;
+import org.lance.namespace.model.QueryTableRequestVector;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
@@ -676,16 +684,31 @@ public class LanceRESTServiceIT extends BaseIT {
     AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();
     dropNonExistingColumnsRequest.setId(ids);
     dropNonExistingColumnsRequest.setColumns(List.of("non_existing_column"));
-    Exception dropColumnException =
+    long versionBeforeRejectedDrop;
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      versionBeforeRejectedDrop = dataset.version();
+    }
+    ApiException dropColumnException =
         Assertions.assertThrows(
-            Exception.class,
+            ApiException.class,
             () ->
                 tableApi.alterTableDropColumns(
                     String.join(delimiter, ids), dropNonExistingColumnsRequest, delimiter));
-    Assertions.assertTrue(
-        dropColumnException
-            .getMessage()
-            .contains("Column non_existing_column does not exist in the dataset"));
+    Assertions.assertEquals(400, dropColumnException.getCode());
+    ErrorResponse error =
+        JsonUtils.anyFieldMapper()
+            .readValue(dropColumnException.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+    Assertions.assertTrue(error.getError().contains("non_existing_column"));
+    Assertions.assertEquals("", error.getDetail());
+    Assertions.assertEquals(
+        List.of("id"),
+        ns.describeTable(describeTableRequest).getSchema().getFields().stream()
+            .map(JsonArrowField::getName)
+            .toList());
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      Assertions.assertEquals(versionBeforeRejectedDrop, dataset.version());
+    }
   }
 
   @Test
@@ -729,6 +752,59 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
+  void testUnimplementedOperationUsesUnsupportedError() throws Exception {
+    QueryTableRequest request = new QueryTableRequest();
+    request.setId(List.of("missing", "schema", "table"));
+    request.setK(1);
+    request.setVector(new QueryTableRequestVector().singleVector(List.of(1.0f, 2.0f)));
+    request.setVectorColumn("vector");
+    UnsupportedOperationException error =
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> ns.queryTable(request));
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+    // The native client classifies by code but does not retain instance; inspect diagnostics
+    // on the wire independently rather than requiring it to preserve every response field.
+    HttpRequest httpRequest =
+        HttpRequest.newBuilder(
+                URI.create(getLanceRestServiceUrl() + "/v1/table/missing.schema.table/query"))
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    JsonUtils.anyFieldMapper().writeValueAsString(request)))
+            .build();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    Assertions.assertEquals(406, response.statusCode());
+    ErrorResponse body = JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), body.getCode());
+    Assertions.assertTrue(body.getInstance().startsWith("POST "));
+    Assertions.assertTrue(body.getInstance().endsWith("/query"));
+    Assertions.assertTrue(body.getError().contains(body.getInstance()));
+    Assertions.assertEquals("", body.getDetail());
+  }
+
+  @Test
+  void testInvalidJsonRequestUsesLanceEnvelope() throws Exception {
+    HttpClient http = HttpClient.newHttpClient();
+    for (String body : List.of("{", "[]")) {
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(getLanceRestServiceUrl() + "/v1/namespace/missing/create"))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      Assertions.assertEquals(400, response.statusCode());
+      Assertions.assertTrue(
+          response.headers().firstValue("Content-Type").orElse("").contains("application/json"));
+      ErrorResponse error =
+          JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertEquals("Invalid JSON request", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  @Test
   void testAlterColumns() throws Exception {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
@@ -746,6 +822,33 @@ public class LanceRESTServiceIT extends BaseIT {
 
     TableApi tableApi = createTableApi();
     String delimiter = DELIMITER;
+
+    AlterTableAlterColumnsRequest conflictRequest = new AlterTableAlterColumnsRequest();
+    conflictRequest.setId(ids);
+    AlterColumnsEntry conflict = new AlterColumnsEntry();
+    conflict.setPath("id");
+    conflict.setRename("value");
+    conflictRequest.setAlterations(List.of(conflict));
+    ApiException conflictError =
+        Assertions.assertThrows(
+            ApiException.class,
+            () ->
+                tableApi.alterTableAlterColumns(
+                    String.join(delimiter, ids), conflictRequest, delimiter));
+    Assertions.assertEquals(400, conflictError.getCode());
+    ErrorResponse conflictBody =
+        JsonUtils.anyFieldMapper().readValue(conflictError.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), conflictBody.getCode());
+    Assertions.assertTrue(conflictBody.getError().contains("value"));
+    Assertions.assertEquals("", conflictBody.getDetail());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    NameIdentifier.of(SCHEMA_NAME, ids.get(2)),
+                    TableChange.renameColumn(new String[] {"id"}, "value")));
 
     AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
     alterRequest.setId(ids);

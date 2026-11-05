@@ -142,6 +142,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return icebergConfig;
   }
 
+  /**
+   * Invalidates cached metadata before a subclass changes or removes a table.
+   *
+   * @param tableIdentifier the table whose cached metadata must be invalidated
+   */
+  protected void invalidateTableMetadata(TableIdentifier tableIdentifier) {
+    getMetadataCache().invalidate(tableIdentifier);
+  }
+
   private SupportsNamespaces getNamespaceCatalog() {
     SupportsNamespaces namespaceCatalog = asNamespaceCatalog;
     if (namespaceCatalog != null) {
@@ -276,12 +285,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     CatalogHandlers.dropTable(getCatalog(), tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
-    getMetadataCache().invalidate(tableIdentifier);
+    invalidateTableMetadata(tableIdentifier);
     Table table = getCatalog().loadTable(tableIdentifier);
     if (!(table instanceof HasTableOperations)) {
       CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
@@ -324,10 +333,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
+   * @throws BadRequestException if no metadata file exists at the location
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
       return TableMetadataParser.read(fileIO, metadataLocation);
+    } catch (NotFoundException e) {
+      // The location comes from the request, so a missing file is a client error. 404 is reserved
+      // by the REST spec for a namespace or table that does not exist.
+      throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
     }
   }
 
@@ -440,7 +454,14 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
     request.validate();
-    return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
+    try {
+      return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
+    } catch (NotFoundException e) {
+      // As in registerTable: the metadata location comes from the request.
+      throw new BadRequestException(
+          "Cannot register view %s: metadata location %s does not exist",
+          request.name(), request.metadataLocation());
+    }
   }
 
   public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {

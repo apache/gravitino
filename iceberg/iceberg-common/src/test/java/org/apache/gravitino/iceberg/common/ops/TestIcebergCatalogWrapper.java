@@ -56,7 +56,9 @@ import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types;
@@ -309,6 +311,39 @@ public class TestIcebergCatalogWrapper {
       BadRequestException e =
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.registerTable(namespace, request));
+      Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testRegisterViewWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(
+            new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory")))) {
+      Namespace namespace = Namespace.of("db");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      RegisterViewRequest request =
+          ImmutableRegisterViewRequest.builder()
+              .name("ghost")
+              .metadataLocation(warehouseDir.resolve("missing/v1.metadata.json").toUri().toString())
+              .build();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.registerView(namespace, request));
+      Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromMissingLocationIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      String location = warehouseDir.resolve("missing/v1.metadata.json").toUri().toString();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
       Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
     }
   }

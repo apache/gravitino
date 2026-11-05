@@ -542,6 +542,100 @@ public class TestExperimentalIcebergReadRestrictionLoader {
   }
 
   @Test
+  void testIgnoresIdentityMasksAlongsideEffectiveMasks() {
+    PolicyEntity identity = maskPolicy(1, "identity", "(value STRING) RETURNS STRING -> value");
+    PolicyEntity mask =
+        maskPolicy(2, "masked", "(value STRING) RETURNS STRING -> show_last_4(value)");
+    Map<Integer, PolicyEntity[]> policies = new LinkedHashMap<>();
+    policies.put(2, new PolicyEntity[] {identity, mask});
+    policies.put(3, new PolicyEntity[] {mask, identity});
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0], policies, SCHEMA, context("alice"));
+
+    assertEquals(2, restrictions.columnProjections().size());
+    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
+    assertEquals(3, restrictions.columnProjections().get(1).fieldId());
+    assertEquals("show-last-4", restrictions.columnProjections().get(0).name());
+    assertEquals("show-last-4", restrictions.columnProjections().get(1).name());
+  }
+
+  @Test
+  void testConditionalIdentityMaskDoesNotConflictWithEffectiveMask() {
+    Map<Integer, PolicyEntity[]> policies =
+        Collections.singletonMap(
+            2,
+            new PolicyEntity[] {
+              maskPolicy(
+                  1,
+                  "conditional",
+                  "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('auditors') THEN show_first_4(value) ELSE value END"),
+              maskPolicy(2, "masked", "(value STRING) RETURNS STRING -> show_last_4(value)")
+            });
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0],
+            policies,
+            SCHEMA,
+            context("alice", Collections.singletonMap("auditors", false)));
+
+    assertEquals(1, restrictions.columnProjections().size());
+    assertEquals(2, restrictions.columnProjections().get(0).fieldId());
+    assertEquals("show-last-4", restrictions.columnProjections().get(0).name());
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ExperimentalIcebergReadRestrictionLoader.resolve(
+                    new PolicyEntity[0],
+                    policies,
+                    SCHEMA,
+                    context("alice", Collections.singletonMap("auditors", true))));
+    assertTrue(exception.getMessage().contains("Conflicting column-mask"));
+  }
+
+  @Test
+  void testAllIdentityMasksAreUnrestricted() {
+    Map<Integer, PolicyEntity[]> policies =
+        Collections.singletonMap(
+            2,
+            new PolicyEntity[] {
+              maskPolicy(1, "identity", "(value STRING) RETURNS STRING -> value"),
+              maskPolicy(
+                  2,
+                  "conditional",
+                  "(value STRING) RETURNS STRING -> CASE WHEN is_group_member('auditors') THEN show_last_4(value) ELSE value END")
+            });
+
+    ReadRestrictions restrictions =
+        ExperimentalIcebergReadRestrictionLoader.resolve(
+            new PolicyEntity[0],
+            policies,
+            SCHEMA,
+            context("alice", Collections.singletonMap("auditors", false)));
+
+    assertTrue(restrictions.isEmpty());
+  }
+
+  @Test
+  void testRejectsIdentityMaskWithIncompatibleFieldType() {
+    Map<Integer, PolicyEntity[]> policies =
+        Collections.singletonMap(
+            1,
+            new PolicyEntity[] {
+              maskPolicy(1, "identity", "(value STRING) RETURNS STRING -> value")
+            });
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ExperimentalIcebergReadRestrictionLoader.resolve(
+                new PolicyEntity[0], policies, SCHEMA, context("alice")));
+  }
+
+  @Test
   void testRejectsDistinctMasksForOneField() {
     Map<Integer, PolicyEntity[]> policies = new LinkedHashMap<>();
     policies.put(

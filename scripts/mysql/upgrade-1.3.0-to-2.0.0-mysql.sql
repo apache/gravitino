@@ -27,6 +27,9 @@
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
+-- Support external column names up to 300 characters (including BigQuery).
+ALTER TABLE `table_column_version_info` MODIFY COLUMN `column_name` VARCHAR(300) NOT NULL COMMENT 'column name';
+
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND column_name = 'allowed_values'),
     'SELECT 1',
