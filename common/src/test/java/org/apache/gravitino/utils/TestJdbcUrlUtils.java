@@ -45,7 +45,12 @@ public class TestJdbcUrlUtils {
         "jdbc:postgresql://host/db?sslpassword=hidden",
         "jdbc:sqlserver://host;accessToken=hidden",
         "jdbc:postgresql://host/db?password=",
-        "jdbc:postgresql://host/db?%2570assword=hidden#%zz"
+        "jdbc:postgresql://host/db?%2570assword=hidden#%zz",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8&password=hidden",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false&%70assword2=hidden",
+        "jdbc:mysql://host/db?password1=hidden",
+        "jdbc:mysql://host/db?password3=hidden",
+        "jdbc:postgresql://host/db?passwordCharacterEncoding=hidden"
       })
   void testCredentialsAreDetected(String url) {
     Assertions.assertTrue(JdbcUrlUtils.containsCredentials(url));
@@ -58,7 +63,10 @@ public class TestJdbcUrlUtils {
         "jdbc:sqlserver://host;databaseName=db;encrypt=true",
         "jdbc:oracle:thin:@host:1521/service",
         "jdbc:sqlite::memory:",
-        "jdbc:mysql://host/db?useSSL=true"
+        "jdbc:mysql://host/db?useSSL=true",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false",
+        "jdbc:mysql://host/db?%70asswordCharacterEncoding=UTF-8&disconnectOnExpiredPasswords=false"
       })
   void testPublicConnectionOptionsRemainVisible(String url) {
     Assertions.assertFalse(JdbcUrlUtils.containsCredentials(url));

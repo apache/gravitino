@@ -49,6 +49,9 @@ public class JdbcUrlUtils {
   private static final Pattern URL_PARAMETER = Pattern.compile("(?:[?;&,(]|^)([^=?;&,()]+)=");
   private static final List<String> CREDENTIAL_PARAMETER_KEYWORDS =
       Arrays.asList("password", "passwd", "pwd", "secret", "token", "credential");
+  // Connector/J options whose names contain "password" but whose values are not credentials.
+  private static final List<String> NON_SECRET_MYSQL_PARAMETERS =
+      Arrays.asList("passwordcharacterencoding", "disconnectonexpiredpasswords");
   private static final Pattern USER_INFO =
       Pattern.compile("(?i)(?://[^/?#]*@|jdbc:oracle:(?:thin|oci|oci8):[^/@]+/[^@]*@)");
 
@@ -180,6 +183,9 @@ public class JdbcUrlUtils {
     Matcher parameters = URL_PARAMETER.matcher(url);
     while (parameters.find()) {
       String key = parameters.group(1);
+      if (url.startsWith("jdbc:mysql:") && NON_SECRET_MYSQL_PARAMETERS.contains(key)) {
+        continue;
+      }
       if (CREDENTIAL_PARAMETER_KEYWORDS.stream().anyMatch(key::contains)) {
         return true;
       }
