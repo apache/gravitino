@@ -555,7 +555,7 @@ public abstract class TestBaseCatalog {
    * createTable must reject them instead of storing plain physical columns without the watermark.
    */
   @Test
-  void testCreateTableRejectsComputedColumnsAndWatermarks() {
+  void testCreateTableRejectsComputedAndMetadataColumnsAndWatermarks() {
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockedCatalogHandle());
 
@@ -569,6 +569,11 @@ public abstract class TestBaseCatalog {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> catalog.createTable(new ObjectPath("db", "t1"), computedTable, false));
+    // Flink calls createTable for CREATE TABLE IF NOT EXISTS even when the table exists, and the
+    // check runs before the Gravitino call, so IF NOT EXISTS is rejected too.
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> catalog.createTable(new ObjectPath("db", "t1"), computedTable, true));
 
     // metadata column: m INT METADATA
     List<Column> metadata =
@@ -605,11 +610,11 @@ public abstract class TestBaseCatalog {
   }
 
   /**
-   * ALTER TABLE ... ADD of a computed column must be rejected like createTable does, while adding a
-   * physical column still goes through.
+   * ALTER TABLE ... ADD of a computed or metadata column must be rejected like createTable does,
+   * while adding a physical column still goes through.
    */
   @Test
-  void testAlterTableRejectsComputedColumns() throws Exception {
+  void testAlterTableRejectsComputedAndMetadataColumns() throws Exception {
     Catalog gravitinoCatalogHandle = Mockito.mock(Catalog.class);
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Mockito.when(gravitinoCatalogHandle.asTableCatalog()).thenReturn(tableCatalog);
@@ -630,6 +635,16 @@ public abstract class TestBaseCatalog {
                 Collections.singletonList(
                     org.apache.flink.table.catalog.TableChange.add(
                         Column.computed("b", resolvedExpression(DataTypes.INT())))),
+                false));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            catalog.alterTable(
+                new ObjectPath("db", "t"),
+                existing,
+                Collections.singletonList(
+                    org.apache.flink.table.catalog.TableChange.add(
+                        Column.metadata("m", DataTypes.INT(), null, false))),
                 false));
 
     Assertions.assertDoesNotThrow(
@@ -703,6 +718,8 @@ public abstract class TestBaseCatalog {
     Assertions.assertFalse(
         plainWatermarkError.getMessage().contains("generic table"),
         plainWatermarkError.getMessage());
+    Assertions.assertTrue(
+        plainWatermarkError.getMessage().contains("column 'ts'"), plainWatermarkError.getMessage());
     UnsupportedOperationException genericLikeWatermarkError =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
@@ -754,9 +771,7 @@ public abstract class TestBaseCatalog {
     schema
         .getWatermarkSpecs()
         .forEach(
-            w ->
-                builder.watermark(
-                    w.getRowtimeAttribute(), w.getWatermarkExpression().asSerializableString()));
+            w -> builder.watermark(w.getRowtimeAttribute(), "`" + w.getRowtimeAttribute() + "`"));
     CatalogTable unresolved =
         catalogCompat()
             .createCatalogTable(

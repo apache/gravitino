@@ -46,6 +46,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -913,11 +914,13 @@ public abstract class BaseCatalog extends AbstractCatalog {
         resolvedTable.getResolvedSchema().getColumns()) {
       rejectUnsupportedColumn(column);
     }
-    if (!resolvedTable.getResolvedSchema().getWatermarkSpecs().isEmpty()) {
+    List<WatermarkSpec> watermarks = resolvedTable.getResolvedSchema().getWatermarkSpecs();
+    if (!watermarks.isEmpty()) {
+      // Flink allows at most one watermark per table.
       throw new UnsupportedOperationException(
           String.format(
-              "The watermark cannot be stored in the Gravitino catalog '%s'.%s",
-              getName(), genericTableAdvice()));
+              "The watermark on column '%s' cannot be stored in the Gravitino catalog '%s'.%s",
+              watermarks.get(0).getRowtimeAttribute(), getName(), genericTableAdvice()));
     }
   }
 
