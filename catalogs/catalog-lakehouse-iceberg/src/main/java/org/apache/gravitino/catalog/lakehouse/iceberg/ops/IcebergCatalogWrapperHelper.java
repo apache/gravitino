@@ -249,14 +249,9 @@ public class IcebergCatalogWrapperHelper {
   }
 
   private void alterTableColumn(
-      Transaction transaction,
-      Table icebergTable,
+      UpdateSchema icebergUpdateSchema,
       List<ColumnChange> columnChanges,
       Schema icebergTableSchema) {
-    if (columnChanges.stream().anyMatch(IcebergCatalogWrapperHelper::changeSetsColumnDefault)) {
-      ensureFormatVersionForColumnDefaults(transaction, icebergTable);
-    }
-    UpdateSchema icebergUpdateSchema = transaction.updateSchema();
     for (ColumnChange change : columnChanges) {
       if (change instanceof AddColumn) {
         doAddColumn(icebergUpdateSchema, (AddColumn) change);
@@ -324,8 +319,12 @@ public class IcebergCatalogWrapperHelper {
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);
     if (!gravitinoColumnChanges.isEmpty()) {
+      if (gravitinoColumnChanges.stream()
+          .anyMatch(IcebergCatalogWrapperHelper::changeSetsColumnDefault)) {
+        ensureFormatVersionForColumnDefaults(transaction, icebergBaseTable);
+      }
       alterTableColumn(
-          transaction, icebergBaseTable, gravitinoColumnChanges, icebergBaseTable.schema());
+          transaction.updateSchema(), gravitinoColumnChanges, icebergBaseTable.schema());
     }
 
     if (!gravitinoPropertyChanges.isEmpty()) {
