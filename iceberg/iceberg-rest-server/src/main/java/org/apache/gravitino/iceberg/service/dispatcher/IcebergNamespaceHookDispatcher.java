@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockType;
@@ -123,14 +124,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (GravitinoEnv.getInstance().internalSchemaDispatcher() == null) {
       return;
     }
-    for (String level : namespace.levels()) {
-      if (level.contains(".")) {
-        throw new BadRequestException(
-            "Invalid namespace %s: the level '%s' contains '.', which is reserved as the"
-                + " qualified-name separator",
-            namespace, level);
-      }
-    }
+    IcebergRESTUtils.checkNamespaceLevels(namespace);
     String name = String.join(HierarchicalSchemaUtil.schemaSeparator(), namespace.levels());
     if (name.codePointCount(0, name.length()) > EntityFieldLimits.MAX_NAME_LENGTH) {
       throw new BadRequestException(

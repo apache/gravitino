@@ -372,6 +372,25 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testRegisterJobTemplateRejectsDottedName() {
+    JobTemplateEntity template = newShellJobTemplateEntity("a.b", "dotted name");
+    JobTemplateRegisterRequest request =
+        new JobTemplateRegisterRequest(JobOperations.toDTO(template));
+
+    try (Response response =
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(jobOperationDispatcher, never()).registerJobTemplate(any(), any());
+  }
+
+  @Test
   public void testGetJobTemplate() {
     JobTemplateEntity template =
         newShellJobTemplateEntity("shell_template_1", "Test Shell Template 1");
@@ -726,6 +745,26 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp5 = resp6.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp5.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp5.getType());
+  }
+
+  @Test
+  public void testRenameJobTemplateRejectsDottedName() {
+    JobTemplateUpdatesRequest request =
+        new JobTemplateUpdatesRequest(
+            Lists.newArrayList(new JobTemplateUpdateRequest.RenameJobTemplateRequest("a.b")));
+
+    try (Response response =
+        target(jobTemplatePath())
+            .path("shell_template_1")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(jobOperationDispatcher, never()).alterJobTemplate(any(), any(), any());
   }
 
   @Test

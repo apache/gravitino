@@ -31,7 +31,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -106,6 +106,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             rawNamespace =
                 RESTUtil.decodeNamespace(
                     value, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+            IcebergRESTUtils.checkNamespaceLevels(rawNamespace);
             schema = String.join(separator, rawNamespace.levels());
             nameIdentifierMap.put(
                 Entity.EntityType.SCHEMA,
@@ -149,7 +150,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
@@ -168,6 +172,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case REGISTER_TABLE:
+            return Optional.of(new RegisterTableAuthzHandler(parameters, args, nameIdentifierMap));
           default:
             break;
         }
@@ -208,7 +214,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
 
-    IcebergCatalogWrapper catalogWrapper;
+    CatalogWrapperForREST catalogWrapper;
     try {
       catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
     } catch (NoSuchCatalogException | IllegalArgumentException e) {
@@ -218,8 +224,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
-    // authorization. IRC2 handles authorization.
-    return catalogWrapper.isRESTCatalog();
+    // authorization. IRC2 handles authorization. A REST backend connected as a service account is
+    // never skipped: the remote catalog sees only the service account, so IRC1 must authorize.
+    return catalogWrapper.forwardsUserToken();
   }
 
   /** Metrics are stored locally, so a downstream REST catalog cannot authorize the report. */
