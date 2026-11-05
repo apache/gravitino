@@ -520,7 +520,9 @@ and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership, in addition to metadata
 `USE_CATALOG` alone does not allow retrieving the source account. Engine users that need
 catalog credentials must receive these privileges explicitly. Catalog credentials are
 unscoped: they carry the source account's privileges, including access beyond a single
-Gravitino table. Fileset path-based credential authorization is unchanged.
+Gravitino table. Fileset path-based credential authorization is unchanged. GVFS skips an optional catalog
+credential lookup when it is forbidden, then uses the fileset credential endpoint; denial at
+that fileset endpoint still prevents access.
 
 For relational JDBC catalogs, `jdbc-url` must not contain passwords, tokens, or inline user
 information. Move login credentials to `jdbc-user` and `jdbc-password` (or secret references)
