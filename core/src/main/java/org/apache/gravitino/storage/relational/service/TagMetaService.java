@@ -48,6 +48,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -701,29 +702,11 @@ public class TagMetaService {
 
   private static void validateAllowedValue(TagPO tagPO, TagValue tagValue)
       throws JsonProcessingException {
-    if (tagPO.getAllowedValues() == null) {
-      return;
-    }
-
-    String[] allowedValues =
-        JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class);
-    if (!tagValue.value().isPresent()) {
-      Preconditions.checkArgument(
-          allowedValues.length == 0,
-          "Tag %s requires assignment values from allowed values %s",
-          tagValue.name(),
-          Arrays.toString(allowedValues));
-      return;
-    }
-
-    Preconditions.checkArgument(
-        allowedValues.length > 0, "Tag %s does not allow assignment values", tagValue.name());
-    Preconditions.checkArgument(
-        Arrays.asList(allowedValues).contains(tagValue.value().get()),
-        "Tag %s value %s is not in allowed values %s",
-        tagValue.name(),
-        tagValue.value().get(),
-        Arrays.toString(allowedValues));
+    TagEntity.validateAllowedValue(
+        tagPO.getAllowedValues() == null
+            ? null
+            : JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class),
+        tagValue);
   }
 
   /**
@@ -914,6 +897,65 @@ public class TagMetaService {
       lockedTagPOs.put(lockedTagPO.getTagId(), lockedTagPO);
     }
     return lockedTagPOs;
+  }
+
+  /**
+   * Resolves a tag by name and locks it exclusively, in the caller's transaction, for a domain to
+   * bind it as its backing tag. The tag is re-checked after it is locked, so a tag dropped or
+   * renamed after it was resolved is reported as missing. The session cache is cleared before the
+   * tag is resolved, so neither the tag nor the reads that follow the lock are served from earlier
+   * reads in the session, such as those of a caller's outer transaction.
+   *
+   * @param metalakeId The metalake ID.
+   * @param namespace The tag namespace of the metalake.
+   * @param tagName The tag name.
+   * @return The locked tag.
+   * @throws NoSuchTagException If the tag does not exist.
+   */
+  TagEntity lockAndGetTagForDomainBinding(Long metalakeId, Namespace namespace, String tagName) {
+    // Earlier reads in the session, such as those of a caller's outer transaction, may be cached:
+    // the tag, which may since have been dropped and created again under a new ID, and the domains
+    // bound to it, which the caller reads after the lock. Both must be read as they are now.
+    SessionUtils.clearSessionCache();
+    TagPO observedTagPO =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, tagName));
+    List<TagPO> lockedTagPOs =
+        observedTagPO == null
+            ? Collections.emptyList()
+            : lockTagsForAssignment(Collections.singletonList(observedTagPO));
+    if (lockedTagPOs.isEmpty()) {
+      throw new NoSuchTagException(
+          "Tag with name %s under metalake %s does not exist", tagName, namespace.level(0));
+    }
+    return POConverters.fromTagPO(lockedTagPOs.get(0), namespace);
+  }
+
+  /**
+   * Inserts the new backing tag of a new domain, in the caller's transaction. The caller holds the
+   * shared lock on the metalake.
+   *
+   * @param tagEntity The new tag.
+   * @param metalakeId The metalake ID.
+   * @throws TagAlreadyExistsException If a tag with the same name exists.
+   */
+  void insertTagOfNewDomain(TagEntity tagEntity, Long metalakeId) {
+    TagPO tagPO =
+        POConverters.initializeTagPOWithVersion(
+            tagEntity, TagPO.builder().withMetalakeId(metalakeId));
+    try {
+      insertNewTagWithoutCommit(tagPO);
+    } catch (RuntimeException e) {
+      if (ExceptionUtils.isDuplicateKey(e)) {
+        throw new TagAlreadyExistsException(
+            e,
+            "Tag with name %s under metalake %s already exists",
+            tagEntity.name(),
+            tagEntity.namespace().level(0));
+      }
+      throw e;
+    }
   }
 
   private TagPO getTagPOByMetalakeAndName(String metalakeName, String tagName) {

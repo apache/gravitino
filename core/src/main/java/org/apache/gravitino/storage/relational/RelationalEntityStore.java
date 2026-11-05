@@ -63,10 +63,12 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -422,13 +424,42 @@ public class RelationalEntityStore
   }
 
   @Override
-  public void insertDomain(DomainEntity domain, Consumer<LockedDomainState> check)
+  public void insertDomainWithBackingTag(
+      DomainEntity domain, TagValue backingTag, Consumer<LockedDomainState> check)
       throws IOException {
     try {
-      backend.insertDomain(domain, check);
+      backend.insertDomainWithBackingTag(domain, backingTag, check);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(
           re, Entity.EntityType.DOMAIN, domain.nameIdentifier());
+    }
+  }
+
+  @Override
+  public void insertDomainWithNewBackingTag(
+      DomainEntity domain, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      backend.insertDomainWithNewBackingTag(domain, backingTag, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, Entity.EntityType.DOMAIN, domain.nameIdentifier());
+    }
+    // Tags are cached; the new tag must not be shadowed by an entry cached for its name.
+    invalidateCache(backingTag.nameIdentifier(), Entity.EntityType.TAG);
+  }
+
+  @Override
+  public DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier ident,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.updateDomainBackingTagAndGet(ident, backingTag, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
     }
   }
 

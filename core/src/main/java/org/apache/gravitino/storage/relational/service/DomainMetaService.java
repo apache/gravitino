@@ -29,6 +29,8 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
@@ -37,9 +39,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
@@ -50,6 +55,8 @@ import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service that stores domains in the {@code domain_meta} table. */
 public class DomainMetaService {
@@ -128,9 +135,10 @@ public class DomainMetaService {
 
   /**
    * Inserts a top-level domain. A sub-domain, whose parent must be locked and checked, is inserted
-   * with {@link #insertDomain(DomainEntity, Consumer)}. Replacing a domain keeps its status and its
-   * parent: the status is changed only under the locks its rules need, by {@link
-   * DomainRelService#updateDomainStatusAndGet}.
+   * with {@link #insertDomainWithBackingTag} or {@link #insertDomainWithNewBackingTag}. Replacing a
+   * domain keeps its status, its parent and its backing tag, which are changed only under the locks
+   * their rules need: the status by {@link DomainRelService#updateDomainStatusAndGet}, the backing
+   * tag by {@link #updateDomainBackingTagAndGet}.
    *
    * @param domainEntity The domain to insert.
    * @param overwritten Whether to replace an active domain with the same name or ID.
@@ -138,7 +146,7 @@ public class DomainMetaService {
    * @throws EntityAlreadyExistsException If a domain with the same name exists and {@code
    *     overwritten} is false.
    * @throws IllegalArgumentException If the domain has a parent, or replaces a domain with another
-   *     status.
+   *     status or another backing tag.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -177,72 +185,182 @@ public class DomainMetaService {
   }
 
   /**
-   * Inserts a new domain after a check of the locked state. If the domain has a parent, it is
-   * inserted as a sub-domain of that parent, together with its parent edge, in one transaction.
+   * Inserts a new domain backed by an existing tag, after a check of the locked state. If the
+   * domain has a parent, it is inserted as a sub-domain of that parent, together with its parent
+   * edge, in one transaction.
    *
-   * <p>The metalake row is locked shared, then the parent row, if any, is locked shared, so the
-   * parent cannot be attached elsewhere, deleted or have its status changed until the domain is
-   * committed. The check gets the new domain, the parent with its own parent set, and no
-   * sub-domains.
+   * <p>The metalake row is locked shared, then the parent row, if any, shared, so the parent cannot
+   * be attached elsewhere, deleted or have its status changed until the domain is committed. Then
+   * the tag is resolved by name and locked exclusively, so it cannot be deleted or bound by another
+   * domain meanwhile; every binding of a tag holds this lock. The domain is written next, so a
+   * missing parent or tag is reported before a duplicate domain name, and then the check runs. The
+   * check gets the new domain with its backing tag set, the parent with its own parent set, no
+   * sub-domains, the tag, and the domains the tag already backs.
    *
    * <p>This operation must own its transaction so a failed check rolls back the inserted domain. It
    * cannot run inside another transaction.
    *
    * @param domainEntity The domain to insert; its parent, if set, is the parent to insert it under.
+   * @param backingTag The existing tag, with an optional value, that backs the domain.
    * @param check The check of the locked state; nothing is inserted if it throws.
    * @throws IOException If the domain cannot be stored.
    * @throws EntityAlreadyExistsException If a domain with the same name exists.
    * @throws NoSuchEntityException If the metalake or the parent does not exist.
    * @throws IllegalStateException If it is called inside a transaction.
+   * @throws NoSuchTagException If the tag does not exist.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "insertDomainWithCheck")
-  public void insertDomain(DomainEntity domainEntity, Consumer<LockedDomainState> check)
+      baseMetricName = "insertDomainWithBackingTag")
+  public void insertDomainWithBackingTag(
+      DomainEntity domainEntity, TagValue backingTag, Consumer<LockedDomainState> check)
       throws IOException {
-    Preconditions.checkState(
-        !SessionUtils.isInTransaction(),
-        "The domain %s cannot be inserted with a check inside another transaction",
-        domainEntity.nameIdentifier());
-    Namespace ns = domainEntity.namespace();
-    String metalakeName = ns.level(0);
+    insertBackedDomain(
+        domainEntity,
+        backingTag.value().orElse(null),
+        metalakePO -> {
+          Namespace tagNamespace = NamespaceUtil.ofTag(metalakePO.getMetalakeName());
+          TagEntity tag =
+              TagMetaService.getInstance()
+                  .lockAndGetTagForDomainBinding(
+                      metalakePO.getMetalakeId(), tagNamespace, backingTag.name());
+          return Pair.of(
+              tag,
+              listDomainsByBackingTagId(
+                  metalakePO.getMetalakeId(), tag.id(), domainEntity.namespace()));
+        },
+        check,
+        null);
+  }
 
+  /**
+   * Inserts a new domain together with a new tag that backs it without a value, after a check of
+   * the locked state. If the domain has a parent, it is inserted as a sub-domain of that parent,
+   * together with its parent edge. The tag, the domain and the edge are written in one transaction.
+   *
+   * <p>The metalake row is locked shared, then the parent row, if any, shared. The new tag has no
+   * row to lock; the unique key on the tag name fails the insert if a tag with the same name exists
+   * or is created at the same time. The check gets the new domain with its backing tag set, the
+   * parent with its own parent set, no sub-domains, the new tag, and no other domains.
+   *
+   * @param domainEntity The domain to insert; its parent, if set, is the parent to insert it under.
+   * @param backingTag The new tag that backs the domain.
+   * @param check The check of the locked state; nothing is inserted if it throws.
+   * @throws IOException If the domain cannot be stored.
+   * @throws EntityAlreadyExistsException If a domain with the same name exists.
+   * @throws NoSuchEntityException If the metalake or the parent does not exist.
+   * @throws TagAlreadyExistsException If a tag with the same name exists.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertDomainWithNewBackingTag")
+  public void insertDomainWithNewBackingTag(
+      DomainEntity domainEntity, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    insertBackedDomain(
+        domainEntity,
+        null,
+        metalakePO -> Pair.of(backingTag, Collections.emptyList()),
+        check,
+        backingTag);
+  }
+
+  /**
+   * Sets or removes the backing tag of a domain, after a check of the locked state. Setting the
+   * current backing tag writes nothing.
+   *
+   * <p>The metalake row is locked shared, then the domain row exclusively, then the new tag, if
+   * any, exclusively, so the tag cannot be deleted or bound by another domain until the change
+   * commits. The check gets the domain with its current parent and backing tag set, no parent and
+   * no sub-domains, the new tag, and the domains the tag already backs, which include this domain
+   * if the tag already backs it.
+   *
+   * @param identifier The identifier of the domain.
+   * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
+   *     remove the backing tag.
+   * @param auditInfo The audit info of the change; the domain keeps its creator and takes its last
+   *     modifier.
+   * @param check The check of the locked state; nothing is written if it throws.
+   * @return The domain after the change.
+   * @throws IOException If the domain cannot be stored.
+   * @throws NoSuchEntityException If the domain does not exist.
+   * @throws NoSuchTagException If the tag does not exist.
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateDomainBackingTagAndGet")
+  public DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier identifier,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    Namespace namespace = identifier.namespace();
+    String metalakeName = namespace.level(0);
+    DomainEntity[] updated = new DomainEntity[1];
     try {
-      MetalakePO metalakePO = getMetalakePO(metalakeName);
-      DomainPO domainPO = DomainPO.initializeDomainPO(domainEntity, metalakePO.getMetalakeId());
-
+      DomainPO observedPO = getDomainPOByMetalakeAndName(metalakeName, identifier.name());
       SessionUtils.doMultipleWithCommit(
-          () ->
-              lockMetalakeForDomainWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
           () -> {
-            DomainEntity parent =
-                domainEntity
-                    .parent()
-                    .map(
-                        parentName ->
-                            DomainRelService.getInstance()
-                                .lockAndGetParentOfNewSubDomain(NameIdentifier.of(ns, parentName)))
-                    .orElse(null);
-            // The domain is written before the check, so that a duplicate name fails as such.
-            insertNewDomainWithoutCommit(domainPO);
-            check.accept(new LockedDomainState(domainEntity, parent, Collections.emptyList()));
-            if (parent != null) {
-              DomainRelService.getInstance()
-                  .insertDomainRelOfNewSubDomain(
-                      metalakePO.getMetalakeId(),
-                      parent.id(),
-                      domainPO.domainId(),
-                      AuditInfo.builder()
-                          .withCreator(domainEntity.auditInfo().creator())
-                          .withCreateTime(domainEntity.auditInfo().createTime())
-                          .build());
+            DomainPO lockedPO =
+                DomainRelService.getInstance().lockAndGetDomainForChange(identifier, observedPO);
+            DomainEntity domain =
+                DomainRelService.getInstance().toEntityWithParent(lockedPO, namespace);
+            TagEntity tag = null;
+            List<DomainEntity> bindings = Collections.emptyList();
+            if (backingTag != null) {
+              tag =
+                  TagMetaService.getInstance()
+                      .lockAndGetTagForDomainBinding(
+                          lockedPO.metalakeId(),
+                          NamespaceUtil.ofTag(metalakeName),
+                          backingTag.name());
+              bindings = listDomainsByBackingTagId(lockedPO.metalakeId(), tag.id(), namespace);
             }
+            check.accept(
+                new LockedDomainState(domain, null, Collections.emptyList(), tag, bindings));
+
+            Long newTagId = tag == null ? null : tag.id();
+            String newValue = backingTag == null ? null : backingTag.value().orElse(null);
+            if (Objects.equals(lockedPO.backingTagId(), newTagId)
+                && Objects.equals(lockedPO.backingTagValue(), newValue)) {
+              // The locked domain row does not include the backing tag name.
+              updated[0] =
+                  tag == null ? domain : domain.toBuilder().withBackingTagName(tag.name()).build();
+              return;
+            }
+
+            DomainEntity newDomain =
+                domain.toBuilder()
+                    .withBackingTagId(newTagId)
+                    .withBackingTagName(tag == null ? null : tag.name())
+                    .withBackingTagValue(newValue)
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(domain.auditInfo().creator())
+                            .withCreateTime(domain.auditInfo().createTime())
+                            .withLastModifier(auditInfo.lastModifier())
+                            .withLastModifiedTime(auditInfo.lastModifiedTime())
+                            .build())
+                    .build();
+            DomainPO newPO = DomainPO.updateDomainPO(lockedPO, newDomain);
+            OccWriteSupport.updateWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        DomainMetaMapper.class, mapper -> mapper.updateDomainMeta(newPO, lockedPO)),
+                () -> ExceptionUtils.concurrentModification(Entity.EntityType.DOMAIN, identifier));
+            updated[0] =
+                fromDomainPOWithParent(
+                    SessionUtils.getWithoutCommit(
+                        DomainMetaMapper.class,
+                        mapper -> mapper.selectDomainMetaById(lockedPO.domainId())),
+                    namespace);
           });
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(
-          e, Entity.EntityType.DOMAIN, domainEntity.nameIdentifier().toString());
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.DOMAIN, identifier.toString());
       throw e;
     }
+    return updated[0];
   }
 
   /**
@@ -258,10 +376,11 @@ public class DomainMetaService {
    * created with the same name in between, this call reports the domain as missing instead of
    * changing the new domain; a later call with the name acts on the new domain.
    *
-   * <p>The returned domain is read back in the same transaction, so its backing tag name comes from
-   * the tag it is now bound to rather than from the updater's entity. The parent and the status
-   * cannot be changed by an update, an updater that changes either is rejected; {@link
-   * DomainRelService} changes them under the locks their rules need.
+   * <p>The returned domain is read back in the same transaction, so its backing tag name is the
+   * tag's current name rather than the one the updater's entity carries. The parent, the status and
+   * the backing tag cannot be changed by an update, an updater that changes any of them is
+   * rejected; {@link DomainRelService} and {@link #updateDomainBackingTagAndGet} change them under
+   * the locks their rules need.
    *
    * @param identifier The domain identifier.
    * @param updater The function that returns the updated domain.
@@ -307,6 +426,11 @@ public class DomainMetaService {
                 oldDomainEntity.status() == updatedDomainEntity.status(),
                 "The status of domain %s cannot be changed by an update, use"
                     + " DomainRelService#updateDomainStatusAndGet",
+                identifier);
+            Preconditions.checkArgument(
+                sameBackingTag(oldDomainEntity, updatedDomainEntity),
+                "The backing tag of domain %s cannot be changed by an update, use"
+                    + " updateDomainBackingTagAndGet",
                 identifier);
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
@@ -449,6 +573,100 @@ public class DomainMetaService {
   }
 
   /**
+   * Inserts a new domain, and a new backing tag if one is given, in one transaction: locks the
+   * metalake shared, then the parent, if any, shared, then gets the backing tag and its bindings
+   * from {@code backingTagLocker}, writes the domain and the new tag, runs the check, and writes
+   * the parent edge.
+   */
+  private void insertBackedDomain(
+      DomainEntity domainEntity,
+      @Nullable String backingTagValue,
+      Function<MetalakePO, Pair<TagEntity, List<DomainEntity>>> backingTagLocker,
+      Consumer<LockedDomainState> check,
+      @Nullable TagEntity newBackingTag)
+      throws IOException {
+    Preconditions.checkState(
+        !SessionUtils.isInTransaction(),
+        "The domain %s cannot be inserted with a check inside another transaction",
+        domainEntity.nameIdentifier());
+    Namespace ns = domainEntity.namespace();
+    String metalakeName = ns.level(0);
+
+    try {
+      MetalakePO metalakePO = getMetalakePO(metalakeName);
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              lockMetalakeForDomainWrite(metalakePO.getMetalakeName(), metalakePO.getMetalakeId()),
+          () -> {
+            DomainEntity parent =
+                domainEntity
+                    .parent()
+                    .map(
+                        parentName ->
+                            DomainRelService.getInstance()
+                                .lockAndGetParentOfNewSubDomain(NameIdentifier.of(ns, parentName)))
+                    .orElse(null);
+            Pair<TagEntity, List<DomainEntity>> backingTag = backingTagLocker.apply(metalakePO);
+            DomainEntity domain =
+                domainEntity.toBuilder()
+                    .withBackingTagId(backingTag.getLeft().id())
+                    .withBackingTagName(backingTag.getLeft().name())
+                    .withBackingTagValue(backingTagValue)
+                    .build();
+            DomainPO domainPO = DomainPO.initializeDomainPO(domain, metalakePO.getMetalakeId());
+            // The domain is written before the check, so that a duplicate name fails as such.
+            insertNewDomainWithoutCommit(domainPO);
+            if (newBackingTag != null) {
+              TagMetaService.getInstance()
+                  .insertTagOfNewDomain(newBackingTag, metalakePO.getMetalakeId());
+            }
+            check.accept(
+                new LockedDomainState(
+                    domain,
+                    parent,
+                    Collections.emptyList(),
+                    backingTag.getLeft(),
+                    backingTag.getRight()));
+            if (parent != null) {
+              DomainRelService.getInstance()
+                  .insertDomainRelOfNewSubDomain(
+                      metalakePO.getMetalakeId(),
+                      parent.id(),
+                      domainPO.domainId(),
+                      AuditInfo.builder()
+                          .withCreator(domain.auditInfo().creator())
+                          .withCreateTime(domain.auditInfo().createTime())
+                          .build());
+            }
+          });
+    } catch (TagAlreadyExistsException e) {
+      // Its cause is the duplicate key of the tag, which must not be reported as the domain's.
+      throw e;
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(
+          e, Entity.EntityType.DOMAIN, domainEntity.nameIdentifier().toString());
+      throw e;
+    }
+  }
+
+  // Whether two domains are bound to the same backing tag ID and value.
+  private static boolean sameBackingTag(DomainEntity domain, DomainEntity other) {
+    return Objects.equals(domain.backingTagId(), other.backingTagId())
+        && Objects.equals(domain.backingTagValue(), other.backingTagValue());
+  }
+
+  // Lists the domains backed by a tag, read in the caller's transaction under the lock on the tag.
+  private List<DomainEntity> listDomainsByBackingTagId(
+      Long metalakeId, Long backingTagId, Namespace namespace) {
+    return SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class,
+            mapper -> mapper.listDomainPOsByBackingTagId(metalakeId, backingTagId))
+        .stream()
+        .map(po -> DomainPO.fromDomainPO(po, namespace))
+        .collect(Collectors.toList());
+  }
+
+  /**
    * Holds the parent metalake row for the rest of the transaction, so a domain cannot be created,
    * altered or deleted while the metalake is being dropped. The lock is shared, so domains under
    * the same metalake can be written at the same time, while dropping the metalake takes an
@@ -495,6 +713,11 @@ public class DomainMetaService {
     Preconditions.checkArgument(
         Objects.equals(existingDomainPO.status(), domainEntity.status().name()),
         "The status of domain %s cannot be changed by replacing it",
+        domainEntity.nameIdentifier());
+    Preconditions.checkArgument(
+        Objects.equals(existingDomainPO.backingTagId(), domainEntity.backingTagId())
+            && Objects.equals(existingDomainPO.backingTagValue(), domainEntity.backingTagValue()),
+        "The backing tag of domain %s cannot be changed by replacing it",
         domainEntity.nameIdentifier());
     DomainPO replacementDomainPO = DomainPO.updateDomainPO(existingDomainPO, domainEntity);
     NameIdentifier observedIdentifier =
