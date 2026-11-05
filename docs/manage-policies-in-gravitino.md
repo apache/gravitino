@@ -23,6 +23,11 @@ The Python client does not cover policies, so the examples below are REST and Ja
 A policy needs a name and a type. Content carries the rules, the object types the policy supports,
 and optional properties. `supportedObjectTypes` cannot be changed after creation.
 
+`policyType` accepts the known wire values case-insensitively (for example `CUSTOM` and
+`System_Iceberg_Compaction`). Gravitino stores and returns the canonical lowercase value listed in
+the OpenAPI schema. Unknown types such as `system_iceberg_bogus` return HTTP 400 that names the
+type.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 

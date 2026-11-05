@@ -70,6 +70,12 @@ paths:
             examples:
               PolicyCreate:
                 $ref: "#/components/examples/PolicyCreate"
+              PolicyCreateLowercaseType:
+                $ref: "#/components/examples/PolicyCreateLowercaseType"
+              PolicyCreateUppercaseType:
+                $ref: "#/components/examples/PolicyCreateUppercaseType"
+              PolicyCreateMixedCaseType:
+                $ref: "#/components/examples/PolicyCreateMixedCaseType"
 
       responses:
         "200":
@@ -139,6 +145,13 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PolicyUpdatesRequest"
+            examples:
+              PolicyUpdateContentLowercaseType:
+                $ref: "#/components/examples/PolicyUpdateContentLowercaseType"
+              PolicyUpdateContentUppercaseType:
+                $ref: "#/components/examples/PolicyUpdateContentUppercaseType"
+              PolicyUpdateContentMixedCaseType:
+                $ref: "#/components/examples/PolicyUpdateContentMixedCaseType"
       responses:
         "200":
             description: Returns the updated policy object
@@ -538,6 +551,46 @@ components:
             - "FUNCTION"
             - "COLUMN"
 
+    CustomRequestPolicyType:
+      type: string
+      description: Request value `custom`, matched case-insensitively.
+      pattern: '^[cC][uU][sS][tT][oO][mM]$'
+
+    IcebergCompactionRequestPolicyType:
+      type: string
+      description: Request value `system_iceberg_compaction`, matched case-insensitively.
+      pattern: '^[sS][yY][sS][tT][eE][mM]_[iI][cC][eE][bB][eE][rR][gG]_[cC][oO][mM][pP][aA][cC][tT][iI][oO][nN]$'
+
+    IcebergCompactionContent:
+      type: object
+      description: Built-in Iceberg compaction thresholds, scoring weights, and rewrite options.
+      properties:
+        minDataFileMse:
+          type: integer
+          format: int64
+          minimum: 0
+        minDeleteFileNumber:
+          type: integer
+          format: int64
+          minimum: 0
+        dataFileMseWeight:
+          type: integer
+          format: int64
+          minimum: 0
+        deleteFileNumberWeight:
+          type: integer
+          format: int64
+          minimum: 0
+        maxPartitionNum:
+          type: integer
+          format: int64
+          minimum: 1
+        rewriteOptions:
+          type: object
+          description: Rewrite options expanded to job.options.* during rule generation.
+          additionalProperties:
+            type: string
+
     PolicyCreateRequestBase:
       type: object
       description: A base policy create request without content
@@ -568,18 +621,40 @@ components:
           required:
             - content
           properties:
+            policyType:
+              $ref: '#/components/schemas/CustomRequestPolicyType'
             content:
               $ref: '#/components/schemas/CustomPolicyContent'
 
+    IcebergCompactionPolicyCreateRequest:
+      description: A request to create an Iceberg compaction policy.
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required:
+            - content
+          properties:
+            policyType:
+              $ref: '#/components/schemas/IcebergCompactionRequestPolicyType'
+            content:
+              $ref: '#/components/schemas/IcebergCompactionContent'
+
     PolicyCreateRequest:
-      description: A request to create a policy.
+      description: >-
+        A request to create a policy. Known `policyType` values are matched case-insensitively;
+        the server stores and returns the canonical lowercase form.
       type: object
       oneOf:
         - $ref: '#/components/schemas/CustomPolicyCreateRequest'
-      discriminator:
-        propertyName: policyType
-        mapping:
-          custom: '#/components/schemas/CustomPolicyCreateRequest'
+        - $ref: '#/components/schemas/IcebergCompactionPolicyCreateRequest'
+      example: {
+        "name": "compaction_upper",
+        "policyType": "SYSTEM_ICEBERG_COMPACTION",
+        "enabled": true,
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
 
 
     PolicyUpdatesRequest:
@@ -660,16 +735,16 @@ components:
             - updateContent
         policyType:
           type: string
-          description: The type of the policy
+          description: >-
+            The type of the policy, either `custom` or `system_iceberg_compaction`. Known
+            values are matched case-insensitively; the server stores and returns the canonical
+            lowercase form. An unknown value is rejected with HTTP 400 naming the type.
         newContent:
           type: object
           description: The new content of the policy, its structure depends on the 'policyType'.
           oneOf:
               - $ref: '#/components/schemas/CustomPolicyContent'
-          discriminator:
-            propertyName: policyType
-            mapping:
-              custom: '#/components/schemas/CustomPolicyContent'
+              - $ref: '#/components/schemas/IcebergCompactionContent'
       example: {
         "@type": "updateContent",
         "policyType": "custom",
@@ -812,6 +887,78 @@ components:
             "key1": "value1"
           }
         }
+      }
+
+    PolicyCreateLowercaseType:
+      summary: Create a compaction policy with the canonical lowercase policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "system_iceberg_compaction",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyCreateUppercaseType:
+      summary: Create a compaction policy with an uppercase policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "SYSTEM_ICEBERG_COMPACTION",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyCreateMixedCaseType:
+      summary: Create a compaction policy with a mixed-case policyType
+      value: {
+        "name": "compaction_policy",
+        "policyType": "System_Iceberg_Compaction",
+        "content": {
+          "maxPartitionNum": 5
+        }
+      }
+
+    PolicyUpdateContentLowercaseType:
+      summary: Update compaction content with the canonical lowercase policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "system_iceberg_compaction",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
+      }
+
+    PolicyUpdateContentUppercaseType:
+      summary: Update compaction content with an uppercase policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "SYSTEM_ICEBERG_COMPACTION",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
+      }
+
+    PolicyUpdateContentMixedCaseType:
+      summary: Update compaction content with a mixed-case policyType
+      value: {
+        "updates": [
+          {
+            "@type": "updateContent",
+            "policyType": "System_Iceberg_Compaction",
+            "newContent": {
+              "maxPartitionNum": 5
+            }
+          }
+        ]
       }
 
     PolicyAssociate:
