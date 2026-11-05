@@ -21,7 +21,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-Gravitino columns can't hold computed columns, metadata columns or watermarks, so `CREATE TABLE`
+Gravitino tables can't store computed columns, metadata columns or watermarks, so `CREATE TABLE`
 and `ALTER TABLE ... ADD` with them fail in every catalog. The only exception is generic tables in
 the [Hive catalog](flink-catalog-hive.md#generic-tables).
 

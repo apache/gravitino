@@ -916,7 +916,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     if (!resolvedTable.getResolvedSchema().getWatermarkSpecs().isEmpty()) {
       throw new UnsupportedOperationException(
           String.format(
-              "Watermarks cannot be stored in the Gravitino catalog '%s'.%s",
+              "The watermark cannot be stored in the Gravitino catalog '%s'.%s",
               getName(), genericTableAdvice()));
     }
   }
