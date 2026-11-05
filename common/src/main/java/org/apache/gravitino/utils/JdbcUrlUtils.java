@@ -94,12 +94,17 @@ public class JdbcUrlUtils {
    * @return whether the URL must not be exposed as a public catalog property
    */
   public static boolean containsCredentials(@Nullable String url) {
+    if (url == null) {
+      return false;
+    }
+    // Determine the driver family before URLDecoder turns the DNS SRV scheme's '+' into a space.
+    String lowerUrl = url.toLowerCase(Locale.ROOT);
+    boolean mysqlUrl = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
     // Decoding a password can introduce '/', '?' or '#' and change the authority boundaries.
     // Inspect raw user information before scanning decoded parameter names.
-    return url != null
-        && (USER_INFO.matcher(url).find()
-            || decodedFormsForScan(url).stream()
-                .anyMatch(JdbcUrlUtils::containsCredentialParameters));
+    return USER_INFO.matcher(url).find()
+        || decodedFormsForScan(url).stream()
+            .anyMatch(form -> containsCredentialParameters(form, mysqlUrl));
   }
 
   /**
@@ -180,14 +185,14 @@ public class JdbcUrlUtils {
     }
   }
 
-  private static boolean containsCredentialParameters(String url) {
+  private static boolean containsCredentialParameters(String url, boolean mysqlUrl) {
     if (USER_INFO.matcher(url).find()) {
       return true;
     }
     Matcher parameters = URL_PARAMETER.matcher(url);
     while (parameters.find()) {
       String key = parameters.group(1);
-      if (url.startsWith("jdbc:mysql:") && NON_SECRET_MYSQL_PARAMETERS.contains(key)) {
+      if (mysqlUrl && NON_SECRET_MYSQL_PARAMETERS.contains(key)) {
         continue;
       }
       if (CREDENTIAL_PARAMETER_KEYWORDS.stream().anyMatch(key::contains)) {
