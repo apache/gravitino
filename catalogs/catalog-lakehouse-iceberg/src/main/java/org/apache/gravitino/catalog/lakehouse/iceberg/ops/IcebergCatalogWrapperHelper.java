@@ -174,18 +174,13 @@ public class IcebergCatalogWrapperHelper {
 
     org.apache.iceberg.types.Type icebergType =
         IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType());
-    // Iceberg addColumn seeds both initial-default and write-default from this single value;
-    // null defaultValue is equivalent to the overload without a default.
-    Literal<?> defaultValue =
-        ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType);
-
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
           icebergType,
           addColumn.getComment(),
-          defaultValue);
+          ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType));
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
@@ -194,7 +189,7 @@ public class IcebergCatalogWrapperHelper {
           getLeafName(addColumn.fieldName()),
           icebergType,
           addColumn.getComment(),
-          defaultValue);
+          ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType));
     }
 
     if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
