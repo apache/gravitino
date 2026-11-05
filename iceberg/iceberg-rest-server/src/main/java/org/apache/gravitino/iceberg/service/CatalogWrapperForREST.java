@@ -55,6 +55,7 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
@@ -65,6 +66,7 @@ import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -76,6 +78,7 @@ import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.util.SnapshotUtil;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -483,7 +486,69 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
       if (cachedResponse.isPresent()) {
         LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+<<<<<<< HEAD
         return cachedResponse.get();
+=======
+        response = cachedResponse.get();
+      } else {
+        Schema residualFrom = null;
+        Schema residualTo = null;
+        Expression extraResidual = null;
+        List<FileScanTask> fileScanTasks = new ArrayList<>();
+        try (CloseableIterable<FileScanTask> scanTasks =
+            createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
+          // Recompute whether names were rewritten so residuals can be mapped back to the request
+          // schema. createFilePlanScanTasks applies the same rewrite rules.
+          if (scanRequest.snapshotId() != null && !scanRequest.useSnapshotSchema()) {
+            long snapshotId = scanRequest.snapshotId();
+            Optional<String> branch = IcebergScanPlanHelper.branchAt(table, snapshotId);
+            if (!branch.isPresent()) {
+              residualFrom = SnapshotUtil.schemaFor(table, snapshotId);
+              residualTo = table.schema();
+              // Keep the complete client filter as a residual. Extracting only
+              // post-snapshot predicates by replacing others with always-true
+              // collapses OR/NOT (e.g. id=1 OR new_col=2 → true).
+              if (scanRequest.filter() != null) {
+                extraResidual = scanRequest.filter();
+              }
+            }
+          }
+          for (FileScanTask fileScanTask : scanTasks) {
+            fileScanTasks.add(fileScanTask);
+          }
+        } catch (IOException e) {
+          LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
+          throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
+        }
+        fileScanTasks =
+            IcebergScanPlanHelper.prepareTasksForResponse(
+                fileScanTasks,
+                table.specs(),
+                residualTo,
+                residualFrom,
+                extraResidual,
+                scanRequest.caseSensitive());
+
+        if (fileScanTasks.isEmpty()) {
+          LOG.info(
+              "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
+              tableIdentifier);
+        }
+
+        checkDeleteFilesCanBeReferenced(tableIdentifier, fileScanTasks);
+        try {
+          response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+        } catch (Exception e) {
+          LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
+          throw new RuntimeException(
+              String.format(
+                  "Failed to build scan plan response for table: %s. Error: %s",
+                  tableIdentifier, e.getMessage()),
+              e);
+        }
+
+        scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
+>>>>>>> c07c70047 ([#14536] fix(iceberg-rest): honor use-snapshot-schema and plan dropped partition sources (#14552))
       }
 
       List<FileScanTask> fileScanTasks = new ArrayList<>();
@@ -555,7 +620,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return PlanTableScanResponse.builder()
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
-        .withSpecsById(table.specs())
+        .withSpecsById(
+            IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+                table.specs(), fileScanTasks, table.schemas().values()))
         .build();
   }
 
@@ -564,6 +631,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>If both start and end snapshot IDs are provided, uses IncrementalAppendScan. Otherwise, uses
    * regular TableScan.
+   *
+   * <p>With {@code use-snapshot-schema} false (the REST default, sent for branch scans) and a
+   * {@code snapshot-id}, the request is written against the current table schema. A branch that
+   * points at the snapshot is scanned with {@code useRef}, which binds to the current schema like a
+   * client-side branch scan. If no branch points there any more, the snapshot is scanned and the
+   * request's column names are mapped to the snapshot schema by field id.
    *
    * @param table The table to scan
    * @param tableIdentifier The table identifier for logging
@@ -596,12 +669,28 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
+      PlanTableScanRequest requestToApply = scanRequest;
       // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
-        tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
-        LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
+        long snapshotId = scanRequest.snapshotId();
+        Optional<String> branch =
+            scanRequest.useSnapshotSchema()
+                ? Optional.empty()
+                : IcebergScanPlanHelper.branchAt(table, snapshotId);
+        if (branch.isPresent()) {
+          tableScan = tableScan.useRef(branch.get());
+          LOG.debug("Applied branch {} for snapshot-id={}", branch.get(), snapshotId);
+        } else {
+          tableScan = tableScan.useSnapshot(snapshotId);
+          if (!scanRequest.useSnapshotSchema()) {
+            requestToApply =
+                IcebergScanPlanHelper.rewriteForSnapshot(
+                    scanRequest, table.schema(), SnapshotUtil.schemaFor(table, snapshotId));
+          }
+          LOG.debug("Applied snapshot filter: snapshot-id={}", snapshotId);
+        }
       }
-      tableScan = applyScanRequest(tableScan, scanRequest);
+      tableScan = applyScanRequest(tableScan, requestToApply);
       return tableScan.planFiles();
     }
   }
@@ -621,8 +710,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanFilter(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.filter() != null) {
       try {
-        scan = (T) scan.filter(scanRequest.filter());
-        LOG.debug("Applied filter expression: {}", scanRequest.filter());
+        Expression filter = scanRequest.filter();
+        scan = (T) scan.filter(filter);
+        LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
         LOG.error("Failed to apply filter expression: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);
