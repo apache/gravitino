@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -35,6 +36,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -54,12 +56,18 @@ public class TestSparkJdbcReadCorrectness {
       Table metadata = mock(Table.class);
       when(metadata.columns())
           .thenReturn(
-              new Column[] {
-                Column.of("id", Types.IntegerType.get()), Column.of("s", Types.StringType.get()),
-                Column.of("b", Types.BinaryType.get()),
-                    Column.of("ts", Types.TimestampType.withoutTimeZone()),
-                Column.of("tz", Types.TimestampType.withTimeZone())
-              });
+              identifier.name().equals("timestamp_only")
+                  ? new Column[] {
+                    Column.of("id", Types.IntegerType.get()),
+                    Column.of("ts", Types.TimestampType.withoutTimeZone())
+                  }
+                  : new Column[] {
+                    Column.of("id", Types.IntegerType.get()),
+                        Column.of("s", Types.StringType.get()),
+                    Column.of("b", Types.BinaryType.get()),
+                        Column.of("ts", Types.TimestampType.withoutTimeZone()),
+                    Column.of("tz", Types.TimestampType.withTimeZone())
+                  });
       return new SparkJdbcTable(
           identifier,
           metadata,
@@ -139,6 +147,67 @@ public class TestSparkJdbcReadCorrectness {
                   .sql("SELECT cast(ts as string) FROM safe.public.samples WHERE id=2")
                   .head()
                   .getString(0));
+        }
+      }
+    }
+  }
+
+  @Test
+  void testTimestampFilterOnTableWithoutStringColumns() throws Exception {
+    try (GenericContainer<?> pg =
+        new GenericContainer<>("postgres:16")
+            .withEnv("POSTGRES_DB", "test")
+            .withEnv("POSTGRES_PASSWORD", "test")
+            .withExposedPorts(5432)
+            .waitingFor(
+                Wait.forLogMessage(".*database system is ready to accept connections.*\\n", 2))) {
+      pg.start();
+      String url = "jdbc:postgresql://" + pg.getHost() + ":" + pg.getMappedPort(5432) + "/test";
+      try (Connection connection = DriverManager.getConnection(url, "postgres", "test");
+          Statement statement = connection.createStatement()) {
+        statement.execute("CREATE TABLE timestamp_only(id int, ts timestamp)");
+        statement.execute(
+            "INSERT INTO timestamp_only VALUES (1, '2024-01-01 03:04:05'), (2, '2024-01-03 03:04:05')");
+      }
+      try (SparkSession spark =
+          SparkSession.builder()
+              .master("local[1]")
+              .appName("timestamp-filter-regression")
+              .config("spark.ui.enabled", "false")
+              .config("spark.sql.catalog.safe", SafeCatalog.class.getName())
+              .config("spark.sql.catalog.safe.url", url)
+              .config("spark.sql.catalog.safe.user", "postgres")
+              .config("spark.sql.catalog.safe.password", "test")
+              .config("spark.sql.catalog.safe.driver", "org.postgresql.Driver")
+              .config("spark.sql.catalog.safe.preferTimestampNTZ", "true")
+              .config("spark.sql.catalog.safe.pushDownPredicate", "true")
+              .getOrCreate()) {
+        JDBCTableCatalog catalog =
+            (JDBCTableCatalog) spark.sessionState().catalogManager().catalog("safe");
+        SparkJdbcTable table =
+            (SparkJdbcTable)
+                catalog.loadTable(Identifier.of(new String[] {"public"}, "timestamp_only"));
+        boolean supported = !spark.version().startsWith("3.5.");
+        Assertions.assertEquals(supported, table.jdbcOptions().pushDownPredicate());
+        Assertions.assertEquals(supported, table.jdbcOptions().pushDownAggregate());
+        Assertions.assertEquals(supported, table.jdbcOptions().pushDownLimit());
+        Assertions.assertEquals(supported, table.jdbcOptions().pushDownOffset());
+        // Scan options must not override the safety policy installed on the table.
+        Assertions.assertEquals(
+            supported,
+            table
+                .newScanBuilder(new CaseInsensitiveStringMap(Map.of("pushDownPredicate", "true")))
+                .jdbcOptions()
+                .pushDownPredicate());
+        for (String zone : new String[] {"UTC", "America/Los_Angeles"}) {
+          spark.conf().set("spark.sql.session.timeZone", zone);
+          List<Row> rows =
+              spark
+                  .sql(
+                      "SELECT id FROM safe.public.timestamp_only WHERE ts > TIMESTAMP_NTZ '2024-01-02 03:04:05.123456'")
+                  .collectAsList();
+          Assertions.assertEquals(1, rows.size());
+          Assertions.assertEquals(2, rows.get(0).getInt(0));
         }
       }
     }

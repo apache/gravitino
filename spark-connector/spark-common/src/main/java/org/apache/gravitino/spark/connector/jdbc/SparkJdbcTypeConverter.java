@@ -33,7 +33,7 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
 
   private final boolean useTimestampNtz;
 
-  /** Creates a converter retaining the MySQL timestamp mapping. */
+  /** Creates a converter retaining the existing JDBC timestamp mapping. */
   public SparkJdbcTypeConverter() {
     this(false);
   }

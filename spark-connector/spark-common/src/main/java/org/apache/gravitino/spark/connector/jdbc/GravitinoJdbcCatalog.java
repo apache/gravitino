@@ -21,10 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
@@ -33,7 +30,6 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
-import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
@@ -50,37 +46,14 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
 
-  private Map<String, String> initialProperties;
-  private Instant initialCreatedAt;
-  private String initialProvider;
-
-  /** {@inheritDoc} */
-  @Override
-  public void initialize(String name, CaseInsensitiveStringMap options) {
-    GravitinoCatalogManager.get().reloadGravitinoCatalogInfo(name);
-    super.initialize(name, options);
-  }
-
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    // Use the exact vended credential snapshot for both JDBC initialization and later checks.
-    // A second vending request could observe a rotation between the two snapshots.
-    initialProperties = connectionState(gravitinoCatalogClient);
-    for (String key :
-        new String[] {
-          JdbcPropertiesConstants.SPARK_JDBC_USER, JdbcPropertiesConstants.SPARK_JDBC_PASSWORD
-        }) {
-      if (initialProperties.containsKey(key)) {
-        all.put(key, initialProperties.get(key));
-      }
-    }
-    initialCreatedAt = gravitinoCatalogClient.auditInfo().createTime();
-    initialProvider = gravitinoCatalogClient.provider();
-    if (!"jdbc-mysql".equalsIgnoreCase(initialProvider)) {
+    applyJdbcCredential(gravitinoCatalogClient, all);
+    if (useTimestampNtz()) {
       all.put("preferTimestampNTZ", "true");
     }
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
@@ -130,32 +103,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         (JDBCTableCatalog) sparkCatalog,
         propertiesConverter,
         sparkTransformConverter,
-        sparkTypeConverter,
-        this::checkCatalogUnchanged);
-  }
-
-  /**
-   * Rejects use of a JDBC catalog whose server configuration or credentials have changed.
-   * Dialect-specific table wrappers can use this guard before planning cached-table reads/writes.
-   *
-   * @throws IllegalStateException if a new Spark session is required
-   */
-  @VisibleForTesting
-  protected final void checkCatalogUnchanged() {
-    Catalog current = GravitinoCatalogManager.get().reloadGravitinoCatalogInfo(name());
-    if (!Objects.equals(initialProvider, current.provider())
-        || !Objects.equals(initialCreatedAt, current.auditInfo().createTime())
-        || !Objects.equals(initialProperties, connectionState(current))) {
-      throw new IllegalStateException(
-          "The JDBC catalog configuration or credentials changed; restart the Spark session before accessing it");
-    }
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  protected Table loadSparkTable(Identifier identifier) {
-    checkCatalogUnchanged();
-    return super.loadSparkTable(identifier);
+        sparkTypeConverter);
   }
 
   @Override
@@ -170,8 +118,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkJdbcTypeConverter(
-        !"jdbc-mysql".equalsIgnoreCase(gravitinoCatalogClient.provider()));
+    return new SparkJdbcTypeConverter(useTimestampNtz());
   }
 
   @Override
@@ -199,9 +146,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     super.createNamespace(namespace, properties);
   }
 
-  private static Map<String, String> connectionState(Catalog catalog) {
-    Map<String, String> state = new HashMap<>(catalog.properties());
-    applyJdbcCredential(catalog, state);
-    return state;
+  private boolean useTimestampNtz() {
+    // Keep the reader and metadata mapping aligned; other providers retain their existing mapping.
+    return "jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider());
   }
 }

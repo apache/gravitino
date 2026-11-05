@@ -23,7 +23,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
-import java.util.Map;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Type;
@@ -47,16 +46,26 @@ public class TestSparkJdbcTableWriteValidation {
   @Test
   void testUnsafeReadPushdownIsDisabledOnlyForAffectedTables() {
     for (Type type :
-        new Type[] {Types.StringType.get(), Types.BinaryType.get(), Types.VarCharType.of(10)}) {
+        new Type[] {
+          Types.StringType.get(), Types.BinaryType.get(), Types.VarCharType.of(10),
+          Types.FixedCharType.of(10), Types.UUIDType.get(), Types.ExternalType.of("jsonb")
+        }) {
       SparkJdbcTable table = table(type, "jdbc:postgresql://localhost/test");
       Assertions.assertFalse(table.jdbcOptions().pushDownPredicate());
       Assertions.assertFalse(table.jdbcOptions().pushDownAggregate());
       Assertions.assertFalse(table.jdbcOptions().pushDownLimit());
       Assertions.assertFalse(table.jdbcOptions().pushDownOffset());
     }
-    SparkJdbcTable numeric = table(Types.IntegerType.get(), "jdbc:postgresql://localhost/test");
-    Assertions.assertTrue(numeric.jdbcOptions().pushDownPredicate());
-    Assertions.assertTrue(numeric.jdbcOptions().pushDownAggregate());
+    for (Type type :
+        new Type[] {
+          Types.IntegerType.get(), Types.DateType.get(), Types.TimestampType.withTimeZone()
+        }) {
+      SparkJdbcTable compatible = table(type, "jdbc:postgresql://localhost/test");
+      Assertions.assertTrue(compatible.jdbcOptions().pushDownPredicate());
+      Assertions.assertTrue(compatible.jdbcOptions().pushDownAggregate());
+      Assertions.assertTrue(compatible.jdbcOptions().pushDownLimit());
+      Assertions.assertTrue(compatible.jdbcOptions().pushDownOffset());
+    }
   }
 
   @Test
@@ -89,26 +98,7 @@ public class TestSparkJdbcTableWriteValidation {
     Assertions.assertNotNull(table.newWriteBuilder(info));
   }
 
-  @Test
-  void testCachedTableChecksCatalogBeforeReadAndWritePlanning() {
-    SparkJdbcTable table =
-        table(
-            Types.IntegerType.get(),
-            "jdbc:postgresql://localhost/test",
-            () -> {
-              throw new IllegalStateException("catalog changed");
-            });
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () -> table.newScanBuilder(new CaseInsensitiveStringMap(Map.of())));
-    Assertions.assertThrows(IllegalStateException.class, () -> table.newWriteBuilder(null));
-  }
-
   private SparkJdbcTable table(Type type, String url) {
-    return table(type, url, () -> {});
-  }
-
-  private SparkJdbcTable table(Type type, String url, Runnable guard) {
     Table metadata = mock(Table.class);
     when(metadata.columns())
         .thenReturn(new Column[] {Column.of("special_value", type, null, true, false, null)});
@@ -119,7 +109,10 @@ public class TestSparkJdbcTableWriteValidation {
                 .updated("dbtable", "t")
                 .updated("driver", "org.postgresql.Driver"));
     JDBCTable physical = mock(JDBCTable.class);
-    when(physical.schema()).thenReturn(new StructType());
+    when(physical.schema())
+        .thenReturn(
+            new StructType()
+                .add("special_value", new SparkJdbcTypeConverter(true).toSparkType(type)));
     when(physical.jdbcOptions()).thenReturn(options);
     return new SparkJdbcTable(
         Identifier.of(new String[] {"public"}, "t"),
@@ -128,7 +121,6 @@ public class TestSparkJdbcTableWriteValidation {
         mock(JDBCTableCatalog.class),
         JdbcPropertiesConverter.getInstance(),
         new SparkTransformConverter(false),
-        new SparkJdbcTypeConverter(),
-        guard);
+        new SparkJdbcTypeConverter(true));
   }
 }

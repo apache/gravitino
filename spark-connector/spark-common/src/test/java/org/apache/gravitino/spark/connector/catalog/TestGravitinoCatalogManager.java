@@ -66,19 +66,6 @@ public class TestGravitinoCatalogManager {
   }
 
   @Test
-  void testExplicitReloadBypassesCacheAndPublishesCurrentSnapshot() {
-    SparkConf conf = tokenConf();
-    GravitinoCatalogManager manager = createManager(conf);
-    conf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt("alice"));
-    Catalog original = manager.getGravitinoCatalogInfo(CATALOG_NAME);
-    Catalog current = manager.reloadGravitinoCatalogInfo(CATALOG_NAME);
-    assertNotSame(original, current);
-    assertSame(current, manager.getGravitinoCatalogInfo(CATALOG_NAME));
-    assertEquals(2, clientFactory.loadCount());
-    assertEquals(1, clientFactory.clientCount());
-  }
-
-  @Test
   void testDifferentSubjectsDoNotShareCatalogCache() {
     SparkConf sparkConf = tokenConf();
     GravitinoCatalogManager manager = createManager(sparkConf);

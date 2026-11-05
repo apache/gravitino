@@ -151,19 +151,6 @@ public class GravitinoCatalogManager {
     gravitinoCatalogManager = null;
   }
 
-  /**
-   * Reloads a catalog for the current identity without using the catalog cache.
-   *
-   * @param name the catalog name
-   * @return the current server catalog
-   */
-  public Catalog reloadGravitinoCatalogInfo(String name) {
-    GravitinoIdentity identity = currentIdentity();
-    Catalog catalog = loadCatalog(identity, name);
-    gravitinoCatalogs.put(cacheKey(identity, name), catalog);
-    return catalog;
-  }
-
   public Catalog getGravitinoCatalogInfo(String name) {
     GravitinoIdentity identity = currentIdentity();
     try {

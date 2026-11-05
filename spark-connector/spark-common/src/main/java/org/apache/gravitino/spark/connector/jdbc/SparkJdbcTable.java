@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -37,6 +38,9 @@ import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.jdbc.JdbcDialects;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
@@ -48,7 +52,6 @@ public class SparkJdbcTable extends JDBCTable {
 
   private final GravitinoTableInfoHelper gravitinoTableInfoHelper;
   private final Table gravitinoTable;
-  private final Runnable catalogCheck;
   private final boolean unsafePushDown;
 
   public SparkJdbcTable(
@@ -59,41 +62,8 @@ public class SparkJdbcTable extends JDBCTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    this(
-        identifier,
-        gravitinoTable,
-        jdbcTable,
-        jdbcTableCatalog,
-        propertiesConverter,
-        sparkTransformConverter,
-        sparkTypeConverter,
-        () -> {});
-  }
-
-  /**
-   * Creates a JDBC table with a guard against stale catalog configuration and credentials.
-   *
-   * @param identifier the table identifier
-   * @param gravitinoTable the source metadata
-   * @param jdbcTable the underlying Spark table
-   * @param jdbcTableCatalog the Spark JDBC catalog
-   * @param propertiesConverter the properties converter
-   * @param sparkTransformConverter the transform converter
-   * @param sparkTypeConverter the type converter
-   * @param catalogCheck the driver-side check run before scan/write planning
-   */
-  public SparkJdbcTable(
-      Identifier identifier,
-      Table gravitinoTable,
-      JDBCTable jdbcTable,
-      JDBCTableCatalog jdbcTableCatalog,
-      PropertiesConverter propertiesConverter,
-      SparkTransformConverter sparkTransformConverter,
-      SparkTypeConverter sparkTypeConverter,
-      Runnable catalogCheck) {
     super(identifier, jdbcTable.schema(), readOptions(jdbcTable, gravitinoTable));
-    this.catalogCheck = catalogCheck;
-    this.unsafePushDown = hasUnsafePushDown(gravitinoTable);
+    this.unsafePushDown = hasUnsafePushDown(jdbcTable, gravitinoTable);
 
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =
@@ -109,7 +79,6 @@ public class SparkJdbcTable extends JDBCTable {
   /** {@inheritDoc} */
   @Override
   public JDBCScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    catalogCheck.run();
     return super.newScanBuilder(
         unsafePushDown
             ? new CaseInsensitiveStringMap(safeOptions(options.asCaseSensitiveMap()))
@@ -124,7 +93,6 @@ public class SparkJdbcTable extends JDBCTable {
    */
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
-    catalogCheck.run();
     if (jdbcOptions().url().toLowerCase(Locale.ROOT).startsWith("jdbc:postgresql:")) {
       for (Column column : gravitinoTable.columns()) {
         if (column.dataType() instanceof Types.UUIDType
@@ -157,7 +125,7 @@ public class SparkJdbcTable extends JDBCTable {
     return gravitinoTableInfoHelper.properties();
   }
 
-  private static boolean hasUnsafePushDown(Table source) {
+  private static boolean hasUnsafePushDown(JDBCTable table, Table source) {
     for (Column column : source.columns()) {
       Type type = column.dataType();
       if (type instanceof Types.StringType
@@ -167,6 +135,16 @@ public class SparkJdbcTable extends JDBCTable {
           || type instanceof Types.ExternalType
           || type instanceof Types.UUIDType) {
         return true;
+      }
+    }
+    for (StructField field : table.schema().fields()) {
+      if (DataTypes.TimestampNTZType.equals(field.dataType())) {
+        // Spark 3.5 leaves LocalDateTime literals unquoted; Spark 4 quotes them. Check the
+        // actual dialect instead of relying on a Spark version or provider name. Until the
+        // dialect supports these literals, retain Spark evaluation for the whole table.
+        return !(JdbcDialects.get(table.jdbcOptions().url())
+                .compileValue(LocalDateTime.of(2000, 1, 1, 0, 0))
+            instanceof String);
       }
     }
     return false;
@@ -182,7 +160,7 @@ public class SparkJdbcTable extends JDBCTable {
   }
 
   private static JDBCOptions readOptions(JDBCTable table, Table source) {
-    if (!hasUnsafePushDown(source)) {
+    if (!hasUnsafePushDown(table, source)) {
       return table.jdbcOptions();
     }
     // Disable source evaluation on affected tables; the same query must retain Spark semantics.

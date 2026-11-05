@@ -153,28 +153,26 @@ INSERT OVERWRITE. The error identifies the unsupported column. Spark binds these
 as VARCHAR, which does not preserve the PostgreSQL target type. Use a native PostgreSQL
 writer for these tables. Other PostgreSQL column types retain their existing write behavior.
 
-### JDBC query consistency and configuration changes
+### JDBC query consistency
 
 For JDBC tables containing string, fixed/variable character, binary, UUID, or external-type
 columns, predicates, aggregates, Top-N/limits, and offsets are evaluated by Spark. This
 conservative table-level policy avoids source collation differences and unsupported binary
 literals. It also disables numeric predicate/aggregate pushdown on those tables and can
-increase transferred data. Tables containing only compatible numeric/date/timestamp columns
-keep their existing pushdown behavior. User options do not re-enable the unsafe operations.
+increase transferred data. User options do not re-enable the unsafe operations. Finer-grained
+pushdown requires a separate assessment of expression and source semantics.
 
-The standard JDBC type converter uses Spark `TimestampNTZType` for providers other than MySQL, and
-the underlying Spark JDBC reader receives `preferTimestampNTZ=true`. Zoned timestamps
-remain instants. MySQL retains its existing timestamp mapping. Provider-specific timestamp
-restrictions still apply.
+The standard JDBC catalog uses Spark `TimestampNTZType` for PostgreSQL timestamps without
+time zone, and the underlying Spark JDBC reader receives `preferTimestampNTZ=true`. Zoned
+timestamps remain instants. Other providers retain their existing timestamp mapping.
+Custom JDBC type converters can opt into zone-free timestamp handling using the appropriate
+`SparkJdbcTypeConverter` constructor.
 
-The standard JDBC catalog reloads server configuration and credentials before loading physical
-Spark tables and planning scans/writes. A changed provider, catalog creation time, property
-map, or vended credential causes an explicit failure requiring a Spark session restart.
-A failed reload or denied credential request fails closed. This introduces driver-side
-server requests per planning operation; it does not refresh an existing instance or revoke
-already planned/running executor work or cached results. Newly initialized JDBC catalogs
-bypass the catalog-info cache to pick up the latest configuration.
+Tables with NTZ columns also use Spark evaluation when their JDBC dialect cannot compile
+`LocalDateTime` literals, including the built-in PostgreSQL dialect in Spark 3.5. Spark 4 can
+retain pushdown on timestamp/numeric-only tables. Tables containing only compatible numeric,
+date, or zoned timestamp columns keep their existing pushdown behavior.
 
-Custom JDBC type converters must opt into zone-free timestamp handling using the appropriate
-`SparkJdbcTypeConverter` constructor. Custom table wrappers must pass the catalog guard to
-the `SparkJdbcTable` constructor to protect already loaded tables during scan/write planning.
+Configuration and credential snapshot invalidation from #14642 remains unresolved and is
+deferred to a 2.0 follow-up. This change does not add per-planning catalog reloads or a stale
+catalog guard.
