@@ -1152,8 +1152,11 @@ public class TestDomainMetaService extends TestJDBCBackend {
 
     // Setting the current backing tag writes nothing.
     long version = selectDomainPO(markets.id()).currentVersion();
-    domainMetaService.updateDomainBackingTagAndGet(
-        markets.nameIdentifier(), TagValue.of("dept", "other"), modified, s -> {});
+    TagValue current = TagValue.of("dept", "other");
+    DomainEntity unchanged =
+        domainMetaService.updateDomainBackingTagAndGet(
+            markets.nameIdentifier(), current, modified, s -> {});
+    Assertions.assertEquals(current, unchanged.backingTag().orElse(null));
     Assertions.assertEquals(version, selectDomainPO(markets.id()).currentVersion());
 
     // Removing the backing tag locks no tag.
@@ -1164,6 +1167,13 @@ public class TestDomainMetaService extends TestJDBCBackend {
     Assertions.assertFalse(removed.backingTag().isPresent());
     Assertions.assertNull(removed.backingTagId());
     Assertions.assertFalse(states.get(0).backingTag().isPresent());
+
+    version = selectDomainPO(markets.id()).currentVersion();
+    Assertions.assertEquals(
+        removed,
+        domainMetaService.updateDomainBackingTagAndGet(
+            markets.nameIdentifier(), null, modified, s -> {}));
+    Assertions.assertEquals(version, selectDomainPO(markets.id()).currentVersion());
 
     // A missing tag or a failing check changes nothing.
     Assertions.assertThrows(

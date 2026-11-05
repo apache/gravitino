@@ -322,30 +322,33 @@ public class DomainMetaService {
 
             Long newTagId = tag == null ? null : tag.id();
             String newValue = backingTag == null ? null : backingTag.value().orElse(null);
-            if (!Objects.equals(lockedPO.backingTagId(), newTagId)
-                || !Objects.equals(lockedPO.backingTagValue(), newValue)) {
-              DomainEntity newDomain =
-                  domain.toBuilder()
-                      .withBackingTagId(newTagId)
-                      .withBackingTagName(tag == null ? null : tag.name())
-                      .withBackingTagValue(newValue)
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator(domain.auditInfo().creator())
-                              .withCreateTime(domain.auditInfo().createTime())
-                              .withLastModifier(auditInfo.lastModifier())
-                              .withLastModifiedTime(auditInfo.lastModifiedTime())
-                              .build())
-                      .build();
-              DomainPO newPO = DomainPO.updateDomainPO(lockedPO, newDomain);
-              OccWriteSupport.updateWithVersion(
-                  () ->
-                      SessionUtils.getWithoutCommit(
-                          DomainMetaMapper.class,
-                          mapper -> mapper.updateDomainMeta(newPO, lockedPO)),
-                  () ->
-                      ExceptionUtils.concurrentModification(Entity.EntityType.DOMAIN, identifier));
+            if (Objects.equals(lockedPO.backingTagId(), newTagId)
+                && Objects.equals(lockedPO.backingTagValue(), newValue)) {
+              // The locked domain row does not include the backing tag name.
+              updated[0] =
+                  tag == null ? domain : domain.toBuilder().withBackingTagName(tag.name()).build();
+              return;
             }
+
+            DomainEntity newDomain =
+                domain.toBuilder()
+                    .withBackingTagId(newTagId)
+                    .withBackingTagName(tag == null ? null : tag.name())
+                    .withBackingTagValue(newValue)
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(domain.auditInfo().creator())
+                            .withCreateTime(domain.auditInfo().createTime())
+                            .withLastModifier(auditInfo.lastModifier())
+                            .withLastModifiedTime(auditInfo.lastModifiedTime())
+                            .build())
+                    .build();
+            DomainPO newPO = DomainPO.updateDomainPO(lockedPO, newDomain);
+            OccWriteSupport.updateWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        DomainMetaMapper.class, mapper -> mapper.updateDomainMeta(newPO, lockedPO)),
+                () -> ExceptionUtils.concurrentModification(Entity.EntityType.DOMAIN, identifier));
             updated[0] =
                 fromDomainPOWithParent(
                     SessionUtils.getWithoutCommit(

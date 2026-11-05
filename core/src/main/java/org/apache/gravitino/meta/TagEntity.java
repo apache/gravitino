@@ -173,12 +173,16 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
     Preconditions.checkArgument(
         allowedValues.length > 0, "Tag %s does not allow assignment values", tagValue.name());
-    Preconditions.checkArgument(
-        Arrays.asList(allowedValues).contains(tagValue.value().get()),
-        "Tag %s value %s is not in allowed values %s",
-        tagValue.name(),
-        tagValue.value().get(),
-        Arrays.toString(allowedValues));
+    String value = tagValue.value().get();
+    for (String allowedValue : allowedValues) {
+      if (value.equals(allowedValue)) {
+        return;
+      }
+    }
+    throw new IllegalArgumentException(
+        String.format(
+            "Tag %s value %s is not in allowed values %s",
+            tagValue.name(), value, Arrays.toString(allowedValues)));
   }
 
   @Override
