@@ -178,17 +178,23 @@ public class IcebergCatalogWrapperHelper {
     // null defaultValue is equivalent to the overload without a default.
     Literal<?> defaultValue =
         ToIcebergColumnDefault.fromGravitino(addColumn.getDefaultValue(), icebergType);
-    String parent = getParentName(addColumn.fieldName());
-    String leaf = getLeafName(addColumn.fieldName());
 
     if (addColumn.isNullable()) {
       icebergUpdateSchema.addColumn(
-          parent, leaf, icebergType, addColumn.getComment(), defaultValue);
+          getParentName(addColumn.fieldName()),
+          getLeafName(addColumn.fieldName()),
+          icebergType,
+          addColumn.getComment(),
+          defaultValue);
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
       icebergUpdateSchema.addRequiredColumn(
-          parent, leaf, icebergType, addColumn.getComment(), defaultValue);
+          getParentName(addColumn.fieldName()),
+          getLeafName(addColumn.fieldName()),
+          icebergType,
+          addColumn.getComment(),
+          defaultValue);
     }
 
     if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
