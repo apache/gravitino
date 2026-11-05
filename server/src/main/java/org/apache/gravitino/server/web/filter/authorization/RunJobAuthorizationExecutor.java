@@ -30,6 +30,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
@@ -71,13 +72,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
         "Expected JobRunRequest but found %s",
         request.getClass().getSimpleName());
     JobRunRequest jobRunRequest = (JobRunRequest) request;
-    try {
-      jobRunRequest.validate();
-    } catch (IllegalArgumentException e) {
-      // validate() throws IllegalArgumentException; map to BadRequest so the interceptor returns
-      // 400 instead of the catch-all 500 authorization internal error.
-      throw new BadRequestException(e, "%s", e.getMessage());
-    }
+    RequestValidation.validate(jobRunRequest::validate);
     String jobTemplateName = jobRunRequest.getJobTemplateName();
     NameIdentifier metalake = metadataContext.get(Entity.EntityType.METALAKE);
     NameIdentifier jobTemplateNameIdentifier =

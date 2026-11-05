@@ -488,8 +488,8 @@ public class IcebergCatalogOperations
    */
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
+    Namespace destNamespace = tableIdent.namespace();
     try {
-      Namespace destNamespace = tableIdent.namespace();
       if (renameTable.getNewSchemaName().isPresent()) {
         String[] namespaceLevels = tableIdent.namespace().levels();
         String[] destLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
@@ -511,6 +511,11 @@ public class IcebergCatalogOperations
       icebergCatalogWrapper.renameTable(renameTableRequest);
       return loadTable(
           NameIdentifier.of(ArrayUtils.add(destNamespace.levels(), renameTable.getNewName())));
+    } catch (AlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table already exists: %s",
+          NameIdentifier.of(destNamespace, renameTable.getNewName()));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
