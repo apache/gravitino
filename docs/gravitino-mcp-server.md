@@ -369,6 +369,8 @@ Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-
 | `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
 | `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |
 
+For every scheme other than `Basic`, `principal` is a fingerprint of one credential, not a stable user identity. The hash has no key, so the fingerprint suits high-entropy tokens only: a short static credential can be recovered from the log by guessing. To trace what one user did, use the Gravitino server's [audit log](./gravitino-server-config.md#audit-logging).
+
 Example record:
 
 ```json

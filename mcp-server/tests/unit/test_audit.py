@@ -17,6 +17,7 @@
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import unittest
@@ -131,8 +132,12 @@ class TestExtractPrincipal(unittest.TestCase):
         )
 
     def test_jwt_principal_is_the_fingerprint_of_the_whole_token(self):
+        token = _jwt_for("alice")
         self.assertEqual(
-            audit._extract_principal(f"Bearer {_jwt_for('alice')}"),
+            hashlib.sha256(token.encode()).hexdigest()[:16], "3056aa588a7ade5e"
+        )
+        self.assertEqual(
+            audit._extract_principal(f"Bearer {token}"),
             "bearer:3056aa588a7ade5e",
         )
 
