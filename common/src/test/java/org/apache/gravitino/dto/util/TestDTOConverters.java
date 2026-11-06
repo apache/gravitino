@@ -22,6 +22,7 @@ package org.apache.gravitino.dto.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.io.BaseEncoding;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,8 +63,26 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDTOConverters {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryLiteralBytesUseHex(String hex) {
+    byte[] bytes = BaseEncoding.base16().lowerCase().decode(hex);
+    LiteralDTO dto =
+        (LiteralDTO) DTOConverters.toFunctionArg(Literals.of(bytes, Types.BinaryType.get()));
+    Assertions.assertEquals(Types.BinaryType.get(), dto.dataType());
+    Assertions.assertEquals("0x" + hex, dto.value());
+    Assertions.assertArrayEquals(
+        bytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(dto)).value());
+    Assertions.assertEquals(
+        "legacy",
+        ((LiteralDTO) DTOConverters.toFunctionArg(Literals.of("legacy", Types.BinaryType.get())))
+            .value());
+  }
 
   @Test
   void testIdentityPartitionDTOConvert() {
@@ -403,7 +422,7 @@ public class TestDTOConverters {
   }
 
   @Test
-  void testBinaryAndFixedLiteralsUseIcebergHexEncoding() throws Exception {
+  void testBinaryAndFixedLiteralsUseHexEncoding() throws Exception {
     byte[] bytes = new byte[] {1, 2, 3};
     Expression binaryLiteral = Literals.of(bytes, Types.BinaryType.get());
     Expression fixedLiteral = Literals.of(bytes, Types.FixedType.of(3));
@@ -412,32 +431,32 @@ public class TestDTOConverters {
     FunctionArg fixedArg = DTOConverters.toFunctionArg(fixedLiteral);
     Assertions.assertInstanceOf(LiteralDTO.class, binaryArg);
     Assertions.assertInstanceOf(LiteralDTO.class, fixedArg);
-    // Iceberg Appendix D / REST OpenAPI: uppercase hexadecimal string
-    Assertions.assertEquals("010203", ((LiteralDTO) binaryArg).value());
-    Assertions.assertEquals("010203", ((LiteralDTO) fixedArg).value());
-    Assertions.assertFalse(((LiteralDTO) binaryArg).value().startsWith("[B@"));
+    // Wire format: 0x + lowercase hex (#14609); reversible encoding of Iceberg-style bytes.
+    Assertions.assertEquals("0x010203", ((LiteralDTO) binaryArg).value());
+    Assertions.assertEquals("0x010203", ((LiteralDTO) fixedArg).value());
+    Assertions.assertFalse(((LiteralDTO) binaryArg).value().contains("[B@"));
 
     Literal<?> roundTripBinary = (Literal<?>) DTOConverters.fromFunctionArg(binaryArg);
     Literal<?> roundTripFixed = (Literal<?>) DTOConverters.fromFunctionArg(fixedArg);
     Assertions.assertArrayEquals(bytes, (byte[]) roundTripBinary.value());
     Assertions.assertArrayEquals(bytes, (byte[]) roundTripFixed.value());
 
-    // Lowercase hex must also parse (Iceberg reader rule).
+    // Uppercase hex after 0x must also parse.
     byte[] mixedCaseBytes = new byte[] {0x0a, 0x1b, (byte) 0x2c};
-    LiteralDTO lowercase =
-        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0a1b2c").build();
+    LiteralDTO uppercase =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0x0A1B2C").build();
     Assertions.assertArrayEquals(
-        mixedCaseBytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(lowercase)).value());
+        mixedCaseBytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(uppercase)).value());
 
     ColumnDTO viaConverters =
         DTOConverters.toDTO(
             Column.of(
                 "bin_col", Types.BinaryType.get(), null, true, false, binaryLiteral, fixedLiteral));
     String json = JsonUtils.objectMapper().writeValueAsString(viaConverters);
-    Assertions.assertTrue(json.contains("\"010203\""));
+    Assertions.assertTrue(json.contains("\"0x010203\""));
     Assertions.assertFalse(json.contains("[B@"));
     ColumnDTO deser = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);
-    Assertions.assertEquals("010203", ((LiteralDTO) deser.defaultValue()).value());
-    Assertions.assertEquals("010203", ((LiteralDTO) deser.initialDefaultValue()).value());
+    Assertions.assertEquals("0x010203", ((LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals("0x010203", ((LiteralDTO) deser.initialDefaultValue()).value());
   }
 }

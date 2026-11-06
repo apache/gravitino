@@ -882,18 +882,23 @@ class DTOConverters:
     def _literal_value_to_dto_string(value, data_type) -> Optional[str]:
         if value is None:
             return None
-        # Iceberg Appendix D / REST OpenAPI: binary and fixed as uppercase hex.
-        if DTOConverters._is_binary_or_fixed(data_type) and isinstance(value, (bytes, bytearray)):
-            return bytes(value).hex().upper()
+        # Match Java DTOConverters / #14609: 0x + lowercase hex for binary/fixed bytes.
+        if DTOConverters._is_binary_or_fixed(data_type) and isinstance(
+            value, (bytes, bytearray)
+        ):
+            return "0x" + bytes(value).hex()
         return str(value)
 
     @staticmethod
-    def _decode_binary_hex(hex_value: str, data_type):
+    def _decode_binary_hex(value: str, data_type):
+        if not value.lower().startswith("0x"):
+            return value
+        hex_value = value[2:]
         try:
             decoded = bytes.fromhex(hex_value)
         except ValueError as exc:
             raise IllegalArgumentException(
-                f"Invalid hexadecimal binary/fixed literal value: {hex_value}"
+                "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs"
             ) from exc
         if isinstance(data_type, Types.FixedType) and len(decoded) != data_type.length():
             raise IllegalArgumentException(

@@ -153,11 +153,13 @@ import org.apache.gravitino.tag.TagValueConstraint;
 public class DTOConverters {
 
   /**
-   * Iceberg JSON single-value serialization (Appendix D / REST OpenAPI) encodes {@code binary} and
-   * {@code fixed} as uppercase hexadecimal strings. Writers emit uppercase; readers accept either
-   * case.
+   * Gravitino's string-valued literal wire API encodes {@code binary}/{@code fixed} {@code byte[]}
+   * values as {@code 0x} plus lowercase hex pairs (see #14609). This is a reversible encoding of
+   * the same bytes Iceberg stores as unprefixed hex in Appendix D / REST OpenAPI.
    */
-  private static final BaseEncoding BINARY_HEX = BaseEncoding.base16().upperCase();
+  private static final BaseEncoding BINARY_HEX = BaseEncoding.base16().lowerCase();
+
+  private static final String BINARY_HEX_PREFIX = "0x";
 
   private DTOConverters() {}
 
@@ -1157,10 +1159,8 @@ public class DTOConverters {
           return Literals.NULL;
         }
         Type dataType = literalDTO.dataType();
-        if (isBinaryOrFixed(dataType)) {
-          return Literals.of(decodeBinaryHex(literalDTO.value(), dataType), dataType);
-        }
-        return Literals.of(literalDTO.value(), dataType);
+        Object value = literalValueFromDtoString(literalDTO.value(), dataType);
+        return Literals.of(value, dataType);
       case FIELD:
         return NamedReference.field(((FieldReferenceDTO) arg).fieldName());
       case FUNCTION:
@@ -1679,21 +1679,31 @@ public class DTOConverters {
   }
 
   private static String literalValueToDtoString(Object value, Type dataType) {
+    // byte[].toString() is an object identity and cannot preserve the literal's bytes.
     if (isBinaryOrFixed(dataType) && value instanceof byte[]) {
-      return BINARY_HEX.encode((byte[]) value);
+      return BINARY_HEX_PREFIX + BINARY_HEX.encode((byte[]) value);
     }
     return value.toString();
   }
 
-  private static byte[] decodeBinaryHex(String hex, Type dataType) {
-    Preconditions.checkArgument(hex != null, "binary/fixed literal value must not be null");
+  /**
+   * Decodes {@code 0x}-prefixed hex for binary/fixed. Unprefixed values keep their previous string
+   * interpretation (#14609).
+   */
+  private static Object literalValueFromDtoString(String value, Type dataType) {
+    if (!isBinaryOrFixed(dataType) || value == null) {
+      return value;
+    }
+    if (!value.regionMatches(true, 0, BINARY_HEX_PREFIX, 0, BINARY_HEX_PREFIX.length())) {
+      return value;
+    }
+    String hex = value.substring(BINARY_HEX_PREFIX.length());
     byte[] bytes;
     try {
-      // Upper-case before decode so lowercase Iceberg hex values are accepted.
-      bytes = BINARY_HEX.decode(hex.toUpperCase(Locale.ROOT));
+      bytes = BINARY_HEX.decode(hex.toLowerCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
-          "Invalid hexadecimal binary/fixed literal value: " + hex, e);
+          "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs", e);
     }
     if (dataType instanceof Types.FixedType) {
       int expected = ((Types.FixedType) dataType).length();

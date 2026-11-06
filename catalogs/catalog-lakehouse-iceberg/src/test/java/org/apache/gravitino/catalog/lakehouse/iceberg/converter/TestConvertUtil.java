@@ -740,17 +740,17 @@ public class TestConvertUtil extends TestBaseConvert {
     org.apache.gravitino.dto.rel.ColumnDTO dto =
         org.apache.gravitino.dto.util.DTOConverters.toDTO(column);
     String json = org.apache.gravitino.json.JsonUtils.objectMapper().writeValueAsString(dto);
-    Assertions.assertTrue(json.contains("\"010203\""));
+    Assertions.assertTrue(json.contains("\"0x010203\""));
     Assertions.assertFalse(json.contains("[B@"));
 
     org.apache.gravitino.dto.rel.ColumnDTO deser =
         org.apache.gravitino.json.JsonUtils.objectMapper()
             .readValue(json, org.apache.gravitino.dto.rel.ColumnDTO.class);
     Assertions.assertEquals(
-        "010203",
+        "0x010203",
         ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.defaultValue()).value());
     Assertions.assertEquals(
-        "010203",
+        "0x010203",
         ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.initialDefaultValue())
             .value());
   }
