@@ -160,10 +160,11 @@ These scripts should run to completion without any errors. If you
 do encounter errors you need to analyze the cause and attempt to
 trace it back to one of the preceding steps.
 
-For the MySQL, PostgreSQL, and H2 1.3.0-to-2.0.0 upgrade scripts, you can rerun the
-script after fixing the cause of a partial failure; earlier upgrade scripts are unchanged.
-Unexpected schema differences, such as a missing MySQL index during a rename, require
-manual schema repair before retrying.
+The MySQL upgrade scripts can be rerun after fixing the cause of a partial failure;
+they guard column additions, index creation and deletion, and unique-key conversions so a
+restarted upgrade skips the steps that already completed. The PostgreSQL and H2
+1.3.0-to-2.0.0 upgrade scripts are retryable as well. Unexpected schema differences, such
+as a missing MySQL index during a rename, require manual schema repair before retrying.
 
 ### Step 6: Verify the Upgrade
 
@@ -272,5 +273,23 @@ Verify the schema matches the expected state after restoring.
 After restoring, verify that your Gravitino instance starts
 successfully with the restored database before attempting the
 upgrade again.
+
+## Column name capacity in 2.0
+
+The entity store supports top-level table column names up to 300 characters; other entity names retain
+their 128-character limit. Catalog-specific name restrictions still apply. Fresh 2.0 installs
+and the 1.3-to-2.0 upgrade scripts include this column expansion.
+
+If the database was initialized with an earlier 2.0 SNAPSHOT schema, stop Gravitino and back
+up the entity store, then apply the `table_column_version_info.column_name` expansion from
+the corresponding H2, MySQL or PostgreSQL upgrade script before starting the new binary.
+To roll back, restore the pre-upgrade database backup and matching binary; changes made
+after the backup will be lost. Renaming or dropping a long-named column does not remove
+its historical rows. Mixed-version writers are not supported.
+
+The 300-character boundary is consistent for ASCII/BMP names. Java validation counts Unicode
+code points, whereas H2 counts UTF-16 code units for `VARCHAR` capacity. Names containing
+supplementary characters can reach H2's storage limit sooner; this existing backend difference
+is not changed by the expansion.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />

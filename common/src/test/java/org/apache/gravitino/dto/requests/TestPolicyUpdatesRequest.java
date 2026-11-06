@@ -21,11 +21,16 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.Policy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPolicyUpdatesRequest {
 
@@ -57,17 +62,80 @@ public class TestPolicyUpdatesRequest {
     PolicyContentDTO contentDTO =
         PolicyContentDTO.CustomContentDTO.builder()
             .withCustomRules(ImmutableMap.of("rule1", "value1"))
+            .withSupportedObjectTypes(ImmutableSet.of(MetadataObject.Type.TABLE))
             .withProperties(ImmutableMap.of("key", "value"))
             .build();
     PolicyUpdateRequest.UpdatePolicyContentRequest request =
-        new PolicyUpdateRequest.UpdatePolicyContentRequest("test_type", contentDTO);
+        new PolicyUpdateRequest.UpdatePolicyContentRequest("custom", contentDTO);
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     PolicyUpdateRequest.UpdatePolicyContentRequest deserRequest =
         JsonUtils.objectMapper()
             .readValue(serJson, PolicyUpdateRequest.UpdatePolicyContentRequest.class);
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals("test_type", deserRequest.getPolicyType());
+    Assertions.assertEquals("custom", deserRequest.getPolicyType());
     Assertions.assertEquals(contentDTO, deserRequest.getNewContent());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "system_iceberg_compaction",
+        "SYSTEM_ICEBERG_COMPACTION",
+        "System_Iceberg_Compaction"
+      })
+  public void testUpdatePolicyContentAcceptsKnownPolicyTypeCaseInsensitively(String policyType)
+      throws JsonProcessingException {
+    String json =
+        "{\"@type\":\"updateContent\",\"policyType\":\""
+            + policyType
+            + "\",\"newContent\":{\"maxPartitionNum\":5}}";
+    PolicyUpdateRequest.UpdatePolicyContentRequest request =
+        JsonUtils.objectMapper()
+            .readValue(json, PolicyUpdateRequest.UpdatePolicyContentRequest.class);
+    Assertions.assertEquals(policyType, request.getPolicyType());
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.IcebergCompactionContentDTO.class, request.getNewContent());
+    request.validate();
+    Assertions.assertTrue(
+        request
+            .policyChange()
+            .toString()
+            .contains(Policy.BuiltInType.ICEBERG_COMPACTION.policyType()),
+        request.policyChange().toString());
+  }
+
+  @Test
+  public void testUpdatePolicyContentDeserializeRejectsUnknownPolicyType()
+      throws JsonProcessingException {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"newContent\":{}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"newContent\":{\"maxPartitionNum\":5}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testUpdatePolicyContentDeserializeReportsMissingPolicyType(String content)
+      throws JsonProcessingException {
+    assertPolicyTypeNamedOnDeserialize(
+        "{\"@type\":\"updateContent\",\"newContent\":" + content + "}",
+        "\"policyType\" must not be null");
+  }
+
+  private static void assertPolicyTypeNamedOnDeserialize(String json, String expectedMessage)
+      throws JsonProcessingException {
+    PolicyUpdateRequest.UpdatePolicyContentRequest request =
+        JsonUtils.objectMapper()
+            .readValue(json, PolicyUpdateRequest.UpdatePolicyContentRequest.class);
+    Assertions.assertNull(request.getNewContent());
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals(expectedMessage, thrown.getMessage());
   }
 
   @Test
@@ -77,9 +145,10 @@ public class TestPolicyUpdatesRequest {
         new PolicyUpdateRequest.UpdatePolicyCommentRequest("policy comment new");
     PolicyUpdateRequest request2 =
         new PolicyUpdateRequest.UpdatePolicyContentRequest(
-            "test_type",
+            "custom",
             PolicyContentDTO.CustomContentDTO.builder()
                 .withCustomRules(ImmutableMap.of("rule1", "value1"))
+                .withSupportedObjectTypes(ImmutableSet.of(MetadataObject.Type.TABLE))
                 .withProperties(ImmutableMap.of("key", "value"))
                 .build());
 

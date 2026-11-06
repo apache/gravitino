@@ -40,6 +40,7 @@ import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.Locale
+import java.util.Properties
 import java.util.zip.ZipFile
 
 Locale.setDefault(Locale.US)
@@ -305,6 +306,95 @@ class LegalFilesTransformer(
   }
 }
 
+/**
+ * Removes the Apache Avro copy that hadoop-client-runtime shades under
+ * org/apache/hadoop/shaded/org/apache/avro when it is older than 1.11.4.
+ *
+ * Hadoop 3.3.6 shades Avro 1.7.7, and a dependency constraint cannot replace classes that live inside
+ * another jar. Within Hadoop the shaded Avro only backs Avro serialization (SequenceFile, MapReduce job
+ * history, `hadoop fs -text`), which Gravitino does not use; the FileSystem, HDFS and Kerberos code
+ * paths do not load it. Other jars pass through unchanged. Remove this transform once Hadoop is
+ * upgraded to a release that shades Avro 1.11.4 or later (Hadoop 3.4.2+).
+ */
+@CacheableTransform
+abstract class StripShadedAvroTransform : TransformAction<TransformParameters.None> {
+  companion object {
+    val STRIPPED: Attribute<Boolean> =
+      Attribute.of("org.apache.gravitino.shaded-avro-stripped", Boolean::class.javaObjectType)
+    const val SHADED_AVRO_PREFIX = "org/apache/hadoop/shaded/org/apache/avro/"
+    const val AVRO_METADATA_PREFIX = "META-INF/maven/org.apache.avro/"
+    const val AVRO_POM_PROPERTIES = "META-INF/maven/org.apache.avro/avro/pom.properties"
+    private val MIN_AVRO_VERSION = listOf(1, 11, 4)
+
+    /** Returns true if the dotted [version] is lower than 1.11.4. */
+    fun isOutdatedAvro(version: String): Boolean {
+      val parts = version.split('.', '-').map { it.toIntOrNull() ?: 0 }
+      for (i in MIN_AVRO_VERSION.indices) {
+        val part = parts.getOrElse(i) { 0 }
+        if (part != MIN_AVRO_VERSION[i]) {
+          return part < MIN_AVRO_VERSION[i]
+        }
+      }
+      return false
+    }
+  }
+
+  @get:InputArtifact
+  @get:PathSensitive(PathSensitivity.NAME_ONLY)
+  abstract val inputArtifact: Provider<FileSystemLocation>
+
+  override fun transform(outputs: TransformOutputs) {
+    val input = inputArtifact.get().asFile
+    if (!input.isFile || !input.name.startsWith("hadoop-client-runtime-") || !input.name.endsWith(".jar")) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    val avroVersion = ZipFile(input).use { jar ->
+      jar.getEntry(AVRO_POM_PROPERTIES)?.let { entry ->
+        Properties().apply { jar.getInputStream(entry).use { load(it) } }.getProperty("version")
+      }
+    }
+    if (avroVersion == null || !isOutdatedAvro(avroVersion)) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    // Keep the original file name so that the distribution layout and license reports do not change.
+    val output = outputs.file(input.name)
+    var removed = 0
+    ZipFile(input).use { jar ->
+      ZipOutputStream(output).use { out ->
+        jar.entries().asSequence().forEach { source ->
+          if (source.name.startsWith(SHADED_AVRO_PREFIX) || source.name.startsWith(AVRO_METADATA_PREFIX)) {
+            removed++
+            return@forEach
+          }
+          val entry = ZipEntry(source.name)
+          entry.time = source.time
+          out.putNextEntry(entry)
+          if (!source.isDirectory) {
+            jar.getInputStream(source).use { it.copyTo(out) }
+          }
+          out.closeEntry()
+        }
+      }
+    }
+    if (removed == 0) {
+      throw GradleException("Expected shaded Avro $avroVersion entries in ${input.name}, found none")
+    }
+  }
+}
+
+// Projects whose runtime libraries ship hadoop-client-runtime in the distribution.
+val shadedAvroStrippedProjects = setOf(
+  ":authorizations:authorization-ranger",
+  ":catalogs:catalog-fileset",
+  ":catalogs:catalog-lakehouse-iceberg",
+  ":iceberg:iceberg-rest-server",
+  ":iceberg:iceberg-rest-server-experiment"
+)
+
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -405,7 +495,11 @@ allprojects {
         // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
         // integration-test is intentionally excluded from this carve-out: it runs outside
         // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
-        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+        // The :trino-connector project itself formats the shared common-* source trees.
+        val isTrinoPluginSource =
+          project.path == ":trino-connector" ||
+            project.path.startsWith(":trino-connector:trino-connector")
+        if (!isTrinoPluginSource) {
           replaceRegex(
             "Use SLF4J Logger instead of other logging frameworks",
             "import\\s+.*\\.(Logger|LoggerFactory);",
@@ -612,6 +706,29 @@ subprojects {
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
     exclude(group = "log4j", module = "log4j")
   }
+  // Strip the outdated Avro shaded into hadoop-client-runtime, see StripShadedAvroTransform.
+  // The test classpaths use the same jar so that tests run against what the distribution ships.
+  if (project.path in shadedAvroStrippedProjects) {
+    dependencies {
+      attributesSchema {
+        attribute(StripShadedAvroTransform.STRIPPED)
+      }
+      artifactTypes.getByName(ArtifactTypeDefinition.JAR_TYPE) {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, false)
+      }
+      // The source is not restricted to the "jar" artifact type: with that restriction, artifacts
+      // such as hadoop-yarn-server-tests on the test classpaths had no matching variant. The
+      // transform passes every artifact other than hadoop-client-runtime through unchanged.
+      registerTransform(StripShadedAvroTransform::class) {
+        from.attribute(StripShadedAvroTransform.STRIPPED, false)
+        to.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
+    }
+    configurations.matching { it.name == "runtimeClasspath" || it.name == "testRuntimeClasspath" }
+      .configureEach {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
+  }
 
   repositories {
     mavenCentral()
@@ -811,7 +928,7 @@ subprojects {
     ":common" to listOf("iceberg", "hadoop"),
     ":core" to listOf("spark", "iceberg", "kafka", "aws"),
     ":clients:client-java" to listOf("iceberg"),
-    ":catalogs:catalog-common" to listOf("doris"),
+    ":bundles:aws" to listOf("doris"),
     ":catalogs:hive-metastore-common" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
     ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
@@ -1361,18 +1478,19 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector-473-478:copyLibs")
+    dependsOn("trino-connector:trino-connector-482-483:copyLibs")
     group = "gravitino distribution"
   }
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
       compileDistribution,
-      ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
-      ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
-      ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
       ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
-      ":trino-connector:trino-connector-473-478:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-477:assembleTrinoConnector",
+      ":trino-connector:trino-connector-478-479:assembleTrinoConnector",
+      ":trino-connector:trino-connector-480:assembleTrinoConnector",
+      ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
       "assembleIcebergRESTServer",
       "assembleLanceRESTServer"
     )

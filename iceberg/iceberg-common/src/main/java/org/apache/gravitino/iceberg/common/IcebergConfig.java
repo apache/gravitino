@@ -240,6 +240,53 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .booleanConf()
           .createWithDefault(true);
 
+  /**
+   * How a REST catalog backend authenticates to the remote catalog. {@code user-token} forwards the
+   * calling user's access token; {@code service-account} connects with the configured service
+   * account credential and makes Gravitino authorize every request locally.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_AUTH_TYPE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_AUTH_TYPE)
+          .doc(
+              "How the REST catalog backend authenticates to the remote catalog. `user-token`"
+                  + " forwards the calling user's access token, and the remote catalog authorizes"
+                  + " the user. `service-account` connects with the credential in"
+                  + " `rest-backend-token` or `rest-backend-credential`, and Gravitino authorizes"
+                  + " every request before proxying it.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN.equals(value)
+                      || IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(value),
+              "The value must be `user-token` or `service-account`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN);
+
+  /**
+   * Who issues storage credentials for tables of a federated REST catalog. {@code remote} passes
+   * through what the remote catalog vends; {@code local} issues credentials through this catalog's
+   * credential providers, scoped to the table and to the caller's privilege. Service-account
+   * connections always use local credentials.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_STORAGE_CREDENTIAL_SOURCE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE)
+          .doc(
+              "Who issues storage credentials for tables of a federated REST catalog. `remote`"
+                  + " passes through the credentials the remote catalog vends. `local` does not"
+                  + " request credentials from the remote catalog and issues them through this"
+                  + " catalog's `credential-providers`, scoped to the table location and to the"
+                  + " caller's privilege on the table. Service-account connections always use local"
+                  + " credentials.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE.equals(value)
+                      || IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                          value),
+              "The value must be `local` or `remote`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE);
+
   /** HTTP connection timeout in milliseconds for the REST catalog backend. */
   public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
       new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)
@@ -430,6 +477,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         IcebergPropertiesUtils.toIcebergCatalogProperties(config);
     transformedConfig.putAll(config);
     return transformedConfig;
+  }
+
+  /**
+   * Returns whether a REST catalog backend connects to the remote catalog as a service account.
+   *
+   * @return {@code true} if {@code rest-backend-auth-type} is {@code service-account}
+   */
+  public boolean isRestBackendServiceAccount() {
+    return IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(
+        get(REST_BACKEND_AUTH_TYPE));
   }
 
   @Override

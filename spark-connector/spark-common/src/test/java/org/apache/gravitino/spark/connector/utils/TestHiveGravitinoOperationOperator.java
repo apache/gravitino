@@ -1,26 +1,26 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *  http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing,
- *  software distributed under the License is distributed on an
- *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- *  KIND, either express or implied.  See the License for the
- *  specific language governing permissions and limitations
- *  under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.gravitino.spark.connector.utils;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -34,62 +34,91 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-/** Tests for {@link HiveGravitinoOperationOperator} partition-name building. */
 public class TestHiveGravitinoOperationOperator {
 
-  private static final StructType SCHEMA =
+  private static final StructType PARTITION_SCHEMA =
+      new StructType().add("ds", DataTypes.StringType);
+
+  private static final StructType MULTI_KEY_SCHEMA =
       new StructType()
           .add("dt", DataTypes.IntegerType, true)
           .add("region", DataTypes.StringType, true);
 
+  private SupportsPartitions partitions;
+  private HiveGravitinoOperationOperator operator;
+
+  @BeforeEach
+  void setUp() {
+    Table table = mock(Table.class);
+    partitions = mock(SupportsPartitions.class);
+    when(table.supportPartitions()).thenReturn(partitions);
+    operator = new HiveGravitinoOperationOperator(table);
+  }
+
+  @Test
+  void testDropPartitionEscapesValue() {
+    when(partitions.dropPartition("ds=a%2Fb")).thenReturn(true);
+
+    Assertions.assertTrue(operator.dropPartition(ident("a/b"), PARTITION_SCHEMA));
+    verify(partitions).dropPartition("ds=a%2Fb");
+  }
+
+  @Test
+  void testListPartitionIdentifiersUnescapesValues() {
+    when(partitions.listPartitionNames()).thenReturn(new String[] {"ds=a%2Fb", "ds=c"});
+
+    InternalRow[] rows =
+        operator.listPartitionIdentifiers(new String[] {"ds"}, ident("a/b"), PARTITION_SCHEMA);
+
+    Assertions.assertEquals(1, rows.length);
+    Assertions.assertEquals("a/b", rows[0].getUTF8String(0).toString());
+  }
+
   @Test
   void testNullPartitionValueUsesHiveDefaultMarker() {
-    SupportsPartitions partitions = mock(SupportsPartitions.class);
     ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
     when(partitions.dropPartition(name.capture())).thenReturn(true);
 
     InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
-    operator(partitions).dropPartition(ident, SCHEMA);
+    operator.dropPartition(ident, MULTI_KEY_SCHEMA);
 
-    assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
+    Assertions.assertEquals("dt=20240101/region=__HIVE_DEFAULT_PARTITION__", name.getValue());
   }
 
   @Test
   void testAddNullPartitionValueUsesHiveDefaultMarker() throws Exception {
-    SupportsPartitions partitions = mock(SupportsPartitions.class);
     ArgumentCaptor<Partition> partition = ArgumentCaptor.forClass(Partition.class);
     when(partitions.addPartition(partition.capture())).thenReturn(null);
 
     InternalRow ident = new GenericInternalRow(new Object[] {20240101, null});
-    operator(partitions).createPartition(ident, Collections.emptyMap(), SCHEMA);
+    operator.createPartition(ident, Collections.emptyMap(), MULTI_KEY_SCHEMA);
 
     Literal<?>[] values = ((IdentityPartition) partition.getValue()).values();
-    assertEquals(20240101, values[0].value());
-    assertEquals("__HIVE_DEFAULT_PARTITION__", values[1].value());
+    Assertions.assertEquals(20240101, values[0].value());
+    Assertions.assertEquals("__HIVE_DEFAULT_PARTITION__", values[1].value());
   }
 
   @Test
   void testPartialSpecResolvesColumnsByName() {
-    SupportsPartitions partitions = mock(SupportsPartitions.class);
     when(partitions.listPartitionNames())
         .thenReturn(new String[] {"dt=1/region=us", "dt=2/region=eu"});
 
     // SHOW PARTITIONS ... PARTITION (region = 'us') passes only the region column and its value.
     InternalRow ident = new GenericInternalRow(new Object[] {UTF8String.fromString("us")});
     InternalRow[] result =
-        operator(partitions).listPartitionIdentifiers(new String[] {"region"}, ident, SCHEMA);
+        operator.listPartitionIdentifiers(new String[] {"region"}, ident, MULTI_KEY_SCHEMA);
 
-    assertEquals(1, result.length);
-    assertEquals(1, result[0].getInt(0));
-    assertEquals("us", result[0].getUTF8String(1).toString());
+    Assertions.assertEquals(1, result.length);
+    Assertions.assertEquals(1, result[0].getInt(0));
+    Assertions.assertEquals("us", result[0].getUTF8String(1).toString());
   }
 
-  private static HiveGravitinoOperationOperator operator(SupportsPartitions partitions) {
-    Table table = mock(Table.class);
-    when(table.supportPartitions()).thenReturn(partitions);
-    return new HiveGravitinoOperationOperator(table);
+  private static InternalRow ident(String value) {
+    return new GenericInternalRow(new Object[] {UTF8String.fromString(value)});
   }
 }

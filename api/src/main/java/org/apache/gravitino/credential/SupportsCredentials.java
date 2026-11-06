@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCredentialException;
 
 /** Interface to get credentials. */
@@ -31,6 +32,11 @@ public interface SupportsCredentials {
 
   /**
    * Retrieves an array of {@link Credential} objects.
+   *
+   * <p>When authorization is enabled, catalog credentials require metadata access plus both {@code
+   * USE_SECRETS} and {@code INCLUDE_CREDENTIAL_SECRETS}, or metalake ownership. The credentials
+   * carry the source account's permissions; they are not scoped to individual Gravitino tables.
+   * Fileset credentials use path-based authorization.
    *
    * @return An array of {@link Credential} objects. In most cases the array only contains one
    *     credential. If the object like {@link org.apache.gravitino.file.Fileset} contains multiple
@@ -40,6 +46,7 @@ public interface SupportsCredentials {
    *     credential provider only generate credential for the specific object like {@link
    *     org.apache.gravitino.file.Fileset}, {@link org.apache.gravitino.rel.Table}. There will be
    *     at most one credential for one credential type.
+   * @throws ForbiddenException If the caller lacks the required credential privileges.
    */
   Credential[] getCredentials();
 
@@ -50,6 +57,8 @@ public interface SupportsCredentials {
    *     the specific credentials.
    * @return An {@link Credential} object with the specified credential type.
    * @throws NoSuchCredentialException If the specific credential cannot be found.
+   * @throws ForbiddenException If the caller lacks the privileges required by {@link
+   *     #getCredentials()}.
    */
   default Credential getCredential(String credentialType) throws NoSuchCredentialException {
     Preconditions.checkArgument(

@@ -115,7 +115,8 @@ To manage table and partition statistics, see [Manage statistics in Gravitino](.
 
 * [**Model catalog**](./model-catalog.md)
 
-If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
+To run maintenance inside the Gravitino server, see [Service](./table-maintenance-service/service.md).
+For the manual CLI workflow, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
 Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image.  Gravitino provides a
@@ -169,6 +170,8 @@ Gravitino provides governance features to manage metadata in a unified way. See:
   to manage policies.
 * [Manage jobs in Gravitino](./manage-jobs-in-gravitino.md): a complete guide to using Gravitino
   to manage jobs.
+* [Local job executor](./local-job-executor.md) and
+  [Kubernetes job executor](./k8s-job-executor.md): where the jobs run and how to configure them.
 
 ### Gravitino Iceberg REST Catalog Service
 
