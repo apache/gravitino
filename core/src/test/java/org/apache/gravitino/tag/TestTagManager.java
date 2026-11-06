@@ -625,6 +625,103 @@ public class TestTagManager {
   }
 
   @Test
+  void testTagOperationsFollowGlueStyleColumnCase() throws IOException {
+    // Glue folds schema and table names but keeps the case of column names.
+    NameIdentifier table = putTableWithColumn("glue_table", "MixedCol");
+    Capability glueStyle =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return scope == Scope.SCHEMA || scope == Scope.TABLE
+                ? CapabilityResult.unsupported("case insensitive")
+                : CapabilityResult.SUPPORTED;
+          }
+        };
+    when(backendCatalog.capability()).thenReturn(glueStyle);
+    try {
+      MetadataObject request =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(
+                  METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), "GLUE_TABLE", "MixedCol"),
+              Entity.EntityType.COLUMN);
+      MetadataObject canonical =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, table.name(), "MixedCol"),
+              Entity.EntityType.COLUMN);
+      assertTagRoundTrip(request, canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      entityStore.delete(table, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testTagOperationsKeepExactStoredColumnName() throws IOException {
+    // A capability can fold column names that the source stored with another case. The exact
+    // stored name must still find the column.
+    NameIdentifier table = putTableWithColumn("exact_table", "MyCol");
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    try {
+      MetadataObject canonical =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, table.name(), "MyCol"),
+              Entity.EntityType.COLUMN);
+      MetadataObject request =
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifier.of(
+                  METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), "EXACT_TABLE", "MyCol"),
+              Entity.EntityType.COLUMN);
+      assertTagRoundTrip(request, canonical, canonical);
+    } finally {
+      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+      entityStore.delete(table, Entity.EntityType.TABLE);
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TABLE", "COLUMN"})
+  void testFailedTableNameResolutionLeavesTagsUnchanged(Entity.EntityType type) {
+    MetadataObject canonical = tagTarget(type, false);
+    Tag kept = tagManager.createTag(METALAKE, "kept_tag", null, null);
+    Tag added = tagManager.createTag(METALAKE, "added_tag", null, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, canonical, new String[] {kept.name()}, null);
+
+    CatalogOperations ops =
+        mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) ops).resolveTableName(any()))
+        .thenThrow(new IllegalStateException("source unavailable"));
+    Mockito.doReturn(ops).when(backendCatalog).ops();
+    try {
+      RuntimeException addError =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  tagManager.associateTagsForMetadataObject(
+                      METALAKE, canonical, new String[] {added.name()}, null));
+      Assertions.assertInstanceOf(IllegalStateException.class, addError.getCause());
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, canonical, null, new String[] {kept.name()}));
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              tagManager.associateTagValuesForMetadataObject(
+                  METALAKE, canonical, new TagValue[] {TagValue.of(added.name(), "v")}, null));
+    } finally {
+      Mockito.doReturn(null).when(backendCatalog).ops();
+    }
+    Assertions.assertArrayEquals(
+        new String[] {kept.name()}, tagManager.listTagsForMetadataObject(METALAKE, canonical));
+  }
+
+  @Test
   void testTagOperationsUseCustomNormalization() throws IOException {
     NameIdentifier uppercase = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "CUSTOM_TABLE");
     AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -1749,6 +1846,32 @@ public class TestTagManager {
   private static void assertAssignmentValues(Tag tag, String[] expectedValues) {
     Assertions.assertTrue(tag.assignment().isPresent());
     Assertions.assertArrayEquals(expectedValues, tag.assignment().get().values());
+  }
+
+  private static NameIdentifier putTableWithColumn(String tableName, String columnName)
+      throws IOException {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, tableName);
+    entityStore.put(
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(tableName)
+            .withNamespace(ident.namespace())
+            .withColumns(
+                Lists.newArrayList(
+                    ColumnEntity.builder()
+                        .withId(idGenerator.nextId())
+                        .withName(columnName)
+                        .withPosition(0)
+                        .withDataType(Types.IntegerType.get())
+                        .withNullable(true)
+                        .withAutoIncrement(false)
+                        .withAuditInfo(audit)
+                        .build()))
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    return ident;
   }
 
   private static MetadataObject tagTarget(Entity.EntityType type, boolean upperCase) {

@@ -344,6 +344,41 @@ public class TestMetadataIdConverter {
     Assertions.assertEquals(physical, authorized);
   }
 
+  @Test
+  void testColumnAuthorizationResolvesParentPhysicalName() {
+    // Tag operations and authorization share one helper, so a column's parent table resolves to
+    // the same physical name as a table does.
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(new Capability() {});
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> fn = invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "t_phys", "col"),
+        MetadataIdConverter.normalizeCaseSensitive(
+            NameIdentifier.of("metalake", "catalog", "schema", "T_NORM", "col"),
+            Capability.Scope.COLUMN,
+            mockCatalogManager));
+  }
+
   private void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake");
     ident2 = NameIdentifier.of("metalake", "catalog");

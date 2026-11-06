@@ -22,7 +22,6 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import com.google.common.collect.ObjectArrays;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
@@ -39,14 +38,12 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CapabilityHelpers;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -482,7 +479,7 @@ public class TagManager implements TagDispatcher {
     }
   }
 
-  private static NameIdentifier checkAndNormalizeMetadataObject(
+  private NameIdentifier checkAndNormalizeMetadataObject(
       String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     // Existence checks use normalizing dispatchers and must see the original request. Applying
@@ -493,29 +490,11 @@ public class TagManager implements TagDispatcher {
       return ident;
     }
 
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
-    Capability.Scope scope = Capability.Scope.valueOf(metadataObject.type().name());
-    if (scope == Capability.Scope.COLUMN) {
-      NameIdentifier table =
-          CapabilityHelpers.applyCaseSensitive(
-              NameIdentifier.of(ident.namespace().levels()), Capability.Scope.TABLE, capability);
-      table = CapabilityHelpers.resolvePhysicalTableName(table, catalogManager);
-      return NameIdentifier.of(
-          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())),
-          CapabilityHelpers.applyCaseSensitiveOnName(scope, ident.name(), capability));
-    }
-
-    // Semantic Model names are owned by Gravitino; only their schema follows the catalog rules.
-    if (scope == Capability.Scope.SEMANTIC_MODEL) {
-      return NameIdentifier.of(
-          CapabilityHelpers.applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
-    }
-
-    NameIdentifier normalized = CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
-    return scope == Capability.Scope.TABLE
-        ? CapabilityHelpers.resolvePhysicalTableName(normalized, catalogManager)
-        : normalized;
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident,
+        Capability.Scope.valueOf(metadataObject.type().name()),
+        GravitinoEnv.getInstance().catalogManager(),
+        () -> entityStore);
   }
 
   private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {
