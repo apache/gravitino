@@ -31,14 +31,23 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.TestTlsServerUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestHTTPClientTLS {
   private static final String TEST_SERVLET_PATH = "/tls-test";
   private static final String TEST_CLIENT_PATH = "tls-test";
 
+  @TempDir static Path tlsDirectory;
+
   private JettyServer jettyServer;
+
+  @BeforeAll
+  static void generateTlsMaterial() throws Exception {
+    TestTlsServerUtils.generateTlsMaterial(tlsDirectory);
+  }
 
   @BeforeEach
   public void setUp() {
@@ -56,15 +65,12 @@ public class TestHTTPClientTLS {
   public void testMutualTlsAcceptsTrustedClientCertificate() throws Exception {
     int port =
         TestTlsServerUtils.startHttpsServer(
-            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
+            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH, tlsDirectory);
 
     TLSConfigurer tlsConfigurer =
         TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
-            .keyStore(
-                TestTlsServerUtils.testResource("test-trusted-client-keystore.p12"),
-                TEST_STORE_PASSWORD)
+            .trustStore(tlsDirectory.resolve("test-client-truststore.p12"), TEST_STORE_PASSWORD)
+            .keyStore(tlsDirectory.resolve("test-trusted-client-keystore.p12"), TEST_STORE_PASSWORD)
             .build();
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
@@ -76,12 +82,11 @@ public class TestHTTPClientTLS {
   public void testMutualTlsRejectsMissingClientCertificate() throws Exception {
     int port =
         TestTlsServerUtils.startHttpsServer(
-            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
+            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH, tlsDirectory);
 
     TLSConfigurer tlsConfigurer =
         TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
+            .trustStore(tlsDirectory.resolve("test-client-truststore.p12"), TEST_STORE_PASSWORD)
             .build();
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
@@ -98,15 +103,13 @@ public class TestHTTPClientTLS {
   public void testMutualTlsRejectsUntrustedClientCertificate() throws Exception {
     int port =
         TestTlsServerUtils.startHttpsServer(
-            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
+            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH, tlsDirectory);
 
     TLSConfigurer tlsConfigurer =
         TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
+            .trustStore(tlsDirectory.resolve("test-client-truststore.p12"), TEST_STORE_PASSWORD)
             .keyStore(
-                TestTlsServerUtils.testResource("test-untrusted-client-keystore.p12"),
-                TEST_STORE_PASSWORD)
+                tlsDirectory.resolve("test-untrusted-client-keystore.p12"), TEST_STORE_PASSWORD)
             .build();
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
@@ -123,12 +126,11 @@ public class TestHTTPClientTLS {
   public void testHttpsWithoutClientAuthentication() throws Exception {
     int port =
         TestTlsServerUtils.startHttpsServer(
-            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH);
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, tlsDirectory);
 
     TLSConfigurer tlsConfigurer =
         TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
+            .trustStore(tlsDirectory.resolve("test-client-truststore.p12"), TEST_STORE_PASSWORD)
             .build();
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
@@ -140,13 +142,12 @@ public class TestHTTPClientTLS {
   public void testClientRejectsUntrustedServerCertificate() throws Exception {
     int port =
         TestTlsServerUtils.startHttpsServer(
-            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH);
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, tlsDirectory);
 
     TLSConfigurer tlsConfigurer =
         TLSConfigurers.builder()
             .trustStore(
-                TestTlsServerUtils.testResource("test-untrusted-server-truststore.p12"),
-                TEST_STORE_PASSWORD)
+                tlsDirectory.resolve("test-untrusted-server-truststore.p12"), TEST_STORE_PASSWORD)
             .build();
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
@@ -181,7 +182,7 @@ public class TestHTTPClientTLS {
 
   @Test
   public void testWrongTrustStorePasswordFailsAtBuild() throws Exception {
-    Path trustStore = TestTlsServerUtils.testResource("test-client-truststore.p12");
+    Path trustStore = tlsDirectory.resolve("test-client-truststore.p12");
 
     assertThrows(
         IllegalArgumentException.class,
