@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.postgresql.converter;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -113,7 +114,23 @@ public class TestPostgreSqlExceptionConverter {
   @ValueSource(strings = {"XX000", "53300", "57014"})
   void testServerSideFailuresRemainGeneric(String state) {
     SQLException failure = new SQLException("server side failure", state);
+    // Preemptive: a regression loops without checking interruption, so the test must not run on
+    // the test thread.
+    Exception error =
+        Assertions.assertTimeoutPreemptively(
+            Duration.ofSeconds(10),
+            () -> new PostgreSqlExceptionConverter().toGravitinoException(failure));
+    Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
+  }
+
+  @Test
+  void testCauseCycleWithoutSqlStateEndsTheWalk() {
+    SQLException failure = new SQLException("source failure");
+    RuntimeException wrapper = new RuntimeException("wrapper");
+    failure.initCause(wrapper);
+    wrapper.initCause(failure);
     Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
     Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
+    Assertions.assertSame(failure, error.getCause());
   }
 }

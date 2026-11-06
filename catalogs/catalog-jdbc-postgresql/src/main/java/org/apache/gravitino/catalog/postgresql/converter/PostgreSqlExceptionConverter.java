@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.postgresql.converter;
 
 import com.google.common.collect.ImmutableSet;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -63,17 +65,15 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     // A pool wraps the driver's exception, for example DBCP's "Cannot create
     // PoolableConnectionFactory", so the SQLSTATE that names the cause can be on a nested
-    // exception.
-    for (Throwable t = se; t != null; t = t.getCause()) {
+    // exception. Track visited exceptions by identity so a cause cycle (A -> B -> A) ends the walk.
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    for (Throwable t = se; t != null && visited.add(t); t = t.getCause()) {
       if (t instanceof SQLException) {
         GravitinoRuntimeException converted =
             convertBySqlState(se, ((SQLException) t).getSQLState());
         if (converted != null) {
           return converted;
         }
-      }
-      if (t.getCause() == t) {
-        break;
       }
     }
 
