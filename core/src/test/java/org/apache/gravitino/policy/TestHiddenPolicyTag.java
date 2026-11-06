@@ -38,7 +38,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -57,39 +56,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Tests hidden tag models and reserved namespace protection. */
 public class TestHiddenPolicyTag {
 
-  /** Rejects alternate casing and noncanonical identity encodings. */
+  /** Only the complete internal prefix is reserved, including alternate casing. */
   @Test
   public void testReservedNames() {
-    assertEquals(123, HiddenPolicyTag.policyId(HiddenPolicyTag.name(123)));
     assertTrue(HiddenPolicyTag.isReservedName("GRAVITINO_HIDDEN_123"));
     assertFalse(HiddenPolicyTag.isReservedName(null));
     assertFalse(HiddenPolicyTag.isReservedName("data_domain"));
     assertFalse(HiddenPolicyTag.isReservedName("reserved_123"));
     assertFalse(HiddenPolicyTag.isReservedName("gravitino_hidden"));
     assertFalse(HiddenPolicyTag.isReservedName("gravitino_hiddenish"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> HiddenPolicyTag.checkNameNotReserved("GRAVITINO_HIDDEN_123"));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_0123"));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("GRAVITINO_HIDDEN_123"));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_+123"));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_-0"));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> HiddenPolicyTag.checkNameNotReserved("gravitino_hidden_business_tag"));
-    HiddenPolicyTag.checkNameNotReserved("data_domain");
     assertEquals("gravitino_hidden_123", HiddenPolicyTag.name(123));
-  }
-
-  /** Canonical names preserve the full ID range without assuming a generator's sign convention. */
-  @ParameterizedTest
-  @ValueSource(longs = {Long.MIN_VALUE, -1L, 0L, 1L, Long.MAX_VALUE})
-  public void testPolicyIdRoundTrip(long policyId) {
-    assertEquals(policyId, HiddenPolicyTag.policyId(HiddenPolicyTag.name(policyId)));
   }
 
   /** The internal prefix alone determines visibility, including alternate casing. */
@@ -105,8 +81,6 @@ public class TestHiddenPolicyTag {
             .withAuditInfo(audit)
             .build();
     assertThrows(NoSuchTagException.class, () -> HiddenPolicyTag.checkVisible(legacy));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.checkNameNotReserved(legacy.name()));
   }
 
   /** New policies use the tag model, with matching ownership and audit metadata. */
@@ -135,9 +109,7 @@ public class TestHiddenPolicyTag {
     assertEquals(audit, tag.auditInfo());
     assertEquals(TagValueConstraint.noValue(), tag.valueConstraint());
     assertFalse(tag.assignment().isPresent());
-    assertEquals(
-        HiddenPolicyTag.properties(policy.id()),
-        JsonUtils.anyFieldMapper().writeValueAsString(tag.properties()));
+    assertEquals(Collections.singletonMap("gravitino.internal.policy-id", "12"), tag.properties());
   }
 
   /** A database alias must not bypass checks against the actual stored tag name. */

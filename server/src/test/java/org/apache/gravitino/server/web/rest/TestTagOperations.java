@@ -88,6 +88,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestTagOperations extends BaseOperationsTest {
@@ -413,6 +415,38 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertTrue(error.getMessage().contains("a.b"));
     }
     Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any(), any());
+  }
+
+  /** REST rejects internal names on creation and rename before invoking the dispatcher. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_internal"})
+  public void testRejectsInternalTagNames(String name) {
+    TagUpdatesRequest rename =
+        new TagUpdatesRequest(
+            Lists.newArrayList(
+                new TagUpdateRequest.RenameTagRequest(name),
+                new TagUpdateRequest.RenameTagRequest("ordinary")));
+    try (Response created =
+            target(tagPath(metalake))
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .post(
+                    Entity.entity(
+                        new TagCreateRequest(name, null, null), MediaType.APPLICATION_JSON_TYPE));
+        Response renamed =
+            target(tagPath(metalake))
+                .path("tag1")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.entity(rename, MediaType.APPLICATION_JSON_TYPE))) {
+      for (Response response : Arrays.asList(created, renamed)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            response.readEntity(ErrorResponse.class).getCode());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
   }
 
   @Test

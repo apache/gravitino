@@ -18,11 +18,9 @@
  */
 package org.apache.gravitino.policy;
 
-import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Locale;
 import javax.annotation.Nullable;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -44,27 +42,14 @@ public final class HiddenPolicyTag {
    * @return An unassigned, value-less tag with the policy's namespace and audit information.
    */
   public static TagEntity create(PolicyEntity policy, long tagId) {
-    return create(policy.id(), tagId, policy.namespace().level(0), policy.auditInfo());
-  }
-
-  /**
-   * Builds a hidden tag from persisted policy identity and audit metadata.
-   *
-   * @param policyId The owning policy ID.
-   * @param tagId The generated tag ID.
-   * @param metalake The policy's metalake name.
-   * @param audit The creation audit information.
-   * @return The hidden tag entity.
-   */
-  public static TagEntity create(long policyId, long tagId, String metalake, Audit audit) {
     return TagEntity.builder()
         .withId(tagId)
-        .withName(name(policyId))
-        .withNamespace(NamespaceUtil.ofTag(metalake))
+        .withName(name(policy.id()))
+        .withNamespace(NamespaceUtil.ofTag(policy.namespace().level(0)))
         .withComment("Server-managed policy binding")
-        .withProperties(Collections.singletonMap(POLICY_ID_PROPERTY, Long.toString(policyId)))
+        .withProperties(Collections.singletonMap(POLICY_ID_PROPERTY, Long.toString(policy.id())))
         .withAllowedValues(new String[0])
-        .withAuditInfo(audit)
+        .withAuditInfo(policy.auditInfo())
         .build();
   }
 
@@ -89,29 +74,6 @@ public final class HiddenPolicyTag {
   }
 
   /**
-   * Parses the policy identity from a canonical hidden tag name.
-   *
-   * @param tagName The internal tag name.
-   * @return The policy entity ID.
-   */
-  public static long policyId(String tagName) {
-    Preconditions.checkArgument(isReservedName(tagName), "Not a reserved policy tag name");
-    long id = Long.parseLong(tagName.substring(PREFIX.length()));
-    Preconditions.checkArgument(name(id).equals(tagName), "Invalid hidden policy tag name");
-    return id;
-  }
-
-  /**
-   * Returns the persisted ownership marker for a hidden tag.
-   *
-   * @param policyId The policy entity ID.
-   * @return The internal properties as JSON.
-   */
-  public static String properties(long policyId) {
-    return "{\"" + POLICY_ID_PROPERTY + "\":\"" + policyId + "\"}";
-  }
-
-  /**
    * Rejects an ordinary operation on a tag in the internal name namespace.
    *
    * @param tag The resolved tag entity.
@@ -123,15 +85,5 @@ public final class HiddenPolicyTag {
           "Tag with name %s under metalake %s does not exist",
           tag.name(), tag.namespace().level(0));
     }
-  }
-
-  /**
-   * Rejects the reserved prefix for a new tag name or a rename target.
-   *
-   * @param name The proposed tag name.
-   */
-  public static void checkNameNotReserved(String name) {
-    Preconditions.checkArgument(
-        !isReservedName(name), "Tag name is reserved for internal policy bindings");
   }
 }

@@ -1305,19 +1305,15 @@ public class TestTagManager {
     }
   }
 
-  /** Internal tag names are hidden and protected through the ordinary tag APIs. */
+  /** The manager can create internal names while preserving their visibility and access rules. */
   @ParameterizedTest
   @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
   public void testInternalPrefixControlsVisibility(String name) throws Exception {
+    Tag created = tagManager.createTag(METALAKE, name, null, null);
     TagEntity hidden =
-        TagEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(name)
-            .withNamespace(NameIdentifierUtil.ofTag(METALAKE, name).namespace())
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-    entityStore.put(hidden, false);
+        entityStore.get(
+            NameIdentifierUtil.ofTag(METALAKE, name), Entity.EntityType.TAG, TagEntity.class);
+    Assertions.assertEquals(created, hidden);
     MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
     try {
       entityStore
@@ -1340,12 +1336,11 @@ public class TestTagManager {
           () -> tagManager.alterTag(METALAKE, name, TagChange.updateComment("changed")));
       Assertions.assertEquals(
           hidden, entityStore.get(hidden.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> tagManager.createTag(METALAKE, name, null, null));
+      entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
       tagManager.createTag(METALAKE, "visible", null, null);
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> tagManager.alterTag(METALAKE, "visible", TagChange.rename(name)));
+      Tag renamed = tagManager.alterTag(METALAKE, "visible", TagChange.rename(name));
+      Assertions.assertEquals(name, renamed.name());
+      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, name));
     } finally {
       entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
     }

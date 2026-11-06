@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -62,6 +63,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -175,8 +177,7 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifierUtil.checkMetadataObjectName(
-                NameIdentifierUtil.ofTag(metalake, request.getName()), Entity.EntityType.TAG);
+            validateTagName(metalake, request.getName());
             Tag tag =
                 tagDispatcher.createTag(
                     metalake,
@@ -251,9 +252,7 @@ public class TagOperations {
                     .toArray(TagChange[]::new);
             for (TagChange change : changes) {
               if (change instanceof TagChange.RenameTag) {
-                NameIdentifierUtil.checkMetadataObjectName(
-                    NameIdentifierUtil.ofTag(metalake, ((TagChange.RenameTag) change).getNewName()),
-                    Entity.EntityType.TAG);
+                validateTagName(metalake, ((TagChange.RenameTag) change).getNewName());
               }
             }
             Tag tag = tagDispatcher.alterTag(metalake, name, changes);
@@ -544,5 +543,12 @@ public class TagOperations {
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
+  }
+
+  private static void validateTagName(String metalake, String name) {
+    Preconditions.checkArgument(
+        !HiddenPolicyTag.isReservedName(name), "Tag name is reserved for internal policy bindings");
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
   }
 }

@@ -393,8 +393,8 @@ Hidden tags participate in policy resolution but do not appear in ordinary tag l
 Tag API requests for hidden tags return not-found, and hidden tags cannot receive owners or user grants.
 Deleting their policy also removes any existing ownership and grant rows for the hidden tag.
 Internal tags use the `gravitino_hidden_{policyId}` name. The `gravitino_hidden_` prefix,
-including alternate casing, determines visibility and is reserved for internal use. Ordinary tag
-creation and rename targets cannot use this prefix. Other names, including the generic `reserved_`
+including alternate casing, determines visibility and is reserved for internal use. REST tag
+creation and rename requests cannot use this prefix. Other names, including the generic `reserved_`
 prefix, remain available to users.
 The internal binding operation loads the policy's existing hidden tag and writes the tag-to-object
 assignment. Endpoint validation and the transaction belong to the relation operation. It does not
