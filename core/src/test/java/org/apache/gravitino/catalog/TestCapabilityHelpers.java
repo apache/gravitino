@@ -22,12 +22,187 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.partitions.IdentityPartition;
+import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.types.Types;
+>>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestCapabilityHelpers {
 
+<<<<<<< HEAD
+=======
+  private static final Capability UPPERCASE_CAPABILITY =
+      new Capability() {
+        @Override
+        public CapabilityResult caseSensitiveOnName(Scope scope) {
+          return CapabilityResult.unsupported("not case sensitive");
+        }
+
+        @Override
+        public String normalizeName(Scope scope, String name) {
+          return name.toUpperCase(Locale.ROOT);
+        }
+      };
+
+  private static final Capability NULL_NORMALIZING_CAPABILITY =
+      new Capability() {
+        @Override
+        public String normalizeName(Scope scope, String name) {
+          return null;
+        }
+      };
+
+  /**
+   * Mimics Oracle's quoting convention: a quoted name (e.g. {@code "My Table"}) is unquoted with
+   * its case and embedded spaces preserved, while an unquoted name must match a simple word
+   * pattern. {@code specificationOnName} must see the name as it was originally supplied (still
+   * quoted) rather than the already-unquoted result of {@code normalizeName}, or a quoted name with
+   * a space would be wrongly rejected after normalization even though it was valid as supplied.
+   */
+  static final Capability QUOTE_AWARE_CAPABILITY =
+      new Capability() {
+        @Override
+        public CapabilityResult specificationOnName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return CapabilityResult.SUPPORTED;
+          }
+          return name.matches("^\\w+$")
+              ? CapabilityResult.SUPPORTED
+              : CapabilityResult.unsupported("Illegal name: " + name);
+        }
+
+        @Override
+        public CapabilityResult caseSensitiveOnName(Scope scope) {
+          return CapabilityResult.unsupported("folding depends on quoting");
+        }
+
+        @Override
+        public String normalizeName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return name.substring(1, name.length() - 1);
+          }
+          return name.toUpperCase(Locale.ROOT);
+        }
+      };
+
+  @Test
+  void testNewColumnDoesNotUseExistingNameRules() {
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            throw new AssertionError("New columns must use creation rules");
+          }
+        };
+    TableChange[] changes =
+        CapabilityHelpers.applyCapabilities(
+            capability,
+            TableChange.addColumn(new String[] {"new_column"}, Types.IntegerType.get()));
+    Assertions.assertEquals(1, changes.length);
+  }
+
+  /** Checks existing references and new names use their respective provider rules. */
+  @Test
+  public void testExistingColumnReferencesDoNotUseCreationPattern() {
+    Capability strict =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnName(Scope scope, String name) {
+            return name.matches("[a-zA-Z_][a-zA-Z0-9_]*")
+                ? CapabilityResult.SUPPORTED
+                : CapabilityResult.unsupported("invalid new name");
+          }
+
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            return CapabilityResult.SUPPORTED;
+          }
+        };
+    TableChange[] changes =
+        CapabilityHelpers.applyCapabilities(
+            strict,
+            TableChange.updateColumnComment(new String[] {"native col"}, "comment"),
+            TableChange.renameColumn(new String[] {"native col"}, "valid_name"),
+            TableChange.deleteColumn(new String[] {"native col"}, false));
+    Assertions.assertEquals(3, changes.length);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CapabilityHelpers.applyCapabilities(
+                strict, TableChange.addColumn(new String[] {"new col"}, Types.IntegerType.get())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CapabilityHelpers.applyCapabilities(
+                strict, TableChange.renameColumn(new String[] {"native col"}, "new col")));
+  }
+
+  @Test
+  void testApplyCaseSensitiveOnNameHonorsCustomNormalizeName() {
+    String normalized =
+        CapabilityHelpers.applyCaseSensitiveOnName(
+            Capability.Scope.TABLE, "myTable", UPPERCASE_CAPABILITY);
+    Assertions.assertEquals("MYTABLE", normalized);
+  }
+
+  @Test
+  void testApplyCaseSensitivePartitionHonorsCustomNormalizeName() {
+    IdentityPartition partition =
+        Partitions.identity(
+            "myPartition",
+            new String[][] {{"col1"}},
+            new Literal<?>[] {Literals.stringLiteral("val1")},
+            null);
+
+    Partition result = CapabilityHelpers.applyCaseSensitive(partition, UPPERCASE_CAPABILITY);
+    Assertions.assertEquals("MYPARTITION", result.name());
+  }
+
+  @Test
+  void testApplyCaseSensitiveOnNameRejectsNullNormalizeNameResult() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CapabilityHelpers.applyCaseSensitiveOnName(
+                Capability.Scope.TABLE, "myTable", NULL_NORMALIZING_CAPABILITY));
+  }
+
+  @Test
+  void testApplyCaseSensitiveOnNameAllowsNullNameToPassThrough() {
+    // A null name (e.g. an auto-generated identity partition name yet to be assigned) must be
+    // allowed to pass through as null rather than being rejected as an invalid normalizeName
+    // result.
+    String normalized =
+        CapabilityHelpers.applyCaseSensitiveOnName(
+            Capability.Scope.PARTITION, null, Capability.DEFAULT);
+    Assertions.assertNull(normalized);
+  }
+
+  @Test
+  void testApplyCapabilitiesValidatesNameBeforeNormalizing() {
+    // A quoted name with an embedded space is valid as supplied, but its normalized (unquoted)
+    // form no longer matches the plain-word pattern. specificationOnName must be checked against
+    // the original name, not the already-normalized one, or this would be wrongly rejected.
+    NameIdentifier quotedIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "\"My Table\"");
+
+    NameIdentifier result =
+        CapabilityHelpers.applyCapabilities(
+            quotedIdent, Capability.Scope.TABLE, QUOTE_AWARE_CAPABILITY);
+
+    Assertions.assertEquals("My Table", result.name());
+  }
+
+>>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
   @Test
   void testGetCapabilityPropagatesNoSuchCatalogException() {
     NameIdentifier tableIdent =

@@ -85,13 +85,13 @@ public interface Capability {
   }
 
   /**
-   * Checks a table or schema name on an existing-table deletion path.
+   * Checks an existing table or schema name for deletion, or an existing column reference.
    *
    * <p>The default preserves the create-time restrictions. A catalog may accept additional native
-   * names only when its deletion operations safely quote them. This does not relax creation or
-   * rename validation.
+   * names only when the corresponding operations safely quote them. This does not relax creation or
+   * rename-target validation.
    *
-   * @param scope the table or schema scope
+   * @param scope the table, schema, or column scope
    * @param name the existing name to check
    * @return whether the existing name is supported
    */
