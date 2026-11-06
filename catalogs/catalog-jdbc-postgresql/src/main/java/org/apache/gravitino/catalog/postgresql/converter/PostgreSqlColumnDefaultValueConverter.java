@@ -50,6 +50,10 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
   private static final Pattern QUOTED_LITERAL =
       Pattern.compile(
           "([eE]?)'((?:[^']|'')*+)'(?:\\s*::\\s*" + LITERAL_TYPE + ")?", Pattern.CASE_INSENSITIVE);
+  // An unsigned integer or decimal constant, for example from `varchar(20) DEFAULT (10)`. Its text
+  // form is the value that an assignment cast stores. Exponents and leading dots are excluded
+  // because the stored text would differ.
+  private static final Pattern NUMERIC_CONSTANT = Pattern.compile("\\d++(?:\\.\\d++)?");
   private static final Pattern NULL_LITERAL =
       Pattern.compile("NULL(?:\\s*::\\s*(.+))?", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
@@ -100,12 +104,13 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
       return UnparsedExpression.of(columnDefaultValue);
     }
 
+    // Checked before literal parsing so string columns also report the function, not its name.
+    if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
+      return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+    }
     try {
       return parseLiteral(type, columnDefaultValue);
     } catch (Exception e) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
-        return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
-      }
       return UnparsedExpression.of(columnDefaultValue);
     }
   }
@@ -190,7 +195,7 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.timestampLiteral(
             LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
-        if (!quoted) {
+        if (!quoted && !NUMERIC_CONSTANT.matcher(expression).matches()) {
           return UnparsedExpression.of(expression);
         }
         Integer length = type.getColumnSize();
@@ -199,7 +204,7 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
             : Literals.varcharLiteral(length, columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:
       case JdbcTypeConverter.TEXT:
-        return quoted
+        return quoted || NUMERIC_CONSTANT.matcher(expression).matches()
             ? Literals.stringLiteral(columnDefaultValue)
             : UnparsedExpression.of(expression);
       default:

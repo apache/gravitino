@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.postgresql.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -81,6 +83,32 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertEquals(Literals.NULL, converter.toGravitino(text, "NULL::text", false, true));
     Assertions.assertEquals(
         Literals.stringLiteral("plain"), converter.toGravitino(text, "'plain'", false, true));
+  }
+
+  @Test
+  void testStringColumnConstantsAndFunctionsKeepTheirMeaning() {
+    JdbcTypeConverter.JdbcTypeBean varchar = new JdbcTypeConverter.JdbcTypeBean("varchar");
+    varchar.setColumnSize(20);
+    JdbcTypeConverter.JdbcTypeBean text = new JdbcTypeConverter.JdbcTypeBean("text");
+    // PostgreSQL shows `varchar(20) DEFAULT (10)` as 10; the stored value is the text '10'.
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "10"), converter.toGravitino(varchar, "10", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("1.50"), converter.toGravitino(text, "1.50", false, true));
+    // These constants store different text, such as '1000' for 1e3.
+    for (String sql : new String[] {"1e3", ".5", "10 + 1"}) {
+      Assertions.assertEquals(
+          UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
+    }
+    Assertions.assertEquals(
+        UnparsedExpression.of("CURRENT_DATE"),
+        converter.toGravitino(varchar, "CURRENT_DATE", false, true));
+    Assertions.assertEquals(
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP,
+        converter.toGravitino(varchar, "CURRENT_TIMESTAMP", false, true));
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "CURRENT_TIMESTAMP"),
+        converter.toGravitino(varchar, "'CURRENT_TIMESTAMP'::character varying", false, true));
   }
 
   @Test
