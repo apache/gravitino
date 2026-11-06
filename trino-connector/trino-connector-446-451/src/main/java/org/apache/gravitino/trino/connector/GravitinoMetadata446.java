@@ -50,25 +50,9 @@ public class GravitinoMetadata446 extends GravitinoMetadata {
 
   @Override
   public void addColumn(
-<<<<<<< HEAD:trino-connector/trino-connector-446-451/src/main/java/org/apache/gravitino/trino/connector/GravitinoMetadata446.java
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
-    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
-=======
-      ConnectorSession session,
-      ConnectorTableHandle tableHandle,
-      ColumnMetadata column,
-      ColumnPosition position) {
-    TableChange.ColumnPosition columnPosition = TableChange.ColumnPosition.defaultPos();
-    if (position instanceof ColumnPosition.First) {
-      columnPosition = TableChange.ColumnPosition.first();
-    }
-    if (position instanceof ColumnPosition.After after) {
-      columnPosition = TableChange.ColumnPosition.after(after.columnName());
-    }
     GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
-    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn, columnPosition);
->>>>>>> 463296cac ([#14587] fix(connector): Fix Glue catalog handling in Trino and Spark connectors (#14588)):trino-connector/trino-connector-481/src/main/java/org/apache/gravitino/trino/connector/GravitinoMetadata481.java
+    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 
   @Override

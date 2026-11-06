@@ -20,14 +20,10 @@ package org.apache.gravitino.trino.connector.catalog.glue;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-<<<<<<< HEAD:trino-connector/trino-connector/src/test/java/org/apache/gravitino/trino/connector/catalog/glue/TestGlueConnectorAdapter.java
-=======
-import com.google.common.collect.Maps;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.type.TimestampType;
->>>>>>> 463296cac ([#14587] fix(connector): Fix Glue catalog handling in Trino and Spark connectors (#14588)):trino-connector/src/common/test/java/org/apache/gravitino/trino/connector/catalog/glue/TestGlueConnectorAdapter.java
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
@@ -85,21 +81,6 @@ class TestGlueConnectorAdapter {
     Assertions.assertEquals(
         "https://glue.custom.endpoint", config.get("hive.metastore.glue.endpoint-url"));
   }
-<<<<<<< HEAD:trino-connector/trino-connector/src/test/java/org/apache/gravitino/trino/connector/catalog/glue/TestGlueConnectorAdapter.java
-=======
-
-  @Test
-  void testApplyS3CredentialUsesAwsForGlueAndS3ForStorage() {
-    Map<String, String> config = Maps.newHashMap();
-    Credential[] credentials = {
-      new AwsSecretKeyCredential("glue-ak", "glue-sk"), new S3SecretKeyCredential("s3-ak", "s3-sk")
-    };
-    GlueConnectorAdapter.applyS3Credential(credentials, config);
-    Assertions.assertEquals("glue-ak", config.get("hive.metastore.glue.aws-access-key"));
-    Assertions.assertEquals("glue-sk", config.get("hive.metastore.glue.aws-secret-key"));
-    Assertions.assertEquals("s3-ak", config.get("hive.s3.aws-access-key"));
-    Assertions.assertEquals("s3-sk", config.get("hive.s3.aws-secret-key"));
-  }
 
   @Test
   void testMetadataAdapterUsesCatalogDefaultTableFormat() {
@@ -125,5 +106,4 @@ class TestGlueConnectorAdapter {
                     .build()));
     Assertions.assertDoesNotThrow(() -> metadataAdapter.createTable(tableMetadata));
   }
->>>>>>> 463296cac ([#14587] fix(connector): Fix Glue catalog handling in Trino and Spark connectors (#14588)):trino-connector/src/common/test/java/org/apache/gravitino/trino/connector/catalog/glue/TestGlueConnectorAdapter.java
 }

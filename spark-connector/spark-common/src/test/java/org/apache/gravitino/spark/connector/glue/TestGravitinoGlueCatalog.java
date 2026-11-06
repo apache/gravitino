@@ -250,11 +250,6 @@ public class TestGravitinoGlueCatalog {
 
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(), converter.toGravitinoType(DataTypes.TimestampType));
-    Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(),
-        converter.toGravitinoType(DataTypes.TimestampNTZType));
-    Assertions.assertEquals(
-        DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone(6)));
   }
 
   @Test
@@ -382,8 +377,7 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertEquals(1, loads.get());
 
     catalog.getSparkTableChangeConverter(
-        ident,
-        new TableChange[] {TableChange.updateColumnType(column, DataTypes.TimestampNTZType)});
+        ident, new TableChange[] {TableChange.updateColumnType(column, DataTypes.TimestampType)});
     Assertions.assertEquals(2, loads.get());
   }
 

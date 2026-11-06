@@ -79,13 +79,6 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
 
-  /**
-   * Iceberg tables follow Iceberg type semantics: a Spark {@code timestamp} is an Iceberg {@code
-   * timestamptz} and a Spark {@code timestamp_ntz} an Iceberg {@code timestamp}, as with the
-   * Iceberg catalog. The Hive rules of {@link SparkHiveTypeConverter} apply to the other tables.
-   */
-  private static final SparkTypeConverter ICEBERG_TYPE_CONVERTER = new SparkTypeConverter();
-
   // Lazily initialized Iceberg GlueCatalog for Iceberg tables
   volatile SparkCatalog icebergGlueCatalog;
 
@@ -209,7 +202,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           getOrCreateIcebergGlueCatalog(),
           propertiesConverter,
           sparkTransformConverter,
-          ICEBERG_TYPE_CONVERTER);
+          getIcebergTypeConverter());
     }
 
     return new SparkHiveTable(
@@ -234,6 +227,17 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     return new SparkTransformConverter(false);
   }
 
+  /**
+   * Returns the type converter of Iceberg tables. They follow Iceberg type semantics, as with the
+   * Iceberg catalog, while the Hive rules of {@link #getSparkTypeConverter()} apply to the other
+   * tables. Spark versions that support {@code timestamp_ntz} override this method.
+   *
+   * @return the type converter of Iceberg tables
+   */
+  protected SparkTypeConverter getIcebergTypeConverter() {
+    return new SparkTypeConverter();
+  }
+
   /** {@inheritDoc} Returns the Hive-compatible type converter used for Glue tables. */
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
@@ -253,7 +257,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
                 ? null
                 : catalogProperties.get(GlueConstants.DEFAULT_TABLE_FORMAT));
     return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
-        ? ICEBERG_TYPE_CONVERTER
+        ? getIcebergTypeConverter()
         : super.getSparkTypeConverter(gravitinoTableProperties);
   }
 
@@ -269,7 +273,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     }
     try {
       if (isIcebergTable(loadGravitinoTable(ident))) {
-        return getSparkTableChangeConverter(ICEBERG_TYPE_CONVERTER);
+        return getSparkTableChangeConverter(getIcebergTypeConverter());
       }
     } catch (NoSuchTableException e) {
       // The alter reports the missing table.

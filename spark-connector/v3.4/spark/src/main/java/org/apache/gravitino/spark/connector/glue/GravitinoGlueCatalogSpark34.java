@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.glue;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 import org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter34;
 
 /** Spark 3.4 specific Gravitino Glue catalog implementation. */
@@ -28,6 +29,11 @@ public class GravitinoGlueCatalogSpark34 extends GravitinoGlueCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter34();
+  }
+
+  @Override
+  protected SparkTypeConverter getIcebergTypeConverter() {
+    return new SparkTypeConverter34();
   }
 
   @Override

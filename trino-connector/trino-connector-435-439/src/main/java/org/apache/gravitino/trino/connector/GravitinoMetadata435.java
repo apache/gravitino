@@ -49,7 +49,7 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
   @Override
   public void addColumn(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 
