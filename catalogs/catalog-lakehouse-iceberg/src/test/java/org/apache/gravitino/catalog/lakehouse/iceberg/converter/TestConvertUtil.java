@@ -711,6 +711,50 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertEquals(Literals.stringLiteral("US"), column.initialDefaultValue());
   }
 
+  @Test
+  public void testFromNestedFieldBinaryDefaultsRoundTripThroughDtoJson() throws Exception {
+    byte[] bytes = new byte[] {1, 2, 3};
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("payload")
+            .asOptional()
+            .ofType(Types.BinaryType.get())
+            .withWriteDefault(Literal.of(bytes))
+            .withInitialDefault(Literal.of(bytes))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertArrayEquals(
+        bytes,
+        (byte[])
+            ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.defaultValue())
+                .value());
+    Assertions.assertArrayEquals(
+        bytes,
+        (byte[])
+            ((org.apache.gravitino.rel.expressions.literals.Literal<?>)
+                    column.initialDefaultValue())
+                .value());
+
+    org.apache.gravitino.dto.rel.ColumnDTO dto =
+        org.apache.gravitino.dto.util.DTOConverters.toDTO(column);
+    String json = org.apache.gravitino.json.JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains("\"010203\""));
+    Assertions.assertFalse(json.contains("[B@"));
+
+    org.apache.gravitino.dto.rel.ColumnDTO deser =
+        org.apache.gravitino.json.JsonUtils.objectMapper()
+            .readValue(json, org.apache.gravitino.dto.rel.ColumnDTO.class);
+    Assertions.assertEquals(
+        "010203",
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals(
+        "010203",
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.initialDefaultValue())
+            .value());
+  }
+
   private static void checkType(Type type, org.apache.gravitino.rel.types.Type expected) {
     org.apache.gravitino.rel.types.Type actual = CONVERTER.toGravitino(type);
     checkType(actual, expected);

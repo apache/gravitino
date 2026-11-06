@@ -21,7 +21,10 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.ArrayUtils;
@@ -139,6 +142,7 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.stats.Statistic;
@@ -147,6 +151,13 @@ import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Utility class for converting between DTOs and domain objects. */
 public class DTOConverters {
+
+  /**
+   * Iceberg JSON single-value serialization (Appendix D / REST OpenAPI) encodes {@code binary} and
+   * {@code fixed} as uppercase hexadecimal strings. Writers emit uppercase; readers accept either
+   * case.
+   */
+  private static final BaseEncoding BINARY_HEX = BaseEncoding.base16().upperCase();
 
   private DTOConverters() {}
 
@@ -811,10 +822,11 @@ public class DTOConverters {
         return LiteralDTO.NULL;
       }
 
-      Object value = ((Literal) expression).value();
+      Literal<?> literal = (Literal<?>) expression;
+      Object value = literal.value();
       return LiteralDTO.builder()
-          .withValue(value == null ? null : value.toString())
-          .withDataType(((Literal) expression).dataType())
+          .withValue(value == null ? null : literalValueToDtoString(value, literal.dataType()))
+          .withDataType(literal.dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
       return FieldReferenceDTO.builder()
@@ -1140,11 +1152,15 @@ public class DTOConverters {
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
-        if (((LiteralDTO) arg).value() == null
-            || ((LiteralDTO) arg).dataType().equals(Types.NullType.get())) {
+        LiteralDTO literalDTO = (LiteralDTO) arg;
+        if (literalDTO.value() == null || literalDTO.dataType().equals(Types.NullType.get())) {
           return Literals.NULL;
         }
-        return Literals.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());
+        Type dataType = literalDTO.dataType();
+        if (isBinaryOrFixed(dataType)) {
+          return Literals.of(decodeBinaryHex(literalDTO.value(), dataType), dataType);
+        }
+        return Literals.of(literalDTO.value(), dataType);
       case FIELD:
         return NamedReference.field(((FieldReferenceDTO) arg).fieldName());
       case FUNCTION:
@@ -1656,5 +1672,37 @@ public class DTOConverters {
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
+  }
+
+  private static boolean isBinaryOrFixed(Type dataType) {
+    return dataType instanceof Types.BinaryType || dataType instanceof Types.FixedType;
+  }
+
+  private static String literalValueToDtoString(Object value, Type dataType) {
+    if (isBinaryOrFixed(dataType) && value instanceof byte[]) {
+      return BINARY_HEX.encode((byte[]) value);
+    }
+    return value.toString();
+  }
+
+  private static byte[] decodeBinaryHex(String hex, Type dataType) {
+    Preconditions.checkArgument(hex != null, "binary/fixed literal value must not be null");
+    byte[] bytes;
+    try {
+      // Upper-case before decode so lowercase Iceberg hex values are accepted.
+      bytes = BINARY_HEX.decode(hex.toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Invalid hexadecimal binary/fixed literal value: " + hex, e);
+    }
+    if (dataType instanceof Types.FixedType) {
+      int expected = ((Types.FixedType) dataType).length();
+      Preconditions.checkArgument(
+          bytes.length == expected,
+          "Fixed literal length mismatch: expected %s bytes, got %s",
+          expected,
+          bytes.length);
+    }
+    return bytes;
   }
 }

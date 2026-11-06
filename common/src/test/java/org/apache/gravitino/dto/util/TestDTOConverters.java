@@ -32,6 +32,8 @@ import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import org.apache.gravitino.dto.rel.partitioning.RangePartitioningDTO;
@@ -42,9 +44,12 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -395,5 +400,44 @@ public class TestDTOConverters {
     PolicyContent roundTripped = DTOConverters.fromDTO(contentDTO);
     Assertions.assertInstanceOf(AccessControlContent.class, roundTripped);
     Assertions.assertEquals(content, roundTripped);
+  }
+
+  @Test
+  void testBinaryAndFixedLiteralsUseIcebergHexEncoding() throws Exception {
+    byte[] bytes = new byte[] {1, 2, 3};
+    Expression binaryLiteral = Literals.of(bytes, Types.BinaryType.get());
+    Expression fixedLiteral = Literals.of(bytes, Types.FixedType.of(3));
+
+    FunctionArg binaryArg = DTOConverters.toFunctionArg(binaryLiteral);
+    FunctionArg fixedArg = DTOConverters.toFunctionArg(fixedLiteral);
+    Assertions.assertInstanceOf(LiteralDTO.class, binaryArg);
+    Assertions.assertInstanceOf(LiteralDTO.class, fixedArg);
+    // Iceberg Appendix D / REST OpenAPI: uppercase hexadecimal string
+    Assertions.assertEquals("010203", ((LiteralDTO) binaryArg).value());
+    Assertions.assertEquals("010203", ((LiteralDTO) fixedArg).value());
+    Assertions.assertFalse(((LiteralDTO) binaryArg).value().startsWith("[B@"));
+
+    Literal<?> roundTripBinary = (Literal<?>) DTOConverters.fromFunctionArg(binaryArg);
+    Literal<?> roundTripFixed = (Literal<?>) DTOConverters.fromFunctionArg(fixedArg);
+    Assertions.assertArrayEquals(bytes, (byte[]) roundTripBinary.value());
+    Assertions.assertArrayEquals(bytes, (byte[]) roundTripFixed.value());
+
+    // Lowercase hex must also parse (Iceberg reader rule).
+    byte[] mixedCaseBytes = new byte[] {0x0a, 0x1b, (byte) 0x2c};
+    LiteralDTO lowercase =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0a1b2c").build();
+    Assertions.assertArrayEquals(
+        mixedCaseBytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(lowercase)).value());
+
+    ColumnDTO viaConverters =
+        DTOConverters.toDTO(
+            Column.of(
+                "bin_col", Types.BinaryType.get(), null, true, false, binaryLiteral, fixedLiteral));
+    String json = JsonUtils.objectMapper().writeValueAsString(viaConverters);
+    Assertions.assertTrue(json.contains("\"010203\""));
+    Assertions.assertFalse(json.contains("[B@"));
+    ColumnDTO deser = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);
+    Assertions.assertEquals("010203", ((LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals("010203", ((LiteralDTO) deser.initialDefaultValue()).value());
   }
 }
