@@ -481,42 +481,46 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
-                  RuntimeException.class);
+    Pair<Boolean, Boolean> result =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () -> {
+              NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+              boolean droppedFromCatalog =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                      RuntimeException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
-          if (isManagedTable) {
-            return droppedFromCatalog;
-          }
+              boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+              if (isManagedTable) {
+                return Pair.of(droppedFromCatalog, isManagedTable);
+              }
 
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+              // A false result is ambiguous: the external table may have been renamed or dropped
+              // out of band. Preserve the registration because deleting it after a rename would
+              // lose Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+              // registration that requires separate cleanup.
+              if (droppedFromCatalog) {
+                try {
+                  store.delete(ident, TABLE);
+                } catch (OptimisticLockException e) {
+                  throw e;
+                } catch (NoSuchEntityException e) {
+                  LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+              return Pair.of(droppedFromCatalog, isManagedTable);
+            });
+    if (!result.getRight()) {
+      // Run even after a false drop result: out-of-band drops can leave orphaned schemas.
+      // Release the table lock before cleanup to avoid a lock upgrade.
+      cleanUpOrphanedSchema(getCatalogIdentifier(ident), schemaIdentifier);
+    }
+    return result.getLeft();
   }
 
   /**
@@ -917,7 +921,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return Objects.equal(left.name(), right.name())
         && columnPosition == right.position()
         && Objects.equal(left.dataType(), right.dataType())
-        && Objects.equal(left.comment(), right.comment())
+        && Objects.equal(ColumnEntity.commentForStorage(left.comment()), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
         && isSameDefaultValue(left.defaultValue(), right.defaultValue());
@@ -965,10 +969,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           String.format(
               "type[catalog=%s, store=%s]", catalogColumn.dataType(), entityColumn.dataType()));
     }
-    if (!Objects.equal(catalogColumn.comment(), entityColumn.comment())) {
+    String storedComment = ColumnEntity.commentForStorage(catalogColumn.comment());
+    if (!Objects.equal(storedComment, entityColumn.comment())) {
       differences.add(
-          String.format(
-              "comment[catalog=%s, store=%s]", catalogColumn.comment(), entityColumn.comment()));
+          String.format("comment[catalog=%s, store=%s]", storedComment, entityColumn.comment()));
     }
     if (catalogColumn.nullable() != entityColumn.nullable()) {
       differences.add(
@@ -1224,7 +1228,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 .withName(column.name())
                 .withPosition(columnPair.getLeft())
                 .withDataType(column.dataType())
-                .withComment(column.comment())
+                .withComment(ColumnEntity.commentForStorage(column.comment()))
                 .withNullable(column.nullable())
                 .withAutoIncrement(column.autoIncrement())
                 .withDefaultValue(column.defaultValue())
@@ -1339,10 +1343,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 combinedTable.tableFromGravitino().id()));
   }
 
+  private void cleanUpOrphanedSchema(NameIdentifier catalogIdent, NameIdentifier schemaIdent) {
+    try {
+      // A queued schema writer also blocks new readers. Avoid queuing one behind another table's
+      // source DDL when the schema still exists and there is nothing to clean up.
+      boolean schemaExists =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent,
+              LockType.READ,
+              () ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                      RuntimeException.class));
+      if (schemaExists) {
+        return;
+      }
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            // Recheck under the write lock before deleting any registration.
+            OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdent);
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.warn("Failed to clean up orphaned schema entities starting from {}", schemaIdent, e);
+    }
+  }
+
   private static void validateColumns(Column[] columns) {
     for (Column column : columns) {
       ColumnEntity.NAME.validate(column.name(), COLUMN);
-      ColumnEntity.COMMENT.validate(column.comment(), COLUMN);
+      ColumnEntity.validateCommentForWrite(column.name(), column.comment());
     }
   }
 
@@ -1351,7 +1384,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       if (addColumn.getFieldName().length == 1) {
         ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
-        ColumnEntity.COMMENT.validate(addColumn.getComment(), COLUMN);
+        ColumnEntity.validateCommentForWrite(addColumn.getFieldName()[0], addColumn.getComment());
       }
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -1361,7 +1394,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } else if (change instanceof TableChange.UpdateColumnComment) {
       TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
       if (updateComment.getFieldName().length == 1) {
-        ColumnEntity.COMMENT.validate(updateComment.getNewComment(), COLUMN);
+        ColumnEntity.validateCommentForWrite(
+            updateComment.getFieldName()[0], updateComment.getNewComment());
       }
     }
   }
