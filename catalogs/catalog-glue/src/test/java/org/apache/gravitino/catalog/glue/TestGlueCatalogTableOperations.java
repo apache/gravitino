@@ -189,7 +189,7 @@ class TestGlueCatalogTableOperations {
     Table icebergTable =
         Table.builder()
             .name("ice_tbl")
-            .parameters(Map.of(GlueConstants.TABLE_FORMAT, "ICEBERG"))
+            .parameters(Map.of(GlueConstants.TABLE_TYPE_PARAM, "ICEBERG"))
             .build();
     Table hiveTable = Table.builder().name("hive_tbl").parameters(Collections.emptyMap()).build();
 
@@ -251,18 +251,55 @@ class TestGlueCatalogTableOperations {
 
   @Test
   void testFormatFilterKeepsVisibleFormatUsable() {
-    ops.tableFormatFilter = Set.of("iceberg");
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "ice_tbl");
-    Table icebergTable =
+    ops.tableFormatFilter = Set.of("hive");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+    // table-format is not stored: a Glue parameter left by an older version does not change the
+    // format, which comes from table_type.
+    Table hiveTable =
         Table.builder()
-            .name("ice_tbl")
+            .name("hive_tbl")
             .parameters(Map.of(GlueConstants.TABLE_FORMAT, "ICEBERG"))
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
     when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(icebergTable).build());
+        .thenReturn(GetTableResponse.builder().table(hiveTable).build());
 
-    assertEquals("ice_tbl", ops.loadTable(ident).name());
+    GlueTable loaded = ops.loadTable(ident);
+    assertEquals("hive_tbl", loaded.name());
+    assertEquals("HIVE", loaded.properties().get(GlueConstants.TABLE_FORMAT));
+  }
+
+  @Test
+  void testCreateRefusesUnknownTableFormatAndDoesNotStoreIt() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                NameIdentifier.of("metalake", "catalog", "mydb", "t"),
+                new Column[] {
+                  GlueColumn.builder().withName("id").withType(Types.LongType.get()).build()
+                },
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "delta"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    useFakeGlueTable(null);
+    ops.createTable(
+        NameIdentifier.of("metalake", "catalog", "mydb", "t"),
+        new Column[] {GlueColumn.builder().withName("id").withType(Types.LongType.get()).build()},
+        null,
+        Map.of(GlueConstants.TABLE_FORMAT, "hive"),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockClient).createTable(captor.capture());
+    assertFalse(
+        captor.getValue().tableInput().parameters().containsKey(GlueConstants.TABLE_FORMAT));
   }
 
   @Test
