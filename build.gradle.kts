@@ -700,9 +700,8 @@ subprojects {
   // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
   // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
   // httpcore5/httpcore5-h2: pulled by httpclient5 (directly and via Iceberg), whose POM still
-  // manages them on the 5.3/5.4.0 line; force the 5.4.4 patch to clear CVE-2026-54399 (HTTP/1.1
-  // parser DoS) and CVE-2026-54428 (HTTP/2 HPACK decoder DoS). 5.4.4 is the newest 5.4 patch and
-  // stays API-compatible with the httpclient5 versions on the classpath.
+  // manages them on the 5.3/5.4.0 line; force the 5.4.4 patch so every module uses the same,
+  // latest 5.4 patch. It stays API-compatible with the httpclient5 versions on the classpath.
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")

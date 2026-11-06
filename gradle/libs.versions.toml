@@ -57,8 +57,7 @@ hadoop-minikdc = "3.3.6"
 re2j = "1.7"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
-# Keep httpcore5 on the same 5.4 line as httpclient5: httpclient5 5.4.x expects httpcore5 5.4.x,
-# and 5.4.3+ fixes the HTTP/1.1 parser and HPACK decoder DoS (CVE-2026-54399, CVE-2026-54428).
+# Keep httpcore5 on the same 5.4 line as httpclient5: httpclient5 5.4.x expects httpcore5 5.4.x.
 httpcore5 = "5.4.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
