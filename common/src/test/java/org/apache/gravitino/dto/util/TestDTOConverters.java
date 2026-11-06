@@ -78,10 +78,26 @@ public class TestDTOConverters {
     Assertions.assertEquals("0x" + hex, dto.value());
     Assertions.assertArrayEquals(
         bytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(dto)).value());
-    Assertions.assertEquals(
-        "legacy",
-        ((LiteralDTO) DTOConverters.toFunctionArg(Literals.of("legacy", Types.BinaryType.get())))
-            .value());
+  }
+
+  @Test
+  void testBinaryOrFixedLiteralRejectsUnprefixedWireValue() {
+    LiteralDTO unprefixedBinary =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("010203").build();
+    IllegalArgumentException binaryThrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> DTOConverters.fromFunctionArg(unprefixedBinary));
+    Assertions.assertTrue(
+        binaryThrown.getMessage().contains("0x followed by hexadecimal"),
+        binaryThrown.getMessage());
+
+    LiteralDTO unprefixedFixed =
+        LiteralDTO.builder().withDataType(Types.FixedType.of(3)).withValue("legacy").build();
+    IllegalArgumentException fixedThrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> DTOConverters.fromFunctionArg(unprefixedFixed));
+    Assertions.assertTrue(
+        fixedThrown.getMessage().contains("0x followed by hexadecimal"), fixedThrown.getMessage());
   }
 
   @Test

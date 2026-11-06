@@ -609,6 +609,17 @@ class TestDTOConverters(unittest.TestCase):
             decoded,
         )
 
+        unprefixed = (
+            LiteralDTO.builder()
+            .with_data_type(Types.BinaryType.get())
+            .with_value("010203")
+            .build()
+        )
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "0x followed by hexadecimal"
+        ):
+            DTOConverters.from_function_arg(unprefixed)
+
     def test_to_dto_raise_exception(self):
         with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
             DTOConverters.to_dto("test")

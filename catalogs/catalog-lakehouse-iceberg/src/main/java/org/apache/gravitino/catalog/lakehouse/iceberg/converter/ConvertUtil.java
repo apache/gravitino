@@ -138,6 +138,8 @@ public class ConvertUtil {
         {
           Types.TimestampType timestampType = (Types.TimestampType) type;
           if (timestampType.shouldAdjustToUTC()) {
+            // Iceberg timestamptz is a UTC instant (micros). Expose it as UTC LocalDateTime while
+            // keeping TimestampType.withTimeZone so the type still says "with time zone".
             return Literals.of(
                 DateTimeUtil.timestamptzFromMicros((Long) value).toLocalDateTime(),
                 org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(
@@ -152,6 +154,7 @@ public class ConvertUtil {
         {
           Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) type;
           if (timestampNanoType.shouldAdjustToUTC()) {
+            // Same UTC-instant → LocalDateTime convention as TIMESTAMP with zone above.
             return Literals.of(
                 DateTimeUtil.timestamptzFromNanos((Long) value).toLocalDateTime(),
                 org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(

@@ -310,4 +310,33 @@ public class TestCapabilityHelpers {
     Assertions.assertEquals(Column.INITIAL_DEFAULT_VALUE_NOT_SET, applied[0].initialDefaultValue());
     Assertions.assertEquals(Literals.stringLiteral("US"), applied[0].defaultValue());
   }
+
+  @Test
+  void testLoadThenCreateRejectsColumnsCarryingInitialDefault() {
+    // Iceberg v3 load exposes write-default and initial-default on columns. Feeding those columns
+    // straight into create/add-column (copy-table / load-then-create) must fail: Gravitino create
+    // still rejects initial defaults, and Iceberg create still rejects write defaults via
+    // capability
+    // for catalogs that do not support them. Document the failure rather than silently dropping.
+    Column loadedLikeIcebergV3 =
+        Column.of(
+            "region",
+            Types.StringType.get(),
+            "loaded from Iceberg",
+            true,
+            false,
+            Literals.stringLiteral("EU"),
+            Literals.stringLiteral("US"));
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CapabilityHelpers.applyCapabilities(
+                    new Column[] {loadedLikeIcebergV3}, Capability.DEFAULT));
+    Assertions.assertTrue(
+        thrown.getMessage().contains("initial default value is not supported"),
+        thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("region"), thrown.getMessage());
+  }
 }

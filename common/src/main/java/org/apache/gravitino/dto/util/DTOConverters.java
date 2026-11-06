@@ -1687,15 +1687,16 @@ public class DTOConverters {
   }
 
   /**
-   * Decodes {@code 0x}-prefixed hex for binary/fixed. Unprefixed values keep their previous string
-   * interpretation (#14609).
+   * Decodes {@code 0x}-prefixed hex for binary/fixed (#14609). Unprefixed values are rejected so a
+   * Binary/Fixed column does not silently become a String literal.
    */
   private static Object literalValueFromDtoString(String value, Type dataType) {
     if (!isBinaryOrFixed(dataType) || value == null) {
       return value;
     }
     if (!value.regionMatches(true, 0, BINARY_HEX_PREFIX, 0, BINARY_HEX_PREFIX.length())) {
-      return value;
+      throw new IllegalArgumentException(
+          "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs");
     }
     String hex = value.substring(BINARY_HEX_PREFIX.length());
     byte[] bytes;

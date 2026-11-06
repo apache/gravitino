@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDa
 
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.DateTimeUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -709,6 +711,39 @@ public class TestConvertUtil extends TestBaseConvert {
     IcebergColumn column = ConvertUtil.fromNestedField(field);
     Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
     Assertions.assertEquals(Literals.stringLiteral("US"), column.initialDefaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldTimestamptzDefaultUsesUtcLocalDateTime() {
+    // Iceberg timestamptz stores a UTC instant. ConvertUtil keeps TimestampType.withTimeZone and
+    // materializes the value as that instant's UTC LocalDateTime (offset is not retained on the
+    // literal value).
+    long micros = 1_700_000_000_123_456L;
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("event_ts")
+            .asOptional()
+            .ofType(Types.TimestampType.withZone())
+            .withWriteDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .withInitialDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.TimestampType.class, column.dataType());
+    org.apache.gravitino.rel.types.Types.TimestampType tsType =
+        (org.apache.gravitino.rel.types.Types.TimestampType) column.dataType();
+    Assertions.assertTrue(tsType.hasTimeZone());
+
+    LocalDateTime expectedUtc = DateTimeUtil.timestamptzFromMicros(micros).toLocalDateTime();
+    Assertions.assertEquals(
+        expectedUtc,
+        ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.defaultValue()).value());
+    Assertions.assertEquals(
+        expectedUtc,
+        ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.initialDefaultValue())
+            .value());
   }
 
   @Test
