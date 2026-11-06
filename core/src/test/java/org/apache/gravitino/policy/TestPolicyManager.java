@@ -371,9 +371,9 @@ public class TestPolicyManager {
     Assertions.assertEquals(policy.auditInfo(), hidden.auditInfo());
     Assertions.assertTrue(HiddenPolicyTag.isReservedName(hidden.name()));
     Assertions.assertEquals(0, hidden.valueConstraint().allowedValues().length);
-    Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
+    Assertions.assertEquals(1, tagManager.listTags(METALAKE).length);
     Assertions.assertEquals(
-        0, policyManager.listTagAssociationsForPolicy(METALAKE, policyName).length);
+        1, policyManager.listTagAssociationsForPolicy(METALAKE, policyName).length);
     Assertions.assertEquals(
         1,
         entityStore

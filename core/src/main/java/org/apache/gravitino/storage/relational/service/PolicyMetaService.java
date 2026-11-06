@@ -40,7 +40,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -193,30 +192,17 @@ public class PolicyMetaService {
     return updatedPolicyEntity;
   }
 
-  public boolean deletePolicy(NameIdentifier ident) {
-    return deletePolicyAndGet(ident) != null;
-  }
-
-  /**
-   * Deletes a policy and returns the snapshot whose version was deleted.
-   *
-   * @param ident The policy identifier.
-   * @return The deleted policy, or null if it no longer exists.
-   */
-  @Nullable
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deletePolicy")
-  public PolicyEntity deletePolicyAndGet(NameIdentifier ident) {
+  public boolean deletePolicy(NameIdentifier ident) {
     PolicyPO policyPO;
     try {
       policyPO = getPolicyPOByMetalakeAndName(ident.namespace().level(0), ident.name());
     } catch (NoSuchEntityException e) {
-      return null;
+      return false;
     }
-    return deletePolicy(ident, policyPO)
-        ? POConverters.fromPolicyPO(policyPO, ident.namespace())
-        : null;
+    return deletePolicy(ident, policyPO);
   }
 
   /**
@@ -470,11 +456,6 @@ public class PolicyMetaService {
     TagEntity tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
     try {
       TagMetaService.getInstance().insertTag(tag, false);
-    } catch (EntityAlreadyExistsException e) {
-      // Do not let the enclosing policy write remap the SQL cause into a policy conflict.
-      throw new TagAlreadyExistsException(
-          "Reserved tag name %s already exists in metalake %s; cannot create policy %s",
-          tag.name(), policy.namespace().level(0), policy.name());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

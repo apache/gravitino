@@ -432,19 +432,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    if (entityType == Entity.EntityType.POLICY) {
-      return deleteWithCallback(
-          ident,
-          entityType,
-          () -> {
-            PolicyEntity deleted = PolicyMetaService.getInstance().deletePolicyAndGet(ident);
-            if (deleted == null) {
-              throw new NoSuchEntityException("Policy %s does not exist", ident);
-            }
-            return clazz.cast(deleted);
-          },
-          postDeleteAction);
-    }
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }

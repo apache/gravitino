@@ -267,6 +267,8 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
+            TagOperations.checkVisibleTag(metalake, object);
+
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             return Utils.ok(
                 new RoleResponse(
@@ -323,6 +325,8 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
+            TagOperations.checkVisibleTag(metalake, object);
+
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             return Utils.ok(
                 new RoleResponse(
@@ -374,6 +378,8 @@ public class PermissionOperations {
               for (Privilege privilegeDTO : dto.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilegeDTO, dto, metalake);
               }
+
+              TagOperations.checkVisibleTag(metalake, dto);
 
               MetadataObjectUtil.checkMetadataObject(metalake, dto);
               AuthorizationUtils.checkDuplicatedNamePrivilege(dto.privileges());

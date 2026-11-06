@@ -20,38 +20,17 @@ package org.apache.gravitino.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.Collections;
-import java.util.function.Function;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.tag.TagChange;
-import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValueConstraint;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests hidden tag models and reserved namespace protection. */
 public class TestHiddenPolicyTag {
@@ -66,21 +45,6 @@ public class TestHiddenPolicyTag {
     assertFalse(HiddenPolicyTag.isReservedName("gravitino_hidden"));
     assertFalse(HiddenPolicyTag.isReservedName("gravitino_hiddenish"));
     assertEquals("gravitino_hidden_123", HiddenPolicyTag.name(123));
-  }
-
-  /** The internal prefix alone determines visibility, including alternate casing. */
-  @ParameterizedTest
-  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
-  public void testReservedNameDeterminesVisibility(String name) {
-    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    TagEntity legacy =
-        TagEntity.builder()
-            .withId(2L)
-            .withName(name)
-            .withNamespace(NamespaceUtil.ofTag("m"))
-            .withAuditInfo(audit)
-            .build();
-    assertThrows(NoSuchTagException.class, () -> HiddenPolicyTag.checkVisible(legacy));
   }
 
   /** New policies use the tag model, with matching ownership and audit metadata. */
@@ -110,58 +74,5 @@ public class TestHiddenPolicyTag {
     assertEquals(TagValueConstraint.noValue(), tag.valueConstraint());
     assertFalse(tag.assignment().isPresent());
     assertEquals(Collections.singletonMap("gravitino.internal.policy-id", "12"), tag.properties());
-  }
-
-  /** A database alias must not bypass checks against the actual stored tag name. */
-  @Test
-  public void testResolvedHiddenTagIsProtected() throws Exception {
-    String alias = "database-alias";
-    EntityStore store = mock(EntityStore.class);
-    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    BaseMetalake metalake =
-        BaseMetalake.builder()
-            .withId(1L)
-            .withName("m")
-            .withVersion(SchemaVersion.V_0_1)
-            .withAuditInfo(audit)
-            .build();
-    when(store.get(NameIdentifier.of("m"), Entity.EntityType.METALAKE, BaseMetalake.class))
-        .thenReturn(metalake);
-    TagEntity hidden =
-        TagEntity.builder()
-            .withId(2L)
-            .withName(HiddenPolicyTag.name(12L))
-            .withNamespace(NamespaceUtil.ofTag("m"))
-            .withAuditInfo(audit)
-            .build();
-    when(store.get(NameIdentifierUtil.ofTag("m", alias), Entity.EntityType.TAG, TagEntity.class))
-        .thenReturn(hidden);
-    when(store.update(
-            any(NameIdentifier.class), eq(TagEntity.class), eq(Entity.EntityType.TAG), any()))
-        .thenAnswer(
-            invocation -> {
-              Function<TagEntity, TagEntity> update = invocation.getArgument(3);
-              return update.apply(hidden);
-            });
-    TagManager tags = new TagManager(RandomIdGenerator.INSTANCE, store);
-    assertThrows(NoSuchTagException.class, () -> tags.getTag("m", alias));
-    assertThrows(NoSuchTagException.class, () -> tags.deleteTag("m", alias));
-    assertThrows(
-        NoSuchTagException.class,
-        () -> tags.alterTag("m", alias, TagChange.updateComment("changed")));
-    assertThrows(NoSuchTagException.class, () -> tags.listMetadataObjectsForTag("m", alias));
-    assertThrows(NoSuchTagException.class, () -> tags.listPolicyAssociationsForTag("m", alias));
-    assertThrows(
-        NoSuchTagException.class,
-        () -> tags.addPolicyForTag("m", alias, "p", AllValuesSelector.get()));
-    assertThrows(NoSuchTagException.class, () -> tags.removePolicyFromTag("m", alias, "p"));
-    MetadataObject object = MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG);
-    assertThrows(
-        NoSuchTagException.class,
-        () -> tags.associateTagsForMetadataObject("m", object, new String[] {alias}, null));
-    assertThrows(
-        NoSuchTagException.class,
-        () -> tags.associateTagsForMetadataObject("m", object, null, new String[] {alias}));
-    verify(store, never()).delete(any(NameIdentifier.class), eq(Entity.EntityType.TAG));
   }
 }

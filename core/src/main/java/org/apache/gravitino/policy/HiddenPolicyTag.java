@@ -21,7 +21,6 @@ package org.apache.gravitino.policy;
 import java.util.Collections;
 import java.util.Locale;
 import javax.annotation.Nullable;
-import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -71,19 +70,5 @@ public final class HiddenPolicyTag {
    */
   public static boolean isReservedName(@Nullable String name) {
     return name != null && name.toLowerCase(Locale.ROOT).startsWith(PREFIX);
-  }
-
-  /**
-   * Rejects an ordinary operation on a tag in the internal name namespace.
-   *
-   * @param tag The resolved tag entity.
-   * @throws NoSuchTagException If the tag is hidden.
-   */
-  public static void checkVisible(TagEntity tag) {
-    if (isReservedName(tag.name())) {
-      throw new NoSuchTagException(
-          "Tag with name %s under metalake %s does not exist",
-          tag.name(), tag.namespace().level(0));
-    }
   }
 }

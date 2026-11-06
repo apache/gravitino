@@ -91,6 +91,7 @@ public class OwnerOperations {
             if (object.type() != MetadataObject.Type.METALAKE) {
               MetalakeManager.checkMetalakeInUse(metalake);
             }
+            TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
@@ -137,6 +138,7 @@ public class OwnerOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
+            TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             ownerDispatcher.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));

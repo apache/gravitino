@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -36,7 +35,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -53,13 +51,9 @@ import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -546,26 +540,6 @@ public class AuthorizationUtils {
                 target.fullName(), target.type(), Lists.newArrayList(affectedPrivileges))),
         (plugin, catalog) ->
             plugin.onRoleUpdated(filterSecurableObjects(role, metalake, catalog), change));
-  }
-
-  static void checkVisibleTag(EntityStore store, String metalake, MetadataObject object) {
-    if (object.type() != MetadataObject.Type.TAG) {
-      return;
-    }
-    // Owner and privilege writes bypass TagManager, so enforce the internal name prefix here too.
-    try {
-      HiddenPolicyTag.checkVisible(
-          store.get(
-              MetadataObjectUtil.toEntityIdent(metalake, object),
-              Entity.EntityType.TAG,
-              TagEntity.class));
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTagException(
-          e, "Tag with name %s under metalake %s does not exist", object.fullName(), metalake);
-    } catch (IOException e) {
-      LOG.error("Failed to get tag {} under metalake {}", object.fullName(), metalake, e);
-      throw new RuntimeException(e);
-    }
   }
 
   @Nullable

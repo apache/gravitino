@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -44,6 +45,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -73,7 +75,7 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
   /** Creates a policy with its internal tag and opens a transaction for assignment checks. */
   @BeforeEach
   public void preparePolicy() throws Exception {
-    store = new RelationalEntityStore(backend, new Config(false) {});
+    store = createStore();
     manager = new PolicyManager(RandomIdGenerator.INSTANCE, store);
     createAndInsertMakeLake(METALAKE);
     catalog = createAndInsertCatalog(METALAKE, "catalog");
@@ -119,9 +121,7 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
   public void testConcurrentBindings() throws Exception {
     SessionUtils.rollbackTransaction();
     CatalogEntity second = createAndInsertCatalog(METALAKE, "second_catalog");
-    PolicyManager concurrentManager =
-        new PolicyManager(
-            RandomIdGenerator.INSTANCE, new RelationalEntityStore(backend, new Config(false) {}));
+    PolicyManager concurrentManager = new PolicyManager(RandomIdGenerator.INSTANCE, createStore());
     CountDownLatch bothStarted = new CountDownLatch(2);
     ExecutorService writers = Executors.newFixedThreadPool(2);
     try {
@@ -264,5 +264,12 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
       rows.next();
       return rows.getLong(1);
     }
+  }
+
+  private RelationalEntityStore createStore() throws IllegalAccessException {
+    RelationalEntityStore store = new RelationalEntityStore();
+    FieldUtils.writeField(store, "backend", backend, true);
+    FieldUtils.writeField(store, "cache", new NoOpsCache(new Config(false) {}), true);
+    return store;
   }
 }

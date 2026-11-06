@@ -58,16 +58,13 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
-import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
-import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.Executable;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,24 +104,6 @@ public class RelationalEntityStore
   // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
   // caches have no per-node copy to invalidate, so no listener is registered.
   @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
-
-  /** Creates a store to be initialized through {@link #initialize(Config)}. */
-  public RelationalEntityStore() {}
-
-  /**
-   * Creates an uncached store around a backend initialized by the caller.
-   *
-   * <p>This constructor starts no background maintenance workers. Closing the store closes the
-   * supplied backend, so the caller must give it exclusive ownership.
-   *
-   * @param backend The initialized backend.
-   * @param config The cache configuration.
-   */
-  public RelationalEntityStore(RelationalBackend backend, Config config) {
-    this.backend = backend;
-    this.cache = new NoOpsCache(config);
-    EntityIdService.initialize(new RelationalEntityStoreIdResolver());
-  }
 
   @VisibleForTesting
   public EntityCache getCache() {
@@ -340,10 +319,6 @@ public class RelationalEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    if (entityType == Entity.EntityType.POLICY) {
-      return deleteAndGet(ident, entityType, PolicyEntity.class, EntityStore.noPostDeleteAction())
-          .isPresent();
-    }
     try {
       boolean deleted = backend.delete(ident, entityType, cascade);
       return deleted;
@@ -363,21 +338,12 @@ public class RelationalEntityStore
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
-    Optional<E> deleted = Optional.empty();
     try {
-      deleted = backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
-      return deleted;
+      return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } catch (RuntimeException re) {
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
-      if (entityType == Entity.EntityType.POLICY && deleted.isPresent()) {
-        PolicyEntity policy = (PolicyEntity) deleted.get();
-        invalidateCache(
-            NameIdentifierUtil.ofTag(
-                policy.namespace().level(0), HiddenPolicyTag.name(policy.id())),
-            Entity.EntityType.TAG);
-      }
     }
   }
 

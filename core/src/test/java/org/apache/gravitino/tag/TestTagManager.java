@@ -76,7 +76,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -130,8 +129,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestTagManager {
@@ -1302,47 +1299,6 @@ public class TestTagManager {
       Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
       Assertions.assertEquals(name, tagManager.createTag(METALAKE, name, null, null).name());
       Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
-    }
-  }
-
-  /** The manager can create internal names while preserving their visibility and access rules. */
-  @ParameterizedTest
-  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
-  public void testInternalPrefixControlsVisibility(String name) throws Exception {
-    Tag created = tagManager.createTag(METALAKE, name, null, null);
-    TagEntity hidden =
-        entityStore.get(
-            NameIdentifierUtil.ofTag(METALAKE, name), Entity.EntityType.TAG, TagEntity.class);
-    Assertions.assertEquals(created, hidden);
-    MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
-    try {
-      entityStore
-          .relationOperations()
-          .updateEntityRelations(
-              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-              NameIdentifier.of(METALAKE, CATALOG),
-              Entity.EntityType.CATALOG,
-              new NameIdentifier[] {hidden.nameIdentifier()},
-              new NameIdentifier[0]);
-      Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
-      Assertions.assertEquals(0, tagManager.listTagsForMetadataObject(METALAKE, object).length);
-      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, name));
-      Assertions.assertThrows(
-          NoSuchTagException.class,
-          () -> tagManager.getTagForMetadataObject(METALAKE, object, name));
-      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.deleteTag(METALAKE, name));
-      Assertions.assertThrows(
-          NoSuchTagException.class,
-          () -> tagManager.alterTag(METALAKE, name, TagChange.updateComment("changed")));
-      Assertions.assertEquals(
-          hidden, entityStore.get(hidden.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class));
-      entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
-      tagManager.createTag(METALAKE, "visible", null, null);
-      Tag renamed = tagManager.alterTag(METALAKE, "visible", TagChange.rename(name));
-      Assertions.assertEquals(name, renamed.name());
-      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, name));
-    } finally {
-      entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
     }
   }
 

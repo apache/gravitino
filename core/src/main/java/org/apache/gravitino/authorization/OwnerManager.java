@@ -67,7 +67,6 @@ public class OwnerManager implements OwnerDispatcher {
   @Override
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
-    AuthorizationUtils.checkVisibleTag(store, metalake, metadataObject);
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
       Optional<Owner> originOwner = getOwner(metalake, metadataObject);
@@ -139,7 +138,6 @@ public class OwnerManager implements OwnerDispatcher {
 
     List<Optional<Owner>> originOwners = new ArrayList<>(metadataObjects.size());
     for (MetadataObject mo : metadataObjects) {
-      AuthorizationUtils.checkVisibleTag(store, metalake, mo);
       originOwners.add(getOwner(metalake, mo));
     }
 

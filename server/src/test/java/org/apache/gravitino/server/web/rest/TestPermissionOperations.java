@@ -140,6 +140,49 @@ public class TestPermissionOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Rejects internal tag privileges for grant, revoke and override operations. */
+  @Test
+  public void testInternalTagPrivilegesAreHidden() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    PrivilegeDTO privilege =
+        PrivilegeDTO.builder()
+            .withName(Privilege.Name.APPLY_TAG)
+            .withCondition(Privilege.Condition.ALLOW)
+            .build();
+    String path = "/metalakes/metalake1/permissions/roles/role1";
+    SecurableObjectDTO tag =
+        SecurableObjectDTO.builder()
+            .withFullName("GRAVITINO_HIDDEN_123")
+            .withType(MetadataObject.Type.TAG)
+            .withPrivileges(new PrivilegeDTO[] {privilege})
+            .build();
+    try (Response grant =
+            target(path + "/tag/GRAVITINO_HIDDEN_123/grant")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeGrantRequest(Lists.newArrayList(privilege))));
+        Response revoke =
+            target(path + "/tag/GRAVITINO_HIDDEN_123/revoke")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeRevokeRequest(Lists.newArrayList(privilege))));
+        Response override =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeOverrideRequest(new SecurableObjectDTO[] {tag})))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), grant.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), revoke.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), override.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
   @Test
   public void testGrantRolesToUser() throws IOException {
     UserEntity userEntity =

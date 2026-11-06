@@ -269,7 +269,6 @@ public class PolicyManager implements PolicyDispatcher {
               Collections.singletonList(policyIdentifier),
               Entity.EntityType.POLICY)
           .stream()
-          .filter(relation -> !HiddenPolicyTag.isReservedName(relation.targetEntity().name()))
           .toArray(RelationalEntity<?>[]::new);
     } catch (IOException e) {
       LOG.error(
