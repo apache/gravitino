@@ -120,11 +120,12 @@ public class CommitJobPlanner {
 
       List<PolicyEntity> chain = new ArrayList<>();
       for (Policy.BuiltInType type : CHAIN_ORDER) {
-        Optional<Long> winnerId = policyMetaService.resolveNearestPolicyId(tableId, type);
-        if (winnerId.isEmpty()) {
+        Long winnerId =
+            policyMetaService.resolveNearestPolicyIds(List.of(tableId), type).get(tableId);
+        if (winnerId == null) {
           continue;
         }
-        PolicyEntity policy = policyMetaService.getPolicyById(winnerId.get());
+        PolicyEntity policy = policyMetaService.getPolicyById(winnerId);
         if (policy == null || !policy.enabled()) {
           continue;
         }

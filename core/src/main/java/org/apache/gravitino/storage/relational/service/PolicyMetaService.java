@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -114,24 +113,6 @@ public class PolicyMetaService {
       return null;
     }
     return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(policyPO.getMetalakeName()));
-  }
-
-  /**
-   * Resolves the unique nearest enabled policy id of {@code policyType} for one table.
-   *
-   * <p>Semantics match {@code ObjectPolicyResolver} effective-tag / selector matching plus
-   * maintenance nearest-level uniqueness. Same-level ambiguity throws {@link
-   * IllegalArgumentException}.
-   *
-   * @param tableId table entity id
-   * @param policyType built-in policy type
-   * @return winner policy id, or empty when none match
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "resolveNearestPolicyId")
-  public Optional<Long> resolveNearestPolicyId(long tableId, Policy.BuiltInType policyType) {
-    return Optional.ofNullable(resolveNearestPolicyIds(List.of(tableId), policyType).get(tableId));
   }
 
   /**

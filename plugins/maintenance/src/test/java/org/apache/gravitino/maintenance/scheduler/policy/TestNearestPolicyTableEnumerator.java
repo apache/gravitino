@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.scheduler.policy;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,7 +27,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
@@ -114,8 +117,9 @@ class TestNearestPolicyTableEnumerator {
                     .withEntityType(Entity.EntityType.TABLE)
                     .build()));
 
-    when(policyMetaService.resolveNearestPolicyId(100L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(100L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(100L, 10L));
 
     Assertions.assertEquals(
         List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -157,10 +161,12 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
         .thenReturn(List.of(t1, t2));
 
-    when(policyMetaService.resolveNearestPolicyId(100L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(11L));
-    when(policyMetaService.resolveNearestPolicyId(101L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(100L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(100L, 11L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(101L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(101L, 10L));
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
@@ -200,8 +206,9 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "a:b"))))
         .thenReturn(List.of(childTable));
 
-    when(policyMetaService.resolveNearestPolicyId(200L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(200L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(200L, 10L));
 
     Assertions.assertEquals(
         List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -249,9 +256,18 @@ class TestNearestPolicyTableEnumerator {
             eq(NamespaceUtil.ofTable(METALAKE, "catalog", "schema"))))
         .thenReturn(List.of(t1, t2, t3));
 
-    when(policyMetaService.resolveNearestPolicyId(
-            any(Long.class), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(java.util.Optional.of(10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            anyList(), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              List<Long> ids = invocation.getArgument(0);
+              Map<Long, Long> winners = new HashMap<>();
+              for (Long id : ids) {
+                winners.put(id, 10L);
+              }
+              return winners;
+            });
 
     NearestPolicyTableEnumerator.ShouldSkipTable gate =
         (tableId, policyId, minIntervalMs, nowMs) -> tableId != 102L;
@@ -276,10 +292,12 @@ class TestNearestPolicyTableEnumerator {
             EntityCombinedTable.of(Mockito.mock(Table.class), table(501L, "missing"))
                 .withImported(true));
 
-    when(policyMetaService.resolveNearestPolicyId(500L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(10L));
-    when(policyMetaService.resolveNearestPolicyId(501L, Policy.BuiltInType.ICEBERG_COMPACTION))
-        .thenReturn(java.util.Optional.of(10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(500L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(500L, 10L));
+    when(policyMetaService.resolveNearestPolicyIds(
+            eq(List.of(501L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
+        .thenReturn(Map.of(501L, 10L));
 
     Assertions.assertEquals(
         List.of(500L, 501L),

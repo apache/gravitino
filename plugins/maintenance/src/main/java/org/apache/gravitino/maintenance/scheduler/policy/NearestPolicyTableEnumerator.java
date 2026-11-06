@@ -28,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -69,7 +68,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link
- * PolicyMetaService#resolveNearestPolicyId} picks this policy and {@link ShouldSkipTable} allows
+ * PolicyMetaService#resolveNearestPolicyIds} picks this policy and {@link ShouldSkipTable} allows
  * schedule. Stops after {@code limit} accepted tables (skipped cooldown / in-flight tables do not
  * count).
  *
@@ -536,9 +535,10 @@ public final class NearestPolicyTableEnumerator {
     }
 
     Policy.BuiltInType policyType = scan.policy.policyType();
-    final Optional<Long> winnerId;
+    final Long winnerId;
     try {
-      winnerId = scan.policyMetaService.resolveNearestPolicyId(tableId, policyType);
+      winnerId =
+          scan.policyMetaService.resolveNearestPolicyIds(List.of(tableId), policyType).get(tableId);
     } catch (IllegalArgumentException e) {
       LOG.error(
           "Skip table {} for maintenance type {}: {}",
@@ -547,7 +547,7 @@ public final class NearestPolicyTableEnumerator {
           e.getMessage());
       return;
     }
-    if (winnerId.isEmpty() || winnerId.get().longValue() != scan.policy.id()) {
+    if (winnerId == null || winnerId.longValue() != scan.policy.id()) {
       return;
     }
     if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id(), scan.minIntervalMs, scan.nowMs)) {
