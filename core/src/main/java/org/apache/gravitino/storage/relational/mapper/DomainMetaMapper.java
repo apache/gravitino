@@ -195,6 +195,19 @@ public interface DomainMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("backingTagId") Long backingTagId);
 
   /**
+   * Lists live domains backed by any of the stable tag IDs in a metalake.
+   *
+   * @param metalakeName The metalake name.
+   * @param backingTagIds The nonempty tag ID list.
+   * @return The matching domains with backing tag names.
+   */
+  @SelectProvider(
+      type = DomainMetaSQLProviderFactory.class,
+      method = "listDomainPOsByMetalakeAndBackingTagIds")
+  List<DomainPO> listDomainPOsByMetalakeAndBackingTagIds(
+      @Param("metalakeName") String metalakeName, @Param("backingTagIds") List<Long> backingTagIds);
+
+  /**
    * Inserts a domain.
    *
    * @param domainPO The domain to insert.

@@ -137,6 +137,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    return SchemaMetaService.getInstance().listDescendantSchemas(identifier);
+  }
+
+  @Override
   public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
     return SemanticModelMetricService.getInstance().listMetrics(namespace);
   }
@@ -825,6 +830,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException {
+    return DomainMetaService.getInstance().listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
   public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) {
     return DomainRelService.getInstance().listSubDomains(parentIdent);
   }
@@ -893,6 +904,20 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
       throws IOException {
+    if (query.anchorId().isPresent()) {
+      Preconditions.checkArgument(
+          query.relationType() == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL
+              && query.anchorEntityType() == Entity.EntityType.TAG,
+          "ID anchor is only supported when listing metadata objects for a tag");
+      return (List<E>)
+          TagMetaService.getInstance()
+              .listAssociatedMetadataObjectsForTagId(
+                  query
+                      .anchorMetalake()
+                      .orElseThrow(() -> new IllegalArgumentException("Missing anchor metalake")),
+                  query.anchorId().get(),
+                  query.relationValue().orElse(null));
+    }
     if (!query.relationValue().isPresent()) {
       return listEntitiesByRelation(
           query.relationType(),

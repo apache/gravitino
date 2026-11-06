@@ -342,44 +342,36 @@ public class TagMetaService {
                       : mapper.listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
                           metalakeName, tagName, value));
 
-      List<GenericEntity> metadataObjects = Lists.newArrayList();
-      Map<String, List<TagMetadataObjectRelPO>> tagMetadataObjectRelPOsByType =
-          tagMetadataObjectRelPOs.stream()
-              .collect(Collectors.groupingBy(TagMetadataObjectRelPO::getMetadataObjectType));
-
-      for (Map.Entry<String, List<TagMetadataObjectRelPO>> entry :
-          tagMetadataObjectRelPOsByType.entrySet()) {
-        String metadataObjectType = entry.getKey();
-        List<TagMetadataObjectRelPO> rels = entry.getValue();
-
-        List<Long> metadataObjectIds =
-            rels.stream()
-                .map(TagMetadataObjectRelPO::getMetadataObjectId)
-                .collect(Collectors.toList());
-        Map<Long, String> metadataObjectNames =
-            MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
-                .get(MetadataObject.Type.valueOf(metadataObjectType))
-                .apply(metadataObjectIds);
-
-        for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
-          String fullName = metadataObjectName.getValue();
-
-          // Metadata object may be deleted asynchronously when we query the name, so it will
-          // return null, we should skip this metadata object.
-          if (fullName != null) {
-            metadataObjects.add(
-                GenericEntity.builder()
-                    .withName(fullName)
-                    .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
-                    .withId(metadataObjectName.getKey())
-                    .build());
-          }
-        }
-      }
-
-      return metadataObjects;
+      return metadataObjectsForRelations(tagMetadataObjectRelPOs);
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagIdent.toString());
+      throw e;
+    }
+  }
+
+  /**
+   * Lists live objects carrying a tag by its stable ID, without resolving a tag name.
+   *
+   * @param metalake The metalake name.
+   * @param tagId The stable tag ID.
+   * @param value The exact assignment value, or null for every value.
+   * @return The live assigned objects; an absent or deleted tag contributes none.
+   * @throws IOException If the objects cannot be read.
+   */
+  public List<GenericEntity> listAssociatedMetadataObjectsForTagId(
+      String metalake, long tagId, @Nullable String value) throws IOException {
+    try {
+      List<TagMetadataObjectRelPO> relations =
+          SessionUtils.doWithCommitAndFetchResult(
+              TagMetadataObjectRelMapper.class,
+              mapper -> mapper.listTagMetadataObjectRelsByTagId(metalake, tagId, value));
+      // Enforce exact value equality independently of the database collation.
+      return metadataObjectsForRelations(
+          relations.stream()
+              .filter(rel -> value == null || value.equals(rel.getTagValue()))
+              .collect(Collectors.toList()));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, metalake + "/tag-id/" + tagId);
       throw e;
     }
   }
@@ -1103,5 +1095,46 @@ public class TagMetaService {
           List<TagPO> tagPOs = mapper.batchSelectTagByIdentifier(metalakeName, tagNames);
           return POConverters.fromTagPOs(tagPOs, firstIdent.namespace());
         });
+  }
+
+  private List<GenericEntity> metadataObjectsForRelations(
+      List<TagMetadataObjectRelPO> tagMetadataObjectRelPOs) {
+    List<GenericEntity> metadataObjects = Lists.newArrayList();
+    Map<String, List<TagMetadataObjectRelPO>> tagMetadataObjectRelPOsByType =
+        tagMetadataObjectRelPOs.stream()
+            .collect(Collectors.groupingBy(TagMetadataObjectRelPO::getMetadataObjectType));
+
+    for (Map.Entry<String, List<TagMetadataObjectRelPO>> entry :
+        tagMetadataObjectRelPOsByType.entrySet()) {
+      String metadataObjectType = entry.getKey();
+      List<TagMetadataObjectRelPO> rels = entry.getValue();
+
+      List<Long> metadataObjectIds =
+          rels.stream()
+              .map(TagMetadataObjectRelPO::getMetadataObjectId)
+              .distinct()
+              .collect(Collectors.toList());
+      Map<Long, String> metadataObjectNames =
+          MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
+              .get(MetadataObject.Type.valueOf(metadataObjectType))
+              .apply(metadataObjectIds);
+
+      for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+        String fullName = metadataObjectName.getValue();
+
+        // Metadata object may be deleted asynchronously when we query the name, so it will
+        // return null, we should skip this metadata object.
+        if (fullName != null) {
+          metadataObjects.add(
+              GenericEntity.builder()
+                  .withName(fullName)
+                  .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
+                  .withId(metadataObjectName.getKey())
+                  .build());
+        }
+      }
+    }
+
+    return metadataObjects;
   }
 }

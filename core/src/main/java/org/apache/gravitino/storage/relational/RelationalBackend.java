@@ -78,6 +78,19 @@ public interface RelationalBackend
   void initialize(Config config);
 
   /**
+   * Lists all recorded descendant schemas of a schema, excluding the schema itself.
+   *
+   * @param identifier The schema identifier using the configured logical separator.
+   * @return The descendant schemas in logical form.
+   * @throws IOException If the schemas cannot be read.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws UnsupportedOperationException If descendant schema listing is not supported.
+   */
+  default List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    throw new UnsupportedOperationException("This store cannot list descendant schemas");
+  }
+
+  /**
    * Lists the entities associated with the given parent namespace and entityType
    *
    * @param <E> The entity type.

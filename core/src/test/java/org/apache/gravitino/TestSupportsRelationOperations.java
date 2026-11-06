@@ -59,6 +59,26 @@ public class TestSupportsRelationOperations {
     Assertions.assertFalse(targetWithNoValue.relationValue().isPresent());
   }
 
+  /** Verifies that an ID query does not require a tag name. */
+  @Test
+  public void testStableTagIdQuery() {
+    RelationQuery byId = RelationQuery.forTagId("metalake", 123L, "finance");
+    Assertions.assertEquals(123L, byId.anchorId().get());
+    Assertions.assertEquals("metalake", byId.anchorMetalake().get());
+    Assertions.assertEquals(Entity.EntityType.TAG, byId.anchorEntityType());
+    Assertions.assertEquals(
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, byId.relationType());
+    Assertions.assertEquals("finance", byId.relationValue().get());
+    Assertions.assertTrue(byId.allFields());
+    Assertions.assertThrows(IllegalStateException.class, byId::anchorIdentifier);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> RelationQuery.forTagId(null, 123L, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> RelationQuery.forTagId("", 123L, null));
+    Assertions.assertFalse(
+        RelationQuery.forTagId("metalake", 123L, null).relationValue().isPresent());
+  }
+
   @Test
   public void testPrimitiveListDelegatesToRelationQuery() throws IOException {
     RecordingRelationOperations relationOperations = new RecordingRelationOperations();
