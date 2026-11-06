@@ -55,10 +55,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   public static final Field ALLOWED_VALUES =
       Field.optional("allowed_values", String[].class, "The allowed assignment values.");
 
-  /** Whether this tag is managed internally and excluded from ordinary tag operations. */
-  public static final Field HIDDEN =
-      Field.required("hidden", Boolean.class, "Whether the tag is hidden.");
-
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the tag entity.");
 
@@ -68,7 +64,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private String comment;
   private Map<String, String> properties;
   private String[] allowedValues;
-  private boolean hidden;
   @Nullable private TagAssignment assignment;
   @Nullable private Boolean inherited;
   private Audit auditInfo;
@@ -83,7 +78,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
     fields.put(ALLOWED_VALUES, allowedValues);
-    fields.put(HIDDEN, hidden);
     fields.put(AUDIT_INFO, auditInfo);
 
     return Collections.unmodifiableMap(fields);
@@ -130,15 +124,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     return TagValueConstraint.ofAllowedValues(allowedValues);
   }
 
-  /**
-   * Returns whether this is a server-managed hidden tag.
-   *
-   * @return Whether ordinary tag operations must hide and protect the tag.
-   */
-  public boolean hidden() {
-    return hidden;
-  }
-
   @Override
   public Optional<TagAssignment> assignment() {
     return Optional.ofNullable(assignment);
@@ -169,14 +154,13 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(properties, that.properties)
-        && hidden == that.hidden
         && Arrays.equals(allowedValues, that.allowedValues)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(id, name, namespace, comment, properties, hidden, auditInfo);
+    int result = Objects.hash(id, name, namespace, comment, properties, auditInfo);
     result = 31 * result + Arrays.hashCode(allowedValues);
     return result;
   }
@@ -199,7 +183,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
             .withComment(comment)
             .withProperties(properties)
             .withAllowedValues(allowedValues)
-            .withHidden(hidden)
             .withAssignment(assignment)
             .withAuditInfo(auditInfo)
             .build();
@@ -273,17 +256,6 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
      */
     public Builder withAssignment(@Nullable TagAssignment assignment) {
       tagEntity.assignment = assignment;
-      return this;
-    }
-
-    /**
-     * Sets the internal visibility flag; ordinary tag creation leaves it false.
-     *
-     * @param hidden Whether the tag is server-managed and hidden.
-     * @return This builder.
-     */
-    public Builder withHidden(boolean hidden) {
-      tagEntity.hidden = hidden;
       return this;
     }
 

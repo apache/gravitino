@@ -344,7 +344,7 @@ public class TestPolicyManager {
                 Entity.EntityType.COLUMN);
     Assertions.assertEquals(1, tags.size());
     Assertions.assertEquals(tagId, tags.get(0).id());
-    Assertions.assertTrue(tags.get(0).hidden());
+    Assertions.assertTrue(HiddenPolicyTag.isReservedName(tags.get(0).name()));
   }
 
   @Test
@@ -369,7 +369,7 @@ public class TestPolicyManager {
             Entity.EntityType.TAG,
             TagEntity.class);
     Assertions.assertEquals(policy.auditInfo(), hidden.auditInfo());
-    Assertions.assertTrue(hidden.hidden());
+    Assertions.assertTrue(HiddenPolicyTag.isReservedName(hidden.name()));
     Assertions.assertEquals(0, hidden.valueConstraint().allowedValues().length);
     Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
     Assertions.assertEquals(

@@ -385,30 +385,24 @@ The UI supports policy lifecycle operations such as creating custom policies, ed
 content, and changing their enabled state. Use the REST API or Java client to manage
 policy-to-tag associations and to read the resulting object policies. The
 [Manage Policies](./manage-policies-in-gravitino.md) guide has requests and examples.
-Creating a policy also creates its server-managed hidden tag (`hidden=true` in `tag_meta`) and policy-to-tag relation
+Creating a policy also creates its server-managed hidden tag and policy-to-tag relation
 in the same metadata transaction. The hidden tag starts without object assignments, so creating
 a policy does not apply it to any object. Renaming or updating the policy preserves this tag;
 deleting the policy removes it and its assignments in the same transaction.
 Hidden tags participate in policy resolution but do not appear in ordinary tag listings.
 Tag API requests for hidden tags return not-found, and hidden tags cannot receive owners or user grants.
 Deleting their policy also removes any existing ownership and grant rows for the hidden tag.
-The `reserved_` tag name prefix is reserved for internal use,
-including alternate casing, for new tags and rename targets. Ordinary tags have `hidden=false`;
-existing tags retain that default and remain accessible even if their names use the reserved prefix.
-The persisted `hidden` field determines visibility; the name prefix only reserves names for new tags
-and rename targets. Using the prefix alone would incorrectly hide existing ordinary tags.
-Existing policies without hidden tags receive them when first bound through the internal binding
-operation; updating or overwriting a policy does not backfill its hidden tag.
-The internal binding operation reuses the hidden tag and policy-to-tag relation created with a new
-policy, and the tag-to-object assignment runs in its own storage transaction. It adds no outer
-transaction. Legacy initialization is idempotent, so a failed binding can leave internal state that a
-retry reuses. Offline migration owns the transaction that combines binding with legacy cleanup.
+Internal tags use the `gravitino_hidden_{policyId}` name. The `gravitino_hidden_` prefix,
+including alternate casing, determines visibility and is reserved for internal use. Ordinary tag
+creation and rename targets cannot use this prefix. Other names, including the generic `reserved_`
+prefix, remain available to users.
+The internal binding operation requires the hidden tag and policy-to-tag relation to already exist.
+It only writes the tag-to-object assignment, which runs in its own storage transaction, and adds no
+outer transaction. Missing tags or policy-to-tag relations cause the operation to fail without
+creating them. Updating or overwriting an existing policy does not create a missing hidden tag.
 
-Hidden tags require all servers to understand the `hidden` field. Stop all old servers before
-upgrading the metadata schema. Complete any required offline policy binding migration, then start
-only upgraded servers. Do not run old and new server versions together after hidden tags have been
-created, whether by policy creation or migration: old servers can expose and modify these tags.
-For existing direct object policy associations, see [Migration Guide](./migration-guide.md).
+Do not run old and new server versions together after internal policy tags have been created:
+old servers do not recognize the internal name prefix and can expose or modify these tags.
 
 To add or remove an association, a user must own the metalake or have the required access to both
 the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy

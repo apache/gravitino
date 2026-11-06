@@ -31,7 +31,6 @@ public class TagPO {
   private String comment;
   private String properties;
   private String allowedValues;
-  private boolean hidden;
   private String assignmentValue;
   private String auditInfo;
   private Long currentVersion;
@@ -56,7 +55,6 @@ public class TagPO {
         && Objects.equal(metalakeId, tagPO.metalakeId)
         && Objects.equal(comment, tagPO.comment)
         && Objects.equal(properties, tagPO.properties)
-        && hidden == tagPO.hidden
         && Objects.equal(allowedValues, tagPO.allowedValues)
         && Objects.equal(assignmentValue, tagPO.assignmentValue)
         && Objects.equal(auditInfo, tagPO.auditInfo)
@@ -74,7 +72,6 @@ public class TagPO {
         comment,
         properties,
         allowedValues,
-        hidden,
         assignmentValue,
         auditInfo,
         currentVersion,
@@ -116,17 +113,6 @@ public class TagPO {
 
     public Builder withAllowedValues(String allowedValues) {
       tagPO.allowedValues = allowedValues;
-      return this;
-    }
-
-    /**
-     * Sets whether the persisted tag is hidden.
-     *
-     * @param hidden The internal visibility flag.
-     * @return This builder.
-     */
-    public Builder withHidden(boolean hidden) {
-      tagPO.hidden = hidden;
       return this;
     }
 

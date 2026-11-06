@@ -104,7 +104,7 @@ public class TagManager implements TagDispatcher {
       return entityStore
           .list(NamespaceUtil.ofTag(metalake), TagEntity.class, Entity.EntityType.TAG)
           .stream()
-          .filter(tag -> !tag.hidden())
+          .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
           .toArray(Tag[]::new);
     } catch (IOException ioe) {
       LOG.error("Failed to list tags under metalake {}", metalake, ioe);
@@ -353,7 +353,9 @@ public class TagManager implements TagDispatcher {
               .relationOperations()
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, entityIdent, entityType);
-      return tags.stream().filter(tag -> !tag.hidden()).toArray(Tag[]::new);
+      return tags.stream()
+          .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
+          .toArray(Tag[]::new);
     } catch (NoSuchEntityException e) {
       throw new NoSuchMetadataObjectException(
           e, "Failed to list tags for metadata object %s due to not found", metadataObject);
@@ -486,7 +488,7 @@ public class TagManager implements TagDispatcher {
                     toNameIdentifiers(metalake, tagValuesToRemove));
       }
       return tags.stream()
-          .filter(tag -> !tag.hidden())
+          .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
           .map(Tag::name)
           .distinct()
           .toArray(String[]::new);
@@ -608,7 +610,6 @@ public class TagManager implements TagDispatcher {
         .withComment(newComment)
         .withProperties(props)
         .withAllowedValues(allowedValuesForStorage(tagEntity.valueConstraint()))
-        .withHidden(tagEntity.hidden())
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(tagEntity.auditInfo().creator())

@@ -61,20 +61,28 @@ public class TestHiddenPolicyTag {
   @Test
   public void testReservedNames() {
     assertEquals(123, HiddenPolicyTag.policyId(HiddenPolicyTag.name(123)));
-    assertTrue(HiddenPolicyTag.isReservedName("RESERVED_123"));
+    assertTrue(HiddenPolicyTag.isReservedName("GRAVITINO_HIDDEN_123"));
     assertFalse(HiddenPolicyTag.isReservedName(null));
     assertFalse(HiddenPolicyTag.isReservedName("data_domain"));
-    assertThrows(
-        IllegalArgumentException.class, () -> HiddenPolicyTag.checkNameNotReserved("RESERVED_123"));
-    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_0123"));
-    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("RESERVED_123"));
-    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_+123"));
-    assertThrows(IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("reserved_-0"));
+    assertFalse(HiddenPolicyTag.isReservedName("reserved_123"));
+    assertFalse(HiddenPolicyTag.isReservedName("gravitino_hidden"));
+    assertFalse(HiddenPolicyTag.isReservedName("gravitino_hiddenish"));
     assertThrows(
         IllegalArgumentException.class,
-        () -> HiddenPolicyTag.checkNameNotReserved("reserved_business_tag"));
+        () -> HiddenPolicyTag.checkNameNotReserved("GRAVITINO_HIDDEN_123"));
+    assertThrows(
+        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_0123"));
+    assertThrows(
+        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("GRAVITINO_HIDDEN_123"));
+    assertThrows(
+        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_+123"));
+    assertThrows(
+        IllegalArgumentException.class, () -> HiddenPolicyTag.policyId("gravitino_hidden_-0"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> HiddenPolicyTag.checkNameNotReserved("gravitino_hidden_business_tag"));
     HiddenPolicyTag.checkNameNotReserved("data_domain");
-    assertEquals("reserved_123", HiddenPolicyTag.name(123));
+    assertEquals("gravitino_hidden_123", HiddenPolicyTag.name(123));
   }
 
   /** Canonical names preserve the full ID range without assuming a generator's sign convention. */
@@ -84,19 +92,19 @@ public class TestHiddenPolicyTag {
     assertEquals(policyId, HiddenPolicyTag.policyId(HiddenPolicyTag.name(policyId)));
   }
 
-  /** Reserving names for new tags does not hide visible tags that already have those names. */
-  @Test
-  public void testReservedNameDoesNotDetermineVisibility() {
+  /** The internal prefix alone determines visibility, including alternate casing. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
+  public void testReservedNameDeterminesVisibility(String name) {
     AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     TagEntity legacy =
         TagEntity.builder()
             .withId(2L)
-            .withName("reserved_123")
+            .withName(name)
             .withNamespace(NamespaceUtil.ofTag("m"))
             .withAuditInfo(audit)
             .build();
-    assertFalse(legacy.hidden());
-    HiddenPolicyTag.checkVisible(legacy);
+    assertThrows(NoSuchTagException.class, () -> HiddenPolicyTag.checkVisible(legacy));
     assertThrows(
         IllegalArgumentException.class, () -> HiddenPolicyTag.checkNameNotReserved(legacy.name()));
   }
@@ -121,7 +129,7 @@ public class TestHiddenPolicyTag {
             .build();
     TagEntity tag = HiddenPolicyTag.create(policy, 34L);
     assertEquals(34L, tag.id());
-    assertTrue(tag.hidden());
+    assertTrue(HiddenPolicyTag.isReservedName(tag.name()));
     assertEquals(HiddenPolicyTag.name(policy.id()), tag.name());
     assertEquals(NamespaceUtil.ofTag("m"), tag.namespace());
     assertEquals(audit, tag.auditInfo());
@@ -150,8 +158,7 @@ public class TestHiddenPolicyTag {
     TagEntity hidden =
         TagEntity.builder()
             .withId(2L)
-            .withName("internal_tag_without_reserved_prefix")
-            .withHidden(true)
+            .withName(HiddenPolicyTag.name(12L))
             .withNamespace(NamespaceUtil.ofTag("m"))
             .withAuditInfo(audit)
             .build();

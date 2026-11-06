@@ -130,6 +130,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestTagManager {
@@ -1256,7 +1258,7 @@ public class TestTagManager {
         () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
   }
 
-  /** Pre-upgrade tags keep working even when their names now use the reserved prefix. */
+  /** The old generic reserved prefix is available for ordinary tags. */
   @Test
   public void testLegacyReservedTagsRemainAccessible() throws Exception {
     MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
@@ -1295,19 +1297,18 @@ public class TestTagManager {
       String newName = "legacy_" + name;
       tagManager.alterTag(METALAKE, name, TagChange.rename(newName));
       Assertions.assertEquals(newName, tagManager.getTag(METALAKE, newName).name());
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> tagManager.alterTag(METALAKE, newName, TagChange.rename(name)));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> tagManager.createTag(METALAKE, name, null, null));
-      Assertions.assertTrue(tagManager.deleteTag(METALAKE, newName));
+      tagManager.alterTag(METALAKE, newName, TagChange.rename(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+      Assertions.assertEquals(name, tagManager.createTag(METALAKE, name, null, null).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
     }
   }
 
-  /** Visibility comes from the persisted flag even when a tag has an ordinary name. */
-  @Test
-  public void testHiddenFieldControlsVisibility() throws Exception {
-    String name = "internal_tag_without_reserved_prefix";
+  /** Internal tag names are hidden and protected through the ordinary tag APIs. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
+  public void testInternalPrefixControlsVisibility(String name) throws Exception {
     TagEntity hidden =
         TagEntity.builder()
             .withId(idGenerator.nextId())
@@ -1315,7 +1316,6 @@ public class TestTagManager {
             .withNamespace(NameIdentifierUtil.ofTag(METALAKE, name).namespace())
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .withHidden(true)
             .build();
     entityStore.put(hidden, false);
     MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
@@ -1338,10 +1338,14 @@ public class TestTagManager {
       Assertions.assertThrows(
           NoSuchTagException.class,
           () -> tagManager.alterTag(METALAKE, name, TagChange.updateComment("changed")));
-      Assertions.assertTrue(
-          entityStore
-              .get(hidden.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)
-              .hidden());
+      Assertions.assertEquals(
+          hidden, entityStore.get(hidden.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tagManager.createTag(METALAKE, name, null, null));
+      tagManager.createTag(METALAKE, "visible", null, null);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> tagManager.alterTag(METALAKE, "visible", TagChange.rename(name)));
     } finally {
       entityStore.delete(hidden.nameIdentifier(), Entity.EntityType.TAG);
     }

@@ -48,13 +48,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Tests that hidden tags cannot receive ownership or user privileges. */
 public class TestHiddenTagAuthorization {
 
-  /** Both canonical and ordinary names are rejected before any authorization write. */
+  /** Internal names are rejected before any authorization write, including alternate casing. */
   @ParameterizedTest
-  @ValueSource(strings = {"reserved_12", "ordinary_hidden_tag"})
+  @ValueSource(strings = {"gravitino_hidden_12", "GRAVITINO_HIDDEN_12"})
   public void testRejectsHiddenTagWrites(String name) throws IOException {
     EntityStore store =
         mock(EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
-    TagEntity tag = tag(name, true);
+    TagEntity tag = tag(name);
     when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
     MetadataObject object = MetadataObjects.parse(name, MetadataObject.Type.TAG);
     OwnerManager owners = new OwnerManager(store);
@@ -90,10 +90,11 @@ public class TestHiddenTagAuthorization {
 
   /** Legacy visible reserved names remain valid, while missing tags return not-found. */
   @ParameterizedTest
-  @ValueSource(strings = {"reserved_legacy", "Reserved_legacy", "business_tag"})
+  @ValueSource(
+      strings = {"reserved_legacy", "Reserved_legacy", "business_tag", "gravitino_hiddenish"})
   public void testVisibleAndMissingTags(String name) throws IOException {
     EntityStore store = mock(EntityStore.class);
-    TagEntity tag = tag(name, false);
+    TagEntity tag = tag(name);
     when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
     MetadataObject object = MetadataObjects.parse(name, MetadataObject.Type.TAG);
     assertDoesNotThrow(() -> AuthorizationUtils.checkVisibleTag(store, "m", object));
@@ -108,12 +109,11 @@ public class TestHiddenTagAuthorization {
                 store, "m", MetadataObjects.parse("missing", MetadataObject.Type.TAG)));
   }
 
-  private TagEntity tag(String name, boolean hidden) {
+  private TagEntity tag(String name) {
     return TagEntity.builder()
         .withId(1L)
         .withName(name)
         .withNamespace(NamespaceUtil.ofTag("m"))
-        .withHidden(hidden)
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();

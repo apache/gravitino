@@ -30,6 +30,7 @@ import static org.mockito.Mockito.spy;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
@@ -48,7 +49,6 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -72,8 +72,9 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
   private PolicyManager manager;
   private PolicyEntity policy;
   private CatalogEntity catalog;
+  private TagEntity tag;
 
-  /** Creates a legacy policy without a hidden tag and opens the migration transaction. */
+  /** Creates a policy with its internal tag and opens a transaction for assignment checks. */
   @BeforeEach
   public void preparePolicy() throws Exception {
     store = new RelationalEntityStore(backend, new Config(false) {});
@@ -82,11 +83,12 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
     catalog = createAndInsertCatalog(METALAKE, "catalog");
     policy = createPolicy(20L, Namespace.of(METALAKE), "policy", AUDIT_INFO);
     store.put(policy, false);
-    store.delete(
-        NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
-        Entity.EntityType.TAG);
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
+    tag =
+        store.get(
+            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    beginTransaction();
   }
 
   /** Rolls back the caller's transaction without closing the shared test backend. */
@@ -95,46 +97,40 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
     SessionUtils.rollbackTransaction();
   }
 
-  /** New tags and both relations are idempotent and participate in the caller's transaction. */
+  /** Only the assignment participates in rollback; the policy-created tag and link are reused. */
   @TestTemplate
   public void testIdempotentBindingAndRollback() throws Exception {
-    long tagId = addPolicy(policy.name(), catalog.name(), AUDIT_INFO);
-    assertEquals(tagId, addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(1, count("tag_relation_meta"));
-    assertTrue(
-        store
-            .get(
-                NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
-                Entity.EntityType.TAG,
-                TagEntity.class)
-            .hidden());
+    assertEquals(tag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(tag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertCounts(1, 1, 1);
     SessionUtils.rollbackTransaction();
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
-    assertEquals(0, count("tag_meta"));
-    assertEquals(0, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
+    beginTransaction();
+    assertCounts(1, 1, 0);
   }
 
-  /** Concurrent first bindings both succeed after observing the missing policy-tag relation. */
+  /** Binding a policy-created internal tag commits the assignment without an outer transaction. */
   @TestTemplate
-  public void testConcurrentFirstBindings() throws Exception {
+  public void testBindingWithoutOuterTransaction() throws Exception {
+    SessionUtils.rollbackTransaction();
+    assertEquals(tag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(tag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    beginTransaction();
+    assertCounts(1, 1, 1);
+  }
+
+  /** Concurrent bindings reuse the same existing policy-tag relation. */
+  @TestTemplate
+  public void testConcurrentBindings() throws Exception {
     SessionUtils.rollbackTransaction();
     CatalogEntity second = createAndInsertCatalog(METALAKE, "second_catalog");
-    TagEntity tag = HiddenPolicyTag.create(policy, 100L);
-    store.put(tag, false);
     RelationalEntityStore concurrentStore =
         spy(new RelationalEntityStore(backend, new Config(false) {}));
-    CountDownLatch bothReadMissing = new CountDownLatch(2);
+    CountDownLatch bothReadRelation = new CountDownLatch(2);
     doAnswer(
             invocation -> {
               List<?> result = (List<?>) invocation.callRealMethod();
-              if (result.isEmpty()) {
-                bothReadMissing.countDown();
-                assertTrue(bothReadMissing.await(15, TimeUnit.SECONDS));
-              }
+              bothReadRelation.countDown();
+              assertTrue(bothReadRelation.await(15, TimeUnit.SECONDS));
               return result;
             })
         .when(concurrentStore)
@@ -162,114 +158,55 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
                       AUDIT_INFO));
       assertEquals(tag.id(), firstBinding.get(30, TimeUnit.SECONDS));
       assertEquals(tag.id(), secondBinding.get(30, TimeUnit.SECONDS));
-      SessionUtils.beginTransaction();
-      connection = SqlSessions.currentConnection();
-      assertEquals(1, count("tag_meta"));
-      assertEquals(1, count("policy_tag_relation_meta"));
-      assertEquals(2, count("tag_relation_meta"));
+      beginTransaction();
+      assertCounts(1, 1, 2);
     } finally {
       writers.shutdownNow();
       assertTrue(writers.awaitTermination(15, TimeUnit.SECONDS));
     }
   }
 
-  /** An optimistic first-link conflict accepts the competing selector-free policy link. */
+  /** A missing tag is reported without creating a replacement or any relations. */
   @TestTemplate
-  public void testOptimisticFirstLinkConflict() throws Exception {
-    TagEntity tag = HiddenPolicyTag.create(policy, 100L);
-    store.put(tag, false);
-    RelationalEntityStore competingStore = spy((RelationalEntityStore) store);
-    doAnswer(
-            invocation -> {
-              RelationUpdate update = invocation.getArgument(0);
-              if (update.relationType() == SupportsRelationOperations.Type.POLICY_TAG_REL) {
-                invocation.callRealMethod();
-                throw new OptimisticLockException("Competing first policy link");
-              }
-              return invocation.callRealMethod();
-            })
-        .when(competingStore)
-        .updateEntityRelations(any(RelationUpdate.class));
-    PolicyManager competingManager = new PolicyManager(RandomIdGenerator.INSTANCE, competingStore);
-    assertEquals(
-        tag.id(),
-        competingManager.addPolicyToObject(
-            METALAKE,
-            policy.name(),
-            MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
-            AUDIT_INFO));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(1, count("tag_relation_meta"));
+  public void testRejectsMissingHiddenTag() throws Exception {
+    store.delete(tag.nameIdentifier(), Entity.EntityType.TAG);
+    assertThrows(
+        NoSuchEntityException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertCounts(0, 0, 0);
   }
 
-  /** An optimistic conflict with no visible competing link still fails before binding. */
+  /** A missing policy-tag relation is reported without repairing it or assigning the object. */
   @TestTemplate
-  public void testOptimisticFirstLinkConflictWithoutRelation() throws Exception {
-    store.put(HiddenPolicyTag.create(policy, 100L), false);
-    RelationalEntityStore competingStore = spy((RelationalEntityStore) store);
-    OptimisticLockException conflict = new OptimisticLockException("No visible competing link");
-    doAnswer(
-            invocation -> {
-              throw conflict;
-            })
-        .when(competingStore)
-        .updateEntityRelations(any(RelationUpdate.class));
-    PolicyManager competingManager = new PolicyManager(RandomIdGenerator.INSTANCE, competingStore);
-    assertSame(
-        conflict,
-        assertThrows(
-            OptimisticLockException.class,
-            () ->
-                competingManager.addPolicyToObject(
-                    METALAKE,
-                    policy.name(),
-                    MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
-                    AUDIT_INFO)));
-    assertEquals(0, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
+  public void testRejectsMissingPolicyRelation() throws Exception {
+    store
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                tag.nameIdentifier(),
+                Entity.EntityType.TAG,
+                new RelationEdgeTarget[0],
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(policy.nameIdentifier(), Entity.EntityType.POLICY, null)
+                }));
+    assertThrows(
+        IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertCounts(1, 0, 0);
   }
 
-  /** Policy-created tags are reused and remain when only the new assignment rolls back. */
+  /** A failed assignment preserves the existing tag and policy link and can be retried. */
   @TestTemplate
-  public void testReusesPolicyTag() throws Exception {
-    SessionUtils.rollbackTransaction();
-    PolicyEntity second = createPolicy(21L, policy.namespace(), "second_policy", AUDIT_INFO);
-    store.put(second, false);
-    TagEntity tag =
-        store.get(
-            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(second.id())),
-            Entity.EntityType.TAG,
-            TagEntity.class);
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
-    assertEquals(tag.id(), addPolicy(second.name(), catalog.name(), AUDIT_INFO));
-    SessionUtils.rollbackTransaction();
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
-  }
-
-  /** A failed assignment can be retried after legacy initialization commits without an outer tx. */
-  @TestTemplate
-  public void testRetriesBindingAfterInitializationWithoutOuterTransaction() throws Exception {
+  public void testRetriesFailedAssignmentWithoutOuterTransaction() throws Exception {
     SessionUtils.rollbackTransaction();
     RelationalEntityStore failingStore = spy((RelationalEntityStore) store);
-    IOException failure = new IOException("Assignment failed after initialization");
+    IOException failure = new IOException("Assignment failed");
     doAnswer(
             invocation -> {
-              RelationUpdate update = invocation.getArgument(0);
-              if (update.relationType()
-                  == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL) {
-                throw failure;
-              }
-              return invocation.callRealMethod();
+              throw failure;
             })
         .when(failingStore)
         .updateEntityRelations(any(RelationUpdate.class));
     PolicyManager failingManager = new PolicyManager(RandomIdGenerator.INSTANCE, failingStore);
-
     assertSame(
         failure,
         assertThrows(
@@ -280,27 +217,14 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
                     policy.name(),
                     MetadataObjects.parse(catalog.name(), MetadataObject.Type.CATALOG),
                     AUDIT_INFO)));
-
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(0, count("tag_relation_meta"));
-    TagEntity initializedTag =
-        store.get(
-            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
-            Entity.EntityType.TAG,
-            TagEntity.class);
+    beginTransaction();
+    assertCounts(1, 1, 0);
+    assertEquals(tag, store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class));
     SessionUtils.rollbackTransaction();
 
-    // The retry reuses initialized state and commits just the assignment without an outer tx.
-    assertEquals(initializedTag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
-    assertEquals(initializedTag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
-    SessionUtils.beginTransaction();
-    connection = SqlSessions.currentConnection();
-    assertEquals(1, count("tag_meta"));
-    assertEquals(1, count("policy_tag_relation_meta"));
-    assertEquals(1, count("tag_relation_meta"));
+    assertEquals(tag.id(), addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    beginTransaction();
+    assertCounts(1, 1, 1);
   }
 
   /** Missing endpoints, unsupported types and missing audit metadata fail before writes. */
@@ -319,27 +243,28 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
                 MetadataObjects.parse("policy", MetadataObject.Type.POLICY),
                 AUDIT_INFO));
     assertThrows(NullPointerException.class, () -> addPolicy(policy.name(), catalog.name(), null));
-    assertEquals(0, count("tag_meta"));
-    assertEquals(0, count("tag_relation_meta"));
+    assertCounts(1, 1, 0);
   }
 
-  /** Reserved-name collisions are rejected through the persisted tag model. */
+  /** Internal tag names must still carry the matching policy identity marker. */
   @TestTemplate
-  public void testRejectsVisibleTagCollision() throws Exception {
+  public void testRejectsTagOwnershipCollision() throws Exception {
+    store.delete(tag.nameIdentifier(), Entity.EntityType.TAG);
     store.put(
         TagEntity.builder()
             .withId(100L)
-            .withNamespace(policy.namespace())
-            .withName(HiddenPolicyTag.name(policy.id()))
+            .withNamespace(tag.namespace())
+            .withName(tag.name())
+            .withAllowedValues(new String[0])
             .withAuditInfo(AUDIT_INFO)
             .build(),
         false);
     assertThrows(
         IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
-    assertEquals(0, count("tag_relation_meta"));
+    assertCounts(1, 0, 0);
   }
 
-  /** Explicit audit metadata passes through relation operations and is preserved on retries. */
+  /** Assignment audit metadata is preserved on retries; the existing policy link is untouched. */
   @TestTemplate
   public void testPreservesRelationAudit() throws Exception {
     AuditInfo audit =
@@ -354,15 +279,17 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
           ResultSet rows =
               statement.executeQuery("SELECT audit_info FROM " + table + " WHERE deleted_at = 0")) {
         assertTrue(rows.next());
-        assertEquals(JsonUtils.anyFieldMapper().writeValueAsString(audit), rows.getString(1));
+        assertEquals(
+            JsonUtils.anyFieldMapper()
+                .writeValueAsString(table.equals("tag_relation_meta") ? audit : AUDIT_INFO),
+            rows.getString(1));
       }
     }
   }
 
-  /** A hidden tag cannot silently select another policy. */
+  /** An internal tag cannot silently select another policy. */
   @TestTemplate
   public void testRejectsUnexpectedPolicyRelation() throws Exception {
-    addPolicy(policy.name(), catalog.name(), AUDIT_INFO);
     PolicyEntity second = createPolicy(21L, policy.namespace(), "second_policy", AUDIT_INFO);
     store.put(second, false);
     store
@@ -370,7 +297,7 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
         .updateEntityRelations(
             RelationUpdate.of(
                 SupportsRelationOperations.Type.POLICY_TAG_REL,
-                NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+                tag.nameIdentifier(),
                 Entity.EntityType.TAG,
                 new RelationEdgeTarget[] {
                   RelationEdgeTarget.of(second.nameIdentifier(), Entity.EntityType.POLICY, null)
@@ -378,11 +305,23 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
                 null));
     assertThrows(
         IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), AUDIT_INFO));
+    assertEquals(0, count("tag_relation_meta"));
   }
 
   private long addPolicy(String name, String object, AuditInfo audit) throws Exception {
     return manager.addPolicyToObject(
         METALAKE, name, MetadataObjects.parse(object, MetadataObject.Type.CATALOG), audit);
+  }
+
+  private void beginTransaction() throws SQLException {
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
+  }
+
+  private void assertCounts(long tags, long policyRelations, long assignments) throws Exception {
+    assertEquals(tags, count("tag_meta"));
+    assertEquals(policyRelations, count("policy_tag_relation_meta"));
+    assertEquals(assignments, count("tag_relation_meta"));
   }
 
   private long count(String table) throws Exception {

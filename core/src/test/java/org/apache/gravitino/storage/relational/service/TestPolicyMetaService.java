@@ -140,7 +140,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .getTagByIdentifier(
                 NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id())));
     assertEquals(NamespaceUtil.ofTag(METALAKE_NAME), tag.namespace());
-    assertTrue(tag.hidden());
+    assertTrue(HiddenPolicyTag.isReservedName(tag.name()));
     assertEquals(Map.of("gravitino.internal.policy-id", policy.id().toString()), tag.properties());
     assertEquals(AUDIT_INFO, tag.auditInfo());
     assertEquals(0, tag.valueConstraint().allowedValues().length);

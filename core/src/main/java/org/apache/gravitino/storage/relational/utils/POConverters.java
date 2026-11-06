@@ -1448,7 +1448,6 @@ public class POConverters {
       return TagEntity.builder()
           .withId(tagPO.getTagId())
           .withName(tagPO.getTagName())
-          .withHidden(tagPO.isHidden())
           .withNamespace(namespace)
           .withComment(tagPO.getComment())
           .withAllowedValues(
@@ -1473,7 +1472,6 @@ public class POConverters {
       return builder
           .withTagId(tagEntity.id())
           .withTagName(tagEntity.name())
-          .withHidden(tagEntity.hidden())
           .withComment(tagEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.properties()))
           .withAllowedValues(serializeAllowedValues(tagEntity.valueConstraint()))
@@ -1493,7 +1491,6 @@ public class POConverters {
       return TagPO.builder()
           .withTagId(oldTagPO.getTagId())
           .withTagName(newEntity.name())
-          .withHidden(newEntity.hidden())
           .withMetalakeId(oldTagPO.getMetalakeId())
           .withComment(newEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))

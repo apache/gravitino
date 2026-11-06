@@ -31,7 +31,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** Naming and visibility checks for server-managed policy tags. */
 public final class HiddenPolicyTag {
 
-  private static final String PREFIX = "reserved_";
+  private static final String PREFIX = "gravitino_hidden_";
   private static final String POLICY_ID_PROPERTY = "gravitino.internal.policy-id";
 
   private HiddenPolicyTag() {}
@@ -64,7 +64,6 @@ public final class HiddenPolicyTag {
         .withComment("Server-managed policy binding")
         .withProperties(Collections.singletonMap(POLICY_ID_PROPERTY, Long.toString(policyId)))
         .withAllowedValues(new String[0])
-        .withHidden(true)
         .withAuditInfo(audit)
         .build();
   }
@@ -113,13 +112,13 @@ public final class HiddenPolicyTag {
   }
 
   /**
-   * Rejects an ordinary operation on a tag whose persisted hidden flag is set.
+   * Rejects an ordinary operation on a tag in the internal name namespace.
    *
    * @param tag The resolved tag entity.
    * @throws NoSuchTagException If the tag is hidden.
    */
   public static void checkVisible(TagEntity tag) {
-    if (tag.hidden()) {
+    if (isReservedName(tag.name())) {
       throw new NoSuchTagException(
           "Tag with name %s under metalake %s does not exist",
           tag.name(), tag.namespace().level(0));
@@ -128,9 +127,6 @@ public final class HiddenPolicyTag {
 
   /**
    * Rejects the reserved prefix for a new tag name or a rename target.
-   *
-   * <p>Existing tags use their persisted hidden flag for visibility, including visible tags created
-   * with the reserved prefix before the upgrade.
    *
    * @param name The proposed tag name.
    */

@@ -567,7 +567,7 @@ public class PolicyMetaService {
             mapper ->
                 mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
                     policy.getMetalakeId(), HiddenPolicyTag.name(policy.getPolicyId())));
-    if (tag == null || !tag.isHidden()) {
+    if (tag == null) {
       return;
     }
     int deleted =

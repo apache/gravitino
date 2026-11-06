@@ -23,11 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
@@ -36,7 +33,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -119,10 +115,10 @@ public class TestPolicyObjectBindingAbstraction {
             .isPresent());
   }
 
-  /** Only the expected selector-free relation may win a concurrent internal binding. */
+  /** Missing, multiple, unexpected or selector-bearing policy relations fail without writes. */
   @ParameterizedTest
-  @ValueSource(strings = {"matching", "selector", "other-policy", "missing"})
-  public void testConcurrentPolicyRelationCreation(String winnerType) throws Exception {
+  @ValueSource(strings = {"selector", "other-policy", "missing", "multiple"})
+  public void testRejectsInvalidPolicyRelation(String relationState) throws Exception {
     EntityStore store =
         mock(EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
     SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
@@ -147,55 +143,28 @@ public class TestPolicyObjectBindingAbstraction {
     when(store.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class)).thenReturn(policy);
     when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
     PolicyEntity winner = policy;
-    if (winnerType.equals("other-policy")) {
+    if (relationState.equals("other-policy")) {
       winner = mock(PolicyEntity.class);
       when(winner.nameIdentifier()).thenReturn(NameIdentifierUtil.ofPolicy("m", "other"));
     }
-    List<RelationalEntity<?>> winningRelations =
-        winnerType.equals("missing")
+    RelationalEntity<?> relation =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            winner,
+            relationState.equals("selector") ? "{}" : null);
+    List<RelationalEntity<?>> policyRelations =
+        relationState.equals("missing")
             ? List.of()
-            : List.of(
-                new RelationalEntity<>(
-                    SupportsRelationOperations.Type.POLICY_TAG_REL,
-                    tag.nameIdentifier(),
-                    Entity.EntityType.TAG,
-                    winner,
-                    winnerType.equals("selector") ? "{}" : null));
-    when(relations.batchListEntitiesByRelation(any(), any(), any()))
-        .thenReturn(List.of(), winningRelations);
-    doAnswer(
-            invocation -> {
-              RelationUpdate update = invocation.getArgument(0);
-              if (update.relationType() == SupportsRelationOperations.Type.POLICY_TAG_REL) {
-                throw new EntityAlreadyExistsException("Concurrent relation creation");
-              }
-              return List.of();
-            })
-        .when(relations)
-        .updateEntityRelations(any(RelationUpdate.class));
+            : relationState.equals("multiple") ? List.of(relation, relation) : List.of(relation);
+    when(relations.batchListEntitiesByRelation(any(), any(), any())).thenReturn(policyRelations);
     PolicyManager manager = new PolicyManager(mock(IdGenerator.class), store);
     MetadataObject object = MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG);
-    if (winnerType.equals("matching")) {
-      assertEquals(34L, manager.addPolicyToObject("m", "p", object, audit));
-      ArgumentCaptor<RelationUpdate> updates = ArgumentCaptor.forClass(RelationUpdate.class);
-      verify(relations, times(2)).updateEntityRelations(updates.capture());
-      assertEquals(
-          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-          updates.getAllValues().get(1).relationType());
-      assertEquals(audit, updates.getAllValues().get(1).auditInfo().orElseThrow());
-    } else {
-      Class<? extends RuntimeException> expected =
-          winnerType.equals("missing")
-              ? EntityAlreadyExistsException.class
-              : IllegalArgumentException.class;
-      assertThrows(expected, () -> manager.addPolicyToObject("m", "p", object, audit));
-      verify(relations, never())
-          .updateEntityRelations(
-              argThat(
-                  update ->
-                      update.relationType()
-                          == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
-    }
+    assertThrows(
+        IllegalArgumentException.class, () -> manager.addPolicyToObject("m", "p", object, audit));
+    verify(store, never()).put(any(TagEntity.class), anyBoolean());
+    verify(relations, never()).updateEntityRelations(any(RelationUpdate.class));
   }
 
   private static Stream<MetadataObject> supportedObjects() {

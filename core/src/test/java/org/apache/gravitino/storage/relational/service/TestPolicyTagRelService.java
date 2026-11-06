@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
@@ -147,7 +148,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     Assertions.assertEquals(2, byPolicy.size());
     byPolicy =
         byPolicy.stream()
-            .filter(edge -> !((TagEntity) edge.targetEntity()).hidden())
+            .filter(edge -> !HiddenPolicyTag.isReservedName(edge.targetEntity().name()))
             .collect(Collectors.toList());
     Assertions.assertEquals(1, byPolicy.size());
     Assertions.assertEquals(policy.nameIdentifier(), byPolicy.get(0).source());
@@ -308,7 +309,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                     NameIdentifierUtil.ofPolicy(METALAKE, "surviving_policy")),
                 Entity.EntityType.POLICY)
             .stream()
-            .allMatch(relation -> ((TagEntity) relation.targetEntity()).hidden()));
+            .allMatch(relation -> HiddenPolicyTag.isReservedName(relation.targetEntity().name())));
   }
 
   @TestTemplate
