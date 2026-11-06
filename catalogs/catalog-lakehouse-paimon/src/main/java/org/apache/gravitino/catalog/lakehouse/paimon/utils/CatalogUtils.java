@@ -134,7 +134,7 @@ public class CatalogUtils {
     } catch (RuntimeException e) {
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {
-        throw new ConnectionFailedException(e, e.getMessage());
+        throw new ConnectionFailedException(e, "%s", e.getMessage());
       }
       throw e;
     }
