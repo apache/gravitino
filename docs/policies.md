@@ -396,10 +396,10 @@ Internal tags use the `gravitino_hidden_{policyId}` name. The `gravitino_hidden_
 including alternate casing, determines visibility and is reserved for internal use. Ordinary tag
 creation and rename targets cannot use this prefix. Other names, including the generic `reserved_`
 prefix, remain available to users.
-The internal binding operation requires the hidden tag and policy-to-tag relation to already exist.
-It only writes the tag-to-object assignment, which runs in its own storage transaction, and adds no
-outer transaction. Missing tags or policy-to-tag relations cause the operation to fail without
-creating them. Updating or overwriting an existing policy does not create a missing hidden tag.
+The internal binding operation loads the policy's existing hidden tag and writes the tag-to-object
+assignment. Endpoint validation and the transaction belong to the relation operation. It does not
+inspect or modify policy-to-tag relations. Updating or overwriting an existing policy does not
+create a missing hidden tag.
 
 Do not run old and new server versions together after internal policy tags have been created:
 old servers do not recognize the internal name prefix and can expose or modify these tags.

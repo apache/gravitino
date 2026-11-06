@@ -20,17 +20,16 @@ package org.apache.gravitino.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -39,7 +38,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationUpdate;
-import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -49,15 +47,15 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /** Verifies policy binding works against the entity store contract without a JDBC backend. */
 public class TestPolicyObjectBindingAbstraction {
 
-  /** The manager reads models and submits a relation update to the injected store. */
+  /** Binding loads the existing tag and submits only the object assignment. */
   @ParameterizedTest
   @MethodSource("supportedObjects")
   public void testUsesEntityStoreRelationOperations(MetadataObject object) throws Exception {
@@ -73,7 +71,13 @@ public class TestPolicyObjectBindingAbstraction {
     when(policy.auditInfo()).thenReturn(audit);
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy("m", "p");
     when(policy.nameIdentifier()).thenReturn(policyIdent);
-    TagEntity tag = HiddenPolicyTag.create(policy, 34L);
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(34L)
+            .withName(HiddenPolicyTag.name(policy.id()))
+            .withNamespace(NamespaceUtil.ofTag("m"))
+            .withAuditInfo(audit)
+            .build();
     when(store.get(NameIdentifier.of("m"), Entity.EntityType.METALAKE, BaseMetalake.class))
         .thenReturn(
             BaseMetalake.builder()
@@ -85,18 +89,11 @@ public class TestPolicyObjectBindingAbstraction {
     when(store.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class)).thenReturn(policy);
     when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent("m", object);
-    when(relations.batchListEntitiesByRelation(any(), any(), any()))
-        .thenReturn(
-            List.of(
-                new RelationalEntity<>(
-                    SupportsRelationOperations.Type.POLICY_TAG_REL,
-                    tag.nameIdentifier(),
-                    Entity.EntityType.TAG,
-                    policy)));
     PolicyManager manager = new PolicyManager(mock(IdGenerator.class), store);
     assertEquals(34L, manager.addPolicyToObject("m", "p", object, audit));
     ArgumentCaptor<RelationUpdate> captured = ArgumentCaptor.forClass(RelationUpdate.class);
     verify(relations).updateEntityRelations(captured.capture());
+    verifyNoMoreInteractions(relations);
     RelationUpdate update = captured.getValue();
     verify(store, never()).put(any(TagEntity.class), anyBoolean());
     assertEquals(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, update.relationType());
@@ -113,58 +110,6 @@ public class TestPolicyObjectBindingAbstraction {
                 null)
             .auditInfo()
             .isPresent());
-  }
-
-  /** Missing, multiple, unexpected or selector-bearing policy relations fail without writes. */
-  @ParameterizedTest
-  @ValueSource(strings = {"selector", "other-policy", "missing", "multiple"})
-  public void testRejectsInvalidPolicyRelation(String relationState) throws Exception {
-    EntityStore store =
-        mock(EntityStore.class, withSettings().extraInterfaces(SupportsRelationOperations.class));
-    SupportsRelationOperations relations = mock(SupportsRelationOperations.class);
-    when(store.relationOperations()).thenReturn(relations);
-    AuditInfo audit =
-        AuditInfo.builder().withCreator("original-user").withCreateTime(Instant.now()).build();
-    PolicyEntity policy = mock(PolicyEntity.class);
-    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy("m", "p");
-    when(policy.id()).thenReturn(12L);
-    when(policy.namespace()).thenReturn(Namespace.of("m"));
-    when(policy.auditInfo()).thenReturn(audit);
-    when(policy.nameIdentifier()).thenReturn(policyIdent);
-    TagEntity tag = HiddenPolicyTag.create(policy, 34L);
-    when(store.get(NameIdentifier.of("m"), Entity.EntityType.METALAKE, BaseMetalake.class))
-        .thenReturn(
-            BaseMetalake.builder()
-                .withId(1L)
-                .withName("m")
-                .withVersion(SchemaVersion.V_0_1)
-                .withAuditInfo(audit)
-                .build());
-    when(store.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class)).thenReturn(policy);
-    when(store.get(tag.nameIdentifier(), Entity.EntityType.TAG, TagEntity.class)).thenReturn(tag);
-    PolicyEntity winner = policy;
-    if (relationState.equals("other-policy")) {
-      winner = mock(PolicyEntity.class);
-      when(winner.nameIdentifier()).thenReturn(NameIdentifierUtil.ofPolicy("m", "other"));
-    }
-    RelationalEntity<?> relation =
-        new RelationalEntity<>(
-            SupportsRelationOperations.Type.POLICY_TAG_REL,
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            winner,
-            relationState.equals("selector") ? "{}" : null);
-    List<RelationalEntity<?>> policyRelations =
-        relationState.equals("missing")
-            ? List.of()
-            : relationState.equals("multiple") ? List.of(relation, relation) : List.of(relation);
-    when(relations.batchListEntitiesByRelation(any(), any(), any())).thenReturn(policyRelations);
-    PolicyManager manager = new PolicyManager(mock(IdGenerator.class), store);
-    MetadataObject object = MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG);
-    assertThrows(
-        IllegalArgumentException.class, () -> manager.addPolicyToObject("m", "p", object, audit));
-    verify(store, never()).put(any(TagEntity.class), anyBoolean());
-    verify(relations, never()).updateEntityRelations(any(RelationUpdate.class));
   }
 
   private static Stream<MetadataObject> supportedObjects() {

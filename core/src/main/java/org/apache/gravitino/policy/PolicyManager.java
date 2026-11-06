@@ -81,9 +81,9 @@ public class PolicyManager implements PolicyDispatcher {
   /**
    * Applies a policy to an object through its hidden tag using the entity store.
    *
-   * <p>The policy's hidden tag and policy-tag relation must already exist. This operation is
-   * idempotent and only writes the tag-object assignment in the relation operation's transaction.
-   * It does not create tags or policy-tag relations, and adds no outer transaction.
+   * <p>The hidden tag is created with the policy. This method loads that tag and submits an
+   * idempotent object assignment. The relation operation validates the object endpoint and owns the
+   * transaction.
    *
    * <p>This internal method is not exposed through the policy dispatcher or client APIs.
    *
@@ -94,7 +94,7 @@ public class PolicyManager implements PolicyDispatcher {
    * @return The policy's hidden tag ID.
    * @throws IOException If an entity or relation cannot be persisted.
    * @throws NoSuchEntityException If the policy, hidden tag or target object does not exist.
-   * @throws IllegalArgumentException If the existing hidden tag or policy-tag relation is invalid.
+   * @throws IllegalArgumentException If the object type does not support tag assignments.
    */
   public long addPolicyToObject(
       String metalake, String policyName, MetadataObject object, Audit auditInfo)
@@ -109,18 +109,20 @@ public class PolicyManager implements PolicyDispatcher {
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
     PolicyEntity policy =
         entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
-    NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
-    Entity.EntityType objectType = MetadataObjectUtil.toEntityType(object);
-
-    // Relation lookup validates the endpoint, including columns stored as part of a table.
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
     entityStore
         .relationOperations()
-        .listEntitiesByRelation(
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, objectIdent, objectType);
-
-    TagEntity tag = loadHiddenTag(policy);
-    validateHiddenTagPolicyRelation(tag.nameIdentifier(), policyIdent);
-    associateHiddenTagWithObject(tag.nameIdentifier(), objectIdent, objectType, auditInfo);
+        .updateEntityRelations(
+            RelationUpdate.of(
+                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                    MetadataObjectUtil.toEntityIdent(metalake, object),
+                    MetadataObjectUtil.toEntityType(object),
+                    new RelationEdgeTarget[] {
+                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
+                    },
+                    null)
+                .withAuditInfo(auditInfo));
     return tag.id();
   }
 
@@ -297,58 +299,6 @@ public class PolicyManager implements PolicyDispatcher {
     }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return objectPolicyResolver.resolve(metalake, metadataObjects);
-  }
-
-  private TagEntity loadHiddenTag(PolicyEntity policy) throws IOException {
-    NameIdentifier tagIdent =
-        NameIdentifierUtil.ofTag(policy.namespace().level(0), HiddenPolicyTag.name(policy.id()));
-    TagEntity tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
-
-    Preconditions.checkArgument(
-        HiddenPolicyTag.isReservedName(tag.name())
-            && tag.valueConstraint().allowedValues() != null
-            && tag.valueConstraint().allowedValues().length == 0
-            && HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties()),
-        "Reserved tag name collision for policy %s",
-        policy.id());
-    return tag;
-  }
-
-  private void validateHiddenTagPolicyRelation(NameIdentifier tagIdent, NameIdentifier policyIdent)
-      throws IOException {
-    List<RelationalEntity<?>> policies =
-        entityStore
-            .relationOperations()
-            .batchListEntitiesByRelation(
-                SupportsRelationOperations.Type.POLICY_TAG_REL,
-                Collections.singletonList(tagIdent),
-                Entity.EntityType.TAG);
-    Preconditions.checkArgument(
-        policies.size() == 1
-            && policies.get(0).targetEntity().nameIdentifier().equals(policyIdent)
-            && !policies.get(0).relationValue().isPresent(),
-        "Invalid policy relation for hidden tag %s",
-        tagIdent);
-  }
-
-  private void associateHiddenTagWithObject(
-      NameIdentifier tagIdent,
-      NameIdentifier objectIdent,
-      Entity.EntityType objectType,
-      Audit auditInfo)
-      throws IOException {
-    entityStore
-        .relationOperations()
-        .updateEntityRelations(
-            RelationUpdate.of(
-                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                    objectIdent,
-                    objectType,
-                    new RelationEdgeTarget[] {
-                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
-                    },
-                    null)
-                .withAuditInfo(auditInfo));
   }
 
   private PolicyEntity loadPolicyEntity(String metalake, String policyName) {
