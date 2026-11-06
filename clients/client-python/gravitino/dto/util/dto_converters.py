@@ -900,7 +900,10 @@ class DTOConverters:
             raise IllegalArgumentException(
                 "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs"
             ) from exc
-        if isinstance(data_type, Types.FixedType) and len(decoded) != data_type.length():
+        if (
+            isinstance(data_type, Types.FixedType)
+            and len(decoded) != data_type.length()
+        ):
             raise IllegalArgumentException(
                 f"Fixed literal length mismatch: expected {data_type.length()} bytes, "
                 f"got {len(decoded)}"

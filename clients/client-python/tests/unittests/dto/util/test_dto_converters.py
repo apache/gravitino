@@ -127,8 +127,17 @@ class TestDTOConverters(unittest.TestCase):
     def test_from_function_arg_literal_dto(self):
         for data_type, value in TestDTOConverters.literals.items():
             expected = Literals.of(value=value, data_type=data_type)
+            wire_value = value
+            if isinstance(
+                data_type, (Types.BinaryType, Types.FixedType)
+            ) and isinstance(value, (bytes, bytearray)):
+                # Wire form is 0x + lowercase hex (#14609 / Iceberg Appendix D).
+                wire_value = "0x" + bytes(value).hex()
             literal_dto = (
-                LiteralDTO.builder().with_data_type(data_type).with_value(value).build()
+                LiteralDTO.builder()
+                .with_data_type(data_type)
+                .with_value(wire_value)
+                .build()
             )
             self.assertTrue(DTOConverters.from_function_arg(literal_dto) == expected)
 
@@ -527,10 +536,19 @@ class TestDTOConverters(unittest.TestCase):
 
         for data_type, value in TestDTOConverters.literals.items():
             literal = Literals.of(value=value, data_type=data_type)
+            if value is None:
+                expected_value = None
+            elif isinstance(
+                data_type, (Types.BinaryType, Types.FixedType)
+            ) and isinstance(value, (bytes, bytearray)):
+                # Wire form is 0x + lowercase hex (#14609 / Iceberg Appendix D).
+                expected_value = "0x" + bytes(value).hex()
+            else:
+                expected_value = str(value)
             expected = (
                 LiteralDTO.builder()
                 .with_data_type(data_type)
-                .with_value(str(value))
+                .with_value(expected_value)
                 .build()
             )
             self.assertTrue(DTOConverters.to_function_arg(literal) == expected)
@@ -565,6 +583,31 @@ class TestDTOConverters(unittest.TestCase):
             IllegalArgumentException, "Unsupported expression type"
         ):
             DTOConverters.to_function_arg(DistributionDTO.NONE)
+
+    def test_binary_and_fixed_literal_hex_round_trip(self):
+        bytes_value = bytes([0x01, 0x02, 0x03])
+        for data_type in (Types.BinaryType.get(), Types.FixedType.of(3)):
+            literal = Literals.of(value=bytes_value, data_type=data_type)
+            dto = DTOConverters.to_function_arg(literal)
+            self.assertIsInstance(dto, LiteralDTO)
+            self.assertEqual("0x010203", cast(LiteralDTO, dto).value())
+            round_trip = DTOConverters.from_function_arg(dto)
+            self.assertEqual(literal, round_trip)
+
+        # Uppercase hex after 0x must also decode.
+        upper = (
+            LiteralDTO.builder()
+            .with_data_type(Types.BinaryType.get())
+            .with_value("0x0A1B2C")
+            .build()
+        )
+        decoded = DTOConverters.from_function_arg(upper)
+        self.assertEqual(
+            Literals.of(
+                value=bytes([0x0A, 0x1B, 0x2C]), data_type=Types.BinaryType.get()
+            ),
+            decoded,
+        )
 
     def test_to_dto_raise_exception(self):
         with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):

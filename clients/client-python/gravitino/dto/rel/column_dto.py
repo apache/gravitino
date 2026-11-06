@@ -156,7 +156,8 @@ class ColumnDTO(Column, DataClassJsonMixin):
                 ),
                 (
                     None
-                    if self._initial_default_value is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                    if self._initial_default_value
+                    is Column.INITIAL_DEFAULT_VALUE_NOT_SET
                     else self._initial_default_value
                 ),
             )
