@@ -243,6 +243,7 @@ public class TestResponses {
     ErrorResponse[] responses = {
       ErrorResponse.illegalArguments(message, throwable),
       ErrorResponse.connectionFailed(message, throwable),
+      ErrorResponse.serviceUnavailable(message, throwable),
       ErrorResponse.notFound("error type", message, throwable),
       ErrorResponse.internalError(message, throwable),
       ErrorResponse.alreadyExists("error type", message, throwable),

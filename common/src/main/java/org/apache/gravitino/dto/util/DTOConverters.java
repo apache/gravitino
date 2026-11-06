@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.io.BaseEncoding;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -298,8 +299,14 @@ public class DTOConverters {
     return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
+        // Connector results are snapshotted through here before the table dispatcher rejects a
+        // missing column list with a clear error, so a null list must not throw here.
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            table.columns() == null
+                ? null
+                : Arrays.stream(table.columns())
+                    .map(DTOConverters::toDTO)
+                    .toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(toDTOs(table.sortOrder()))
         .withDistribution(toDTO(table.distribution()))
@@ -801,6 +808,12 @@ public class DTOConverters {
       }
 
       Object value = ((Literal) expression).value();
+      // Binary literals use an explicit hexadecimal representation on the string-valued wire API.
+      // byte[].toString() is an object identity and cannot preserve the literal's bytes.
+      if (((Literal) expression).dataType() instanceof Types.BinaryType
+          && value instanceof byte[]) {
+        value = "0x" + BaseEncoding.base16().lowerCase().encode((byte[]) value);
+      }
       return LiteralDTO.builder()
           .withValue(value == null ? null : value.toString())
           .withDataType(((Literal) expression).dataType())

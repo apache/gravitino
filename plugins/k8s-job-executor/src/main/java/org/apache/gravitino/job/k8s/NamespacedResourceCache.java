@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.job.k8s;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,23 +44,30 @@ import org.slf4j.LoggerFactory;
  * namespace was listed, or the namespace can't be listed at all. The caller must fall back to a GET
  * call on a cache miss.
  *
+ * <p>A namespace that can't be listed isn't listed again for {@link #FAILED_LIST_TTL_MS}, longer
+ * than a listing is cached: a failed listing may have taken long, for example one that timed out
+ * after its retries, and getting the resources one by one meanwhile gives the same results.
+ *
  * @param <T> the resource type
  */
 final class NamespacedResourceCache<T extends HasMetadata> {
 
   private static final class Snapshot<T> {
 
-    private final long listedAtMs;
+    private final long expiresAtMs;
 
     private final Map<String, T> resources;
 
-    private Snapshot(long listedAtMs, Map<String, T> resources) {
-      this.listedAtMs = listedAtMs;
+    private Snapshot(long expiresAtMs, Map<String, T> resources) {
+      this.expiresAtMs = expiresAtMs;
       this.resources = resources;
     }
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(NamespacedResourceCache.class);
+
+  /** How long a namespace that can't be listed isn't listed again, at least the TTL. */
+  @VisibleForTesting static final long FAILED_LIST_TTL_MS = 10 * 60 * 1000L;
 
   private final long ttlMs;
 
@@ -149,6 +159,12 @@ final class NamespacedResourceCache<T extends HasMetadata> {
     snapshots.remove(namespace);
   }
 
+  /** Returns the namespaces whose listing is cached or being made. */
+  @VisibleForTesting
+  Set<String> getCachedNamespaces() {
+    return ImmutableSet.copyOf(snapshots.keySet());
+  }
+
   /** Whether a listing must be made again: there is none, it failed, or it is too old. */
   private boolean isExpired(@Nullable CompletableFuture<Snapshot<T>> snapshot) {
     if (snapshot == null || snapshot.isCompletedExceptionally()) {
@@ -156,7 +172,7 @@ final class NamespacedResourceCache<T extends HasMetadata> {
     }
     // A listing being made is waited for.
     Snapshot<T> made = snapshot.getNow(null);
-    return made != null && clock.getAsLong() - made.listedAtMs >= ttlMs;
+    return made != null && clock.getAsLong() >= made.expiresAtMs;
   }
 
   private Snapshot<T> snapshotOf(String namespace) {
@@ -164,20 +180,22 @@ final class NamespacedResourceCache<T extends HasMetadata> {
     try {
       ImmutableMap.Builder<String, T> resources = ImmutableMap.builder();
       lister.apply(namespace).forEach(r -> resources.put(r.getMetadata().getName(), r));
-      return new Snapshot<>(listedAtMs, resources.buildKeepingLast());
+      return new Snapshot<>(listedAtMs + ttlMs, resources.buildKeepingLast());
     } catch (RuntimeException e) {
       if (isFatal.test(e)) {
         throw e;
       }
       // Cache the failure as an empty listing, so that the callers get the resources one by one
-      // instead of each of them failing to list the namespace again.
+      // instead of each of them failing to list the namespace again. It is cached from when the
+      // listing failed: a listing that timed out may have taken longer than the TTL.
+      long failedTtlMs = Math.max(ttlMs, FAILED_LIST_TTL_MS);
       LOG.warn(
           "Failed to list the resources in namespace {}, getting them one by one for the next {}"
               + " ms: {}",
           namespace,
-          ttlMs,
+          failedTtlMs,
           e.toString());
-      return new Snapshot<>(listedAtMs, ImmutableMap.of());
+      return new Snapshot<>(clock.getAsLong() + failedTtlMs, ImmutableMap.of());
     }
   }
 }

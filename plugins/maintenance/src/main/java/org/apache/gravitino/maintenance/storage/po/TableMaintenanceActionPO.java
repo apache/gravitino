@@ -37,12 +37,12 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableMaintenanceActionPO {
 
-  private Long id;
+  private Long actionId;
   private Long jobId;
   private Long tableId;
   private Long policyId;
-  private Long beforeSnapshotId;
-  private Long afterSnapshotId;
-  private Long finishedAt;
+  private Long beforeMetricsId;
+  private Long afterMetricsId;
   private Long createdAt;
+  private Long finishedAt;
 }

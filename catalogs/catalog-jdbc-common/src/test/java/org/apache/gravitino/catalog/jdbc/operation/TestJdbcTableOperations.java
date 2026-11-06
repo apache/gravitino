@@ -22,6 +22,9 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,6 +57,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestJdbcTableOperations {
 
@@ -119,6 +123,129 @@ public class TestJdbcTableOperations {
         TYPE_CONVERTER,
         COLUMN_DEFAULT_VALUE_CONVERTER,
         Collections.emptyMap());
+  }
+
+  @Test
+  void testRequestLocalMetadataEnrichment() throws Exception {
+    String tableName = "snapshot_hooks";
+    JdbcTableOperations operations = Mockito.spy(JDBC_TABLE_OPERATIONS);
+    try (Connection setup = DATA_SOURCE.getConnection();
+        Statement statement = setup.createStatement()) {
+      statement.executeUpdate("CREATE TABLE " + tableName + " (id INTEGER)");
+      try {
+        List<Connection> borrowed = new ArrayList<>();
+        JdbcTable first =
+            operations.load(
+                DATABASE_NAME,
+                tableName,
+                (connection, builder) -> {
+                  Assertions.assertFalse(Assertions.assertDoesNotThrow(connection::isClosed));
+                  borrowed.add(connection);
+                  builder.withProperties(Map.of("snapshot", "first"));
+                });
+        JdbcTable second =
+            operations.load(
+                DATABASE_NAME,
+                tableName,
+                (connection, builder) -> {
+                  Assertions.assertFalse(Assertions.assertDoesNotThrow(connection::isClosed));
+                  borrowed.add(connection);
+                  builder.withProperties(Map.of("snapshot", "second"));
+                });
+        Assertions.assertEquals("first", first.properties().get("snapshot"));
+        Assertions.assertEquals("second", second.properties().get("snapshot"));
+        Assertions.assertEquals("id", first.columns()[0].name());
+        for (Connection connection : borrowed) {
+          Assertions.assertTrue(connection.isClosed());
+        }
+        Mockito.verify(operations, Mockito.never())
+            .getTablePartitioning(Mockito.any(), Mockito.anyString(), Mockito.anyString());
+        Mockito.verify(operations, Mockito.never())
+            .getTableProperties(Mockito.any(), Mockito.anyString());
+        Mockito.verify(operations, Mockito.never())
+            .correctJdbcTableFields(
+                Mockito.any(), Mockito.anyString(), Mockito.anyString(), Mockito.any());
+        Mockito.verify(operations, Mockito.times(2))
+            .getDistributionInfo(Mockito.any(), Mockito.eq(DATABASE_NAME), Mockito.eq(tableName));
+        JdbcTable standard = operations.load(DATABASE_NAME, tableName);
+        Assertions.assertFalse(standard.properties().containsKey("snapshot"));
+        Mockito.verify(operations)
+            .getTablePartitioning(Mockito.any(), Mockito.eq(DATABASE_NAME), Mockito.eq(tableName));
+        Mockito.verify(operations).getTableProperties(Mockito.any(), Mockito.eq(tableName));
+        Mockito.verify(operations)
+            .correctJdbcTableFields(
+                Mockito.any(), Mockito.eq(DATABASE_NAME), Mockito.eq(tableName), Mockito.any());
+      } finally {
+        statement.executeUpdate("DROP TABLE " + tableName);
+      }
+    }
+  }
+
+  @Test
+  void testEnrichmentFailureClosesConnectionAndPreservesCause() throws Exception {
+    String tableName = "snapshot_failure";
+    try (Connection setup = DATA_SOURCE.getConnection();
+        Statement statement = setup.createStatement()) {
+      statement.executeUpdate("CREATE TABLE " + tableName + " (id INTEGER)");
+      try {
+        List<Connection> borrowed = new ArrayList<>();
+        IllegalStateException failure = new IllegalStateException("snapshot failed");
+        Assertions.assertSame(
+            failure,
+            Assertions.assertThrows(
+                IllegalStateException.class,
+                () ->
+                    JDBC_TABLE_OPERATIONS.load(
+                        DATABASE_NAME,
+                        tableName,
+                        (connection, builder) -> {
+                          Assertions.assertFalse(
+                              Assertions.assertDoesNotThrow(connection::isClosed));
+                          borrowed.add(connection);
+                          throw failure;
+                        })));
+        Assertions.assertEquals(1, borrowed.size());
+        Assertions.assertTrue(borrowed.get(0).isClosed());
+      } finally {
+        statement.executeUpdate("DROP TABLE " + tableName);
+      }
+    }
+  }
+
+  @Test
+  void testTargetValidationAfterSqlValidationBeforeExecutionConnection() throws Exception {
+    JdbcTableOperations operations = Mockito.spy(new SqliteTableOperations());
+    DataSource source = Mockito.mock(DataSource.class);
+    operations.initialize(
+        source, EXCEPTION_CONVERTER, TYPE_CONVERTER, COLUMN_DEFAULT_VALUE_CONVERTER, Map.of());
+    TableChange change = TableChange.deleteColumn(new String[] {"id"}, false);
+    IllegalArgumentException invalid = new IllegalArgumentException("invalid local SQL");
+    Mockito.doThrow(invalid)
+        .when(operations)
+        .generateAlterTableSql(DATABASE_NAME, "target", change);
+    Assertions.assertSame(
+        invalid,
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> operations.alterTable(DATABASE_NAME, "target", change)));
+    Mockito.verify(operations, Mockito.never())
+        .validateAlterTableTarget(Mockito.anyString(), Mockito.anyString());
+    Mockito.doReturn("").when(operations).generateAlterTableSql(DATABASE_NAME, "target", change);
+    operations.alterTable(DATABASE_NAME, "target", change);
+    Mockito.verify(operations, Mockito.never())
+        .validateAlterTableTarget(Mockito.anyString(), Mockito.anyString());
+    Mockito.doReturn("ALTER TABLE target DROP COLUMN id")
+        .when(operations)
+        .generateAlterTableSql(DATABASE_NAME, "target", change);
+    IllegalStateException forbidden = new IllegalStateException("unsupported target kind");
+    Mockito.doThrow(forbidden).when(operations).validateAlterTableTarget(DATABASE_NAME, "target");
+    Assertions.assertSame(
+        forbidden,
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () -> operations.alterTable(DATABASE_NAME, "target", change)));
+    Mockito.verify(operations).validateAlterTableTarget(DATABASE_NAME, "target");
+    Mockito.verifyNoInteractions(source);
   }
 
   @Test

@@ -49,7 +49,20 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   }
   // Never restore decisions or scheduling state from Actions caches: PR code dispatched
   // on the default branch can write those caches using its runner runtime token.
-  let service = createService(github);
+  // Workflow contents are immutable at a commit SHA. Share them across migration detection,
+  // suite validation and polling passes without caching mutable run or trust decisions.
+  // context.repo is apache/gravitino in production; a sandbox reads its own definitions.
+  const workflowContents = new Map();
+  function readWorkflow(sha) {
+    if (!workflowContents.has(sha)) workflowContents.set(sha,
+      github.rest.repos.getContent({ ...context.repo, path: '.github/workflows/fork-ci.yml', ref: sha })
+        .then(response => response.data).catch(error => {
+          workflowContents.delete(sha); // Retry transient lookup failures on the next pass.
+          throw error;
+        }));
+    return workflowContents.get(sha);
+  }
+  let service = createService(github, { readWorkflow });
   const availableBases = new Map();
   const rate = (await github.rest.rateLimit.get()).data.resources.core;
   // Bound work even while settled successes are watched. Rotate the starting PR to avoid starving
@@ -71,9 +84,9 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
   async function migrated(pr) {
     // Release branches without this CI migration keep their own pull_request workflows.
     if (!availableBases.has(pr.base.sha)) {
-      availableBases.set(pr.base.sha, github.rest.repos.getContent({ ...context.repo,
-        path: '.github/workflows/fork-ci.yml', ref: pr.base.sha }).then(() => true, error => {
+      availableBases.set(pr.base.sha, readWorkflow(pr.base.sha).then(() => true, error => {
         if (error.status === 404) return false;
+        availableBases.delete(pr.base.sha); // Retry transient lookup failures on the next pass.
         throw error;
       }));
     }
@@ -140,7 +153,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     processed = 0;
     visited = new Set();
     refreshed = new Set();
-    service = createService(github);
+    service = createService(github, { readWorkflow });
     // Fork runs, including reruns, finish without an upstream event. Such PRs were updated recently,
     // so probe those first. A completed result changes only with a push or a trusted run, which both
     // signal a refresh, or with a fork rerun, so refresh it only when the fork run id or attempt changed.
@@ -153,7 +166,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       Math.floor(now / slotMs) * Math.max(1, Math.floor(recentBudget / 3))) % recent.length;
     let probed = 0;
     for (let offset = 0; offset < recent.length; offset++) {
-      if (calls + 15 > recentBudget) break; // One PR may need trees, runs, paginated jobs and a status write.
+      if (calls + 15 > recentBudget) break; // One PR may need trees, workflow contents, runs, paginated jobs and a status write.
       const pr = recent[(recentStart + offset) % recent.length];
       probed++;
       await visit(pr, async () => {
