@@ -20,17 +20,35 @@
 package org.apache.gravitino.spark.connector.iceberg.extensions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
+import org.apache.gravitino.spark.connector.iceberg.extensions.IcebergExtendedDataSourceV2Strategy.IcebergCatalogAndIdentifier;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.connector.catalog.Identifier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
+import scala.collection.JavaConverters;
+import scala.collection.immutable.Seq;
 
 /**
  * Tests {@link IcebergExtendedDataSourceV2Strategy} on an Iceberg catalog that Gravitino does not
@@ -69,14 +87,90 @@ public class TestIcebergExtendedDataSourceV2Strategy {
   }
 
   @Test
-  void testIcebergDdlOnPlainIcebergCatalog() {
-    spark.sql("CREATE TABLE local.db.t (id INT) USING iceberg");
-    spark.sql("INSERT INTO local.db.t VALUES (1)");
+  void testBranchAndTagDdlOnPlainIcebergCatalog() {
+    spark.sql("CREATE TABLE local.db.refs (id INT) USING iceberg");
+    spark.sql("INSERT INTO local.db.refs VALUES (1)");
 
-    spark.sql("ALTER TABLE local.db.t CREATE TAG t1");
-    spark.sql("ALTER TABLE local.db.t CREATE BRANCH b1");
+    spark.sql("ALTER TABLE local.db.refs CREATE TAG t1");
+    spark.sql("ALTER TABLE local.db.refs CREATE BRANCH b1");
+    assertEquals("[[b1], [main], [t1]]", refNames("local.db.refs"));
 
-    List<Row> refs = spark.sql("SELECT name FROM local.db.t.refs ORDER BY name").collectAsList();
-    assertEquals("[[b1], [main], [t1]]", refs.toString());
+    spark.sql("ALTER TABLE local.db.refs DROP TAG t1");
+    spark.sql("ALTER TABLE local.db.refs DROP BRANCH b1");
+    assertEquals("[[main]]", refNames("local.db.refs"));
+  }
+
+  @Test
+  void testPartitionFieldDdlOnPlainIcebergCatalog() throws Exception {
+    spark.sql("CREATE TABLE local.db.spec (id INT, category STRING) USING iceberg");
+
+    spark.sql("ALTER TABLE local.db.spec ADD PARTITION FIELD category");
+    assertEquals(Collections.singletonList("category"), partitionFieldNames("local.db.spec"));
+
+    spark.sql(
+        "ALTER TABLE local.db.spec REPLACE PARTITION FIELD category WITH bucket(4, id) AS id_bucket");
+    assertEquals(Collections.singletonList("id_bucket"), partitionFieldNames("local.db.spec"));
+
+    spark.sql("ALTER TABLE local.db.spec DROP PARTITION FIELD id_bucket");
+    assertTrue(partitionFieldNames("local.db.spec").isEmpty());
+  }
+
+  @Test
+  void testIdentifierFieldsAndWriteOrderDdlOnPlainIcebergCatalog() throws Exception {
+    spark.sql("CREATE TABLE local.db.ident (id INT NOT NULL, data STRING) USING iceberg");
+
+    spark.sql("ALTER TABLE local.db.ident SET IDENTIFIER FIELDS id");
+    assertEquals(
+        Collections.singleton("id"), loadTable("local.db.ident").schema().identifierFieldNames());
+
+    spark.sql("ALTER TABLE local.db.ident DROP IDENTIFIER FIELDS id");
+    assertTrue(loadTable("local.db.ident").schema().identifierFieldNames().isEmpty());
+
+    spark.sql("ALTER TABLE local.db.ident WRITE ORDERED BY id");
+    assertTrue(loadTable("local.db.ident").sortOrder().isSorted());
+  }
+
+  @Test
+  void testGravitinoIcebergCatalogTakesGravitinoBranch() {
+    Identifier identifier = Identifier.of(new String[] {"db"}, "t");
+    try (MockedStatic<Spark3Util> util = mockStatic(Spark3Util.class)) {
+      util.when(() -> Spark3Util.catalogAndIdentifier(any(SparkSession.class), anyList()))
+          .thenReturn(
+              new Spark3Util.CatalogAndIdentifier(mock(GravitinoIcebergCatalog.class), identifier));
+      assertTrue(
+          IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, seq("cat", "db", "t"))
+              .isDefined());
+
+      util.when(() -> Spark3Util.catalogAndIdentifier(any(SparkSession.class), anyList()))
+          .thenReturn(new Spark3Util.CatalogAndIdentifier(mock(SparkCatalog.class), identifier));
+      assertFalse(
+          IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, seq("cat", "db", "t"))
+              .isDefined());
+    }
+  }
+
+  private static String refNames(String table) {
+    List<Row> refs = spark.sql("SELECT name FROM " + table + ".refs ORDER BY name").collectAsList();
+    return refs.toString();
+  }
+
+  private static List<String> partitionFieldNames(String table) throws Exception {
+    List<String> names = new ArrayList<>();
+    for (PartitionField field : loadTable(table).spec().fields()) {
+      names.add(field.name());
+    }
+    return names;
+  }
+
+  private static Table loadTable(String table) throws Exception {
+    Table icebergTable = Spark3Util.loadIcebergTable(spark, table);
+    icebergTable.refresh();
+    return icebergTable;
+  }
+
+  private static Seq<String> seq(String... parts) {
+    return JavaConverters.asScalaIteratorConverter(Arrays.asList(parts).iterator())
+        .asScala()
+        .toIndexedSeq();
   }
 }

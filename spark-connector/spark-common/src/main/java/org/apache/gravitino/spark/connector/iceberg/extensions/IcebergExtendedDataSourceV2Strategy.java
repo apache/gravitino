@@ -232,11 +232,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               })
           .getOrElse(() -> superFallback(plan));
     } else {
-      scala.collection.Seq<SparkPlan> sparkPlans = super.apply(plan);
-      if (sparkPlans != null) {
-        return sparkPlans.toIndexedSeq();
-      }
-      return null;
+      return superFallback(plan);
     }
   }
 
@@ -276,8 +272,9 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   }
 
   private Seq<SparkPlan> superFallback(LogicalPlan plan) {
-    // On Scala 2.12 Strategy.apply returns scala.collection.Seq; the parent builds immutable Lists.
-    return (Seq<SparkPlan>) (Object) super.apply(plan);
+    // On Scala 2.12 Strategy.apply returns scala.collection.Seq, so copy it into an immutable Seq.
+    scala.collection.Seq<SparkPlan> sparkPlans = super.apply(plan);
+    return sparkPlans == null ? null : sparkPlans.toIndexedSeq();
   }
 
   private static SetWriteDistributionAndOrderingExec createDistributionAndOrderingExec(
