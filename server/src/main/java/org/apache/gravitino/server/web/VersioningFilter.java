@@ -38,6 +38,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.MediaType;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,10 +116,14 @@ public class VersioningFilter implements Filter {
     return String.format("application/vnd.gravitino.v%d+json", version);
   }
 
+  // Keeps the client's own Accept values after the versioned media type, so that resources which
+  // intentionally produce a different type (e.g. application/json for OpenLineage) still match.
+  // A request without Accept accepts any media type, so "*/*" is kept explicitly: the versioned
+  // type alone would turn "accept anything" into "accept only the versioned type".
   private static String prependAcceptVersion(int version, List<String> acceptHeaders) {
     String versionedAccept = getAcceptVersion(version);
     return acceptHeaders.isEmpty()
-        ? versionedAccept
+        ? versionedAccept + ", " + MediaType.WILDCARD
         : versionedAccept + ", " + String.join(", ", acceptHeaders);
   }
 

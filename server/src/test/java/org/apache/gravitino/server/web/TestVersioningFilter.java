@@ -153,7 +153,8 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
+        String.format(
+            "application/vnd.gravitino.v%d+json, */*", ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
   }
 
@@ -175,7 +176,7 @@ public class TestVersioningFilter {
     ArgumentCaptor<MutableHttpServletRequest> captor =
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
-    assertEquals("application/vnd.gravitino.v2+json", captor.getValue().getHeader("Accept"));
+    assertEquals("application/vnd.gravitino.v2+json, */*", captor.getValue().getHeader("Accept"));
   }
 
   @Test
