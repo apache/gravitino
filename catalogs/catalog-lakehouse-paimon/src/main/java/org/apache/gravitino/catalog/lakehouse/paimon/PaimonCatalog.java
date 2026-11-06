@@ -71,9 +71,7 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   }
 
   /**
-   * Validates the proposed configuration on catalog create and alter, so that a catalog that the
-   * backend cannot load, for example a Hive or JDBC backend without {@code uri}, is refused before
-   * it is stored.
+   * Validates the required Paimon backend settings in the proposed catalog configuration.
    *
    * @param configuration the complete proposed catalog configuration
    * @throws IllegalArgumentException if the configuration is invalid
