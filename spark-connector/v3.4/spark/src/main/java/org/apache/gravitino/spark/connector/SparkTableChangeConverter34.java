@@ -74,6 +74,19 @@ public class SparkTableChangeConverter34 extends SparkTableChangeConverter {
     return super.toGravitinoTableChange(change);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  protected Expression convertAddColumnDefaultValue(
+      TableChange.AddColumn addColumn, Type dataType) {
+    // The new column is not in the table yet, so its own type is the target of its default.
+    return addColumn.defaultValue() == null
+        ? Column.DEFAULT_VALUE_NOT_SET
+        : convertDefaultValue(
+            addColumn.defaultValue().getSql(),
+            addColumn.fieldNames(),
+            () -> new Column[] {Column.of(addColumn.fieldNames()[0], dataType)});
+  }
+
   private Expression convertDefaultValue(
       String sql, String[] fieldNames, Supplier<Column[]> columns) {
     // Spark uses an empty SQL string for DROP DEFAULT; a string literal containing no characters

@@ -26,29 +26,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.rel.expressions.literals.Literals;
-import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConverter;
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.connector.catalog.TableChange;
-import org.apache.spark.sql.connector.expressions.LiteralValue;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
@@ -60,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 /** Table create and alter requests that Spark sends to a Gravitino catalog. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -75,8 +66,7 @@ public class TestBaseCatalogTableChanges {
 
   @BeforeAll
   void initCatalogManager() {
-    GravitinoCatalogManager.create(
-        new SparkConf(false), "user", identity -> mock(GravitinoClient.class));
+    GravitinoCatalogManager.create("user", () -> mock(GravitinoClient.class));
   }
 
   @AfterAll
@@ -98,8 +88,8 @@ public class TestBaseCatalogTableChanges {
 
   @Test
   void testCreateTableCommentIsNotTreatedAsTableProperty() throws Exception {
-    // The JDBC converter refuses every table property, as for PostgreSQL, Oracle and SQL Server.
-    PropertiesConverter jdbcConverter = JdbcPropertiesConverter.getNoTablePropertiesInstance();
+    // PostgreSQL rejects table options such as comment; pass the table comment separately.
+    PropertiesConverter jdbcConverter = JdbcPropertiesConverter.getPGInstance();
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> jdbcConverter.toGravitinoTableProperties(ImmutableMap.of("comment", "c")));
@@ -134,78 +124,12 @@ public class TestBaseCatalogTableChanges {
   void testAlterWithoutChangesDoesNotWrite() throws Exception {
     org.apache.gravitino.rel.Table gravitinoTable = mock(org.apache.gravitino.rel.Table.class);
     Table sparkTable = mock(Table.class);
-    when(gravitinoTableCatalog.loadTable(
-            GRAVITINO_IDENT, ImmutableSet.of(Privilege.Name.SELECT_TABLE)))
-        .thenReturn(gravitinoTable);
+    when(gravitinoTableCatalog.loadTable(GRAVITINO_IDENT)).thenReturn(gravitinoTable);
     when(sparkCatalog.loadTable(IDENT)).thenReturn(sparkTable);
 
     Assertions.assertSame(sparkTable, catalog.alterTable(IDENT));
 
     verify(gravitinoTableCatalog, never()).alterTable(any(), any());
-  }
-
-  @Test
-  void testAddColumnDefaultIsWritten() throws Exception {
-    when(sparkCatalog.loadTable(IDENT)).thenReturn(mock(Table.class));
-
-    catalog.alterTable(
-        IDENT,
-        TableChange.addColumn(
-            new String[] {"c_int"},
-            DataTypes.IntegerType,
-            true,
-            null,
-            null,
-            new ColumnDefaultValue("5", LiteralValue.apply(5, DataTypes.IntegerType))),
-        TableChange.addColumn(
-            new String[] {"c_str"},
-            DataTypes.StringType,
-            true,
-            "with comment",
-            null,
-            new ColumnDefaultValue(
-                "'abc'",
-                LiteralValue.apply(
-                    org.apache.spark.unsafe.types.UTF8String.fromString("abc"),
-                    DataTypes.StringType))),
-        TableChange.addColumn(new String[] {"c_none"}, DataTypes.IntegerType));
-
-    ArgumentCaptor<org.apache.gravitino.rel.TableChange> changes =
-        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
-    verify(gravitinoTableCatalog).alterTable(eq(GRAVITINO_IDENT), changes.capture());
-    org.apache.gravitino.rel.TableChange.AddColumn intColumn =
-        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(0);
-    org.apache.gravitino.rel.TableChange.AddColumn stringColumn =
-        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(1);
-    org.apache.gravitino.rel.TableChange.AddColumn plainColumn =
-        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(2);
-    Assertions.assertEquals(Literals.integerLiteral(5), intColumn.getDefaultValue());
-    Assertions.assertEquals(Literals.stringLiteral("abc"), stringColumn.getDefaultValue());
-    Assertions.assertEquals("with comment", stringColumn.getComment());
-    Assertions.assertEquals(Types.StringType.get(), stringColumn.getDataType());
-    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, plainColumn.getDefaultValue());
-    // A new column's default does not need the existing table schema.
-    verify(gravitinoTableCatalog, never()).loadTable(GRAVITINO_IDENT);
-  }
-
-  @Test
-  void testAddColumnUnsupportedDefaultIsRejectedBeforeWriting() {
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog.alterTable(
-                    IDENT,
-                    TableChange.addColumn(
-                        new String[] {"c"},
-                        DataTypes.IntegerType,
-                        true,
-                        null,
-                        null,
-                        new ColumnDefaultValue(
-                            "abs(-1)", LiteralValue.apply(1, DataTypes.IntegerType)))));
-    Assertions.assertTrue(error.getMessage().contains("abs(-1)"), error.getMessage());
-    Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
   }
 
   private void setField(String name, Object value) throws Exception {
@@ -221,7 +145,7 @@ public class TestBaseCatalogTableChanges {
         org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog) {
       this.gravitinoCatalogClient = gravitinoCatalog;
       this.sparkCatalog = sparkCatalog;
-      this.propertiesConverter = JdbcPropertiesConverter.getNoTablePropertiesInstance();
+      this.propertiesConverter = JdbcPropertiesConverter.getPGInstance();
       this.sparkTransformConverter = new SparkTransformConverter(false);
     }
 
@@ -245,7 +169,7 @@ public class TestBaseCatalogTableChanges {
 
     @Override
     protected PropertiesConverter getPropertiesConverter() {
-      return JdbcPropertiesConverter.getNoTablePropertiesInstance();
+      return JdbcPropertiesConverter.getPGInstance();
     }
 
     @Override

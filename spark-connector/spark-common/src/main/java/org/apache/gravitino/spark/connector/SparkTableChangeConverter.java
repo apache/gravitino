@@ -21,6 +21,8 @@ package org.apache.gravitino.spark.connector;
 import com.google.common.base.Preconditions;
 import java.util.function.Supplier;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter {
@@ -48,14 +50,6 @@ public class SparkTableChangeConverter {
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       Type dataType = sparkTypeConverter.toGravitinoType(addColumn.dataType());
-      // The new column is not in the table yet, so its own type is the target of its default.
-      Expression defaultValue =
-          addColumn.defaultValue() == null
-              ? Column.DEFAULT_VALUE_NOT_SET
-              : convertDefaultValue(
-                  addColumn.defaultValue().getSql(),
-                  addColumn.fieldNames(),
-                  () -> new Column[] {Column.of(addColumn.fieldNames()[0], dataType)});
       return org.apache.gravitino.rel.TableChange.addColumn(
           addColumn.fieldNames(),
           dataType,
@@ -63,7 +57,7 @@ public class SparkTableChangeConverter {
           transformColumnPosition(addColumn.position()),
           addColumn.isNullable(),
           false,
-          defaultValue);
+          convertAddColumnDefaultValue(addColumn, dataType));
     } else if (change instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
       return org.apache.gravitino.rel.TableChange.deleteColumn(
@@ -119,6 +113,19 @@ public class SparkTableChangeConverter {
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(
       TableChange change, Supplier<Column[]> columns) {
     return toGravitinoTableChange(change);
+  }
+
+  /**
+   * Converts an added column's default when supported by the Spark version. Spark 3.3 exposes no
+   * add-column default API, so the base converter leaves the default unset.
+   *
+   * @param addColumn the Spark add-column change
+   * @param dataType the new column's Gravitino type
+   * @return the converted default, or {@link Column#DEFAULT_VALUE_NOT_SET} when absent
+   */
+  protected Expression convertAddColumnDefaultValue(
+      TableChange.AddColumn addColumn, Type dataType) {
+    return Column.DEFAULT_VALUE_NOT_SET;
   }
 
   private org.apache.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(

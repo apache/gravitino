@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.catalog;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,12 +41,15 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter34;
+import org.apache.spark.sql.connector.catalog.ColumnDefaultValue;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.expressions.LiteralValue;
 import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.apache.spark.unsafe.types.UTF8String;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -242,6 +246,70 @@ public class TestBaseCatalogDefaults34 {
         TableChange.updateColumnDefaultValue(new String[] {"label"}, "'label'"));
     verify(gravitinoTableCatalog).loadTable(gravitinoIdentifier);
     verify(table).columns();
+  }
+
+  @Test
+  void testAddColumnDefaultIsWritten() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    when(sparkCatalog.loadTable(identifier)).thenReturn(mock(Table.class));
+
+    catalog.alterTable(
+        identifier,
+        TableChange.addColumn(
+            new String[] {"c_int"},
+            DataTypes.IntegerType,
+            true,
+            null,
+            null,
+            new ColumnDefaultValue("5", LiteralValue.apply(5, DataTypes.IntegerType))),
+        TableChange.addColumn(
+            new String[] {"c_str"},
+            DataTypes.StringType,
+            true,
+            "with comment",
+            null,
+            new ColumnDefaultValue(
+                "'abc'", LiteralValue.apply(UTF8String.fromString("abc"), DataTypes.StringType))),
+        TableChange.addColumn(new String[] {"c_none"}, DataTypes.IntegerType));
+
+    ArgumentCaptor<org.apache.gravitino.rel.TableChange> changes =
+        ArgumentCaptor.forClass(org.apache.gravitino.rel.TableChange.class);
+    verify(gravitinoTableCatalog).alterTable(eq(gravitinoIdentifier), changes.capture());
+    org.apache.gravitino.rel.TableChange.AddColumn intColumn =
+        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(0);
+    org.apache.gravitino.rel.TableChange.AddColumn stringColumn =
+        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(1);
+    org.apache.gravitino.rel.TableChange.AddColumn plainColumn =
+        (org.apache.gravitino.rel.TableChange.AddColumn) changes.getAllValues().get(2);
+    Assertions.assertEquals(Literals.integerLiteral(5), intColumn.getDefaultValue());
+    Assertions.assertEquals(Literals.stringLiteral("abc"), stringColumn.getDefaultValue());
+    Assertions.assertEquals("with comment", stringColumn.getComment());
+    Assertions.assertEquals(Types.StringType.get(), stringColumn.getDataType());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, plainColumn.getDefaultValue());
+    // A new column's default does not need the existing table schema.
+    verify(gravitinoTableCatalog, never()).loadTable(gravitinoIdentifier);
+  }
+
+  @Test
+  void testAddColumnUnsupportedDefaultIsRejectedBeforeWriting() {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.alterTable(
+                    identifier,
+                    TableChange.addColumn(
+                        new String[] {"c"},
+                        DataTypes.IntegerType,
+                        true,
+                        null,
+                        null,
+                        new ColumnDefaultValue(
+                            "abs(-1)", LiteralValue.apply(1, DataTypes.IntegerType)))));
+    Assertions.assertTrue(error.getMessage().contains("abs(-1)"), error.getMessage());
+    Mockito.verifyNoInteractions(gravitinoTableCatalog, sparkCatalog);
   }
 
   private static class TestCatalog extends BaseCatalog {
