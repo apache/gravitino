@@ -58,7 +58,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -81,7 +80,6 @@ import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.aws.AwsProperties;
-import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -182,10 +180,10 @@ final class GlueIcebergTableHelper {
    * @return an initialized Iceberg Glue catalog
    * @throws IllegalArgumentException if {@code aws-region} or {@code warehouse} is not configured
    */
-  static Catalog createGlueCatalog(Map<String, String> config) {
+  static GravitinoGlueCatalog createGlueCatalog(Map<String, String> config) {
     Map<String, String> icebergProps = buildIcebergCatalogProperties(config);
 
-    GlueCatalog glueCatalog = new GlueCatalog();
+    GravitinoGlueCatalog glueCatalog = new GravitinoGlueCatalog();
     glueCatalog.initialize(ICEBERG_CATALOG_NAME, icebergProps);
     LOG.info("Initialized Iceberg GlueCatalog for region {}", config.get(GlueConstants.AWS_REGION));
     return glueCatalog;
@@ -273,14 +271,17 @@ final class GlueIcebergTableHelper {
    * @param icebergCatalog the Iceberg Glue catalog
    * @param dbName the Glue database name
    * @param tableName the table name
+   * @param metadataLocation the metadata file location recorded in Glue
    * @param table the GlueTable to populate with recovered metadata
    */
-  static void loadTable(Catalog icebergCatalog, String dbName, String tableName, GlueTable table) {
-    Table icebergTable = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
-    if (icebergTable == null) {
-      throw new NoSuchTableException(
-          "Iceberg table %s.%s not found in Iceberg catalog", dbName, tableName);
-    }
+  static void loadTable(
+      GravitinoGlueCatalog icebergCatalog,
+      String dbName,
+      String tableName,
+      String metadataLocation,
+      GlueTable table) {
+    Table icebergTable =
+        icebergCatalog.loadStaticTable(TableIdentifier.of(dbName, tableName), metadataLocation);
 
     // Merge Iceberg table properties (stored in metadata.json) into the Gravitino properties.
     // Iceberg properties take precedence over Glue parameters for overlapping keys, except for the
