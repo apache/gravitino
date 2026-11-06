@@ -40,6 +40,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -158,6 +159,17 @@ public class TestGravitinoClientEviction {
   }
 
   @Test
+  void testLookupAfterCloseFails() throws Exception {
+    GravitinoCatalogManager manager = createManager(client -> {});
+    TestCatalog catalog = new TestCatalog();
+    catalog.initialize(CATALOG_NAME, CaseInsensitiveStringMap.empty());
+    manager.close();
+
+    assertThrows(IllegalStateException.class, catalog::listNamespaces);
+    assertEquals(1, clients.size(), "A closed manager must not build a new client");
+  }
+
+  @Test
   void testCatalogThatCannotBeReloadedFailsTheRequest() throws Exception {
     GravitinoCatalogManager manager = createManager(client -> {});
     TestCatalog catalog = new TestCatalog();
@@ -198,7 +210,9 @@ public class TestGravitinoClientEviction {
       Future<Catalog> first =
           pool.submit(() -> manager.getGravitinoCatalogInfo(identity, CATALOG_NAME));
       assertTrue(await(() -> reloads.get() == 1), "The first caller should start the reload");
-      Thread second = new Thread(() -> manager.getGravitinoCatalogInfo(identity, CATALOG_NAME));
+      FutureTask<Catalog> secondTask =
+          new FutureTask<>(() -> manager.getGravitinoCatalogInfo(identity, CATALOG_NAME));
+      Thread second = new Thread(secondTask);
       second.start();
       // The second caller either waits for the first reload or starts its own.
       assertTrue(
@@ -209,9 +223,10 @@ public class TestGravitinoClientEviction {
                       || second.getState() == Thread.State.WAITING),
           "The second caller should reach the reload");
       release.countDown();
-      second.join(10_000);
 
-      assertSame(current, clientOf(first.get(10, TimeUnit.SECONDS)));
+      Catalog firstCatalog = first.get(10, TimeUnit.SECONDS);
+      assertSame(current, clientOf(firstCatalog));
+      assertSame(firstCatalog, secondTask.get(10, TimeUnit.SECONDS));
       assertEquals(1, reloads.get(), "Concurrent lookups should share one reload");
     } finally {
       release.countDown();

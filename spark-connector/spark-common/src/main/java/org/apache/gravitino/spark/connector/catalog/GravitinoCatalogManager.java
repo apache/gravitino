@@ -178,9 +178,9 @@ public class GravitinoCatalogManager {
    * Returns the catalog for the given identity, loaded through that identity's current client.
    *
    * <p>Spark catalogs call this before every Gravitino request instead of keeping the returned
-   * catalog: the lookup refreshes the client's cache entry, so a client in use is not evicted for
-   * being idle, and a catalog loaded through a client that has since been evicted and closed is
-   * loaded again through the current one.
+   * catalog: the lookup resets the idle timer of the client's cache entry, and a catalog loaded
+   * through a client that has since been evicted and closed is loaded again through the current
+   * one.
    *
    * <p>Gravitino exceptions are thrown as is, so callers can still tell them apart.
    *
