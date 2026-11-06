@@ -54,10 +54,10 @@ download_mysql_jar() {
 }
 
 download_postgresql_jar() {
-  download_jar "postgresql-42.7.11.jar" \
-  "https://jdbc.postgresql.org/download/postgresql-42.7.11.jar" \
+  download_jar "postgresql-42.7.14.jar" \
+  "https://jdbc.postgresql.org/download/postgresql-42.7.14.jar" \
   "$GRAVITINO_SERVER_DIR/catalogs/jdbc-postgresql/libs"
-  cp -rp $GRAVITINO_SERVER_DIR/catalogs/jdbc-postgresql/libs/postgresql-42.7.11.jar $GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs
+  cp -rp $GRAVITINO_SERVER_DIR/catalogs/jdbc-postgresql/libs/postgresql-42.7.14.jar $GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs
 }
 
 download_iceberg_aws_bundle() {
