@@ -118,6 +118,31 @@ public class TestHiveGravitinoOperationOperator {
     Assertions.assertEquals("us", result[0].getUTF8String(1).toString());
   }
 
+  @Test
+  void testNullValueInNonStringColumnUsesHiveDefaultMarker() throws Exception {
+    InternalRow ident = new GenericInternalRow(new Object[] {null, UTF8String.fromString("us")});
+
+    ArgumentCaptor<Partition> partition = ArgumentCaptor.forClass(Partition.class);
+    when(partitions.addPartition(partition.capture())).thenReturn(null);
+    operator.createPartition(ident, Collections.emptyMap(), MULTI_KEY_SCHEMA);
+    Literal<?>[] values = ((IdentityPartition) partition.getValue()).values();
+    Assertions.assertEquals("__HIVE_DEFAULT_PARTITION__", values[0].value());
+
+    ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+    when(partitions.getPartition(name.capture())).thenReturn(null);
+    operator.loadPartitionMetadata(ident, MULTI_KEY_SCHEMA);
+    Assertions.assertEquals("dt=__HIVE_DEFAULT_PARTITION__/region=us", name.getValue());
+  }
+
+  @Test
+  void testPartitionExistsWithNullInPartialSpec() {
+    when(partitions.partitionExists("region=__HIVE_DEFAULT_PARTITION__")).thenReturn(true);
+
+    InternalRow ident = new GenericInternalRow(new Object[] {null});
+    Assertions.assertTrue(
+        operator.partitionExists(new String[] {"region"}, ident, MULTI_KEY_SCHEMA));
+  }
+
   private static InternalRow ident(String value) {
     return new GenericInternalRow(new Object[] {UTF8String.fromString(value)});
   }
