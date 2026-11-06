@@ -23,10 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Ticker;
@@ -41,6 +44,7 @@ import java.util.function.Consumer;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
@@ -70,7 +74,7 @@ public class TestGravitinoClientEviction {
     try {
       GravitinoCatalogManager.get().close();
     } catch (IllegalStateException e) {
-      // The test closed the manager itself.
+      // The test did not create a manager.
     }
   }
 
@@ -132,6 +136,38 @@ public class TestGravitinoClientEviction {
     assertSame(clients.get(1).client, clientOf(second));
   }
 
+  @Test
+  void testSeededCatalogIsNotLoadedAgain() throws Exception {
+    createManager(client -> {});
+    GravitinoCatalogManager manager = GravitinoCatalogManager.get();
+    GravitinoClient seedClient = manager.getClient(GravitinoIdentity.application("simple"));
+    Catalog seeded = clients.get(0).newCatalog(CATALOG_NAME);
+    when(seedClient.listCatalogsInfo()).thenReturn(new Catalog[] {seeded});
+    manager.loadRelationalCatalogs();
+
+    TestCatalog catalog = new TestCatalog();
+    catalog.initialize(CATALOG_NAME, CaseInsensitiveStringMap.empty());
+    catalog.listNamespaces();
+
+    verify(seedClient, never()).loadCatalog(anyString());
+  }
+
+  @Test
+  void testCatalogThatCannotBeReloadedFailsTheRequest() throws Exception {
+    GravitinoCatalogManager manager = createManager(client -> {});
+    TestCatalog catalog = new TestCatalog();
+    catalog.initialize(CATALOG_NAME, CaseInsensitiveStringMap.empty());
+
+    // The client is evicted and the catalog was dropped in the meantime.
+    ticker.advance(CLIENT_TTL_SEC + 1);
+    manager.getGravitinoCatalogInfo("other_catalog");
+    assertTrue(await(() -> clients.get(0).closed.get()), "The idle client should be closed");
+    when(clients.get(1).client.loadCatalog(CATALOG_NAME))
+        .thenThrow(new NoSuchCatalogException("catalog %s does not exist", CATALOG_NAME));
+
+    assertThrows(NoSuchCatalogException.class, catalog::listNamespaces);
+  }
+
   private GravitinoCatalogManager createManager(Consumer<FakeClient> customizer) {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(
@@ -177,7 +213,8 @@ public class TestGravitinoClientEviction {
     private Runnable onLoad = () -> {};
 
     private FakeClient() {
-      when(client.loadCatalog(anyString())).thenAnswer(invocation -> newCatalog());
+      when(client.loadCatalog(anyString()))
+          .thenAnswer(invocation -> newCatalog(invocation.getArgument(0)));
       doAnswer(
               invocation -> {
                 closed.set(true);
@@ -187,9 +224,10 @@ public class TestGravitinoClientEviction {
           .close();
     }
 
-    private Catalog newCatalog() {
+    private Catalog newCatalog(String name) {
       onLoad.run();
       Catalog catalog = mock(Catalog.class);
+      when(catalog.name()).thenReturn(name);
       when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
       when(catalog.provider()).thenReturn("hive");
       when(catalog.supportsSecrets()).thenThrow(new UnsupportedOperationException());

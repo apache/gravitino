@@ -195,9 +195,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   /**
    * Returns the Gravitino catalog that serves schema, table and function requests. Look it up for
-   * each request instead of keeping it: the lookup keeps the Gravitino client in the manager's
-   * cache while this catalog uses it, and returns a catalog bound to a live client after the cache
-   * has evicted and closed an earlier one.
+   * each request instead of keeping it: the lookup resets the idle timer of the Gravitino client in
+   * the manager's cache, and returns a catalog bound to a live client after the cache has evicted
+   * and closed an earlier one.
    *
    * @return the Gravitino catalog for this Spark catalog's name and identity
    */

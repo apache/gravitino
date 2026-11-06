@@ -189,6 +189,8 @@ public class GravitinoCatalogManager {
    * @return the catalog, bound to the identity's current client
    */
   Catalog getGravitinoCatalogInfo(GravitinoIdentity identity, String name) {
+    // Spark catalogs keep a reference to this manager, so fail instead of building a new client.
+    Preconditions.checkState(!isClosed, "GravitinoCatalogManager is already closed");
     GravitinoClient client = getClient(identity);
     String key = cacheKey(identity, name);
     CachedCatalog cached =
