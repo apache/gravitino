@@ -46,7 +46,7 @@ public class PostgreSqlCatalogCapability implements Capability {
   /** {@inheritDoc} */
   @Override
   public CapabilityResult specificationOnExistingName(Scope scope, String name) {
-    if (scope != Scope.TABLE && scope != Scope.SCHEMA) {
+    if (scope != Scope.TABLE && scope != Scope.SCHEMA && scope != Scope.COLUMN) {
       return specificationOnName(scope, name);
     }
     if (MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(name)) {

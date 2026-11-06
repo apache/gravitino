@@ -249,10 +249,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
             .map(structField -> createGravitinoColumn(structField))
             .toArray(org.apache.gravitino.rel.Column[]::new);
 
+    // Spark stores the table comment in the table properties. Take it out before converting the
+    // properties, because it is passed to Gravitino as the comment, not as a table property, and
+    // a catalog that accepts no table properties would otherwise refuse it.
+    Map<String, String> sparkProperties =
+        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    String comment = sparkProperties.remove(ConnectorConstants.COMMENT);
     Map<String, String> gravitinoProperties =
-        propertiesConverter.toGravitinoTableProperties(properties);
-    // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
-    String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
+        propertiesConverter.toGravitinoTableProperties(sparkProperties);
 
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
@@ -308,6 +312,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
+    if (changes == null || changes.length == 0) {
+      // Spark sends no change when every requested change is a no-op, for example DROP COLUMN IF
+      // EXISTS on an absent column. There is nothing to apply.
+      return loadTable(ident);
+    }
     try {
       Supplier<Column[]> columns =
           Suppliers.memoize(
