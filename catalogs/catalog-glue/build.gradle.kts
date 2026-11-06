@@ -24,7 +24,7 @@ plugins {
   id("idea")
 }
 
-// Keeps the Netty artifacts brought in by the AWS SDK on one latest patch release. The BOM sits in a
+// Keeps the Netty artifacts brought in by the AWS SDK on the single version of the catalog. The BOM sits in a
 // dedicated configuration so that it only applies to this module and is not exported to the
 // modules that depend on it.
 val nettyBom: Configuration by configurations.creating {

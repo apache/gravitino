@@ -165,7 +165,7 @@ publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 kerby = "2.0.3"
-# Transitive of kerb-admin; kept on the latest patch of the 3.8 line.
+# Transitive of kerb-admin; raised above the 3.8.8.Final that kerb-admin brings in.
 xnio = "3.8.17.Final"
 # Netty is a transitive dependency of the AWS SDK (Glue catalog); the BOM keeps all modules on one patch.
 netty = "4.1.140.Final"

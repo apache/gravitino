@@ -25,7 +25,7 @@ plugins {
 }
 
 dependencies {
-  // Keep the xnio-api pulled in by kerb-admin on the latest patch of its line.
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
   constraints {
     implementation(libs.xnio.api)
   }
