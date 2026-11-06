@@ -37,6 +37,7 @@ public class ScanPlanCacheKey {
   private final String statsFieldsStr;
   private final boolean caseSensitive;
   private final boolean useSnapshotSchema;
+  private final int schemaId;
 
   private ScanPlanCacheKey(
       TableIdentifier tableIdentifier,
@@ -47,7 +48,8 @@ public class ScanPlanCacheKey {
       String select,
       String statsFields,
       boolean caseSensitive,
-      boolean useSnapshotSchema) {
+      boolean useSnapshotSchema,
+      int schemaId) {
     this.tableIdentifier = tableIdentifier;
     this.snapshotId = snapshotId;
     this.startSnapshotId = startSnapshotId;
@@ -57,6 +59,7 @@ public class ScanPlanCacheKey {
     this.statsFieldsStr = statsFields;
     this.caseSensitive = caseSensitive;
     this.useSnapshotSchema = useSnapshotSchema;
+    this.schemaId = schemaId;
   }
 
   /**
@@ -94,6 +97,9 @@ public class ScanPlanCacheKey {
       statsFieldsStr = scanRequest.statsFields().stream().sorted().collect(Collectors.joining(","));
     }
 
+    // Current-schema planning binds names by field id; a schema-only evolution must miss cache.
+    int schemaId = table.schema().schemaId();
+
     return new ScanPlanCacheKey(
         tableIdentifier,
         snapshotId,
@@ -103,7 +109,8 @@ public class ScanPlanCacheKey {
         selectStr,
         statsFieldsStr,
         scanRequest.caseSensitive(),
-        scanRequest.useSnapshotSchema());
+        scanRequest.useSnapshotSchema(),
+        schemaId);
   }
 
   public TableIdentifier getTableIdentifier() {
@@ -125,6 +132,7 @@ public class ScanPlanCacheKey {
     ScanPlanCacheKey that = (ScanPlanCacheKey) o;
     return caseSensitive == that.caseSensitive
         && useSnapshotSchema == that.useSnapshotSchema
+        && schemaId == that.schemaId
         && Objects.equal(tableIdentifier, that.tableIdentifier)
         && Objects.equal(snapshotId, that.snapshotId)
         && Objects.equal(startSnapshotId, that.startSnapshotId)
@@ -147,14 +155,16 @@ public class ScanPlanCacheKey {
         selectStr,
         statsFieldsStr,
         caseSensitive,
-        useSnapshotSchema);
+        useSnapshotSchema,
+        schemaId);
   }
 
   @Override
   public String toString() {
     return String.format(
         "ScanPlanCacheKey{table=%s, snapshotId=%s, startSnapshotId=%s, endSnapshotId=%s, "
-            + "filter=%s, select=%s, statsFields=%s, caseSensitive=%s, useSnapshotSchema=%s}",
+            + "filter=%s, select=%s, statsFields=%s, caseSensitive=%s, useSnapshotSchema=%s, "
+            + "schemaId=%s}",
         tableIdentifier,
         snapshotId,
         startSnapshotId,
@@ -163,6 +173,7 @@ public class ScanPlanCacheKey {
         selectStr.isEmpty() ? "null" : selectStr,
         statsFieldsStr.isEmpty() ? "null" : statsFieldsStr,
         caseSensitive,
-        useSnapshotSchema);
+        useSnapshotSchema,
+        schemaId);
   }
 }

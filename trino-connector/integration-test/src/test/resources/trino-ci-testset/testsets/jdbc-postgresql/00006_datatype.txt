@@ -61,6 +61,9 @@ INSERT: 1 row
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f14
 
+"tb01"
+"tb02"
+
 CREATE TABLE
 
 INSERT: 1 row

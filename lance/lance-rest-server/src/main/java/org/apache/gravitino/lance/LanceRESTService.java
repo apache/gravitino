@@ -34,6 +34,7 @@ import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
+import org.apache.gravitino.lance.service.LanceRequestBodyReaderInterceptor;
 import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
 import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
@@ -113,7 +114,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(JacksonFeature.class);
+    resourceConfig.register(JacksonFeature.withoutExceptionMappers());
+    resourceConfig.register(LanceRequestBodyReaderInterceptor.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
     resourceConfig.register(LanceExceptionMapper.class);
     resourceConfig.register(new OutOfMemoryErrorListener());

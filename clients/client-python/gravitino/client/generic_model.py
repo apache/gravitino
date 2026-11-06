@@ -23,9 +23,15 @@ from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.model.model import Model
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag import Tag, TagList
 from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
 )
@@ -37,7 +43,7 @@ from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericModel(Model, SupportsTags, SupportsSecrets):
+class GenericModel(Model, SupportsTags, SupportsPolicies, SupportsSecrets):
     _model_dto: ModelDTO
     """The model DTO object."""
 
@@ -50,6 +56,9 @@ class GenericModel(Model, SupportsTags, SupportsSecrets):
             model_full_name, MetadataObject.Type.MODEL
         )
         self._model_tag_operations = MetadataObjectTagOperations(
+            model_ns.level(0), model_object, rest_client
+        )
+        self._model_policy_operations = MetadataObjectPolicyOperations(
             model_ns.level(0), model_object, rest_client
         )
         self._object_secret_operations = MetadataObjectSecretOperations(
@@ -108,6 +117,21 @@ class GenericModel(Model, SupportsTags, SupportsSecrets):
         return self._model_tag_operations.associate_tags(tags_to_add, tags_to_remove)
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> list[str]:
+        return self._model_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._model_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> list[Policy]:
+        return self._model_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._model_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def support_secrets(self) -> SupportsSecrets:

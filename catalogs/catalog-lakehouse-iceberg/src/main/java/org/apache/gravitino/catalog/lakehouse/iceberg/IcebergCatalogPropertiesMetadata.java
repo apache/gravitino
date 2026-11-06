@@ -132,6 +132,48 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "HTTP socket timeout in milliseconds for the REST catalog backend",
                 false /* immutable */,
                 60000 /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                "How the REST catalog backend authenticates to the remote catalog: user-token"
+                    + " forwards the calling user's token, service-account connects with a"
+                    + " configured credential and authorizes every request in Gravitino",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_TOKEN,
+                "Static bearer token the service account presents to the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_CREDENTIAL,
+                "OAuth2 client credential (client_id:client_secret) the service account uses"
+                    + " with the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI,
+                "OAuth2 token endpoint for the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_SCOPE,
+                "OAuth2 scope requested with the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
+                "Who issues storage credentials for a federated REST catalog: remote passes"
+                    + " through the remote catalog's credentials, local issues them through"
+                    + " this catalog's credential providers. Service-account connections always"
+                    + " use local credentials",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
