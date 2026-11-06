@@ -354,8 +354,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                         .columns();
                   })
               ::get;
-      SparkTableChangeConverter tableChangeConverter =
-          getSparkTableChangeConverter(ident, changes);
+      SparkTableChangeConverter tableChangeConverter = getSparkTableChangeConverter(ident, changes);
       org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
           Arrays.stream(changes)
               .map(change -> tableChangeConverter.toGravitinoTableChange(change, columns))

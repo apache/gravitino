@@ -267,8 +267,8 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   /**
-   * {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. Hive and Iceberg differ
-   * on timestamp types only, so the table is loaded just for changes that set one.
+   * {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. Hive and Iceberg
+   * differ on timestamp types only, so the table is loaded just for changes that set one.
    */
   @Override
   protected SparkTableChangeConverter getSparkTableChangeConverter(
