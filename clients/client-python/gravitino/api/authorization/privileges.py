@@ -192,6 +192,12 @@ class Privilege(ABC):
         MODIFY_FUNCTION = (0, 1 << 32)
         """The privilege to alter a function's metadata."""
 
+        USE_SECRETS = (0, 1 << 37)
+        """Required with INCLUDE_CREDENTIAL_SECRETS for catalog credentials."""
+
+        INCLUDE_CREDENTIAL_SECRETS = (0, 1 << 38)
+        """Required with USE_SECRETS for catalog credentials."""
+
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1586,10 +1592,70 @@ class ModifyFunction(GenericPrivilege):
         return obj_type in Privileges.FUNCTION_SUPPORTED_TYPES
 
 
+class UseSecrets(GenericPrivilege):
+    """Required with INCLUDE_CREDENTIAL_SECRETS for catalog credentials, unless metalake owner.
+
+    Supports metalake and catalog grants on this branch; fileset access is unchanged.
+    """
+
+    _ALLOW_INSTANCE: Optional["UseSecrets"] = None
+    _DENY_INSTANCE: Optional["UseSecrets"] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        if UseSecrets._ALLOW_INSTANCE is None:
+            UseSecrets._ALLOW_INSTANCE = UseSecrets(
+                Privilege.Condition.ALLOW, Privilege.Name.USE_SECRETS
+            )
+        return UseSecrets._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        if UseSecrets._DENY_INSTANCE is None:
+            UseSecrets._DENY_INSTANCE = UseSecrets(
+                Privilege.Condition.DENY, Privilege.Name.USE_SECRETS
+            )
+        return UseSecrets._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in {MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG}
+
+
+class IncludeCredentialSecrets(GenericPrivilege):
+    """Required with USE_SECRETS for catalog credentials, unless metalake owner.
+
+    Supports metalake and catalog grants on this branch; fileset access is unchanged.
+    """
+
+    _ALLOW_INSTANCE: Optional["IncludeCredentialSecrets"] = None
+    _DENY_INSTANCE: Optional["IncludeCredentialSecrets"] = None
+
+    @staticmethod
+    def allow() -> Privilege:
+        if IncludeCredentialSecrets._ALLOW_INSTANCE is None:
+            IncludeCredentialSecrets._ALLOW_INSTANCE = IncludeCredentialSecrets(
+                Privilege.Condition.ALLOW, Privilege.Name.INCLUDE_CREDENTIAL_SECRETS
+            )
+        return IncludeCredentialSecrets._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> Privilege:
+        if IncludeCredentialSecrets._DENY_INSTANCE is None:
+            IncludeCredentialSecrets._DENY_INSTANCE = IncludeCredentialSecrets(
+                Privilege.Condition.DENY, Privilege.Name.INCLUDE_CREDENTIAL_SECRETS
+            )
+        return IncludeCredentialSecrets._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in {MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG}
+
+
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
         Privilege.Name.USE_CATALOG: UseCatalog,
+        Privilege.Name.USE_SECRETS: UseSecrets,
+        Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
         Privilege.Name.CREATE_SCHEMA: CreateSchema,
         Privilege.Name.USE_SCHEMA: UseSchema,
         Privilege.Name.CREATE_TABLE: CreateTable,

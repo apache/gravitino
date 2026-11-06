@@ -267,6 +267,21 @@ public class AuthorizationExpressionConstants {
                   ANY_WRITE_FILESET
                   """;
 
+  /** Catalog credential access requires this grant and the credential-inclusion grant. */
+  public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
+      """
+      METALAKE::OWNER ||
+      ((ANY(USE_SECRETS, METALAKE, CATALOG)) && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG)))
+      """;
+
+  /** Catalog credential access requires this grant and the use-secrets grant. */
+  public static final String FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION =
+      """
+      METALAKE::OWNER ||
+      ((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG))
+       && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG)))
+      """;
+
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||

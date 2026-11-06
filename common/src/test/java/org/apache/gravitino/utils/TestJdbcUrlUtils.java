@@ -27,8 +27,63 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcUrlUtils {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/db?user=u&password=hidden",
+        "jdbc:postgresql://host/db?%70assword=hidden",
+        "jdbc:sqlserver://host;databaseName=db;PASSWORD={hidden;value}",
+        "jdbc:mysql://user:hidden@host/db",
+        "jdbc:mysql://user:pass%2Fword@host/db",
+        "jdbc:mysql://user:pass%3Fword@host/db",
+        "jdbc:mysql://user:pass%23word@host/db",
+        "jdbc:mysql://user:pass%252Fword@host/db",
+        "jdbc:mysql:loadbalance://user:pass%2Fword@host1,host2/db",
+        "jdbc:mysql://(host=host,user=u,password=hidden)/db",
+        "jdbc:oracle:oci:user/hidden@service",
+        "jdbc:oracle:thin:user/hidden@host:1521/db",
+        "jdbc:postgresql://host/db?sslpassword=hidden",
+        "jdbc:sqlserver://host;accessToken=hidden",
+        "jdbc:postgresql://host/db?password=",
+        "jdbc:postgresql://host/db?%2570assword=hidden#%zz",
+        "jdbc:postgresql://host/db?%2570assword=hidden#%25zz",
+        "jdbc:postgresql://host/db?%252570assword=hidden#%2525zz",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8&password=hidden",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false&%70assword2=hidden",
+        "jdbc:mysql://host/db?password1=hidden",
+        "jdbc:mysql://host/db?password3=hidden",
+        "jdbc:mysql+srv://host/db?passwordCharacterEncoding=UTF-8&password=hidden",
+        "jdbc:mysql+srv:loadbalance://host/db?disconnectOnExpiredPasswords=false&%70assword2=hidden",
+        "jdbc:postgresql://host/db?passwordCharacterEncoding=hidden"
+      })
+  void testCredentialsAreDetected(String url) {
+    Assertions.assertTrue(JdbcUrlUtils.containsCredentials(url));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/password?user=reader&sslmode=require",
+        "jdbc:sqlserver://host;databaseName=db;encrypt=true",
+        "jdbc:oracle:thin:@host:1521/service",
+        "jdbc:sqlite::memory:",
+        "jdbc:postgresql://host/db?applicationName=100%",
+        "jdbc:mysql://host/db?useSSL=true",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false",
+        "jdbc:mysql://host/db?%70asswordCharacterEncoding=UTF-8&disconnectOnExpiredPasswords=false",
+        "jdbc:mysql+srv://host/db?passwordCharacterEncoding=UTF-8",
+        "jdbc:mysql+srv:loadbalance://host/db?disconnectOnExpiredPasswords=false",
+        "jdbc:mysql+srv:replication://host/db?%70asswordCharacterEncoding=UTF-8&disconnectOnExpiredPasswords=false"
+      })
+  void testPublicConnectionOptionsRemainVisible(String url) {
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(url));
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(null));
+  }
 
   @Test
   public void whenMalformedUrlGiven_ShouldThrowGravitinoRuntimeException() {

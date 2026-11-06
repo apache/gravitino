@@ -59,6 +59,7 @@ import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -576,6 +577,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             }
           }
 
+          maskJdbcUrlCredentials(tempProperties);
           properties = tempProperties;
         }
       }
@@ -585,6 +587,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
     Map<String, String> result = Maps.newHashMap(properties);
     result.putAll(propertiesWithCredentialProviders());
+    maskJdbcUrlCredentials(result);
     return result;
   }
 
@@ -672,5 +675,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
     return OperationsProxy.createProxy(ops, plugin);
+  }
+
+  private static void maskJdbcUrlCredentials(Map<String, String> properties) {
+    properties.replaceAll(
+        (key, value) ->
+            "jdbc-url".equalsIgnoreCase(key) && JdbcUrlUtils.containsCredentials(value)
+                ? "******"
+                : value);
   }
 }

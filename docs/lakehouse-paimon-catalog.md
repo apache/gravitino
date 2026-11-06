@@ -99,7 +99,7 @@ Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-p
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime. Catalog credential access requires metadata access plus both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership.
 :::
 
 ## Schema

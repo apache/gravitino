@@ -113,6 +113,10 @@ public class Privileges {
         return CreateCatalog.allow();
       case USE_CATALOG:
         return UseCatalog.allow();
+      case USE_SECRETS:
+        return UseSecrets.allow();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.allow();
 
         // Schema
       case CREATE_SCHEMA:
@@ -235,6 +239,10 @@ public class Privileges {
         return CreateCatalog.deny();
       case USE_CATALOG:
         return UseCatalog.deny();
+      case USE_SECRETS:
+        return UseSecrets.deny();
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return IncludeCredentialSecrets.deny();
 
         // Schema
       case CREATE_SCHEMA:
@@ -1241,6 +1249,77 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /**
+   * Required together with {@link IncludeCredentialSecrets} for catalog {@code getCredentials}, in
+   * addition to metadata access. Metalake owners are exempt. Fileset path authorization is
+   * unchanged. This branch supports binding this privilege to metalakes and catalogs.
+   */
+  public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
+    private static final UseSecrets ALLOW_INSTANCE =
+        new UseSecrets(Condition.ALLOW, Name.USE_SECRETS);
+    private static final UseSecrets DENY_INSTANCE =
+        new UseSecrets(Condition.DENY, Name.USE_SECRETS);
+
+    private UseSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return the instance with allow condition
+     */
+    public static UseSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return the instance with deny condition
+     */
+    public static UseSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
+    }
+  }
+
+  /**
+   * Required together with {@link UseSecrets} for catalog {@code getCredentials}, in addition to
+   * metadata access. Metalake owners are exempt. Fileset path authorization is unchanged. This
+   * branch supports binding this privilege to metalakes and catalogs.
+   */
+  public static final class IncludeCredentialSecrets
+      extends GenericPrivilege<IncludeCredentialSecrets> {
+    private static final IncludeCredentialSecrets ALLOW_INSTANCE =
+        new IncludeCredentialSecrets(Condition.ALLOW, Name.INCLUDE_CREDENTIAL_SECRETS);
+    private static final IncludeCredentialSecrets DENY_INSTANCE =
+        new IncludeCredentialSecrets(Condition.DENY, Name.INCLUDE_CREDENTIAL_SECRETS);
+
+    private IncludeCredentialSecrets(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return the instance with allow condition
+     */
+    public static IncludeCredentialSecrets allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return the instance with deny condition
+     */
+    public static IncludeCredentialSecrets deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
   }
 

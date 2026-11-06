@@ -22,6 +22,7 @@ package org.apache.gravitino.utils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,6 +32,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
@@ -41,6 +45,15 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
  * safe to use.
  */
 public class JdbcUrlUtils {
+
+  private static final Pattern URL_PARAMETER = Pattern.compile("(?:[?;&,(]|^)([^=?;&,()]+)=");
+  private static final List<String> CREDENTIAL_PARAMETER_KEYWORDS =
+      Arrays.asList("password", "passwd", "pwd", "secret", "token", "credential");
+  // Connector/J options whose names contain "password" but whose values are not credentials.
+  private static final List<String> NON_SECRET_MYSQL_PARAMETERS =
+      Arrays.asList("passwordcharacterencoding", "disconnectonexpiredpasswords");
+  private static final Pattern USER_INFO =
+      Pattern.compile("(?i)(?://[^/?#]*@|jdbc:oracle:(?:thin|oci|oci8):[^/@]+/[^@]*@)");
 
   // The DBCP2 connection-pool property whose value is a list of connection properties forwarded
   // verbatim to the JDBC driver. Unsafe parameters smuggled here would otherwise evade a check
@@ -72,6 +85,51 @@ public class JdbcUrlUtils {
 
   private JdbcUrlUtils() {
     // Utility class, no instantiation allowed
+  }
+
+  /**
+   * Detects credentials embedded in JDBC URLs, including encoded parameter names.
+   *
+   * @param url the JDBC URL, or null
+   * @return whether the URL must not be exposed as a public catalog property
+   */
+  public static boolean containsCredentials(@Nullable String url) {
+    if (url == null) {
+      return false;
+    }
+    // Determine the driver family before URLDecoder turns the DNS SRV scheme's '+' into a space.
+    String lowerUrl = url.toLowerCase(Locale.ROOT);
+    boolean mysqlUrl = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
+    // Decoding a password can introduce '/', '?' or '#' and change the authority boundaries.
+    // Inspect raw user information before scanning decoded parameter names.
+    if (USER_INFO.matcher(url).find()) {
+      return true;
+    }
+    String form = lowerUrl;
+    // Inspect each decoding stage. Sanitize malformed escapes on every pass so they cannot
+    // hide a separately encoded credential parameter. Keep the existing URL validator unchanged.
+    for (int depth = 0; depth <= 5; depth++) {
+      if (containsCredentialParameters(form, mysqlUrl)) {
+        return true;
+      }
+      if (depth == 5) {
+        break;
+      }
+      String decoded;
+      try {
+        decoded =
+            URLDecoder.decode(form.replaceAll("%(?![0-9a-fA-F]{2})", "%25"), "UTF-8")
+                .toLowerCase(Locale.ROOT);
+      } catch (UnsupportedEncodingException e) {
+        // UTF-8 is required by the JVM specification.
+        throw new IllegalStateException(e);
+      }
+      if (decoded.equals(form)) {
+        break;
+      }
+      form = decoded;
+    }
+    return false;
   }
 
   /**
@@ -116,6 +174,23 @@ public class JdbcUrlUtils {
             "Unsafe %s parameter '%s' detected in JDBC configuration", dbType, param);
       }
     }
+  }
+
+  private static boolean containsCredentialParameters(String url, boolean mysqlUrl) {
+    if (USER_INFO.matcher(url).find()) {
+      return true;
+    }
+    Matcher parameters = URL_PARAMETER.matcher(url);
+    while (parameters.find()) {
+      String key = parameters.group(1);
+      if (mysqlUrl && NON_SECRET_MYSQL_PARAMETERS.contains(key)) {
+        continue;
+      }
+      if (CREDENTIAL_PARAMETER_KEYWORDS.stream().anyMatch(key::contains)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String recursiveDecode(String url) {

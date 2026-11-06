@@ -169,6 +169,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 |----------------------|-------------------------------------|--------------------------------------------------------------------|
 | `CREATE_CATALOG`     | Metalake                            | Create catalogs                                                    |
 | `USE_CATALOG`        | Metalake, Catalog                   | Use any catalog in scope, and reach the objects inside it          |
+| `USE_SECRETS`        | Metalake, Catalog                   | Required with `INCLUDE_CREDENTIAL_SECRETS` for catalog credential access |
+| `INCLUDE_CREDENTIAL_SECRETS` | Metalake, Catalog            | Required with `USE_SECRETS` for catalog credential access |
 | `CREATE_SCHEMA`      | Metalake, Catalog, Schema           | Create schemas or nested schemas in scope                          |
 | `USE_SCHEMA`         | Metalake, Catalog, Schema           | Use any schema in scope, and reach the objects inside it           |
 | `CREATE_TABLE`       | Metalake, Catalog, Schema           | Create tables in any schema in scope                               |
@@ -258,7 +260,11 @@ ownership, the same as altering it, because the caller chooses what the server c
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
-alter or delete. Fetching a credential takes whatever loading the object takes.
+alter or delete. Catalog credential vending requires metadata access plus both
+`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Missing either
+privilege returns a forbidden error. Catalog ownership alone does not bypass these checks.
+The two privileges can be granted on a metalake or catalog in the 1.3 branch; they do not
+introduce a Secrets API. Fileset credential vending retains its path-based authorization.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
 Iceberg REST Catalog when authorization is enabled. Listing first requires access to the schema and

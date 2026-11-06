@@ -227,6 +227,29 @@ GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 
 The server returns short-lived or static credentials that the client can use to access the underlying storage directly. These credentials are catalog-level and are not refreshed. Path-based providers such as `s3-token` and `aws-irsa` vend nothing at catalog level.
 
+### Catalog credential access
+
+With authorization enabled, catalog credential vending requires metadata access plus both
+`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. These privileges can
+be granted on a metalake or catalog in the 1.3 branch using the matching Java/Python client
+or CLI version. `USE_CATALOG` and catalog ownership
+alone do not authorize retrieving the source account. Grant the two privileges only to
+trusted connectors/operators: catalog credentials carry all source-account permissions,
+including access beyond individual Gravitino table grants.
+
+Fileset credential authorization remains path-based. Java and Python GVFS on this branch use
+the fileset credential endpoint directly, without an optional catalog credential overlay.
+Static fileset credentials can still grant broader source access than the requested path;
+prefer short-lived scoped credentials when available.
+
+For relational JDBC catalogs, `jdbc-url` must not contain passwords, tokens, or inline user
+information. Move login credentials to `jdbc-user` and `jdbc-password` **before upgrading**.
+Legacy credential-bearing URLs are masked on the property read path, including when
+credential backfill is enabled, but loading a catalog may fail earlier during configuration
+validation. PostgreSQL catalog ALTER loads the old configuration first, so an already-upgraded
+deployment must use the previous server version to migrate before upgrading again.
+JDBC-backed Iceberg/Paimon `uri` properties are outside this URL protection.
+
 ### Spark and Flink Connector Integration
 
 The Gravitino Spark and Flink connectors automatically call the credential vending API and inject the returned credentials into the connector's configuration, so no connector-side credential configuration is needed. For example, `GravitinoHiveCatalog`, `GravitinoGlueCatalog`, `GravitinoJdbcCatalog`, and `GravitinoIcebergCatalog` all consume the vended credentials transparently.

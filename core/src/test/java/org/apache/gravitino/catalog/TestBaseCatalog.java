@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -31,9 +32,39 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestBaseCatalog {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testLegacyJdbcUrlsAreMaskedWithAndWithoutBackfill(boolean backfill) {
+    for (String url :
+        new String[] {
+          "jdbc:mysql://localhost/db?password=source-secret",
+          "jdbc:mysql://user:encoded%2Fsecret@localhost/db",
+          "jdbc:postgresql://localhost/db?%70assword=source-secret",
+          "jdbc:mysql://localhost/db?passwordCharacterEncoding=UTF-8"
+        }) {
+      CatalogEntity entity = Mockito.mock(CatalogEntity.class);
+      Map<String, String> raw = Map.of("JDBC-URL", url, "ordinary", "visible");
+      Mockito.when(entity.getProperties()).thenReturn(raw);
+      TestCatalog catalog =
+          new TestCatalog() {
+            @Override
+            protected boolean shouldBackfillCredential() {
+              return backfill;
+            }
+          }.withCatalogEntity(entity);
+      String expected = url.endsWith("UTF-8") ? url : "******";
+      Assertions.assertEquals(expected, catalog.properties().get("JDBC-URL"));
+      Assertions.assertEquals(expected, catalog.properties().get("JDBC-URL"));
+      Assertions.assertEquals("visible", catalog.properties().get("ordinary"));
+      Assertions.assertEquals(url, entity.getProperties().get("JDBC-URL"));
+    }
+  }
 
   @Test
   void testCustomCatalogOperations() {

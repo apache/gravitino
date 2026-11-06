@@ -151,7 +151,11 @@ public interface Privilege {
     /** The privilege to execute (invoke) a function. */
     EXECUTE_FUNCTION(0L, 1L << 31),
     /** The privilege to alter a function's metadata. */
-    MODIFY_FUNCTION(0L, 1L << 32);
+    MODIFY_FUNCTION(0L, 1L << 32),
+    /** Required together with INCLUDE_CREDENTIAL_SECRETS for catalog credential access. */
+    USE_SECRETS(0L, 1L << 37),
+    /** Required together with USE_SECRETS for catalog credential access. */
+    INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38);
 
     private final long highBits;
     private final long lowBits;
