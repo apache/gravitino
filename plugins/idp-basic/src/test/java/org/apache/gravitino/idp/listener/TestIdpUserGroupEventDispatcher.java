@@ -85,7 +85,7 @@ class TestIdpUserGroupEventDispatcher {
     Assertions.assertEquals(1, listener.postEvents.size());
     IdpAddUserEvent event = (IdpAddUserEvent) listener.postEvents.get(0);
     Assertions.assertEquals(OperationType.ADD_USER, event.operationType());
-    Assertions.assertEquals("system.user.alice", event.identifier().toString());
+    Assertions.assertEquals("basic.user.alice", event.identifier().toString());
     Assertions.assertEquals("admin", event.user());
   }
 
@@ -128,7 +128,7 @@ class TestIdpUserGroupEventDispatcher {
     IdpUpdateUserEnabledEvent enable = (IdpUpdateUserEnabledEvent) listener.postEvents.get(1);
     Assertions.assertEquals(OperationType.DISABLE_USER, disable.operationType());
     Assertions.assertEquals(OperationType.ENABLE_USER, enable.operationType());
-    Assertions.assertEquals("system.user.alice", disable.identifier().toString());
+    Assertions.assertEquals("basic.user.alice", disable.identifier().toString());
   }
 
   @Test
@@ -176,7 +176,7 @@ class TestIdpUserGroupEventDispatcher {
         (IdpChangeGroupMembershipEvent) listener.postEvents.get(1);
     Assertions.assertEquals(OperationType.ALTER_GROUP, membership.operationType());
     Assertions.assertEquals(List.of("alice"), membership.usersToAdd());
-    Assertions.assertEquals("system.group.g1", membership.identifier().toString());
+    Assertions.assertEquals("basic.group.g1", membership.identifier().toString());
     IdpRemoveGroupEvent remove = (IdpRemoveGroupEvent) listener.postEvents.get(2);
     Assertions.assertEquals(OperationType.REMOVE_GROUP, remove.operationType());
     Assertions.assertTrue(remove.force());

@@ -16,18 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.idp.listener;
 
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
 /**
- * Name identifiers for built-in IdP users and groups. IdP identities are instance-scoped (not
- * metalake-scoped), so they use {@link Entity#SYSTEM_METALAKE_RESERVED_NAME} as the root namespace
- * segment rather than a metalake name.
+ * Name identifiers for built-in IdP ({@code basic}) users and groups. These identities are
+ * instance-scoped (not metalake-scoped). The first namespace segment is the authenticator / local
+ * store channel ({@code basic}), parallel to other instance identity channels such as {@code
+ * scim.user.<name>}.
  */
 public final class IdpNameIdentifierUtil {
+
+  /** Channel prefix for the built-in basic IdP local user store. */
+  public static final String BASIC_CHANNEL = "basic";
 
   private IdpNameIdentifierUtil() {}
 
@@ -35,21 +38,19 @@ public final class IdpNameIdentifierUtil {
    * Creates a {@link NameIdentifier} for a built-in IdP user.
    *
    * @param userName the username
-   * @return {@code system.user.<userName>}
+   * @return {@code basic.user.<userName>}
    */
   public static NameIdentifier ofUser(String userName) {
-    return NameIdentifier.of(
-        Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.USER_SCHEMA_NAME, userName);
+    return NameIdentifier.of(BASIC_CHANNEL, Entity.USER_SCHEMA_NAME, userName);
   }
 
   /**
    * Creates a {@link NameIdentifier} for a built-in IdP group.
    *
    * @param groupName the group name
-   * @return {@code system.group.<groupName>}
+   * @return {@code basic.group.<groupName>}
    */
   public static NameIdentifier ofGroup(String groupName) {
-    return NameIdentifier.of(
-        Entity.SYSTEM_METALAKE_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, groupName);
+    return NameIdentifier.of(BASIC_CHANNEL, Entity.GROUP_SCHEMA_NAME, groupName);
   }
 }
