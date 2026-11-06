@@ -24,8 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
@@ -148,8 +152,7 @@ public class TestIcebergMaintenanceJob {
         7800000000000L,
         ((Number) beforeParsed.get(IcebergMaintenanceJob.TOTAL_FILE_SIZE_METRIC)).longValue());
 
-    Map<String, Object> after =
-        IcebergMaintenanceJob.expireAfterMetrics(86L, 7800000000000L, 24L, 700000000000L);
+    Map<String, Object> after = IcebergMaintenanceJob.expireAfterMetrics(62L, 7100000000000L);
     Map<String, Object> afterParsed = parseJson(IcebergMaintenanceJob.toMetricsJson(after));
     assertEquals(2, afterParsed.size());
     assertEquals(
@@ -159,6 +162,48 @@ public class TestIcebergMaintenanceJob {
         7100000000000L,
         ((Number) afterParsed.get(IcebergMaintenanceJob.BYTES_RECLAIMED_METRIC)).longValue());
     assertFalse(afterParsed.containsKey(IcebergMaintenanceJob.SNAPSHOT_COUNT_METRIC));
+  }
+
+  @Test
+  public void testExpireSetDifferenceIgnoresConcurrentAdds() {
+    Set<Long> beforeSnapshots = new HashSet<>();
+    beforeSnapshots.add(1L);
+    beforeSnapshots.add(2L);
+    beforeSnapshots.add(3L);
+    Set<Long> afterSnapshots = new HashSet<>();
+    afterSnapshots.add(2L);
+    afterSnapshots.add(3L);
+    afterSnapshots.add(99L); // concurrent commit
+    assertEquals(1L, IcebergMaintenanceJob.snapshotsCleared(beforeSnapshots, afterSnapshots));
+
+    Map<String, Long> beforeFiles = new HashMap<>();
+    beforeFiles.put("a.parquet", 100L);
+    beforeFiles.put("b.parquet", 200L);
+    Map<String, Long> afterFiles = new HashMap<>();
+    afterFiles.put("b.parquet", 200L);
+    afterFiles.put("c.parquet", 500L); // concurrent write
+    assertEquals(100L, IcebergMaintenanceJob.bytesReclaimed(beforeFiles, afterFiles));
+
+    IcebergMaintenanceJob.ExpireInventory before =
+        new IcebergMaintenanceJob.ExpireInventory(beforeSnapshots, beforeFiles);
+    IcebergMaintenanceJob.ExpireInventory after =
+        new IcebergMaintenanceJob.ExpireInventory(afterSnapshots, afterFiles);
+    Map<String, Object> metrics = IcebergMaintenanceJob.expireAfterMetrics(before, after);
+    assertEquals(
+        1L, ((Number) metrics.get(IcebergMaintenanceJob.SNAPSHOTS_CLEARED_METRIC)).longValue());
+    assertEquals(
+        100L, ((Number) metrics.get(IcebergMaintenanceJob.BYTES_RECLAIMED_METRIC)).longValue());
+  }
+
+  @Test
+  public void testBuildReachableContentFilesSql() {
+    String sql = IcebergMaintenanceJob.buildReachableContentFilesSql("cat", "db.tbl");
+    assertTrue(sql.contains("FROM `cat`.`db`.`tbl`.`all_files`"));
+    assertTrue(sql.contains("GROUP BY file_path"));
+    assertTrue(sql.contains("MAX(file_size_in_bytes)"));
+    assertEquals(
+        0L,
+        IcebergMaintenanceJob.snapshotsCleared(Collections.emptySet(), Collections.singleton(1L)));
   }
 
   @Test

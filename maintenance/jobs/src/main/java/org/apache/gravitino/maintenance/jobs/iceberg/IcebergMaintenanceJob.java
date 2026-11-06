@@ -507,13 +507,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 results[0].getLong(1),
                 results[0].getLong(2));
           }
-          long afterSnapshotCount = countSnapshots(spark, catalogName, tableIdentifier);
-          long afterTotalFileSize = collectTotalFileSize(spark, catalogName, tableIdentifier);
-          long beforeSnapshotCount = before == null ? afterSnapshotCount : before.snapshotCount;
-          long beforeTotalFileSize = before == null ? afterTotalFileSize : before.totalFileSize;
-          Map<String, Object> afterMetrics =
-              expireAfterMetrics(
-                  beforeSnapshotCount, beforeTotalFileSize, afterSnapshotCount, afterTotalFileSize);
+          ExpireInventory afterInventory =
+              collectExpireInventory(spark, catalogName, tableIdentifier);
+          ExpireInventory beforeInventory =
+              before == null || before.expireInventory == null
+                  ? afterInventory
+                  : before.expireInventory;
+          Map<String, Object> afterMetrics = expireAfterMetrics(beforeInventory, afterInventory);
           long afterSnapshotId =
               currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
           return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
@@ -547,8 +547,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload;
-    long snapshotCount = -1L;
-    long totalFileSize = -1L;
+    ExpireInventory expireInventory = null;
     switch (type) {
       case REWRITE_DATA_FILES:
         payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
@@ -557,9 +556,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
         break;
       case EXPIRE_SNAPSHOTS:
-        snapshotCount = countSnapshots(spark, catalogName, tableIdentifier);
-        totalFileSize = collectTotalFileSize(spark, catalogName, tableIdentifier);
-        payload = expireBeforeMetrics(snapshotCount, totalFileSize);
+        expireInventory = collectExpireInventory(spark, catalogName, tableIdentifier);
+        payload =
+            expireBeforeMetrics(expireInventory.snapshotCount(), expireInventory.totalFileSize());
         break;
       case REMOVE_ORPHAN_FILES:
         throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
@@ -567,8 +566,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         throw new IllegalStateException("Unhandled maintenance type: " + type);
     }
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    return new BeforeSample(
-        snapshotId, headSnapshotId, toMetricsJson(payload), snapshotCount, totalFileSize);
+    return new BeforeSample(snapshotId, headSnapshotId, toMetricsJson(payload), expireInventory);
   }
 
   /**
@@ -676,16 +674,99 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return metrics;
   }
 
+  /**
+   * S1 expire metrics from set difference so concurrent commits do not shrink cleared/reclaimed
+   * counts: snapshots/files present in S0 but absent after expire.
+   */
   @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(
-      long beforeSnapshotCount,
-      long beforeTotalFileSize,
-      long afterSnapshotCount,
-      long afterTotalFileSize) {
+  static Map<String, Object> expireAfterMetrics(ExpireInventory before, ExpireInventory after) {
+    return expireAfterMetrics(
+        snapshotsCleared(before.snapshotIds, after.snapshotIds),
+        bytesReclaimed(before.fileSizesByPath, after.fileSizesByPath));
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireAfterMetrics(long snapshotsCleared, long bytesReclaimed) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOTS_CLEARED_METRIC, Math.max(0L, beforeSnapshotCount - afterSnapshotCount));
-    metrics.put(BYTES_RECLAIMED_METRIC, Math.max(0L, beforeTotalFileSize - afterTotalFileSize));
+    metrics.put(SNAPSHOTS_CLEARED_METRIC, snapshotsCleared);
+    metrics.put(BYTES_RECLAIMED_METRIC, bytesReclaimed);
     return metrics;
+  }
+
+  @VisibleForTesting
+  static long snapshotsCleared(Set<Long> beforeSnapshotIds, Set<Long> afterSnapshotIds) {
+    long cleared = 0L;
+    for (Long snapshotId : beforeSnapshotIds) {
+      if (!afterSnapshotIds.contains(snapshotId)) {
+        cleared++;
+      }
+    }
+    return cleared;
+  }
+
+  @VisibleForTesting
+  static long bytesReclaimed(Map<String, Long> beforeFileSizes, Map<String, Long> afterFileSizes) {
+    long bytes = 0L;
+    for (Map.Entry<String, Long> entry : beforeFileSizes.entrySet()) {
+      if (!afterFileSizes.containsKey(entry.getKey())) {
+        bytes += entry.getValue() == null ? 0L : entry.getValue();
+      }
+    }
+    return bytes;
+  }
+
+  /**
+   * Expire S0/S1 inventory: snapshot ids plus distinct reachable content files across history
+   * ({@code all_files}), same metadata-table style as compaction's {@code files} SQL.
+   */
+  @VisibleForTesting
+  static ExpireInventory collectExpireInventory(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Set<Long> snapshotIds = new HashSet<>();
+    for (Snapshot snapshot : loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
+      snapshotIds.add(snapshot.snapshotId());
+    }
+    String sql = buildReachableContentFilesSql(catalogName, tableIdentifier);
+    List<Row> rows = spark.sql(sql).collectAsList();
+    Map<String, Long> fileSizesByPath = new HashMap<>(rows.size());
+    for (Row row : rows) {
+      String path = row.getAs("file-path");
+      if (path == null || path.isEmpty()) {
+        continue;
+      }
+      Number size = row.getAs("file-size");
+      fileSizesByPath.put(path, size == null ? 0L : size.longValue());
+    }
+    return new ExpireInventory(snapshotIds, fileSizesByPath);
+  }
+
+  /**
+   * Distinct content files still referenced by any tracked snapshot. {@code GROUP BY file_path}
+   * avoids double-counting files that appear in multiple snapshots ({@code all_files} may duplicate
+   * rows).
+   */
+  @VisibleForTesting
+  static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
+    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
+        + buildMetadataTableIdentifier(catalogName, tableIdentifier, "all_files")
+        + " GROUP BY file_path";
+  }
+
+  @VisibleForTesting
+  static String buildMetadataTableIdentifier(
+      String catalogName, String tableIdentifier, String metadataTable) {
+    String[] levels = tableIdentifier.split("\\.");
+    if (levels.length != 2) {
+      throw new IllegalArgumentException(
+          "table_identifier must use schema.table format, but got: " + tableIdentifier);
+    }
+    return IcebergJobUtils.escapeSqlIdentifier(catalogName)
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(levels[0])
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(levels[1])
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(metadataTable);
   }
 
   @VisibleForTesting
@@ -694,23 +775,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     metrics.put(ORPHAN_FILES_REMOVED_METRIC, filesRemoved);
     metrics.put(ORPHAN_BYTES_RECLAIMED_METRIC, bytesReclaimed);
     return metrics;
-  }
-
-  private static long collectTotalFileSize(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    Map<String, Object> compaction = collectCompactionMetrics(spark, catalogName, tableIdentifier);
-    Object value = compaction.get(TOTAL_FILE_SIZE_METRIC);
-    return value instanceof Number ? ((Number) value).longValue() : 0L;
-  }
-
-  private static long countSnapshots(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    Table table = loadIcebergTable(spark, catalogName, tableIdentifier);
-    long count = 0L;
-    for (Snapshot ignored : table.snapshots()) {
-      count++;
-    }
-    return count;
   }
 
   private static double numberAsDouble(Row row, String field) {
@@ -912,25 +976,49 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
+  /**
+   * Snapshot-expiry inventory used for S0 reporting and set-difference S1. Concurrent commits only
+   * add ids/paths to the after set; cleared/reclaimed count ids/paths that disappeared.
+   */
+  @VisibleForTesting
+  static final class ExpireInventory {
+    private final Set<Long> snapshotIds;
+    private final Map<String, Long> fileSizesByPath;
+
+    ExpireInventory(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
+      this.snapshotIds = Collections.unmodifiableSet(new HashSet<>(snapshotIds));
+      this.fileSizesByPath = Collections.unmodifiableMap(new HashMap<>(fileSizesByPath));
+    }
+
+    long snapshotCount() {
+      return snapshotIds.size();
+    }
+
+    long totalFileSize() {
+      long total = 0L;
+      for (Long size : fileSizesByPath.values()) {
+        total += size == null ? 0L : size;
+      }
+      return total;
+    }
+  }
+
   /** Before-metrics sample: snapshot at sample time, HEAD after metrics, and metrics JSON. */
   private static final class BeforeSample {
     private final long snapshotId;
     private final long headSnapshotId;
     private final String metricsJson;
-    private final long snapshotCount;
-    private final long totalFileSize;
+    @Nullable private final ExpireInventory expireInventory;
 
     private BeforeSample(
         long snapshotId,
         long headSnapshotId,
         String metricsJson,
-        long snapshotCount,
-        long totalFileSize) {
+        @Nullable ExpireInventory expireInventory) {
       this.snapshotId = snapshotId;
       this.headSnapshotId = headSnapshotId;
       this.metricsJson = metricsJson;
-      this.snapshotCount = snapshotCount;
-      this.totalFileSize = totalFileSize;
+      this.expireInventory = expireInventory;
     }
   }
 
