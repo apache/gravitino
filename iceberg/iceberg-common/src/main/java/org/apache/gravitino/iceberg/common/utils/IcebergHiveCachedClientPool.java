@@ -26,7 +26,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Comparator;
@@ -79,8 +78,7 @@ import org.slf4j.LoggerFactory;
  * connection that belongs to A. This will not work with kerberos authentication as it will change
  * the user name.
  */
-public class IcebergHiveCachedClientPool
-    implements ClientPool<IMetaStoreClient, TException>, Closeable {
+public class IcebergHiveCachedClientPool implements ClientPool<IMetaStoreClient, TException> {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergHiveCachedClientPool.class);
 
   private static final String CONF_ELEMENT_PREFIX = "conf:";
@@ -256,12 +254,5 @@ public class IcebergHiveCachedClientPool
     UGI,
     USER_NAME,
     CONF
-  }
-
-  @Override
-  public void close() throws IOException {
-    clientPoolCache.asMap().forEach((key, value) -> value.close());
-    clientPoolCache.invalidateAll();
-    if (scheduledExecutorService != null) scheduledExecutorService.shutdownNow();
   }
 }
