@@ -149,7 +149,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
-        System.out.println("Applied custom Spark configurations: " + customConfigs);
       } catch (IllegalArgumentException e) {
         System.err.println("Error: " + e.getMessage());
         printUsage();

@@ -65,6 +65,15 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics;
   private Table tableMetadata;
   private NameIdentifier nameIdentifier;
+<<<<<<< HEAD
+=======
+  /**
+   * Expression inputs from table metadata and numeric policy rules. Table-level statistics are
+   * intentionally excluded so partition-aware strategies cannot be driven by stale {@code
+   * statistic_meta} values after partition stats are refreshed.
+   */
+  private Map<String, Object> metadataAndRulesContext;
+>>>>>>> aa92227f8 ([#14674] fix(maintenance): Ignore table-level stats for partitioned strategies (#14675))
 
   /** Create a handler that evaluates expressions with the default QL evaluator. */
   protected BaseExpressionStrategyHandler() {
@@ -79,6 +88,10 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     this.strategy = context.strategy();
     this.tableStatistics = context.tableStatistics();
     this.partitionStatistics = context.partitionStatistics();
+<<<<<<< HEAD
+=======
+    this.metadataAndRulesContext = buildMetadataAndRulesContext();
+>>>>>>> aa92227f8 ([#14674] fix(maintenance): Ignore table-level stats for partitioned strategies (#14675))
   }
 
   @Override
@@ -127,7 +140,12 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
 
   private boolean shouldTriggerForPartitionTable() {
     if (partitionStatistics.isEmpty()) {
-      LOG.info("No partition statistics available for table {}", nameIdentifier);
+      // Partition-aware strategies require partition statistics; table-level stats are not a
+      // fallback (see #14674 / #14677).
+      LOG.info(
+          "Skip strategy {} for partitioned table {}: no partition statistics available",
+          strategy.name(),
+          nameIdentifier);
       return false;
     }
     String triggerExpression = triggerExpression(strategy);
@@ -219,10 +237,46 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     }
   }
 
+<<<<<<< HEAD
   private static Map<String, Object> buildExpressionContext(
       Strategy strategy, List<StatisticEntry<?>> statistics) {
     Map<String, Object> context = new HashMap<>();
     context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
+=======
+  /**
+   * Builds the expression context for one evaluation unit.
+   *
+   * <p>Partition-aware handlers on partitioned tables receive only {@link #metadataAndRulesContext}
+   * plus the partition's statistics. Non-partitioned evaluation also includes table-level
+   * statistics, applied before metadata/rules so duplicate keys keep the historical precedence
+   * (table statistics → table metadata → numeric policy rules → unit statistics).
+   *
+   * @param statistics statistics of the unit being evaluated (a single partition, or empty for
+   *     non-partitioned table-level evaluation)
+   * @return combined context
+   */
+  private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
+    Map<String, Object> context = new HashMap<>();
+    if (!isPartitionTable()) {
+      // Apply before metadata/rules so same-named properties/rules still win (#14675 review).
+      context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
+    }
+    context.putAll(metadataAndRulesContext);
+    context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
+    return context;
+  }
+
+  /** Precomputes table-metadata and rule inputs for expression evaluation. */
+  private Map<String, Object> buildMetadataAndRulesContext() {
+    Map<String, Object> context = new HashMap<>();
+    context.putAll(TableMetadataTriggerExpressionUtils.buildTableMetadataContext(tableMetadata));
+    context.putAll(getRulesExpressionContext(strategy));
+    return context;
+  }
+
+  private static Map<String, Object> getRulesExpressionContext(Strategy strategy) {
+    Map<String, Object> context = new HashMap<>();
+>>>>>>> aa92227f8 ([#14674] fix(maintenance): Ignore table-level stats for partitioned strategies (#14675))
     strategy
         .rules()
         .forEach(
