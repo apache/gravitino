@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -188,6 +187,11 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public void enablePolicy(String metalake, String policyName) throws NoSuchPolicyException {
+    NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
+    if (!policyEnabled(metalake, policyName)) {
+      requireNoConflictBeforeEnable(metalake, policyName);
+    }
     changePolicyEnabledState(metalake, policyName, true);
   }
 
@@ -273,9 +277,6 @@ public class PolicyManager implements PolicyDispatcher {
     if (policyEnabled(metalake, policyName) == expectedEnabledState) {
       return;
     }
-    if (expectedEnabledState) {
-      requireNoConflictBeforeEnable(metalake, policyName);
-    }
 
     try {
       entityStore.update(
@@ -309,8 +310,6 @@ public class PolicyManager implements PolicyDispatcher {
       return;
     }
 
-    List<String> conflicting = new ArrayList<>();
-    IllegalArgumentException first = null;
     for (RelationalEntity<?> association : listTagAssociationsForPolicy(metalake, policyName)) {
       TagEntity tag = (TagEntity) association.targetEntity();
       PolicyAssociationSelector selector =
@@ -323,24 +322,9 @@ public class PolicyManager implements PolicyDispatcher {
         if (assignment == null) {
           continue;
         }
-        try {
-          objectPolicyResolver.checkMaintenanceTypeUniqueness(
-              metalake, object, assignment, policy, selector);
-        } catch (IllegalArgumentException e) {
-          conflicting.add(object.toString());
-          if (first == null) {
-            first = e;
-          }
-        }
+        objectPolicyResolver.checkMaintenanceTypeUniqueness(
+            metalake, object, assignment, policy, selector);
       }
-    }
-    if (first != null) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Enabling policy %s would create same-type policy conflicts on metadata objects %s."
-                  + " %s",
-              policyName, conflicting, first.getMessage()),
-          first);
     }
   }
 
