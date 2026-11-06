@@ -274,71 +274,7 @@ public class PolicyManager implements PolicyDispatcher {
       return;
     }
     if (expectedEnabledState) {
-      PolicyEntity policy = loadPolicyEntity(metalake, policyName);
-      if (policy.policyType().uniqueAtSameLevel()) {
-        List<String> conflicting = new ArrayList<>();
-        IllegalArgumentException first = null;
-        for (RelationalEntity<?> association : listTagAssociationsForPolicy(metalake, policyName)) {
-          TagEntity tag = (TagEntity) association.targetEntity();
-          PolicyAssociationSelector selector =
-              association
-                  .relationValue()
-                  .map(PolicyAssociationSelectorSerde::deserialize)
-                  .orElseGet(AllValuesSelector::get);
-          List<MetadataObject> objects;
-          try {
-            objects =
-                MetadataObjectService.fromGenericEntities(
-                    entityStore
-                        .relationOperations()
-                        .listEntitiesByRelation(
-                            RelationQuery.of(
-                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                NameIdentifierUtil.ofTag(metalake, tag.name()),
-                                Entity.EntityType.TAG,
-                                true,
-                                null)));
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-          for (MetadataObject object : objects) {
-            TagAssignment assignment;
-            try {
-              assignment =
-                  entityStore
-                      .relationOperations()
-                      .<TagEntity>getEntityByRelation(
-                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                          MetadataObjectUtil.toEntityIdent(metalake, object),
-                          MetadataObjectUtil.toEntityType(object),
-                          NameIdentifierUtil.ofTag(metalake, tag.name()))
-                      .assignment()
-                      .orElseGet(TagAssignment::noValue);
-            } catch (NoSuchEntityException e) {
-              continue;
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-            try {
-              objectPolicyResolver.checkMaintenanceTypeUniqueness(
-                  metalake, object, assignment, policy, selector);
-            } catch (IllegalArgumentException e) {
-              conflicting.add(object.toString());
-              if (first == null) {
-                first = e;
-              }
-            }
-          }
-        }
-        if (first != null) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Enabling policy %s would create same-type policy conflicts on metadata"
-                      + " objects %s. %s",
-                  policyName, conflicting, first.getMessage()),
-              first);
-        }
-      }
+      requireNoConflictBeforeEnable(metalake, policyName);
     }
 
     try {
@@ -360,6 +296,87 @@ public class PolicyManager implements PolicyDispatcher {
       LOG.error(
           "Failed to change policy {} enabled state under metalake {}", policyName, metalake, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /**
+   * Rejects enabling a maintenance policy when that would create a same-level same-type conflict on
+   * any metadata object reached through the policy's tag associations.
+   */
+  private void requireNoConflictBeforeEnable(String metalake, String policyName) {
+    PolicyEntity policy = loadPolicyEntity(metalake, policyName);
+    if (!policy.policyType().uniqueAtSameLevel()) {
+      return;
+    }
+
+    List<String> conflicting = new ArrayList<>();
+    IllegalArgumentException first = null;
+    for (RelationalEntity<?> association : listTagAssociationsForPolicy(metalake, policyName)) {
+      TagEntity tag = (TagEntity) association.targetEntity();
+      PolicyAssociationSelector selector =
+          association
+              .relationValue()
+              .map(PolicyAssociationSelectorSerde::deserialize)
+              .orElseGet(AllValuesSelector::get);
+      for (MetadataObject object : listMetadataObjectsForTag(metalake, tag.name())) {
+        TagAssignment assignment = assignmentOnObject(metalake, object, tag.name());
+        if (assignment == null) {
+          continue;
+        }
+        try {
+          objectPolicyResolver.checkMaintenanceTypeUniqueness(
+              metalake, object, assignment, policy, selector);
+        } catch (IllegalArgumentException e) {
+          conflicting.add(object.toString());
+          if (first == null) {
+            first = e;
+          }
+        }
+      }
+    }
+    if (first != null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Enabling policy %s would create same-type policy conflicts on metadata objects %s."
+                  + " %s",
+              policyName, conflicting, first.getMessage()),
+          first);
+    }
+  }
+
+  private List<MetadataObject> listMetadataObjectsForTag(String metalake, String tagName) {
+    try {
+      return MetadataObjectService.fromGenericEntities(
+          entityStore
+              .relationOperations()
+              .listEntitiesByRelation(
+                  RelationQuery.of(
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                      NameIdentifierUtil.ofTag(metalake, tagName),
+                      Entity.EntityType.TAG,
+                      true,
+                      null)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Returns the tag assignment on {@code object}, or {@code null} if the tag is not present. */
+  private TagAssignment assignmentOnObject(String metalake, MetadataObject object, String tagName) {
+    try {
+      return entityStore
+          .relationOperations()
+          .<TagEntity>getEntityByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(metalake, object),
+              MetadataObjectUtil.toEntityType(object),
+              NameIdentifierUtil.ofTag(metalake, tagName))
+          .assignment()
+          .orElseGet(TagAssignment::noValue);
+    } catch (NoSuchEntityException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
