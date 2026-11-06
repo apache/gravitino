@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,10 +27,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.ref.WeakReference;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.StaticTableOperations;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadataParser;
@@ -85,6 +89,29 @@ class TestGravitinoGlueCatalog {
     GravitinoGlueCatalog catalog = catalogWith(mock(TableOperations.class), mock(FileIO.class));
 
     assertThrows(NoSuchTableException.class, () -> catalog.loadStaticTable(IDENTIFIER, null));
+  }
+
+  @Test
+  void testLoadStaticTableKeepsSourceOperationsReachable() {
+    AtomicReference<WeakReference<TableOperations>> source = new AtomicReference<>();
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          @Override
+          protected TableOperations newTableOps(TableIdentifier identifier) {
+            TableOperations ops = new StaticTableOperations(METADATA_LOCATION, mock(FileIO.class));
+            source.set(new WeakReference<>(ops));
+            return ops;
+          }
+        };
+
+    Table table = catalog.loadStaticTable(IDENTIFIER, METADATA_LOCATION);
+    for (int i = 0; i < 10 && source.get().get() != null; i++) {
+      System.gc();
+    }
+
+    // The catalog closes the FileIO of operations that were garbage collected.
+    assertNotNull(source.get().get());
+    assertEquals(IDENTIFIER.toString(), table.name());
   }
 
   private static GravitinoGlueCatalog catalogWith(TableOperations ops, FileIO io) {

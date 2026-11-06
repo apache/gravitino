@@ -21,12 +21,18 @@ package org.apache.gravitino.catalog.glue;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.StaticTableOperations;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
 
-/** A {@link GlueCatalog} that can open a table from a metadata location already read from Glue. */
+/**
+ * A {@link GlueCatalog} that can open a table from a metadata location already read from Glue.
+ *
+ * <p>This can be removed once the Iceberg dependency stops retrying permission errors during
+ * metadata refresh, see https://github.com/apache/iceberg/pull/17400.
+ */
 class GravitinoGlueCatalog extends GlueCatalog {
 
   /**
@@ -44,7 +50,26 @@ class GravitinoGlueCatalog extends GlueCatalog {
       throw new NoSuchTableException("Table %s has no metadata location", identifier);
     }
 
-    FileIO io = newTableOps(identifier).io();
-    return new BaseTable(new StaticTableOperations(metadataLocation, io), identifier.toString());
+    return new BaseTable(
+        new CatalogStaticTableOperations(metadataLocation, newTableOps(identifier)),
+        identifier.toString());
+  }
+
+  /**
+   * Static operations that hold on to the catalog's operations, because the catalog closes a {@link
+   * FileIO} once the operations it was created for are garbage collected.
+   */
+  private static class CatalogStaticTableOperations extends StaticTableOperations {
+    private final TableOperations catalogOperations;
+
+    CatalogStaticTableOperations(String metadataLocation, TableOperations catalogOperations) {
+      super(metadataLocation, catalogOperations.io());
+      this.catalogOperations = catalogOperations;
+    }
+
+    @Override
+    public FileIO io() {
+      return catalogOperations.io();
+    }
   }
 }
