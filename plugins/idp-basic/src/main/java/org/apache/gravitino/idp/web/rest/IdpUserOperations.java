@@ -38,11 +38,11 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
@@ -54,13 +54,13 @@ import org.apache.gravitino.utils.PrincipalUtils;
 @Path("/idp/users")
 public class IdpUserOperations {
 
-  private final IdpUserGroupManager userGroupManager;
+  private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IdpUserOperations(IdpUserGroupManager userGroupManager) {
-    this.userGroupManager = userGroupManager;
+  public IdpUserOperations(IdpUserGroupEventDispatcher userGroupDispatcher) {
+    this.userGroupDispatcher = userGroupDispatcher;
   }
 
   @GET
@@ -71,7 +71,7 @@ public class IdpUserOperations {
   public Response getUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO())),
+        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO())),
         "user",
         IdpOperationType.GET,
         user);
@@ -92,7 +92,7 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
-                  userGroupManager
+                  userGroupDispatcher
                       .addUser(request.getUser(), request.getPassword(), request.enabledOrDefault())
                       .toDTO()));
         },
@@ -135,15 +135,15 @@ public class IdpUserOperations {
             Preconditions.checkArgument(
                 StringUtils.isNotBlank(request.getOldPassword()),
                 "\"oldPassword\" is required when changing your own password");
-            userGroupManager.changePassword(
+            userGroupDispatcher.changePassword(
                 user, request.getNewPassword(), request.getOldPassword());
           } else {
             Preconditions.checkArgument(
                 request.getOldPassword() == null,
                 "\"oldPassword\" is only allowed when changing your own password");
-            userGroupManager.changePassword(user, request.getNewPassword());
+            userGroupDispatcher.changePassword(user, request.getNewPassword());
           }
-          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,
@@ -182,8 +182,8 @@ public class IdpUserOperations {
               !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
               "Cannot update the enabled flag of service admin %s",
               user);
-          userGroupManager.updateEnabled(user, request.getEnabled());
-          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+          userGroupDispatcher.updateEnabled(user, request.getEnabled());
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,
@@ -198,7 +198,7 @@ public class IdpUserOperations {
   public Response removeUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupDispatcher.removeUser(user))),
         "user",
         IdpOperationType.REMOVE,
         user);

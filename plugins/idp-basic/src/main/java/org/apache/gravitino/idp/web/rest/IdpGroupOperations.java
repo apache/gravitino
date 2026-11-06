@@ -35,10 +35,10 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.RemoveResponse;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
@@ -49,13 +49,13 @@ import org.apache.gravitino.metrics.MetricNames;
 @Path("/idp/groups")
 public class IdpGroupOperations {
 
-  private final IdpUserGroupManager userGroupManager;
+  private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IdpGroupOperations(IdpUserGroupManager userGroupManager) {
-    this.userGroupManager = userGroupManager;
+  public IdpGroupOperations(IdpUserGroupEventDispatcher userGroupDispatcher) {
+    this.userGroupDispatcher = userGroupDispatcher;
   }
 
   @GET
@@ -66,7 +66,7 @@ public class IdpGroupOperations {
   public Response getGroup(@PathParam("group") String group) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new IdpGroupResponse(userGroupManager.getGroup(group).toDTO())),
+        () -> IdpRESTUtils.ok(new IdpGroupResponse(userGroupDispatcher.getGroup(group).toDTO())),
         "group",
         IdpOperationType.GET,
         group);
@@ -87,7 +87,7 @@ public class IdpGroupOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpGroupResponse(
-                  userGroupManager.addGroup(request.getGroup(), request.getComment()).toDTO()));
+                  userGroupDispatcher.addGroup(request.getGroup(), request.getComment()).toDTO()));
         },
         "group",
         IdpOperationType.ADD,
@@ -103,7 +103,7 @@ public class IdpGroupOperations {
       @PathParam("group") String group, @DefaultValue("false") @QueryParam("force") boolean force) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeGroup(group, force))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupDispatcher.removeGroup(group, force))),
         "group",
         IdpOperationType.REMOVE,
         group);
@@ -128,7 +128,7 @@ public class IdpGroupOperations {
           String[] usersToRemove = request.getUsersToRemove();
           return IdpRESTUtils.ok(
               new IdpGroupResponse(
-                  userGroupManager
+                  userGroupDispatcher
                       .changeGroupMembership(
                           group,
                           usersToAdd == null ? null : Arrays.asList(usersToAdd),
