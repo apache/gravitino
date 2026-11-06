@@ -228,6 +228,33 @@ class TestCompactionStrategyHandler {
   }
 
   @Test
+  void testNonPartitionTablePrefersMetadataOverDuplicateStatisticKey() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Strategy strategy = buildStrategyWithTriggerExpr("row_count_limit > 100");
+
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(new org.apache.gravitino.rel.expressions.transforms.Transform[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    Mockito.when(tableMetadata.sortOrder()).thenReturn(new SortOrder[0]);
+    // Metadata value satisfies the trigger; a same-named table statistic would not.
+    Mockito.when(tableMetadata.properties()).thenReturn(Map.of("row_count_limit", "500"));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(
+                List.of(new StatisticEntryImpl("row_count_limit", StatisticValues.longValue(1L))))
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    Assertions.assertTrue(
+        handler.shouldTrigger(),
+        "Non-partitioned evaluation must prefer table metadata over a same-named table statistic");
+  }
+
+  @Test
   void testShouldTriggerUsesMetadataWithPartitionStatsWhenCombinedExprIsFalse() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);

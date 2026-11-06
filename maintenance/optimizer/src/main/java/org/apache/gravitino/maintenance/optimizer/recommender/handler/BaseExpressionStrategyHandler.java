@@ -240,17 +240,20 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
    *
    * <p>Partition-aware handlers on partitioned tables receive only {@link #metadataAndRulesContext}
    * plus the partition's statistics. Non-partitioned evaluation also includes table-level
-   * statistics.
+   * statistics, applied before metadata/rules so duplicate keys keep the historical precedence
+   * (table statistics → table metadata → numeric policy rules → unit statistics).
    *
    * @param statistics statistics of the unit being evaluated (a single partition, or empty for
    *     non-partitioned table-level evaluation)
    * @return combined context
    */
   private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = new HashMap<>(metadataAndRulesContext);
+    Map<String, Object> context = new HashMap<>();
     if (!isPartitionTable()) {
+      // Apply before metadata/rules so same-named properties/rules still win (#14675 review).
       context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
     }
+    context.putAll(metadataAndRulesContext);
     context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
     return context;
   }
