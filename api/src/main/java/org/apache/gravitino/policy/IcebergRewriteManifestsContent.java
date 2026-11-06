@@ -56,10 +56,32 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
       "avg_manifest_size_threshold_bytes";
   /** Default exclusive average size threshold in bytes. */
   public static final long DEFAULT_AVG_MANIFEST_SIZE_THRESHOLD_BYTES = 8388608L;
+  /** S0 metric: total manifest count (TMS / in-job gate). */
+  public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
+  /** S0 metric: average manifest size in bytes (TMS / in-job gate). */
+  public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
   /** Rule key for the requested partition spec ID; omission selects Iceberg's current default. */
   public static final String SPEC_ID = "spec_id";
   /** Rule key for caching option, or null for the Iceberg default. */
   public static final String USE_CACHING = "use_caching";
+
+  /**
+   * Default in-job / enqueue trigger: same thresholds as {@code ManifestRewriteStrategyHandler}
+   * (critical count, or warning count with small avg size).
+   */
+  private static final String TRIGGER_EXPR =
+      MANIFEST_NUMBER_METRIC
+          + " >= "
+          + MANIFEST_COUNT_CRITICAL
+          + " || ("
+          + MANIFEST_NUMBER_METRIC
+          + " >= "
+          + MANIFEST_COUNT_WARNING
+          + " && "
+          + AVG_MANIFEST_SIZE_METRIC
+          + " < "
+          + AVG_MANIFEST_SIZE_THRESHOLD_BYTES
+          + ")";
 
   private final Long manifestCountCritical;
   private final Long manifestCountWarning;
@@ -173,6 +195,7 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
     rules.put(MANIFEST_COUNT_CRITICAL, manifestCountCritical);
     rules.put(MANIFEST_COUNT_WARNING, manifestCountWarning);
     rules.put(AVG_MANIFEST_SIZE_THRESHOLD_BYTES, avgManifestSizeThresholdBytes);
+    rules.put(TRIGGER_EXPR_KEY, TRIGGER_EXPR);
     if (specId != null) {
       rules.put(SPEC_ID, specId);
     }

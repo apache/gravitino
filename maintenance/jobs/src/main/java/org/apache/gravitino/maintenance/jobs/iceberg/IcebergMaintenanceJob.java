@@ -42,6 +42,7 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
@@ -97,10 +98,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   public static final String FILE_NUMBER_METRIC = "custom-file-number";
 
   /** Manifest rewrite S0: total manifest count across specs. */
-  public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
+  public static final String MANIFEST_NUMBER_METRIC =
+      IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC;
 
   /** Manifest rewrite S0: average manifest size in bytes. */
-  public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
+  public static final String AVG_MANIFEST_SIZE_METRIC =
+      IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC;
 
   /** Manifest rewrite S1: manifests rewritten/removed by the procedure. */
   public static final String MANIFESTS_REMOVED_METRIC = "custom-manifests-removed";

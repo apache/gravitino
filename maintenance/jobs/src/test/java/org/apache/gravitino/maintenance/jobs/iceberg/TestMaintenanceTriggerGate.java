@@ -25,16 +25,17 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link MaintenanceTriggerGate}. */
 public class TestMaintenanceTriggerGate {
 
   @Test
-  public void testNonCompactionAlwaysMaintain() {
+  public void testExpireSnapshotsAlwaysMaintain() {
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.EXPIRE_SNAPSHOTS, new HashMap<>(), "{\"snapshotId\":1}"));
+            MaintenanceType.EXPIRE_SNAPSHOTS, new HashMap<>(), "{\"custom-snapshot-count\":1}"));
   }
 
   @Test
@@ -63,5 +64,84 @@ public class TestMaintenanceTriggerGate {
             + "\":0}";
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_DATA_FILES, args, above));
+  }
+
+  @Test
+  public void testManifestRewriteUsesDefaultThresholds() {
+    // Defaults: critical=500, warning=100, avg threshold=8MiB.
+    String belowWarning =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":50,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":1000}";
+    assertFalse(
+        MaintenanceTriggerGate.shouldMaintain(
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), belowWarning));
+
+    String warningAndSmall =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":120,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":1000}";
+    assertTrue(
+        MaintenanceTriggerGate.shouldMaintain(
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), warningAndSmall));
+
+    String critical =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":500,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":9000000}";
+    assertTrue(
+        MaintenanceTriggerGate.shouldMaintain(
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), critical));
+
+    String warningButLarge =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":120,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":9000000}";
+    assertFalse(
+        MaintenanceTriggerGate.shouldMaintain(
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), warningButLarge));
+  }
+
+  @Test
+  public void testManifestRewriteUsesEnqueueRules() {
+    Map<String, String> args = new HashMap<>();
+    args.put(
+        MaintenanceTriggerGate.RULES_ARG,
+        "{\"rewrite_manifests\":{"
+            + "\"trigger-expr\":\"custom-manifest-number >= manifest_count_critical\","
+            + "\"manifest_count_critical\":10}}");
+
+    String below =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":5,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":1}";
+    assertFalse(
+        MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_MANIFESTS, args, below));
+
+    String above =
+        "{\""
+            + IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC
+            + "\":10,\""
+            + IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC
+            + "\":1}";
+    assertTrue(
+        MaintenanceTriggerGate.shouldMaintain(MaintenanceType.REWRITE_MANIFESTS, args, above));
+  }
+
+  @Test
+  public void testManifestRewriteSkipsWhenMetricsMissing() {
+    assertFalse(
+        MaintenanceTriggerGate.shouldMaintain(
+            MaintenanceType.REWRITE_MANIFESTS, new HashMap<>(), "{}"));
   }
 }
