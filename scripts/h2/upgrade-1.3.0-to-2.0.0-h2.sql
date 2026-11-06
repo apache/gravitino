@@ -26,6 +26,9 @@
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
+-- Support external column names up to 300 characters (including BigQuery).
+ALTER TABLE `table_column_version_info` ALTER COLUMN `column_name` VARCHAR(300) NOT NULL;
+
 ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
 ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
 
@@ -229,3 +232,17 @@ ALTER TABLE `policy_meta`
 
 -- Role deletion soft-deletes relation rows by role_id.
 CREATE INDEX IF NOT EXISTS `group_role_rel_idx_role_id` ON `group_role_rel` (`role_id`);
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`)
+) COMMENT='current semantic model dataset source associations';
+CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);

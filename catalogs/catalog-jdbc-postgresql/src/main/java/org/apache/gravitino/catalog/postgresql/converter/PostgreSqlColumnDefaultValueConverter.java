@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARC
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.google.common.io.BaseEncoding;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -133,6 +134,13 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
     return value.indexOf('\\') >= 0
         ? "E'" + escaped.replace("\\", "\\\\") + "'"
         : "'" + escaped + "'";
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected String binaryLiteral(byte[] value) {
+    // PostgreSQL's X'...' literal is a bit string, so decode hex explicitly for bytea.
+    return "decode('" + BaseEncoding.base16().lowerCase().encode(value) + "', 'hex')";
   }
 
   private Expression parseLiteral(JdbcTypeConverter.JdbcTypeBean type, String columnDefaultValue) {

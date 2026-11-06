@@ -205,10 +205,16 @@ class Privilege(ABC):
         """The privilege to list configured secrets providers."""
 
         USE_SECRETS = (0, 1 << 37)
-        """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRETS."""
+        """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
         INCLUDE_CREDENTIAL_SECRETS = (0, 1 << 38)
-        """With USE_SECRETS, include cloud credential secrets in the getSecrets result."""
+        """With USE_SECRETS, include cloud credential secrets in getSecrets.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
         CREATE_SEMANTIC_MODEL = (0, 1 << 39)
         """The privilege to create a Semantic Model."""
@@ -1820,7 +1826,10 @@ class ViewSecretProviders(GenericPrivilege):
 
 
 class UseSecrets(GenericPrivilege):
-    """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRETS."""
+    """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
     _ALLOW_INSTANCE: Optional["UseSecrets"] = None
     _DENY_INSTANCE: Optional["UseSecrets"] = None
@@ -1846,7 +1855,10 @@ class UseSecrets(GenericPrivilege):
 
 
 class IncludeCredentialSecrets(GenericPrivilege):
-    """With USE_SECRETS, include cloud credential secrets in the getSecrets result."""
+    """With USE_SECRETS, include cloud credential secrets in getSecrets.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
     _ALLOW_INSTANCE: Optional["IncludeCredentialSecrets"] = None
     _DENY_INSTANCE: Optional["IncludeCredentialSecrets"] = None

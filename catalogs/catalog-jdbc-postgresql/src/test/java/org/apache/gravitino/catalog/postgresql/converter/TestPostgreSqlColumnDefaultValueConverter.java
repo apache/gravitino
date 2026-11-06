@@ -20,16 +20,32 @@ package org.apache.gravitino.catalog.postgresql.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.google.common.io.BaseEncoding;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPostgreSqlColumnDefaultValueConverter {
 
   private final PostgreSqlColumnDefaultValueConverter converter =
       new PostgreSqlColumnDefaultValueConverter();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryDefaultsUseByteaSyntax(String hex) {
+    Assertions.assertEquals(
+        "decode('" + hex + "', 'hex')",
+        converter.fromGravitino(
+            Literals.of(BaseEncoding.base16().lowerCase().decode(hex), Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "decode('" + hex + "', 'hex')",
+        converter.fromGravitino(Literals.of("0x" + hex, Types.BinaryType.get())));
+  }
 
   @Test
   void testNullDefaultsAllowNativeCastsWithoutSwallowingExpressions() {

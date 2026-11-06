@@ -68,7 +68,7 @@ class TestGlueCatalogCapability {
 
   @Test
   void testCaseSensitiveOnColumnIsSupported() {
-    // Column name case folding is not documented in Glue Column API — treated as supported.
+    // Iceberg keeps the case of column names; Hive-format names are folded by the catalog itself.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
     assertTrue(result.supported());
   }

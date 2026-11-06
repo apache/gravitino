@@ -27,6 +27,9 @@
 ALTER TABLE `table_column_version_info`
     MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
 
+-- Support external column names up to 300 characters (including BigQuery).
+ALTER TABLE `table_column_version_info` MODIFY COLUMN `column_name` VARCHAR(300) NOT NULL COMMENT 'column name';
+
 SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'tag_meta' AND column_name = 'allowed_values'),
     'SELECT 1',
@@ -694,3 +697,18 @@ SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
 PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`),
+    KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
+    KEY `idx_smsr_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'current semantic model dataset source associations';

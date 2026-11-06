@@ -20,6 +20,9 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.io.BaseEncoding;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -34,6 +37,77 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestJdbcColumnDefaultValueConverter {
 
   private final JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Z", "+08:00", "-07:00"})
+  void testTimestampDefaultsUseNumericOffsets(String offset) {
+    String value = "2026-11-04T12:34:56.123456" + offset;
+    String expected =
+        "'2026-11-04 12:34:56.123456" + (offset.equals("Z") ? "+00:00" : offset) + "'";
+    Assertions.assertEquals(
+        expected,
+        converter.fromGravitino(
+            Literals.of(OffsetDateTime.parse(value), Types.TimestampType.withTimeZone())));
+    Assertions.assertEquals(
+        expected, converter.fromGravitino(Literals.of(value, Types.TimestampType.withTimeZone())));
+    Assertions.assertEquals(
+        "'2026-11-04 12:34:56.123456'",
+        converter.fromGravitino(Literals.timestampLiteral("2026-11-04T12:34:56.123456")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"12:34:00", "00:00:00"})
+  void testWholeMinuteTimestampDefaultsIncludeSeconds(String time) {
+    String text = "2026-11-04T" + time;
+    for (String offset : new String[] {"Z", "+08:00", "-07:00"}) {
+      String expected = "'2026-11-04 " + time + (offset.equals("Z") ? "+00:00" : offset) + "'";
+      OffsetDateTime value = OffsetDateTime.parse(text + offset);
+      Assertions.assertEquals(
+          expected,
+          converter.fromGravitino(Literals.of(value, Types.TimestampType.withTimeZone())));
+      Assertions.assertEquals(
+          expected,
+          converter.fromGravitino(
+              Literals.of(value.toString(), Types.TimestampType.withTimeZone())));
+    }
+    Assertions.assertEquals(
+        "'2026-11-04 " + time + "'",
+        converter.fromGravitino(Literals.timestampLiteral(LocalDateTime.parse(text))));
+    Assertions.assertEquals(
+        "'2026-11-04 " + time + "'",
+        converter.fromGravitino(
+            Literals.of(
+                LocalDateTime.parse(text).toString(), Types.TimestampType.withoutTimeZone())));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryDefaultsPreserveBytes(String hex) {
+    Assertions.assertEquals(
+        "X'" + hex + "'",
+        converter.fromGravitino(
+            Literals.of(BaseEncoding.base16().lowerCase().decode(hex), Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "X'" + hex + "'", converter.fromGravitino(Literals.of("0x" + hex, Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "'legacy'", converter.fromGravitino(Literals.of("legacy", Types.BinaryType.get())));
+    Assertions.assertEquals("'0x4142'", converter.fromGravitino(Literals.stringLiteral("0x4142")));
+    Assertions.assertEquals(
+        "X'00ff'", converter.fromGravitino(Literals.of("0x00FF", Types.BinaryType.get())));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0x0", "0xzz", "0x41'); DROP TABLE t; --"})
+  void testMalformedBinaryDefaultsAreRejected(String value) {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Literals.of(value, Types.BinaryType.get())));
+    Assertions.assertEquals(
+        "Invalid binary column default value: use 0x followed by hexadecimal byte pairs",
+        exception.getMessage());
+    Assertions.assertNotNull(exception.getCause());
+  }
 
   @Test
   void testFunctionArgumentsAreRenderedAsSqlLiterals() {

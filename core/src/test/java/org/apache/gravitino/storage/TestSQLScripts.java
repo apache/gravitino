@@ -104,7 +104,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         executeScript(scriptFile);
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
-        assertRoleRelationsIndexedByRoleId("schema " + versionScripts.getKey());
+        assertCleanupIndexes("schema " + versionScripts.getKey());
       }
     }
   }
@@ -137,7 +137,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(sourceSchema);
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
-        assertRoleRelationsIndexedByRoleId(upgradeScript.getName());
+        assertCleanupIndexes(upgradeScript.getName());
       }
     }
   }
@@ -400,6 +400,45 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  /**
+   * Verifies the 2.0 migration expands column names and preserves data on retry.
+   *
+   * @throws SQLException if the migrated database cannot be queried
+   * @throws IOException if the scripts cannot be read
+   */
+  @TestTemplate
+  public void testUpgradeToTwoZeroSupportsLongColumnNames() throws SQLException, IOException {
+    Path scriptDir = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    File upgrade = scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
+    String insert =
+        "INSERT INTO table_column_version_info "
+            + "(metalake_id, catalog_id, schema_id, table_id, table_version, column_id, column_name, "
+            + "column_position, column_type, column_op_type, audit_info) "
+            + "VALUES (1, 2, 3, 4, 1, %d, '%s', 0, 'string', 0, '{}')";
+    String oldName = "c".repeat(128);
+    executeStatements(List.of(String.format(insert, 1, oldName)), "existing 1.3 column");
+    executeScript(upgrade);
+    String longName = "c".repeat(300);
+    executeStatements(List.of(String.format(insert, 2, longName)), "new long column");
+    executeScript(upgrade);
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rows =
+            statement.executeQuery(
+                "SELECT column_name FROM table_column_version_info ORDER BY column_id")) {
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(oldName, rows.getString(1));
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(longName, rows.getString(1));
+      Assertions.assertFalse(rows.next());
+    }
+  }
+
   /** Verifies a completed upgrade can be repeated without resetting migrated data. */
   @TestTemplate
   public void testUpgradeToTwoZeroIsIdempotent() throws SQLException, IOException {
@@ -566,12 +605,19 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
-  private void assertRoleRelationsIndexedByRoleId(String source) throws SQLException {
+  private void assertCleanupIndexes(String source) throws SQLException {
+    Map<String, String> leadingColumns =
+        Map.of(
+            "user_role_rel", "role_id",
+            "group_role_rel", "role_id",
+            "semantic_model_source_rel", "deleted_at");
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection()) {
       DatabaseMetaData metaData = connection.getMetaData();
-      for (String table : List.of("user_role_rel", "group_role_rel")) {
+      for (Map.Entry<String, String> entry : leadingColumns.entrySet()) {
+        String table = entry.getKey();
+        String column = entry.getValue();
         String tableName =
             metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
         boolean indexed = false;
@@ -579,14 +625,14 @@ public class TestSQLScripts extends TestJDBCBackend {
             metaData.getIndexInfo(connection.getCatalog(), null, tableName, false, false)) {
           while (indexes.next()) {
             if (indexes.getShort("ORDINAL_POSITION") == 1
-                && "role_id".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+                && column.equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
               indexed = true;
               break;
             }
           }
         }
         Assertions.assertTrue(
-            indexed, "No index leading with role_id on " + table + " after " + source);
+            indexed, "No index leading with " + column + " on " + table + " after " + source);
       }
     }
   }

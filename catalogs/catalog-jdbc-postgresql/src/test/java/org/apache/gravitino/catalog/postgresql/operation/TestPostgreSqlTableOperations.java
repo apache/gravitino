@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
+import com.google.common.io.BaseEncoding;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -45,6 +46,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConv
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -641,6 +643,53 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
       } finally {
         statement.execute("RESET standard_conforming_strings");
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryDefaultsPreserveBytesOnCreateAndAlter(String hex) throws SQLException {
+    String table = RandomNameUtils.genRandomName("binary_defaults");
+    byte[] bytes = BaseEncoding.base16().lowerCase().decode(hex);
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        table,
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("payload")
+              .withType(Types.BinaryType.get())
+              .withNullable(true)
+              .withDefaultValue(Literals.of(bytes, Types.BinaryType.get()))
+              .build()
+        },
+        null,
+        Collections.emptyMap(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      String qualified = TEST_DB_NAME + "." + table;
+      statement.executeUpdate("INSERT INTO " + qualified + " DEFAULT VALUES");
+      try (ResultSet result = statement.executeQuery("SELECT payload FROM " + qualified)) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertArrayEquals(bytes, result.getBytes(1));
+      }
+      statement.executeUpdate("DELETE FROM " + qualified);
+      byte[] altered = BaseEncoding.base16().lowerCase().decode(hex + "ff");
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"payload"},
+              DTOConverters.toFunctionArg(Literals.of(altered, Types.BinaryType.get()))));
+      statement.executeUpdate("INSERT INTO " + qualified + " DEFAULT VALUES");
+      try (ResultSet result = statement.executeQuery("SELECT payload FROM " + qualified)) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertArrayEquals(altered, result.getBytes(1));
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
     }
   }
 
