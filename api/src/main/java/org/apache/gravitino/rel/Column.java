@@ -84,21 +84,27 @@ public interface Column {
   boolean autoIncrement();
 
   /**
-   * Returns the write-time default value of this column.
+   * Returns the default value used for new records that omit this column.
    *
-   * <p>For Iceberg format-version 3, this corresponds to {@code write-default}: the value writers
-   * fill in when a field is not supplied.
+   * <p>Catalogs that do not support column defaults leave this unset ({@link
+   * Column#DEFAULT_VALUE_NOT_SET}).
+   *
+   * <p>For example, for Iceberg format-version 3 this maps to {@code write-default}: the value
+   * writers fill in when a field is not supplied.
    *
    * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
    */
   Expression defaultValue();
 
   /**
-   * Returns the initial default value of this column.
+   * Returns the default value used when reading stored records that lack this column, such as
+   * records written before the column was added.
    *
-   * <p>For Iceberg format-version 3, this corresponds to {@code initial-default}: the value assumed
-   * for rows written before the field was added. Catalogs that do not distinguish an initial
-   * default may leave this unset.
+   * <p>Catalogs that do not distinguish an initial default leave this unset ({@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
+   *
+   * <p>For example, for Iceberg format-version 3 this maps to {@code initial-default}: the value
+   * assumed for rows written before the field was added.
    *
    * @return The initial default value, {@link Column#INITIAL_DEFAULT_VALUE_NOT_SET} if not
    *     specified
