@@ -25,6 +25,8 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestRepresentationDTO {
 
@@ -39,10 +41,31 @@ public class TestRepresentationDTO {
     RepresentationDTO deserialized =
         JsonUtils.objectMapper().readValue(json, RepresentationDTO.class);
 
+    deserialized.validate();
     Assertions.assertInstanceOf(SQLRepresentationDTO.class, deserialized);
     Assertions.assertEquals(Representation.TYPE_SQL, deserialized.type());
     Assertions.assertEquals("spark", ((SQLRepresentationDTO) deserialized).dialect());
     Assertions.assertEquals("SELECT 1", ((SQLRepresentationDTO) deserialized).sql());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "",
+        "\"type\":null,",
+        "\"type\":\"\",",
+        "\"type\":\" \",",
+        "\"type\":\"notsql\",",
+        "\"type\":\"SQL\","
+      })
+  public void testRejectInvalidRepresentationType(String typeField) throws JsonProcessingException {
+    String json = "{" + typeField + "\"dialect\":\"trino\",\"sql\":\"SELECT 1\"}";
+    RepresentationDTO representation =
+        JsonUtils.objectMapper().readValue(json, RepresentationDTO.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, representation::validate);
+    Assertions.assertEquals("\"type\" must be \"sql\"", exception.getMessage());
   }
 
   @Test

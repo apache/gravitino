@@ -32,8 +32,9 @@ import org.apache.gravitino.rel.Representation;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SQLRepresentationDTO extends RepresentationDTO {
 
+  // Preserve the supplied discriminator so validation can reject missing or invalid types.
   @JsonProperty("type")
-  private final String type = Representation.TYPE_SQL;
+  private String type;
 
   @JsonProperty("dialect")
   private String dialect;
@@ -46,6 +47,7 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
   }
 
   private SQLRepresentationDTO(String dialect, String sql) {
+    this.type = Representation.TYPE_SQL;
     this.dialect = dialect;
     this.sql = sql;
   }
@@ -84,6 +86,7 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(Representation.TYPE_SQL.equals(type), "\"type\" must be \"sql\"");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(dialect), "\"dialect\" field is required and cannot be empty");
     Preconditions.checkArgument(
