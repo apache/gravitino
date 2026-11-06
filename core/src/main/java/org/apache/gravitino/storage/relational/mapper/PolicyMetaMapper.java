@@ -220,19 +220,19 @@ public interface PolicyMetaMapper {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
 
   /**
-   * Lists, for each table, the enabled policies of {@code policyType} matched on its nearest level.
+   * Lists each distinct enabled policy of {@code policyType} matched on a table's nearest level.
    *
-   * <p>Tables without a matching policy are absent from the result.
+   * <p>Tables without a matching policy are absent. A table may appear on more than one row when
+   * several policies tie.
    *
    * @param tableIds table ids
    * @param policyType policy type wire value
-   * @return one row per table with a matching policy
+   * @return one row per {@code (tableId, policyId)}
    */
   @Results(
       id = "nearestPolicyIdPOResultMap",
       value = {
         @Result(property = "tableId", column = "tableId"),
-        @Result(property = "policyCount", column = "policyCount"),
         @Result(property = "policyId", column = "policyId")
       })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listNearestPolicyIds")

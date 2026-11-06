@@ -20,8 +20,10 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
@@ -64,7 +66,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
 
     PolicyMetaService service = PolicyMetaService.getInstance();
     Assertions.assertEquals(
-        tablePolicy.id(),
+        List.of(tablePolicy.id()),
         service
             .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
             .get(table.id()));
@@ -72,7 +74,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     TableEntity other =
         createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "schema"), "t2");
     Assertions.assertEquals(
-        catalogPolicy.id(),
+        List.of(catalogPolicy.id()),
         service
             .resolveNearestPolicyIds(List.of(other.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
             .get(other.id()));
@@ -101,7 +103,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
 
     PolicyMetaService service = PolicyMetaService.getInstance();
     Assertions.assertEquals(
-        outerPolicy.id(),
+        List.of(outerPolicy.id()),
         service
             .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
             .get(table.id()));
@@ -111,7 +113,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     linkPolicy(middleTag, middlePolicy, null);
     assignTag(middle.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("middle_tag"));
     Assertions.assertEquals(
-        middlePolicy.id(),
+        List.of(middlePolicy.id()),
         service
             .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
             .get(table.id()));
@@ -159,7 +161,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     assignTag(catalog.nameIdentifier(), Entity.EntityType.CATALOG, TagValue.noValue("catalog_tag"));
 
     Assertions.assertEquals(
-        Map.of(tagged.id(), tablePolicy.id(), inherited.id(), catalogPolicy.id()),
+        Map.of(tagged.id(), List.of(tablePolicy.id()), inherited.id(), List.of(catalogPolicy.id())),
         PolicyMetaService.getInstance()
             .resolveNearestPolicyIds(
                 List.of(tagged.id(), inherited.id()), Policy.BuiltInType.ICEBERG_COMPACTION));
@@ -187,7 +189,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testSameLevelAmbiguityThrows() throws IOException {
+  public void testSameLevelAmbiguityReturnsAllNearestIds() throws IOException {
     createAndInsertMakeLake(METALAKE);
     createAndInsertCatalog(METALAKE, "cat");
     createAndInsertSchema(METALAKE, "cat", "schema");
@@ -203,14 +205,11 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.noValue("tag_a"));
     assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.noValue("tag_b"));
 
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                PolicyMetaService.getInstance()
-                    .resolveNearestPolicyIds(
-                        List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION));
-    Assertions.assertTrue(thrown.getMessage().contains("ambiguous"));
+    List<Long> nearest =
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id());
+    Assertions.assertEquals(Set.of(a.id(), b.id()), new HashSet<>(nearest));
   }
 
   @TestTemplate
@@ -242,7 +241,7 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("domain", "finance"));
 
     Assertions.assertEquals(
-        finance.id(),
+        List.of(finance.id()),
         PolicyMetaService.getInstance()
             .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
             .get(table.id()));
