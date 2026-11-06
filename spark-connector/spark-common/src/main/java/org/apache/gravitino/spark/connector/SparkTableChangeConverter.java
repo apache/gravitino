@@ -47,12 +47,23 @@ public class SparkTableChangeConverter {
       return org.apache.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      Type dataType = sparkTypeConverter.toGravitinoType(addColumn.dataType());
+      // The new column is not in the table yet, so its own type is the target of its default.
+      Expression defaultValue =
+          addColumn.defaultValue() == null
+              ? Column.DEFAULT_VALUE_NOT_SET
+              : convertDefaultValue(
+                  addColumn.defaultValue().getSql(),
+                  addColumn.fieldNames(),
+                  () -> new Column[] {Column.of(addColumn.fieldNames()[0], dataType)});
       return org.apache.gravitino.rel.TableChange.addColumn(
           addColumn.fieldNames(),
-          sparkTypeConverter.toGravitinoType(addColumn.dataType()),
+          dataType,
           addColumn.comment(),
           transformColumnPosition(addColumn.position()),
-          addColumn.isNullable());
+          addColumn.isNullable(),
+          false,
+          defaultValue);
     } else if (change instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
       return org.apache.gravitino.rel.TableChange.deleteColumn(
