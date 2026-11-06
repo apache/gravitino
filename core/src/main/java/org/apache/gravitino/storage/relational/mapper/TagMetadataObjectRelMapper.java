@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -58,6 +59,22 @@ public interface TagMetadataObjectRelMapper {
       @Param("metalakeName") String metalakeName,
       @Param("tagName") String tagName,
       @Param("tagValue") String tagValue);
+
+  /**
+   * Lists live assignments by stable tag ID, optionally narrowed by value.
+   *
+   * @param metalakeName The metalake of the tag.
+   * @param tagId The stable tag ID.
+   * @param tagValue The assignment value, or null for every value.
+   * @return The matching live assignments.
+   */
+  @SelectProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "listTagMetadataObjectRelsByTagId")
+  List<TagMetadataObjectRelPO> listTagMetadataObjectRelsByTagId(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagId") Long tagId,
+      @Param("tagValue") @Nullable String tagValue);
 
   @InsertProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,

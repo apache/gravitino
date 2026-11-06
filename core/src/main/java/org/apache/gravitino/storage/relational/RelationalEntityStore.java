@@ -217,6 +217,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    return backend.listDescendantSchemas(identifier);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
     return backend.list(namespace, entityType, false);
@@ -502,6 +507,12 @@ public class RelationalEntityStore
   }
 
   @Override
+  public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException {
+    return backend.listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
   public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) throws IOException {
     return backend.listSubDomains(parentIdent);
   }
@@ -634,7 +645,7 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
       throws IOException {
-    if (query.relationValue().isPresent()) {
+    if (query.anchorId().isPresent() || query.relationValue().isPresent()) {
       return backend.listEntitiesByRelation(query);
     }
 

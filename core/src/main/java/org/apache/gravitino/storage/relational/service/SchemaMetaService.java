@@ -134,6 +134,18 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
+  /**
+   * Lists recorded descendant schemas using the existing hierarchy prefix lookup.
+   *
+   * @param identifier The logical schema identifier.
+   * @return Descendant schemas in logical form, excluding the requested schema.
+   * @throws NoSuchEntityException If the schema does not exist.
+   */
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) {
+    SchemaPO schema = getSchemaPOByIdentifier(identifier);
+    return POConverters.fromSchemaPOs(listDescendantSchemaPOs(schema), identifier.namespace());
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertSchema")
