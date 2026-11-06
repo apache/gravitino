@@ -113,8 +113,8 @@ public class JdbcConfig extends Config {
    * normal operations get only the <em>connect</em> timeout (a read timeout there would abort
    * legitimate long-running operations), while the one-off create-time verification probe gets both
    * the <em>connect</em> and the <em>read/login</em> timeout, because that probe runs under the
-   * metalake write lock and a backend that accepts the socket but never speaks the protocol would
-   * otherwise block the connect-only bound forever. An operator value set directly on the
+   * target catalog write lock and a backend that accepts the socket but never speaks the protocol
+   * would otherwise block the connect-only bound forever. An operator value set directly on the
    * connection or in the {@code jdbc-url} is never overridden.
    *
    * <p>The value is bounded by {@link Integer#MAX_VALUE} milliseconds because the MySQL and

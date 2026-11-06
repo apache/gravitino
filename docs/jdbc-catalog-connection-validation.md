@@ -61,9 +61,9 @@ the driver supports `Connection.isValid()`.
 A relational JDBC catalog verifies that its backend is reachable when the catalog is created,
 rather than deferring the first connection to a later operation. The verification opens a dedicated,
 time-bounded one-off probe connection (separate from the pool used by normal operations), confirms
-it, and closes it. If it fails, the create is rejected and rolled back (the catalog entity is not
-persisted), and the caller receives a connection error that names the backend `host:port` and the
-underlying driver message.
+it, and closes it. If it fails, creation is rejected before the catalog entity is persisted, and the
+caller receives a connection error that names the backend `host:port` and the underlying driver
+message.
 
 To register a catalog whose backend is temporarily unavailable, set the catalog property
 `verify-on-create` to `false`, which skips the create-time check:
@@ -101,10 +101,11 @@ It is applied differently to the two kinds of connection:
   timeout is deliberately not imposed there, because it would also abort legitimate long-running
   operations on a healthy backend (a large `ALTER TABLE`, a slow metadata query).
 - **The create-time verification probe** gets both the **connect** and the **read** (and, for
-  PostgreSQL, **login**) timeout. The probe runs under the metalake write lock, so it must be fully
-  bounded: a backend that accepts the TCP connection but never speaks the database protocol (a load
+  PostgreSQL, **login**) timeout. The probe runs under the target catalog write lock, so it must be
+  fully bounded: a backend that accepts the TCP connection but never speaks the database protocol (a load
   balancer with a dead backend, a wrong port, a proxy that accepts and never forwards) would
-  otherwise block a connect-only bound forever and stall the whole metalake.
+  otherwise block a connect-only bound forever, delaying operations that need this catalog lock
+  or an ancestor write lock. Sibling catalogs can still operate while verification runs.
 
 A timeout value you set directly on the connection or in the `jdbc-url` query string is never
 overridden; drivers whose family is not recognized are left unbounded by Gravitino. The pooled
