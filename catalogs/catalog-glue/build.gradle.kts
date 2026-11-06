@@ -24,7 +24,23 @@ plugins {
   id("idea")
 }
 
+// Keeps the Jackson line brought in by Iceberg on its latest patch release. The BOM sits in a
+// dedicated configuration so that it only applies to this module and is not exported to the
+// modules that depend on it.
+val jacksonBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+listOf(
+  "compileClasspath",
+  "runtimeClasspath",
+  "testCompileClasspath",
+  "testRuntimeClasspath"
+).forEach {
+  configurations.named(it) { extendsFrom(jacksonBom) }
+}
 dependencies {
+  jacksonBom(platform(libs.jackson.bom.v221))
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
