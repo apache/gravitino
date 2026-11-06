@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -377,6 +378,56 @@ public class TestMetadataIdConverter {
             NameIdentifier.of("metalake", "catalog", "schema", "T_NORM", "col"),
             Capability.Scope.COLUMN,
             mockCatalogManager));
+  }
+
+  @Test
+  void testColumnAuthorizationKeepsExactStoredColumnName() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("lowercase");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    TableEntity table = mock(TableEntity.class);
+    ColumnEntity column = mock(ColumnEntity.class);
+    when(column.name()).thenReturn("MyCol");
+    when(table.columns()).thenReturn(Collections.singletonList(column));
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "orders"),
+            Entity.EntityType.TABLE,
+            TableEntity.class))
+        .thenReturn(table);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          "catalog.schema.orders.MyCol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse("catalog.SCHEMA.ORDERS.MyCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
+      Assertions.assertEquals(
+          "catalog.schema.orders.othercol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse(
+                      "catalog.SCHEMA.ORDERS.OtherCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
+    }
   }
 
   private void initTestNameIdentifier() {
