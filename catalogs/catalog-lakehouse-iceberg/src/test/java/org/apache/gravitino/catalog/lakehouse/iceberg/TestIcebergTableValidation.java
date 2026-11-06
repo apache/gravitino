@@ -25,11 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -54,22 +59,32 @@ class TestIcebergTableValidation {
 
   @TempDir Path warehouse;
 
-  private IcebergBackend backend;
   private IcebergCatalogOperations operations;
 
   @BeforeEach
   void setUp() {
-    backend =
-        IcebergBackend.create(
-            Map.of("catalog-backend", "memory", "warehouse", warehouse.toString()));
+    CatalogInfo info =
+        new CatalogInfo(
+            1L,
+            "cat",
+            Catalog.Type.RELATIONAL,
+            "iceberg",
+            "",
+            Map.of(),
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build(),
+            Namespace.of("ml"));
     operations = new IcebergCatalogOperations();
-    operations.backend = backend;
+    operations.initialize(
+        Map.of("catalog-backend", "memory", "warehouse", warehouse.toString()),
+        info,
+        TestIcebergCatalog.ICEBERG_PROPERTIES_METADATA);
     operations.createSchema(NameIdentifier.of("ml", "cat", "s"), "", Map.of());
   }
 
   @AfterEach
   void tearDown() {
-    backend.close();
+    operations.close();
+    operations.onCatalogDropped();
   }
 
   @Test

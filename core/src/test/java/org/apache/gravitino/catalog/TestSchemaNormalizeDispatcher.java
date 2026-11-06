@@ -46,11 +46,6 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
             () -> dispatcher.createSchema(ident, comment, ImmutableMap.of()));
     Assertions.assertTrue(error.getMessage().contains("comment"));
     Assertions.assertTrue(error.getMessage().contains("256"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            dispatcher.createSchema(
-                ident, comment, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
     Mockito.verifyNoInteractions(delegate);
   }
 

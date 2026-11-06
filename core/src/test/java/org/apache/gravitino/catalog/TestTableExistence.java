@@ -41,7 +41,6 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -85,10 +84,7 @@ class TestTableExistence {
     dispatcher =
         spy(
             new TableOperationDispatcher(
-                manager,
-                mock(EntityStore.class),
-                mock(IdGenerator.class),
-                mock(SecretManager.class)));
+                manager, mock(EntityStore.class), mock(IdGenerator.class)));
   }
 
   @Test

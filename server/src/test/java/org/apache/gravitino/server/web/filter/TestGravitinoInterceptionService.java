@@ -104,11 +104,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-<<<<<<< HEAD
-import org.junit.jupiter.params.provider.ValueSource;
-=======
 import org.junit.jupiter.params.provider.CsvSource;
->>>>>>> d813da695 ([#14578] fix(rest): validate malformed requests and translate Iceberg errors (#14584))
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
@@ -491,11 +488,11 @@ public class TestGravitinoInterceptionService {
       throws Throwable {
     Method method =
         TestMetadataObjectTagAssociationOperations.class.getMethod(
-            "associateTagValuesForObject",
+            "associateTagsForObject",
             String.class,
             String.class,
             String.class,
-            TagValuesAssociateRequest.class);
+            TagsAssociateRequest.class);
     MethodInvocation invocation = mock(MethodInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
     when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake", type, fullName, null});
