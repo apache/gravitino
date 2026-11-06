@@ -139,7 +139,7 @@ class TestAwsGlueTableConversion extends GlueTableTestBase {
             .storageDescriptor(StorageDescriptor.builder().build())
             .parameters(
                 Map.of(
-                    GlueConstants.TABLE_FORMAT, "ICEBERG",
+                    GlueConstants.TABLE_TYPE_PARAM, "ICEBERG",
                     GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json"))
             .build();
 

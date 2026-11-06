@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -38,6 +39,8 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -259,8 +262,26 @@ public class JobTemplateMetaService {
             SessionUtils.doWithoutCommit(
                 JobMetaMapper.class,
                 mapper -> mapper.softDeleteJobsByTemplateId(observed.jobTemplateId())),
+        () -> deleteJobTemplateRelations(observed.jobTemplateId()),
         () ->
             EntityChangeLogWriter.append(ident, Entity.EntityType.JOB_TEMPLATE, OperateType.DROP));
+  }
+
+  private static void deleteJobTemplateRelations(Long jobTemplateId) {
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                jobTemplateId, MetadataObject.Type.JOB_TEMPLATE.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(
+                jobTemplateId, MetadataObject.Type.JOB_TEMPLATE.name()));
+    // The template's jobs were deleted with it. Jobs have owners but can't be securable objects.
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper -> mapper.softDeleteOwnerRelOfJobsByTemplateId(jobTemplateId));
   }
 
   /** Locks the observed template while a job is inserted in the same transaction. */

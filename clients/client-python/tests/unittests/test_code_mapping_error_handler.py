@@ -39,9 +39,11 @@ from gravitino.exceptions.base import (
     NoSuchModelException,
     NoSuchModelVersionException,
     NoSuchModelVersionURINameException,
+    NoSuchPolicyException,
     NoSuchSchemaException,
     NoSuchTagException,
     NotFoundException,
+    PolicyAlreadyAssociatedException,
     RESTException,
     TagAlreadyAssociatedException,
     TagAlreadyExistsException,
@@ -215,6 +217,13 @@ class TestCodeMappingErrorHandler(unittest.TestCase):
                     "NoSuchTagException",
                     NoSuchTagException,
                 ),
+                # The tag-side policy association calls share this handler,
+                # so the policy types returned by those endpoints map here.
+                (
+                    ErrorConstants.NOT_FOUND_CODE,
+                    "NoSuchPolicyException",
+                    NoSuchPolicyException,
+                ),
                 (
                     ErrorConstants.ALREADY_EXISTS_CODE,
                     "TagAlreadyExistsException",
@@ -224,6 +233,11 @@ class TestCodeMappingErrorHandler(unittest.TestCase):
                     ErrorConstants.ALREADY_EXISTS_CODE,
                     "TagAlreadyAssociatedException",
                     TagAlreadyAssociatedException,
+                ),
+                (
+                    ErrorConstants.ALREADY_EXISTS_CODE,
+                    "PolicyAlreadyAssociatedException",
+                    PolicyAlreadyAssociatedException,
                 ),
                 (
                     ErrorConstants.NOT_IN_USE_CODE,

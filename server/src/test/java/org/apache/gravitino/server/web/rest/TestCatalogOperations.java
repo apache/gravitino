@@ -736,6 +736,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testSetCatalogRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/catalogs/catalog1")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(
+            "Failed to operate catalog(s) [catalog1] operation [SET] under metalake [metalake1], "
+                + "reason [inUse field is required and must not be null]",
+            error.getMessage());
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).enableCatalog(any());
+    Mockito.verify(manager, Mockito.never()).disableCatalog(any());
+  }
+
+  @Test
   public void testSetCatalog() {
     // Test enable catalog
     CatalogSetRequest req = new CatalogSetRequest(true);

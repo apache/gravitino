@@ -26,6 +26,8 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -305,6 +307,38 @@ public class TestPolicyEvent {
         OperationType.LIST_POLICY_INFOS_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
     Assertions.assertEquals(2, ((ListPolicyInfosForMetadataObjectEvent) postevent).resultCount());
+  }
+
+  @Test
+  void testBatchListPolicyInfosEmitsEventsForEachObject() {
+    MetadataObject catalog =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    MetadataObject schema =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSchema("metalake", "catalog_for_test", "schema_for_test"),
+            Entity.EntityType.SCHEMA);
+    PolicyDispatcher delegate = mock(PolicyDispatcher.class);
+    when(delegate.listPolicyInfosForMetadataObjects("metalake", List.of(catalog, schema)))
+        .thenReturn(Map.of(catalog, new PolicyEntity[] {policy}, schema, new PolicyEntity[0]));
+    DummyEventListener listener = new DummyEventListener();
+    PolicyEventDispatcher batchDispatcher =
+        new PolicyEventDispatcher(new EventBus(List.of(listener)), delegate);
+
+    Map<MetadataObject, PolicyEntity[]> result =
+        batchDispatcher.listPolicyInfosForMetadataObjects("metalake", List.of(catalog, schema));
+
+    Assertions.assertEquals(1, result.get(catalog).length);
+    Assertions.assertEquals(0, result.get(schema).length);
+    Assertions.assertEquals(
+        ListPolicyInfosForMetadataObjectPreEvent.class, listener.popPreEvent().getClass());
+    Assertions.assertEquals(
+        ListPolicyInfosForMetadataObjectPreEvent.class, listener.popPreEvent().getClass());
+    Assertions.assertEquals(
+        0, ((ListPolicyInfosForMetadataObjectEvent) listener.popPostEvent()).resultCount());
+    Assertions.assertEquals(
+        1, ((ListPolicyInfosForMetadataObjectEvent) listener.popPostEvent()).resultCount());
   }
 
   @Test
