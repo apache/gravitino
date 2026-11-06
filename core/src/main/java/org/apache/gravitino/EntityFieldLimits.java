@@ -42,6 +42,9 @@ public final class EntityFieldLimits {
   /** The maximum number of characters of a column comment. */
   public static final int MAX_COLUMN_COMMENT_LENGTH = 4096;
 
+  /** The maximum number of characters of a fileset storage location name. */
+  public static final int MAX_STORAGE_LOCATION_NAME_LENGTH = 256;
+
   private EntityFieldLimits() {}
 
   /**

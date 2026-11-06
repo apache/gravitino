@@ -191,6 +191,15 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     Preconditions.checkArgument(
         !storageLocations.isEmpty(),
         "The storage locations of the fileset entity must not be empty.");
+    storageLocations
+        .keySet()
+        .forEach(
+            locationName ->
+                EntityFieldLimits.checkMaxLength(
+                    locationName,
+                    EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+                    "storage location name",
+                    type()));
   }
 
   @Override
