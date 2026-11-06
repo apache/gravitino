@@ -202,6 +202,16 @@ public class HiveExceptionConverter {
       }
     }
 
+    // Schema-resolution messages include table names, which may contain connection keywords.
+    if (lowerMessage.startsWith(
+            "hive metastore did not resolve serde-derived column types for table ")
+        && (exceptionClassName.equals("MetaException")
+            || cause instanceof IllegalArgumentException)) {
+      return cause instanceof IllegalArgumentException
+          ? (IllegalArgumentException) cause
+          : new GravitinoRuntimeException(cause, message);
+    }
+
     if (isConnectionKeyword(lowerMessage) || exceptionClassName.contains("TransportException")) {
       return new ConnectionFailedException(
           cause,

@@ -391,20 +391,25 @@ class TestHiveShimV3 {
 
   @Test
   void testGetFieldsFailureIncludesServerConfigurationGuidance() throws Exception {
-    MockHiveShimV3 shim = new MockHiveShimV3();
-    IMetaStoreClient client = shim.metaStoreClient();
-    Table derived =
-        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
-    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
-    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(derived);
-    when(client.getFields(CATALOG, DB, TABLE))
-        .thenThrow(new MetaException("Storage schema reading not supported"));
+    for (String tableName : List.of(TABLE, "network_events", "connect_events")) {
+      MockHiveShimV3 shim = new MockHiveShimV3();
+      IMetaStoreClient client = shim.metaStoreClient();
+      Table derived =
+          HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+      derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+      derived.setTableName(tableName);
+      when(client.getTable(CATALOG, DB, tableName)).thenReturn(derived);
+      when(client.getFields(CATALOG, DB, tableName))
+          .thenThrow(new MetaException("Storage schema reading not supported"));
 
-    GravitinoRuntimeException failure =
-        assertThrows(GravitinoRuntimeException.class, () -> shim.getTable(CATALOG, DB, TABLE));
+      GravitinoRuntimeException failure =
+          assertThrows(
+              GravitinoRuntimeException.class, () -> shim.getTable(CATALOG, DB, tableName));
 
-    assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
-    verify(client, never()).getNotNullConstraints(any());
+      assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+      verify(client, never()).getNotNullConstraints(any());
+      assertEquals(GravitinoRuntimeException.class, failure.getClass());
+    }
   }
 
   @Test
@@ -436,17 +441,21 @@ class TestHiveShimV3 {
 
   @Test
   void testGetTableRejectsUnresolvedSchemaAfterExceptionConversion() throws Exception {
-    MockHiveShimV3 shim = new MockHiveShimV3();
-    IMetaStoreClient client = shim.metaStoreClient();
-    Table derived =
-        HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
-    derived.getSd().getCols().get(0).setType("<derived from deserializer>");
-    when(client.getTable(CATALOG, DB, TABLE)).thenReturn(derived);
-    when(client.getFields(CATALOG, DB, TABLE)).thenReturn(derived.getSd().getCols());
-    IllegalArgumentException failure =
-        assertThrows(IllegalArgumentException.class, () -> shim.getTable(CATALOG, DB, TABLE));
-    assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
-    verify(client, never()).getNotNullConstraints(any());
+    for (String tableName : List.of(TABLE, "network_events", "connect_events")) {
+      MockHiveShimV3 shim = new MockHiveShimV3();
+      IMetaStoreClient client = shim.metaStoreClient();
+      Table derived =
+          HiveTableConverter.toHiveTable(testTable(Column.of("value", Types.StringType.get())));
+      derived.getSd().getCols().get(0).setType("<derived from deserializer>");
+      derived.setTableName(tableName);
+      when(client.getTable(CATALOG, DB, tableName)).thenReturn(derived);
+      when(client.getFields(CATALOG, DB, tableName)).thenReturn(derived.getSd().getCols());
+      IllegalArgumentException failure =
+          assertThrows(IllegalArgumentException.class, () -> shim.getTable(CATALOG, DB, tableName));
+      assertTrue(failure.getMessage().contains("metastore.storage.schema.reader.impl="));
+      verify(client, never()).getNotNullConstraints(any());
+      assertEquals(IllegalArgumentException.class, failure.getClass());
+    }
   }
 
   @Test
