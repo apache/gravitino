@@ -377,6 +377,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     return "DROP TABLE " + quotedIdentifier(tableName);
   }
 
+  /**
+   * Drops the table by its schema-qualified name. An unqualified name is resolved through the
+   * search path, and PostgreSQL leaves out a schema the catalog user has no USAGE privilege on. The
+   * drop would then report the table as missing instead of refusing it with 42501.
+   *
+   * <p>On {@code branch-1.3}, that missing-table result can cause Gravitino to remove the
+   * registration of a table that still exists. On {@code main}, the registration is already
+   * preserved when the connector returns {@code false}; schema qualification ensures the permission
+   * failure is reported as 403.
+   */
+  @Override
+  protected void dropTable(String schemaName, String tableName) {
+    try (Connection connection = getConnection(schemaName)) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "DROP TABLE " + quotedIdentifier(schemaName) + "." + quotedIdentifier(tableName));
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
