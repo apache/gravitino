@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
@@ -41,7 +40,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
-/** JDBC coverage for {@link PolicyMetaService#resolveNearestPolicyId}. */
+/** JDBC coverage for {@link PolicyMetaService#resolveNearestPolicyIds}. */
 public class TestNearestPolicyResolution extends TestJDBCBackend {
 
   private static final String METALAKE = "nearest_policy_metalake";
@@ -65,19 +64,24 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
 
     PolicyMetaService service = PolicyMetaService.getInstance();
     Assertions.assertEquals(
-        Optional.of(tablePolicy.id()),
-        service.resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+        tablePolicy.id(),
+        service
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
 
     TableEntity other =
         createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "schema"), "t2");
     Assertions.assertEquals(
-        Optional.of(catalogPolicy.id()),
-        service.resolveNearestPolicyId(other.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
-
-    Assertions.assertTrue(
+        catalogPolicy.id(),
         service
-            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
-            .isEmpty());
+            .resolveNearestPolicyIds(List.of(other.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(other.id()));
+
+    Assertions.assertNull(
+        service
+            .resolveNearestPolicyIds(
+                List.of(table.id()), Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
+            .get(table.id()));
   }
 
   @TestTemplate
@@ -97,16 +101,20 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
 
     PolicyMetaService service = PolicyMetaService.getInstance();
     Assertions.assertEquals(
-        Optional.of(outerPolicy.id()),
-        service.resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+        outerPolicy.id(),
+        service
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
 
     PolicyEntity middlePolicy = insertCompaction("middle_compact");
     TagEntity middleTag = insertTag("middle_tag");
     linkPolicy(middleTag, middlePolicy, null);
     assignTag(middle.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("middle_tag"));
     Assertions.assertEquals(
-        Optional.of(middlePolicy.id()),
-        service.resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+        middlePolicy.id(),
+        service
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
   }
 
   @TestTemplate
@@ -124,10 +132,10 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     linkPolicy(tag, policy, null);
     assignTag(a.nameIdentifier(), Entity.EntityType.SCHEMA, TagValue.noValue("a_tag"));
 
-    Assertions.assertTrue(
+    Assertions.assertNull(
         PolicyMetaService.getInstance()
-            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION)
-            .isEmpty());
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
   }
 
   @TestTemplate
@@ -172,10 +180,10 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
         catalog.nameIdentifier(), Entity.EntityType.CATALOG, TagValue.of("domain", "finance"));
     assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("domain", "risk"));
 
-    Assertions.assertTrue(
+    Assertions.assertNull(
         PolicyMetaService.getInstance()
-            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION)
-            .isEmpty());
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
   }
 
   @TestTemplate
@@ -200,7 +208,8 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
             IllegalArgumentException.class,
             () ->
                 PolicyMetaService.getInstance()
-                    .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+                    .resolveNearestPolicyIds(
+                        List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION));
     Assertions.assertTrue(thrown.getMessage().contains("ambiguous"));
   }
 
@@ -233,9 +242,10 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
     assignTag(table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("domain", "finance"));
 
     Assertions.assertEquals(
-        Optional.of(finance.id()),
+        finance.id(),
         PolicyMetaService.getInstance()
-            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION));
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
 
     TagMetaService.getInstance()
         .associateTagValuesWithMetadataObject(
@@ -243,10 +253,10 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
             Entity.EntityType.TABLE,
             new TagValue[] {TagValue.of("domain", "engineering")},
             new TagValue[] {TagValue.of("domain", "finance")});
-    Assertions.assertTrue(
+    Assertions.assertNull(
         PolicyMetaService.getInstance()
-            .resolveNearestPolicyId(table.id(), Policy.BuiltInType.ICEBERG_COMPACTION)
-            .isEmpty());
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
   }
 
   private PolicyEntity insertCompaction(String name) throws IOException {
