@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -55,12 +56,19 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
   private static final String VERSION = "v4";
 
+  /** TMS S1: orphan files removed (or found in dry-run). */
+  public static final String ORPHAN_FILES_REMOVED_METRIC = "custom-orphan-files-removed";
+
   /**
-   * Outcome of one orphan cleanup run: procedure file count plus bytes measured before delete.
+   * TMS S1: bytes reclaimed. Measured from orphan paths before delete (procedure returns locations
+   * only).
+   */
+  public static final String ORPHAN_BYTES_RECLAIMED_METRIC = "custom-orphan-bytes-reclaimed";
+
+  /**
+   * Outcome of a TMS orphan cleanup with byte measurement.
    *
-   * <p>Iceberg's {@code remove_orphan_files} result has only {@code orphan_file_location}. Bytes
-   * are collected with table {@code FileIO} while files still exist (dry-run listing), then a real
-   * delete is issued when requested.
+   * <p>Only produced by {@link #executeWithMetrics}; CLI {@link #execute} does not collect bytes.
    */
   public static final class OrphanCleanupResult {
     private final long filesRemoved;
@@ -121,11 +129,94 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     return Runner.run(args);
   }
 
-  static OrphanCleanupResult execute(SparkSession spark, Map<String, String> options)
+  /**
+   * CLI / standalone path: run {@code remove_orphan_files} once and return the row count. Does
+   * <b>not</b> measure bytes or double-list for metrics.
+   */
+  static long execute(SparkSession spark, Map<String, String> options)
+      throws IOException, AnalysisException {
+    PreparedOrphanCall prepared = prepare(spark, options);
+    boolean dryRun = parseDryRun(options.get("dry-run"));
+    String sql =
+        buildProcedureCall(
+            prepared.catalog,
+            prepared.identifier,
+            options.get("older-than"),
+            prepared.normalizedLocation,
+            dryRun);
+    java.util.Iterator<Row> results = spark.sql(sql).toLocalIterator();
+    long count = 0;
+    while (results.hasNext()) {
+      Row row = results.next();
+      if (dryRun) {
+        LOG.info("Orphan file (dry-run): {}", row.getString(0));
+      }
+      count++;
+    }
+    LOG.info(
+        "Orphan file cleanup completed: {} files {}, table {}.{}",
+        count,
+        dryRun ? "found (dry-run)" : "removed",
+        prepared.catalog,
+        prepared.identifier);
+    return count;
+  }
+
+  /**
+   * TMS-only path: dry-run list → FileIO sizes → optional real delete. CLI {@link #main} never
+   * calls this.
+   */
+  static OrphanCleanupResult executeWithMetrics(SparkSession spark, Map<String, String> options)
+      throws IOException, AnalysisException {
+    PreparedOrphanCall prepared = prepare(spark, options);
+    boolean dryRun = parseDryRun(options.get("dry-run"));
+    List<String> orphanPaths =
+        listOrphanPaths(
+            spark,
+            prepared.catalog,
+            prepared.identifier,
+            options.get("older-than"),
+            prepared.normalizedLocation);
+    long bytes = 0L;
+    for (String orphanPath : orphanPaths) {
+      if (dryRun) {
+        LOG.info("Orphan file (dry-run): {}", orphanPath);
+      }
+      bytes += sizeOf(prepared.table, orphanPath);
+    }
+    if (!dryRun && !orphanPaths.isEmpty()) {
+      String deleteSql =
+          buildProcedureCall(
+              prepared.catalog,
+              prepared.identifier,
+              options.get("older-than"),
+              prepared.normalizedLocation,
+              false);
+      LOG.info("Executing Iceberg remove_orphan_files delete: {}", deleteSql);
+      spark.sql(deleteSql).collect();
+    }
+    LOG.info(
+        "Orphan file cleanup completed: {} files {}, {} bytes, table {}.{}",
+        orphanPaths.size(),
+        dryRun ? "found (dry-run)" : "removed",
+        bytes,
+        prepared.catalog,
+        prepared.identifier);
+    return new OrphanCleanupResult(orphanPaths.size(), bytes);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> orphanAfterMetrics(long filesRemoved, long bytesReclaimed) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(ORPHAN_FILES_REMOVED_METRIC, filesRemoved);
+    metrics.put(ORPHAN_BYTES_RECLAIMED_METRIC, bytesReclaimed);
+    return metrics;
+  }
+
+  private static PreparedOrphanCall prepare(SparkSession spark, Map<String, String> options)
       throws IOException, AnalysisException {
     String catalog = requireOption(options, "catalog");
     String identifier = requireOption(options, "table");
-    boolean dryRun = parseDryRun(options.get("dry-run"));
     // Backslash escapes in string literals must retain Spark's default interpretation.
     Preconditions.checkArgument(
         !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
@@ -141,32 +232,8 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     validateLocation(table.location(), location);
     validateLocalLocation(table.location(), location);
     validateRemoteLocation(spark, table.location(), location);
-    String normalizedLocation = normalizeLocation(location).toString();
-    // Always dry-run list first so sizes can be read before Iceberg deletes the objects.
-    List<String> orphanPaths =
-        listOrphanPaths(spark, catalog, identifier, options.get("older-than"), normalizedLocation);
-    long bytes = 0L;
-    for (String orphanPath : orphanPaths) {
-      if (dryRun) {
-        LOG.info("Orphan file (dry-run): {}", orphanPath);
-      }
-      bytes += sizeOf(table, orphanPath);
-    }
-    if (!dryRun && !orphanPaths.isEmpty()) {
-      String deleteSql =
-          buildProcedureCall(
-              catalog, identifier, options.get("older-than"), normalizedLocation, false);
-      LOG.info("Executing Iceberg remove_orphan_files delete: {}", deleteSql);
-      spark.sql(deleteSql).collect();
-    }
-    LOG.info(
-        "Orphan file cleanup completed: {} files {}, {} bytes, table {}.{}",
-        orphanPaths.size(),
-        dryRun ? "found (dry-run)" : "removed",
-        bytes,
-        catalog,
-        identifier);
-    return new OrphanCleanupResult(orphanPaths.size(), bytes);
+    return new PreparedOrphanCall(
+        catalog, identifier, table, normalizeLocation(location).toString());
   }
 
   private static List<String> listOrphanPaths(
@@ -196,6 +263,21 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     } catch (RuntimeException e) {
       LOG.warn("Failed to measure orphan file size for {}: {}", location, e.toString());
       return 0L;
+    }
+  }
+
+  private static final class PreparedOrphanCall {
+    private final String catalog;
+    private final String identifier;
+    private final Table table;
+    private final String normalizedLocation;
+
+    private PreparedOrphanCall(
+        String catalog, String identifier, Table table, String normalizedLocation) {
+      this.catalog = catalog;
+      this.identifier = identifier;
+      this.table = table;
+      this.normalizedLocation = normalizedLocation;
     }
   }
 

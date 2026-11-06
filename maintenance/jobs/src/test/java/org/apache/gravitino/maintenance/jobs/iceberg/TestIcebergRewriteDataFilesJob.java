@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteDataFilesJob {
@@ -710,5 +711,23 @@ public class TestIcebergRewriteDataFilesJob {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("--spark-conf"));
     }
+  }
+
+  @Test
+  public void testCompactionMetricsSchemaForTms() {
+    Map<String, Object> metrics =
+        IcebergRewriteDataFilesJob.compactionMetrics(1.23e15, 42L, 126877696D, 9876543210L, 80L);
+    assertEquals(5, metrics.size());
+    assertEquals(
+        1.23e15,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
+    assertEquals(
+        126877696D,
+        ((Number) metrics.get(IcebergRewriteDataFilesJob.AVG_FILE_SIZE_METRIC)).doubleValue());
+    assertEquals(
+        9876543210L,
+        ((Number) metrics.get(IcebergRewriteDataFilesJob.TOTAL_FILE_SIZE_METRIC)).longValue());
+    assertEquals(
+        80L, ((Number) metrics.get(IcebergRewriteDataFilesJob.FILE_NUMBER_METRIC)).longValue());
   }
 }

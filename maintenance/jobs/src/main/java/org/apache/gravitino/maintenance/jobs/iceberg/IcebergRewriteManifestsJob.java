@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,11 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
@@ -262,5 +269,68 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main} / {@link #execute})
+  // -------------------------------------------------------------------------
+
+  /** TMS S0: total manifest count. */
+  public static final String MANIFEST_NUMBER_METRIC =
+      IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC;
+
+  /** TMS S0: average manifest size in bytes. */
+  public static final String AVG_MANIFEST_SIZE_METRIC =
+      IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC;
+
+  /** TMS S1: manifests rewritten/removed by the procedure. */
+  public static final String MANIFESTS_REMOVED_METRIC = "custom-manifests-removed";
+
+  /**
+   * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
+   * CLI entry points never call this.
+   */
+  @VisibleForTesting
+  static Map<String, Object> collectManifestBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Table table = loadIcebergTable(spark, catalogName, tableIdentifier);
+    Snapshot snapshot = table.currentSnapshot();
+    long count = 0L;
+    long totalSize = 0L;
+    if (snapshot != null) {
+      for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        count++;
+        totalSize += manifest.length();
+      }
+    }
+    return manifestBeforeMetrics(count, count == 0L ? 0D : (double) totalSize / count);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(MANIFEST_NUMBER_METRIC, manifestNumber);
+    metrics.put(AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestAfterMetrics(long manifestsRemoved) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(MANIFESTS_REMOVED_METRIC, manifestsRemoved);
+    return metrics;
+  }
+
+  private static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    try {
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
+    }
   }
 }

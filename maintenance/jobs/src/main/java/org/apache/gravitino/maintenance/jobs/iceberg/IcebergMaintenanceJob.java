@@ -41,9 +41,6 @@ import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsReq
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
-import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -87,44 +84,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   /** JobConf: soft-slot action ids parallel to {@link #POLICY_IDS_KEY}. */
   public static final String ACTION_IDS_KEY = "action_ids";
-
-  /** Compaction / inventory: average data file size in bytes. */
-  public static final String AVG_FILE_SIZE_METRIC = "custom-avg-file-size";
-
-  /** Compaction / inventory: total data+delete file size in bytes. */
-  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
-
-  /** Compaction / inventory: total file count. */
-  public static final String FILE_NUMBER_METRIC = "custom-file-number";
-
-  /** Manifest rewrite S0: total manifest count across specs. */
-  public static final String MANIFEST_NUMBER_METRIC =
-      IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC;
-
-  /** Manifest rewrite S0: average manifest size in bytes. */
-  public static final String AVG_MANIFEST_SIZE_METRIC =
-      IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC;
-
-  /** Manifest rewrite S1: manifests rewritten/removed by the procedure. */
-  public static final String MANIFESTS_REMOVED_METRIC = "custom-manifests-removed";
-
-  /** Snapshot expiry S0: snapshot count before expire. */
-  public static final String SNAPSHOT_COUNT_METRIC = "custom-snapshot-count";
-
-  /** Snapshot expiry S1: snapshots removed by expire. */
-  public static final String SNAPSHOTS_CLEARED_METRIC = "custom-snapshots-cleared";
-
-  /** Snapshot expiry S1: bytes reclaimed (file-size drop after expire). */
-  public static final String BYTES_RECLAIMED_METRIC = "custom-bytes-reclaimed";
-
-  /** Orphan cleanup S1: orphan files removed (or found in dry-run). */
-  public static final String ORPHAN_FILES_REMOVED_METRIC = "custom-orphan-files-removed";
-
-  /**
-   * Orphan cleanup S1: bytes reclaimed. Measured from orphan paths before delete (procedure returns
-   * locations only).
-   */
-  public static final String ORPHAN_BYTES_RECLAIMED_METRIC = "custom-orphan-bytes-reclaimed";
 
   /** Values accepted in {@code maintenance_types}. */
   public enum MaintenanceType {
@@ -455,7 +414,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           LOG.info("Executing TMS rewrite_data_files: {}", sql);
           spark.sql(sql).collect();
           Map<String, Object> afterMetrics =
-              collectCompactionMetrics(spark, catalogName, tableIdentifier);
+              IcebergRewriteDataFilesJob.collectCompactionMetrics(
+                  spark, catalogName, tableIdentifier);
           long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
           return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
         }
@@ -481,7 +441,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
             LOG.info("Rewrite manifests results: rewritten={}, added={}", rewritten, added);
           }
           long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-          return new AfterSample(afterSnapshotId, toMetricsJson(manifestAfterMetrics(rewritten)));
+          return new AfterSample(
+              afterSnapshotId,
+              toMetricsJson(IcebergRewriteManifestsJob.manifestAfterMetrics(rewritten)));
         }
       case EXPIRE_SNAPSHOTS:
         {
@@ -507,13 +469,14 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 results[0].getLong(1),
                 results[0].getLong(2));
           }
-          ExpireInventory afterInventory =
-              collectExpireInventory(spark, catalogName, tableIdentifier);
-          ExpireInventory beforeInventory =
+          IcebergExpireSnapshotsJob.ExpireInventory afterInventory =
+              IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
+          IcebergExpireSnapshotsJob.ExpireInventory beforeInventory =
               before == null || before.expireInventory == null
                   ? afterInventory
                   : before.expireInventory;
-          Map<String, Object> afterMetrics = expireAfterMetrics(beforeInventory, afterInventory);
+          Map<String, Object> afterMetrics =
+              IcebergExpireSnapshotsJob.expireAfterMetrics(beforeInventory, afterInventory);
           long afterSnapshotId =
               currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
           return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
@@ -527,12 +490,14 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           putIfPresent(orphanOpts, "location", argsByName.get("location"));
           putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
           IcebergRemoveOrphanFilesJob.OrphanCleanupResult orphan =
-              IcebergRemoveOrphanFilesJob.execute(spark, orphanOpts);
+              IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, orphanOpts);
           long afterSnapshotId =
               currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
           return new AfterSample(
               afterSnapshotId,
-              toMetricsJson(orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed())));
+              toMetricsJson(
+                  IcebergRemoveOrphanFilesJob.orphanAfterMetrics(
+                      orphan.filesRemoved(), orphan.bytesReclaimed())));
         }
       default:
         throw new IllegalStateException("Unhandled maintenance type: " + type);
@@ -547,18 +512,24 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload;
-    ExpireInventory expireInventory = null;
+    IcebergExpireSnapshotsJob.ExpireInventory expireInventory = null;
     switch (type) {
       case REWRITE_DATA_FILES:
-        payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+        payload =
+            IcebergRewriteDataFilesJob.collectCompactionMetrics(
+                spark, catalogName, tableIdentifier);
         break;
       case REWRITE_MANIFESTS:
-        payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+        payload =
+            IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
+                spark, catalogName, tableIdentifier);
         break;
       case EXPIRE_SNAPSHOTS:
-        expireInventory = collectExpireInventory(spark, catalogName, tableIdentifier);
+        expireInventory =
+            IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
         payload =
-            expireBeforeMetrics(expireInventory.snapshotCount(), expireInventory.totalFileSize());
+            IcebergExpireSnapshotsJob.expireBeforeMetrics(
+                expireInventory.snapshotCount(), expireInventory.totalFileSize());
         break;
       case REMOVE_ORPHAN_FILES:
         throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
@@ -567,224 +538,6 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     return new BeforeSample(snapshotId, headSnapshotId, toMetricsJson(payload), expireInventory);
-  }
-
-  /**
-   * Compaction S0/S1 metrics from the Iceberg files metadata table (same formulas as {@link
-   * IcebergUpdateStatsAndMetricsJob}). Partitioned tables use max partition MSE, sum of delete /
-   * file counts and sizes, and a file-count-weighted average size.
-   */
-  @VisibleForTesting
-  static Map<String, Object> collectCompactionMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    boolean partitioned =
-        IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
-    if (partitioned) {
-      String sql =
-          IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql(catalogName, tableIdentifier);
-      Row[] rows = (Row[]) spark.sql(sql).collect();
-      return aggregatePartitionCompactionMetrics(rows);
-    }
-
-    String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
-    Row[] rows = (Row[]) spark.sql(sql).collect();
-    if (rows.length == 0) {
-      return compactionMetrics(0D, 0L, 0D, 0L, 0L);
-    }
-    Row row = rows[0];
-    return compactionMetrics(
-        numberAsDouble(row, "data-file-mse"),
-        numberAsLong(row, "delete-file-number"),
-        numberAsDouble(row, "avg-file-size"),
-        numberAsLong(row, "total-file-size"),
-        numberAsLong(row, "file-number"));
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> aggregatePartitionCompactionMetrics(Row[] rows) {
-    double maxMse = 0D;
-    long deleteFiles = 0L;
-    long fileNumber = 0L;
-    long totalFileSize = 0L;
-    double weightedAvgNumerator = 0D;
-    for (Row row : rows) {
-      maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
-      deleteFiles += numberAsLong(row, "delete-file-number");
-      long partitionFiles = numberAsLong(row, "file-number");
-      fileNumber += partitionFiles;
-      totalFileSize += numberAsLong(row, "total-file-size");
-      weightedAvgNumerator += numberAsDouble(row, "avg-file-size") * partitionFiles;
-    }
-    double avgFileSize = fileNumber == 0L ? 0D : weightedAvgNumerator / fileNumber;
-    return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> compactionMetrics(
-      double dataFileMse,
-      long deleteFileNumber,
-      double avgFileSize,
-      long totalFileSize,
-      long fileNumber) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
-    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
-    metrics.put(AVG_FILE_SIZE_METRIC, avgFileSize);
-    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
-    metrics.put(FILE_NUMBER_METRIC, fileNumber);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> collectManifestBeforeMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    Table table = loadIcebergTable(spark, catalogName, tableIdentifier);
-    Snapshot snapshot = table.currentSnapshot();
-    long count = 0L;
-    long totalSize = 0L;
-    if (snapshot != null) {
-      for (ManifestFile manifest : snapshot.allManifests(table.io())) {
-        count++;
-        totalSize += manifest.length();
-      }
-    }
-    return manifestBeforeMetrics(count, count == 0L ? 0D : (double) totalSize / count);
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(MANIFEST_NUMBER_METRIC, manifestNumber);
-    metrics.put(AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> manifestAfterMetrics(long manifestsRemoved) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(MANIFESTS_REMOVED_METRIC, manifestsRemoved);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> expireBeforeMetrics(long snapshotCount, long totalFileSize) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOT_COUNT_METRIC, snapshotCount);
-    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
-    return metrics;
-  }
-
-  /**
-   * S1 expire metrics from set difference so concurrent commits do not shrink cleared/reclaimed
-   * counts: snapshots/files present in S0 but absent after expire.
-   */
-  @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(ExpireInventory before, ExpireInventory after) {
-    return expireAfterMetrics(
-        snapshotsCleared(before.snapshotIds, after.snapshotIds),
-        bytesReclaimed(before.fileSizesByPath, after.fileSizesByPath));
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(long snapshotsCleared, long bytesReclaimed) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOTS_CLEARED_METRIC, snapshotsCleared);
-    metrics.put(BYTES_RECLAIMED_METRIC, bytesReclaimed);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static long snapshotsCleared(Set<Long> beforeSnapshotIds, Set<Long> afterSnapshotIds) {
-    long cleared = 0L;
-    for (Long snapshotId : beforeSnapshotIds) {
-      if (!afterSnapshotIds.contains(snapshotId)) {
-        cleared++;
-      }
-    }
-    return cleared;
-  }
-
-  @VisibleForTesting
-  static long bytesReclaimed(Map<String, Long> beforeFileSizes, Map<String, Long> afterFileSizes) {
-    long bytes = 0L;
-    for (Map.Entry<String, Long> entry : beforeFileSizes.entrySet()) {
-      if (!afterFileSizes.containsKey(entry.getKey())) {
-        bytes += entry.getValue() == null ? 0L : entry.getValue();
-      }
-    }
-    return bytes;
-  }
-
-  /**
-   * Expire S0/S1 inventory: snapshot ids plus distinct reachable content files across history
-   * ({@code all_files}), same metadata-table style as compaction's {@code files} SQL.
-   */
-  @VisibleForTesting
-  static ExpireInventory collectExpireInventory(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    Set<Long> snapshotIds = new HashSet<>();
-    for (Snapshot snapshot : loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
-      snapshotIds.add(snapshot.snapshotId());
-    }
-    String sql = buildReachableContentFilesSql(catalogName, tableIdentifier);
-    List<Row> rows = spark.sql(sql).collectAsList();
-    Map<String, Long> fileSizesByPath = new HashMap<>(rows.size());
-    for (Row row : rows) {
-      String path = row.getAs("file-path");
-      if (path == null || path.isEmpty()) {
-        continue;
-      }
-      Number size = row.getAs("file-size");
-      fileSizesByPath.put(path, size == null ? 0L : size.longValue());
-    }
-    return new ExpireInventory(snapshotIds, fileSizesByPath);
-  }
-
-  /**
-   * Distinct content files still referenced by any tracked snapshot. {@code GROUP BY file_path}
-   * avoids double-counting files that appear in multiple snapshots ({@code all_files} may duplicate
-   * rows).
-   */
-  @VisibleForTesting
-  static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
-    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
-        + buildMetadataTableIdentifier(catalogName, tableIdentifier, "all_files")
-        + " GROUP BY file_path";
-  }
-
-  @VisibleForTesting
-  static String buildMetadataTableIdentifier(
-      String catalogName, String tableIdentifier, String metadataTable) {
-    String[] levels = tableIdentifier.split("\\.");
-    if (levels.length != 2) {
-      throw new IllegalArgumentException(
-          "table_identifier must use schema.table format, but got: " + tableIdentifier);
-    }
-    return IcebergJobUtils.escapeSqlIdentifier(catalogName)
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(levels[0])
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(levels[1])
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(metadataTable);
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> orphanAfterMetrics(long filesRemoved, long bytesReclaimed) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(ORPHAN_FILES_REMOVED_METRIC, filesRemoved);
-    metrics.put(ORPHAN_BYTES_RECLAIMED_METRIC, bytesReclaimed);
-    return metrics;
-  }
-
-  private static double numberAsDouble(Row row, String field) {
-    Number number = row.getAs(field);
-    return number == null ? 0D : number.doubleValue();
-  }
-
-  private static long numberAsLong(Row row, String field) {
-    Number number = row.getAs(field);
-    return number == null ? 0L : number.longValue();
   }
 
   private static long currentSnapshotId(
@@ -976,45 +729,18 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  /**
-   * Snapshot-expiry inventory used for S0 reporting and set-difference S1. Concurrent commits only
-   * add ids/paths to the after set; cleared/reclaimed count ids/paths that disappeared.
-   */
-  @VisibleForTesting
-  static final class ExpireInventory {
-    private final Set<Long> snapshotIds;
-    private final Map<String, Long> fileSizesByPath;
-
-    ExpireInventory(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
-      this.snapshotIds = Collections.unmodifiableSet(new HashSet<>(snapshotIds));
-      this.fileSizesByPath = Collections.unmodifiableMap(new HashMap<>(fileSizesByPath));
-    }
-
-    long snapshotCount() {
-      return snapshotIds.size();
-    }
-
-    long totalFileSize() {
-      long total = 0L;
-      for (Long size : fileSizesByPath.values()) {
-        total += size == null ? 0L : size;
-      }
-      return total;
-    }
-  }
-
   /** Before-metrics sample: snapshot at sample time, HEAD after metrics, and metrics JSON. */
   private static final class BeforeSample {
     private final long snapshotId;
     private final long headSnapshotId;
     private final String metricsJson;
-    @Nullable private final ExpireInventory expireInventory;
+    @Nullable private final IcebergExpireSnapshotsJob.ExpireInventory expireInventory;
 
     private BeforeSample(
         long snapshotId,
         long headSnapshotId,
         String metricsJson,
-        @Nullable ExpireInventory expireInventory) {
+        @Nullable IcebergExpireSnapshotsJob.ExpireInventory expireInventory) {
       this.snapshotId = snapshotId;
       this.headSnapshotId = headSnapshotId;
       this.metricsJson = metricsJson;

@@ -18,14 +18,21 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
@@ -332,5 +339,169 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main})
+  // -------------------------------------------------------------------------
+
+  /** TMS S0: snapshot count before expire. */
+  public static final String SNAPSHOT_COUNT_METRIC = "custom-snapshot-count";
+
+  /** TMS S0: distinct reachable content-file bytes across history. */
+  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
+
+  /** TMS S1: snapshots present in S0 but absent after expire. */
+  public static final String SNAPSHOTS_CLEARED_METRIC = "custom-snapshots-cleared";
+
+  /** TMS S1: content-file bytes present in S0 but absent after expire. */
+  public static final String BYTES_RECLAIMED_METRIC = "custom-bytes-reclaimed";
+
+  /**
+   * Snapshot-expiry inventory for TMS S0 and set-difference S1. Concurrent commits only add
+   * ids/paths to the after set; cleared/reclaimed count ids/paths that disappeared.
+   */
+  @VisibleForTesting
+  static final class ExpireInventory {
+    private final Set<Long> snapshotIds;
+    private final Map<String, Long> fileSizesByPath;
+
+    ExpireInventory(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
+      this.snapshotIds = Collections.unmodifiableSet(new HashSet<>(snapshotIds));
+      this.fileSizesByPath = Collections.unmodifiableMap(new HashMap<>(fileSizesByPath));
+    }
+
+    Set<Long> snapshotIds() {
+      return snapshotIds;
+    }
+
+    Map<String, Long> fileSizesByPath() {
+      return fileSizesByPath;
+    }
+
+    long snapshotCount() {
+      return snapshotIds.size();
+    }
+
+    long totalFileSize() {
+      long total = 0L;
+      for (Long size : fileSizesByPath.values()) {
+        total += size == null ? 0L : size;
+      }
+      return total;
+    }
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireBeforeMetrics(long snapshotCount, long totalFileSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(SNAPSHOT_COUNT_METRIC, snapshotCount);
+    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireAfterMetrics(ExpireInventory before, ExpireInventory after) {
+    return expireAfterMetrics(
+        snapshotsCleared(before.snapshotIds(), after.snapshotIds()),
+        bytesReclaimed(before.fileSizesByPath(), after.fileSizesByPath()));
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireAfterMetrics(long snapshotsCleared, long bytesReclaimed) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(SNAPSHOTS_CLEARED_METRIC, snapshotsCleared);
+    metrics.put(BYTES_RECLAIMED_METRIC, bytesReclaimed);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static long snapshotsCleared(Set<Long> beforeSnapshotIds, Set<Long> afterSnapshotIds) {
+    long cleared = 0L;
+    for (Long snapshotId : beforeSnapshotIds) {
+      if (!afterSnapshotIds.contains(snapshotId)) {
+        cleared++;
+      }
+    }
+    return cleared;
+  }
+
+  @VisibleForTesting
+  static long bytesReclaimed(Map<String, Long> beforeFileSizes, Map<String, Long> afterFileSizes) {
+    long bytes = 0L;
+    for (Map.Entry<String, Long> entry : beforeFileSizes.entrySet()) {
+      if (!afterFileSizes.containsKey(entry.getKey())) {
+        bytes += entry.getValue() == null ? 0L : entry.getValue();
+      }
+    }
+    return bytes;
+  }
+
+  /**
+   * Collects expire inventory for TMS. CLI entry points never call this.
+   *
+   * <p>Uses {@code all_files} metadata SQL (same style as compaction's {@code files} SQL) plus
+   * Iceberg snapshot ids.
+   */
+  @VisibleForTesting
+  static ExpireInventory collectExpireInventory(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Set<Long> snapshotIds = new HashSet<>();
+    for (Snapshot snapshot : loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
+      snapshotIds.add(snapshot.snapshotId());
+    }
+    String sql = buildReachableContentFilesSql(catalogName, tableIdentifier);
+    List<Row> rows = spark.sql(sql).collectAsList();
+    Map<String, Long> fileSizesByPath = new HashMap<>(rows.size());
+    for (Row row : rows) {
+      String path = row.getAs("file-path");
+      if (path == null || path.isEmpty()) {
+        continue;
+      }
+      Number size = row.getAs("file-size");
+      fileSizesByPath.put(path, size == null ? 0L : size.longValue());
+    }
+    return new ExpireInventory(snapshotIds, fileSizesByPath);
+  }
+
+  /**
+   * Distinct content files still referenced by any tracked snapshot. {@code GROUP BY file_path}
+   * avoids double-counting files that appear in multiple snapshots.
+   */
+  @VisibleForTesting
+  static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
+    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
+        + buildMetadataTableIdentifier(catalogName, tableIdentifier, "all_files")
+        + " GROUP BY file_path";
+  }
+
+  @VisibleForTesting
+  static String buildMetadataTableIdentifier(
+      String catalogName, String tableIdentifier, String metadataTable) {
+    String[] levels = tableIdentifier.split("\\.");
+    if (levels.length != 2) {
+      throw new IllegalArgumentException(
+          "table_identifier must use schema.table format, but got: " + tableIdentifier);
+    }
+    return IcebergJobUtils.escapeSqlIdentifier(catalogName)
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(levels[0])
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(levels[1])
+        + "."
+        + IcebergJobUtils.escapeSqlIdentifier(metadataTable);
+  }
+
+  private static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    try {
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
+    }
   }
 }

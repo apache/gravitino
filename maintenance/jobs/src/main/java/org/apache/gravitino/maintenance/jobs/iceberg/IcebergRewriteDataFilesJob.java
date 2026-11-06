@@ -18,14 +18,17 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
@@ -397,5 +400,94 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main} / {@link #run})
+  // -------------------------------------------------------------------------
+
+  /** TMS S0/S1: average data file size in bytes. */
+  public static final String AVG_FILE_SIZE_METRIC = "custom-avg-file-size";
+
+  /** TMS S0/S1: total data+delete file size in bytes. */
+  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
+
+  /** TMS S0/S1: total file count. */
+  public static final String FILE_NUMBER_METRIC = "custom-file-number";
+
+  /**
+   * Collects compaction inventory metrics for TMS before/after reporting. Uses the same {@code
+   * files} metadata SQL as {@link IcebergUpdateStatsAndMetricsJob}. CLI entry points never call
+   * this.
+   */
+  @VisibleForTesting
+  static Map<String, Object> collectCompactionMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    boolean partitioned =
+        IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
+    if (partitioned) {
+      String sql =
+          IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql(catalogName, tableIdentifier);
+      Row[] rows = (Row[]) spark.sql(sql).collect();
+      return aggregatePartitionCompactionMetrics(rows);
+    }
+
+    String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
+    Row[] rows = (Row[]) spark.sql(sql).collect();
+    if (rows.length == 0) {
+      return compactionMetrics(0D, 0L, 0D, 0L, 0L);
+    }
+    Row row = rows[0];
+    return compactionMetrics(
+        numberAsDouble(row, "data-file-mse"),
+        numberAsLong(row, "delete-file-number"),
+        numberAsDouble(row, "avg-file-size"),
+        numberAsLong(row, "total-file-size"),
+        numberAsLong(row, "file-number"));
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> aggregatePartitionCompactionMetrics(Row[] rows) {
+    double maxMse = 0D;
+    long deleteFiles = 0L;
+    long fileNumber = 0L;
+    long totalFileSize = 0L;
+    double weightedAvgNumerator = 0D;
+    for (Row row : rows) {
+      maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
+      deleteFiles += numberAsLong(row, "delete-file-number");
+      long partitionFiles = numberAsLong(row, "file-number");
+      fileNumber += partitionFiles;
+      totalFileSize += numberAsLong(row, "total-file-size");
+      weightedAvgNumerator += numberAsDouble(row, "avg-file-size") * partitionFiles;
+    }
+    double avgFileSize = fileNumber == 0L ? 0D : weightedAvgNumerator / fileNumber;
+    return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> compactionMetrics(
+      double dataFileMse,
+      long deleteFileNumber,
+      double avgFileSize,
+      long totalFileSize,
+      long fileNumber) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
+    metrics.put(AVG_FILE_SIZE_METRIC, avgFileSize);
+    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    metrics.put(FILE_NUMBER_METRIC, fileNumber);
+    return metrics;
+  }
+
+  private static double numberAsDouble(Row row, String field) {
+    Number number = row.getAs(field);
+    return number == null ? 0D : number.doubleValue();
+  }
+
+  private static long numberAsLong(Row row, String field) {
+    Number number = row.getAs(field);
+    return number == null ? 0L : number.longValue();
   }
 }
