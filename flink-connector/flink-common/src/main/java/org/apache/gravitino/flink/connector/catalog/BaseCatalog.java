@@ -46,6 +46,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.catalog.WatermarkSpec;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -425,6 +426,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
     ResolvedCatalogBaseTable<?> resolvedTable = (ResolvedCatalogBaseTable<?>) table;
+    rejectUnsupportedSchemaElements(resolvedTable);
     Column[] columns =
         resolvedTable.getResolvedSchema().getColumns().stream()
             .map(this::toGravitinoColumn)
@@ -888,6 +890,68 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return Optional.of(primaryKeyFieldList);
   }
 
+  /**
+   * Returns whether this catalog can store a table as a Flink generic table, which serializes the
+   * full Flink schema, including computed columns, metadata columns and watermarks, into {@code
+   * flink.*} properties. Only the Hive catalog can.
+   *
+   * @return true if generic tables are supported, false by default
+   */
+  protected boolean supportsGenericTables() {
+    return false;
+  }
+
+  /**
+   * Rejects computed columns, metadata columns and watermarks, which the Gravitino column model
+   * cannot represent. Storing them anyway would turn each such column into a plain physical column
+   * and drop the watermark, without any error. This path serves Paimon, Iceberg and JDBC tables,
+   * and Hive tables with {@code 'connector'='hive'}.
+   *
+   * @param resolvedTable the resolved create-table request
+   */
+  private void rejectUnsupportedSchemaElements(ResolvedCatalogBaseTable<?> resolvedTable) {
+    for (org.apache.flink.table.catalog.Column column :
+        resolvedTable.getResolvedSchema().getColumns()) {
+      rejectUnsupportedColumn(column);
+    }
+    List<WatermarkSpec> watermarks = resolvedTable.getResolvedSchema().getWatermarkSpecs();
+    if (!watermarks.isEmpty()) {
+      // Flink allows at most one watermark per table.
+      throw new UnsupportedOperationException(
+          String.format(
+              "The watermark on column '%s' cannot be stored in the Gravitino catalog '%s'.%s",
+              watermarks.get(0).getRowtimeAttribute(), getName(), genericTableAdvice()));
+    }
+  }
+
+  /**
+   * Rejects a computed or metadata column. Shared by createTable and the add-column path of
+   * alterTable.
+   *
+   * @param column the column to validate
+   */
+  private void rejectUnsupportedColumn(org.apache.flink.table.catalog.Column column) {
+    String kind;
+    if (column instanceof org.apache.flink.table.catalog.Column.ComputedColumn) {
+      kind = "computed";
+    } else if (column instanceof org.apache.flink.table.catalog.Column.MetadataColumn) {
+      kind = "metadata";
+    } else {
+      return;
+    }
+    throw new UnsupportedOperationException(
+        String.format(
+            "Column '%s' is a %s column, which cannot be stored in the Gravitino catalog '%s'.%s",
+            column.getName(), kind, getName(), genericTableAdvice()));
+  }
+
+  private String genericTableAdvice() {
+    return supportsGenericTables()
+        ? " To keep it, create the table as a Flink generic table, with a 'connector' other than"
+            + " 'hive'."
+        : "";
+  }
+
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
     return Column.of(
         column.getName(),
@@ -915,6 +979,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private void addColumn(
       org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
+    // ALTER TABLE t ADD b AS a + 1 (or a METADATA column) arrives here as a non-physical column.
+    rejectUnsupportedColumn(change.getColumn());
     changes.add(
         TableChange.addColumn(
             new String[] {change.getColumn().getName()},

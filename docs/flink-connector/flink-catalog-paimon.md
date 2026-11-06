@@ -36,6 +36,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 - `UPDATE` clause
 - `DELETE` clause
 - `CALL` clause
+- Computed columns, metadata columns and watermarks
 
 ## Prerequisites
 
