@@ -409,20 +409,19 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // For unmanaged table, it could happen that the table:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the table from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, TABLE);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band, or the catalog user may be unable to see it. Preserve the registration, because
+          // deleting it would lose Gravitino-only metadata such as tags and privileges, including
+          // DENY privileges, of a table that may still exist. A true out-of-band drop can therefore
+          // leave a stale registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, TABLE);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -465,21 +464,20 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // For unmanaged table, it could happen that the table:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the table from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, TABLE);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-            return false;
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band, or the catalog user may be unable to see it. Preserve the registration, because
+          // deleting it would lose Gravitino-only metadata such as tags and privileges, including
+          // DENY privileges, of a table that may still exist. A true out-of-band drop can therefore
+          // leave a stale registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, TABLE);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+              return false;
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
