@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -30,8 +32,11 @@ import javax.inject.Inject;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.EntityCombinedView;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -39,11 +44,15 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSource;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -110,12 +119,14 @@ public class SemanticModelSourceValidator {
    *
    * @param metalake the request's metalake, also used for cross-catalog source references
    * @param definition the complete definition to validate before persistence
+   * @return The complete source associations resolved by this validation.
    */
-  public void validate(String metalake, SemanticModelDefinition definition) {
+  public SemanticModelSourceUpdate validate(String metalake, SemanticModelDefinition definition) {
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     GravitinoAuthorizer currentAuthorizer = authorizer.get();
     Map<String, Set<String>> datasetColumns = new HashMap<>();
-    Map<NameIdentifier, Set<String>> sourceColumns = new HashMap<>();
+    Map<NameIdentifier, ResolvedSource> resolvedSources = new HashMap<>();
+    List<SemanticModelSource> associations = new ArrayList<>();
     for (Dataset dataset : definition.datasets()) {
       NameIdentifier source = dataset.source();
       if (source.namespace().length() != 2) {
@@ -124,8 +135,11 @@ public class SemanticModelSourceValidator {
       NameIdentifier ident =
           NameIdentifier.of(
               metalake, source.namespace().level(0), source.namespace().level(1), source.name());
-      Set<String> columns =
-          sourceColumns.computeIfAbsent(ident, key -> loadColumns(key, currentAuthorizer, context));
+      ResolvedSource resolved =
+          resolvedSources.computeIfAbsent(
+              ident, key -> loadSource(key, currentAuthorizer, context));
+      Set<String> columns = resolved.columns;
+      associations.add(new SemanticModelSource(dataset.name(), resolved.type, resolved.id));
       datasetColumns.put(dataset.name(), columns);
       checkColumns(dataset.name(), dataset.primaryKey(), columns);
       if (dataset.uniqueKeys() != null) {
@@ -144,9 +158,10 @@ public class SemanticModelSourceValidator {
             relationship.to(), relationship.toColumns(), datasetColumns.get(relationship.to()));
       }
     }
+    return SemanticModelSourceUpdate.replace(associations);
   }
 
-  private Set<String> loadColumns(
+  private ResolvedSource loadSource(
       NameIdentifier ident,
       GravitinoAuthorizer currentAuthorizer,
       AuthorizationRequestContext context) {
@@ -172,13 +187,18 @@ public class SemanticModelSourceValidator {
       supported = supportedSourceTypes.apply(ident);
       if (tableAllowed && supported.contains(Entity.EntityType.TABLE)) {
         try {
-          return columnNames(ident, tables.loadTable(ident).columns());
+          Table table = tables.loadTable(ident);
+          Set<String> columns = columnNames(ident, table.columns());
+          return new ResolvedSource(
+              registeredTableId(ident, table), Entity.EntityType.TABLE, columns);
         } catch (NotFoundException missing) {
           // An untyped source can also refer to a view.
         }
       }
       if (viewAllowed && supported.contains(Entity.EntityType.VIEW)) {
-        return columnNames(ident, views.loadView(ident).columns());
+        View view = views.loadView(ident);
+        Set<String> columns = columnNames(ident, view.columns());
+        return new ResolvedSource(registeredViewId(ident, view), Entity.EntityType.VIEW, columns);
       }
     } catch (NotFoundException missing) {
       // Do not disclose whether the other, inaccessible object type exists.
@@ -188,6 +208,55 @@ public class SemanticModelSourceValidator {
       throw new ForbiddenException("Not authorized to resolve Semantic Model source %s", ident);
     }
     throw new IllegalSemanticModelException("Semantic Model source %s does not exist", ident);
+  }
+
+  private static long registeredTableId(NameIdentifier ident, Table table) {
+    if (table instanceof EntityCombinedTable) {
+      EntityCombinedTable combined = (EntityCombinedTable) table;
+      if (combined.tableFromGravitino() != null) {
+        return combined.tableFromGravitino().id();
+      }
+      // Managed tables carry their stored ID in the loaded catalog properties, without a separate
+      // TableEntity. Read it before public-property masking, without resolving the name again.
+      if (combined.imported()) {
+        StringIdentifier id =
+            StringIdentifier.fromProperties(combined.tableFromCatalog().properties());
+        if (id != null) {
+          return id.id();
+        }
+      }
+    }
+    throw new IllegalStateException("Source table has no registered Gravitino identity: " + ident);
+  }
+
+  private static long registeredViewId(NameIdentifier ident, View view) {
+    if (view instanceof EntityCombinedView) {
+      EntityCombinedView combined = (EntityCombinedView) view;
+      if (combined.viewEntity() != null) {
+        return combined.viewEntity().id();
+      }
+      // Managed views use the same stored-identity property as managed tables.
+      if (combined.imported()) {
+        StringIdentifier id =
+            StringIdentifier.fromProperties(combined.viewFromCatalog().properties());
+        if (id != null) {
+          return id.id();
+        }
+      }
+    }
+    throw new IllegalStateException("Source view has no registered Gravitino identity: " + ident);
+  }
+
+  private static class ResolvedSource {
+    private final long id;
+    private final Entity.EntityType type;
+    private final Set<String> columns;
+
+    private ResolvedSource(long id, Entity.EntityType type, Set<String> columns) {
+      this.id = id;
+      this.type = type;
+      this.columns = columns;
+    }
   }
 
   private boolean canLoad(

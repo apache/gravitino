@@ -39,6 +39,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -94,11 +95,12 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     SemanticModel semanticModel =
-        dispatcher.createSemanticModel(ident, comment, definition, properties);
+        dispatcher.createSemanticModel(ident, comment, definition, properties, sourceUpdate);
     setCreatorAsOwner(ident);
     return semanticModel;
   }
@@ -108,9 +110,10 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
     SemanticModel semanticModel =
-        dispatcher.importSemanticModel(ident, comment, definition, properties);
+        dispatcher.importSemanticModel(ident, comment, definition, properties, sourceUpdate);
     setCreatorAsOwner(ident);
     return semanticModel;
   }
@@ -121,10 +124,11 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    SemanticModel model = dispatcher.alterSemanticModel(ident, changes);
+    SemanticModel model = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
     for (SemanticModelChange change : changes) {
       if (change instanceof SemanticModelChange.RenameSemanticModel) {
         AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.SEMANTIC_MODEL);

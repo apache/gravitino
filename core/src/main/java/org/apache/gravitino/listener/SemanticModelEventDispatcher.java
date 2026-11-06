@@ -20,7 +20,7 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -64,6 +64,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -159,7 +160,8 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     String user = PrincipalUtils.getCurrentUserName();
@@ -168,7 +170,7 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
     eventBus.dispatchEvent(new CreateSemanticModelPreEvent(user, ident, createRequest));
     try {
       SemanticModel semanticModel =
-          dispatcher.createSemanticModel(ident, comment, definition, properties);
+          dispatcher.createSemanticModel(ident, comment, definition, properties, sourceUpdate);
       eventBus.dispatchEvent(
           new CreateSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
       return semanticModel;
@@ -182,7 +184,7 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   public SemanticModel importOssieDocument(
       Namespace namespace,
       OssieDocument document,
-      Consumer<SemanticModelDefinition> sourceValidator) {
+      Function<SemanticModelDefinition, SemanticModelSourceUpdate> sourceValidator) {
     String user = PrincipalUtils.getCurrentUserName();
     OssieFormat format = document == null ? null : document.format();
     try {
@@ -207,7 +209,8 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
     throw new UnsupportedOperationException(
         "Parsed imports are internal; use importOssieDocument with a source validator");
   }
@@ -227,13 +230,14 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     String user = PrincipalUtils.getCurrentUserName();
     eventBus.dispatchEvent(new AlterSemanticModelPreEvent(user, ident, changes));
     try {
-      SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, changes);
+      SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
       eventBus.dispatchEvent(
           new AlterSemanticModelEvent(user, ident, changes, new SemanticModelInfo(semanticModel)));
       return semanticModel;
