@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -40,6 +41,7 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
+import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
@@ -66,12 +68,163 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.AdditionalAnswers;
+import org.mockito.Mockito;
+import org.postgresql.PGConnection;
 
 @Tag("gravitino-docker-test")
 public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
   private static Type VARCHAR = Types.VarCharType.of(255);
   private static Type INT = Types.IntegerType.get();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"on", "off"})
+  void testBackslashLiteralRoundTripsUnderReadSetting(String setting) throws Exception {
+    DataSource source = Mockito.mock(DataSource.class);
+    Mockito.when(source.getConnection())
+        .thenAnswer(
+            invocation -> {
+              Connection c =
+                  DriverManager.getConnection(
+                      CONTAINER.getJdbcUrl(), CONTAINER.getUsername(), CONTAINER.getPassword());
+              try (Statement s = c.createStatement()) {
+                s.execute("SET standard_conforming_strings = " + setting);
+              }
+              return c;
+            });
+    PostgreSqlTableOperations ops = new PostgreSqlTableOperations();
+    ops.initialize(
+        source,
+        new PostgreSqlExceptionConverter(),
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        Map.of(JdbcConfig.JDBC_DATABASE.getKey(), TEST_DB_NAME));
+    String table = RandomNameUtils.genRandomName("backslash_default_");
+    String[] values = {"a\\b", "a\\\\b", "quote' \\path\nnext", "NULL::text"};
+    for (String value : values) {
+      try {
+        ops.create(
+            TEST_DB_NAME,
+            table,
+            new JdbcColumn[] {
+              JdbcColumn.builder().withName("first").withType(VARCHAR).withNullable(true).build(),
+              JdbcColumn.builder()
+                  .withName("s")
+                  .withType(Types.StringType.get())
+                  .withNullable(true)
+                  .withDefaultValue(Literals.stringLiteral(value))
+                  .build(),
+              JdbcColumn.builder()
+                  .withName("another")
+                  .withType(Types.StringType.get())
+                  .withNullable(true)
+                  .withDefaultValue(Literals.stringLiteral(value))
+                  .build()
+            },
+            null,
+            Map.of(),
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        try (Connection c = source.getConnection();
+            Statement s = c.createStatement()) {
+          s.executeUpdate("INSERT INTO " + TEST_DB_NAME + "." + table + " DEFAULT VALUES");
+          try (ResultSet row = s.executeQuery("SELECT s FROM " + TEST_DB_NAME + "." + table)) {
+            Assertions.assertTrue(row.next());
+            Assertions.assertEquals(value, row.getString(1));
+          }
+          try (ResultSet metadata =
+              c.getMetaData().getColumns(c.getCatalog(), TEST_DB_NAME, table, "s")) {
+            Assertions.assertTrue(metadata.next());
+            String raw = metadata.getString("COLUMN_DEF");
+            Assertions.assertFalse(raw.startsWith("E'"));
+          }
+        }
+        JdbcTable loaded = ops.load(TEST_DB_NAME, table);
+        Assertions.assertEquals(Literals.stringLiteral(value), loaded.columns()[1].defaultValue());
+        Assertions.assertEquals(Literals.stringLiteral(value), loaded.columns()[2].defaultValue());
+        try (Connection c = source.getConnection()) {
+          PGConnection pg =
+              Mockito.mock(
+                  PGConnection.class, AdditionalAnswers.delegatesTo(c.unwrap(PGConnection.class)));
+          Connection wrapped = Mockito.mock(Connection.class, AdditionalAnswers.delegatesTo(c));
+          Mockito.doReturn(pg).when(wrapped).unwrap(PGConnection.class);
+          try (ResultSet columns = ops.getColumns(wrapped, TEST_DB_NAME, table)) {
+            Assertions.assertTrue(columns.next());
+          }
+          Mockito.verify(pg, Mockito.times(value.indexOf('\\') >= 0 ? 1 : 0)).escapeLiteral("\\");
+          try (Statement statement = c.createStatement();
+              ResultSet result = statement.executeQuery("SHOW standard_conforming_strings")) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(setting, result.getString(1));
+          }
+        }
+      } finally {
+        ops.drop(TEST_DB_NAME, table);
+      }
+    }
+  }
+
+  @Test
+  void testFunctionDefaultsRemainExpressionsAfterCreateAndAlter() throws SQLException {
+    String table = RandomNameUtils.genRandomName("function_read_");
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME,
+          table,
+          new JdbcColumn[] {
+            JdbcColumn.builder()
+                .withName("s")
+                .withType(Types.StringType.get())
+                .withNullable(true)
+                .withDefaultValue(FunctionExpression.of("upper", Literals.stringLiteral("x")))
+                .build()
+          },
+          null,
+          Map.of(),
+          null,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      Assertions.assertEquals(
+          UnparsedExpression.of("upper('x'::text)"),
+          TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[0].defaultValue());
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.addColumn(
+              new String[] {"added"},
+              Types.StringType.get(),
+              null,
+              TableChange.ColumnPosition.defaultPos(),
+              true,
+              false,
+              FunctionExpression.of("lower", Literals.stringLiteral("Y"))));
+      Assertions.assertEquals(
+          UnparsedExpression.of("lower('Y'::text)"),
+          TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[1].defaultValue());
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME,
+          table,
+          TableChange.updateColumnDefaultValue(
+              new String[] {"added"}, FunctionExpression.of("upper", Literals.stringLiteral("z"))));
+      Assertions.assertEquals(
+          UnparsedExpression.of("upper('z'::text)"),
+          TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[1].defaultValue());
+      try (Connection connection = DATA_SOURCE.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate("INSERT INTO " + TEST_DB_NAME + "." + table + " DEFAULT VALUES");
+        try (ResultSet result =
+            statement.executeQuery("SELECT s,added FROM " + TEST_DB_NAME + "." + table)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals("X", result.getString(1));
+          Assertions.assertEquals("Z", result.getString(2));
+        }
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
 
   @Test
   void testStandaloneUniqueIndexDeletionIsExplicitlyRejected() throws SQLException {
@@ -300,12 +453,17 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                   .build(),
               JdbcColumn.builder()
                   .withName("n")
-                  .withType(Types.ExternalType.of("numeric(39,0)[]"))
+                  .withType(Types.ExternalType.of("numeric(39,0) ARRAY"))
                   .withNullable(true)
                   .build(),
               JdbcColumn.builder()
                   .withName("iv")
                   .withType(Types.ExternalType.of("interval day to second(6)"))
+                  .withNullable(true)
+                  .build(),
+              JdbcColumn.builder()
+                  .withName("national")
+                  .withType(Types.ExternalType.of("national character(3)"))
                   .withNullable(true)
                   .build()
             },
@@ -319,14 +477,14 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
                 + TEST_DB_NAME
                 + "."
                 + table
-                + " VALUES(7, ARRAY[123456789012345678901234567890123456789], INTERVAL '1 day')");
+                + " VALUES(7, ARRAY[123456789012345678901234567890123456789], INTERVAL '1 day', 'abc')");
         try (ResultSet result =
             statement.executeQuery("SELECT id, n[1]::text FROM " + TEST_DB_NAME + "." + table)) {
           Assertions.assertTrue(result.next());
           Assertions.assertEquals(7, result.getInt(1));
           Assertions.assertEquals("123456789012345678901234567890123456789", result.getString(2));
         }
-        Assertions.assertEquals(3, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns().length);
+        Assertions.assertEquals(4, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns().length);
       } finally {
         TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
         statement.execute("DROP DOMAIN " + type);
@@ -382,6 +540,9 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         Assertions.assertEquals(
             LocalTime.MIDNIGHT, result.getTimestamp(3).toLocalDateTime().toLocalTime());
       }
+      Assertions.assertInstanceOf(
+          UnparsedExpression.class,
+          TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[1].defaultValue());
       TABLE_OPERATIONS.alterTable(
           TEST_DB_NAME,
           table,

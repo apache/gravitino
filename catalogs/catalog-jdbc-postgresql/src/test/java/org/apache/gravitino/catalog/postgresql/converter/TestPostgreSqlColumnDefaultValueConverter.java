@@ -30,6 +30,60 @@ public class TestPostgreSqlColumnDefaultValueConverter {
       new PostgreSqlColumnDefaultValueConverter();
 
   @Test
+  void testNullDefaultsAllowNativeCastsWithoutSwallowingExpressions() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("uuid");
+    for (String sql :
+        new String[] {"NULL", "NULL::uuid", "NULL::integer[]", "NULL::\"schema\".\"domain\""}) {
+      Assertions.assertEquals(Literals.NULL, converter.toGravitino(type, sql, false, true));
+    }
+    String expression = "NULL::uuid IS NULL";
+    Assertions.assertEquals(
+        UnparsedExpression.of(expression), converter.toGravitino(type, expression, false, true));
+  }
+
+  @Test
+  void testBackslashNormalizationDoesNotRewriteExpressions() {
+    String literal = "'a\\\\b'::text";
+    Assertions.assertEquals(
+        "E" + literal, PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(literal));
+    for (String expression :
+        new String[] {
+          null,
+          "'plain'::text",
+          "E'a\\\\b'::text",
+          "upper('a\\\\b'::text)",
+          "'a\\\\b'::text || 'tail'::text"
+        }) {
+      Assertions.assertEquals(
+          expression,
+          PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(expression));
+    }
+  }
+
+  @Test
+  void testExpressionsAreNotMistakenForLiterals() {
+    JdbcTypeConverter.JdbcTypeBean text = new JdbcTypeConverter.JdbcTypeBean("text");
+    for (String sql :
+        new String[] {
+          "upper('x'::text)", "concat('a'::text, 'b'::text)", "'a'::text || 'b'::text",
+          "md5(random()::text)", "('x'::text)::character varying(1)", "NULL::text || 'x'::text"
+        }) {
+      Assertions.assertEquals(
+          UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
+    }
+    String condition = "(random() > 0.5)";
+    Assertions.assertEquals(
+        UnparsedExpression.of(condition),
+        converter.toGravitino(new JdbcTypeConverter.JdbcTypeBean("bool"), condition, false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("NULL::text"),
+        converter.toGravitino(text, "'NULL::text'::text", false, true));
+    Assertions.assertEquals(Literals.NULL, converter.toGravitino(text, "NULL::text", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("plain"), converter.toGravitino(text, "'plain'", false, true));
+  }
+
+  @Test
   void testOtherEscapeStringSyntaxIsPreservedAsExpression() {
     JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
     String sql = "E'line\\n'::text";

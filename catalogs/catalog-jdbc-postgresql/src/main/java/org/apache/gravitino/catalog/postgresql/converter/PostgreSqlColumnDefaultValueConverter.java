@@ -25,6 +25,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -36,18 +37,53 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
 
 public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+  private static final String TYPE_MODIFIER = "(?:\\(\\d++(?:,\\s*\\d++)?\\))?";
+  // Only constant casts that the literal conversion below understands. An arbitrary suffix would
+  // also match operators, COLLATE clauses, or another cast and silently change their semantics.
+  private static final String LITERAL_TYPE =
+      "(?:(?:text|bpchar|varchar|character(?: varying)?|boolean|bool|smallint|int2|integer|int4|bigint|int8|real|float4|double precision|float8|numeric|decimal|date)"
+          + TYPE_MODIFIER
+          + "|(?:timestamp|time)"
+          + TYPE_MODIFIER
+          + "(?: (?:with|without) time zone)?|timestamptz|timetz)";
+  // Possessive repetition avoids recursive backtracking for long default literals.
+  private static final Pattern QUOTED_LITERAL =
+      Pattern.compile(
+          "([eE]?)'((?:[^']|'')*+)'(?:\\s*::\\s*" + LITERAL_TYPE + ")?", Pattern.CASE_INSENSITIVE);
+  private static final Pattern NULL_LITERAL =
+      Pattern.compile("NULL(?:\\s*::\\s*(.+))?", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
   public PostgreSqlColumnDefaultValueConverter() {}
 
-  // for example:
-  // '2021-10-01 00:00:00'::timestamp without time zone
-  // ''something'::character varying'
-  // Possessive repetition avoids recursive backtracking for long default literals.
-  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'((?:[^']|'')*+)'::\\s*(.+)");
+  /**
+   * Makes backslash escaping explicit for a complete quoted default read with PostgreSQL's
+   * standard_conforming_strings disabled. PostgreSQL's catalog printer doubles backslashes in that
+   * mode without adding an E prefix. Other expressions are preserved without rewriting fragments.
+   *
+   * @param defaultValue the catalog default expression, or null when absent
+   * @return the equivalent explicit escape literal, or the unchanged expression
+   */
+  @Nullable
+  public static String withExplicitBackslashEscapes(@Nullable String defaultValue) {
+    return defaultValue != null
+            && defaultValue.startsWith("'")
+            && defaultValue.indexOf('\\') >= 0
+            && QUOTED_LITERAL.matcher(defaultValue).matches()
+        ? "E" + defaultValue
+        : defaultValue;
+  }
 
-  // for example:
-  // NULL::character varying
-  private static final String NULL_PREFIX = "NULL::";
-
+  /**
+   * Converts a default deparsed with standard_conforming_strings enabled, or a literal with
+   * explicit E escaping. Readers using nonstandard strings must first normalize complete quoted
+   * literals with {@link #withExplicitBackslashEscapes(String)}. Other expressions remain unparsed.
+   *
+   * @param type the column's JDBC type
+   * @param columnDefaultValue the default expression, or null when absent
+   * @param isExpression whether the column is generated from an expression
+   * @param nullable whether the column is nullable
+   * @return the literal, recognized current-timestamp default, or preserved expression
+   */
   @Override
   public Expression toGravitino(
       JdbcTypeConverter.JdbcTypeBean type,
@@ -95,17 +131,25 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
   }
 
   private Expression parseLiteral(JdbcTypeConverter.JdbcTypeBean type, String columnDefaultValue) {
-    Matcher matcher = VALUE_WITH_TYPE.matcher(columnDefaultValue);
-    if (matcher.find()) {
+    String expression = columnDefaultValue;
+    Matcher nullLiteral = NULL_LITERAL.matcher(expression);
+    if (nullLiteral.matches()
+        && (nullLiteral.group(1) == null
+            || PostgreSqlTypeConverter.isSingleTypeDeclaration(nullLiteral.group(1)))) {
+      return Literals.NULL;
+    }
+    Matcher matcher = QUOTED_LITERAL.matcher(expression);
+    boolean quoted = matcher.matches();
+    if (quoted) {
       // String literals in the catalog are shown with embedded single quotes doubled.
-      String content = matcher.group(1).replace("''", "'");
-      if (columnDefaultValue.startsWith("E'") || columnDefaultValue.startsWith("e'")) {
+      String content = matcher.group(2).replace("''", "'");
+      if (!matcher.group(1).isEmpty()) {
         StringBuilder decoded = new StringBuilder();
         for (int i = 0; i < content.length(); i++) {
           char character = content.charAt(i);
           if (character == '\\') {
-            // Our renderer and PostgreSQL's catalog printer double literal backslashes. Preserve
-            // other escape syntaxes as expressions instead of guessing their decoded value.
+            // The renderer and metadata normalization make literal backslash pairs explicit.
+            // Preserve other escape syntaxes instead of guessing their decoded value.
             if (++i >= content.length() || content.charAt(i) != '\\') {
               return UnparsedExpression.of(columnDefaultValue);
             }
@@ -117,12 +161,12 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
       columnDefaultValue = content;
     }
 
-    if (columnDefaultValue.startsWith(NULL_PREFIX)) {
-      return Literals.NULL;
-    }
-
-    switch (type.getTypeName().toLowerCase()) {
+    switch (type.getTypeName().toLowerCase(Locale.ROOT)) {
       case PostgreSqlTypeConverter.BOOL:
+        if (!"true".equalsIgnoreCase(columnDefaultValue)
+            && !"false".equalsIgnoreCase(columnDefaultValue)) {
+          return UnparsedExpression.of(expression);
+        }
         return Literals.booleanLiteral(Boolean.valueOf(columnDefaultValue));
       case PostgreSqlTypeConverter.INT_2:
         return Literals.shortLiteral(Short.valueOf(columnDefaultValue));
@@ -146,13 +190,18 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.timestampLiteral(
             LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
+        if (!quoted) {
+          return UnparsedExpression.of(expression);
+        }
         Integer length = type.getColumnSize();
         return length == null || length <= 0 || length == Integer.MAX_VALUE
             ? Literals.stringLiteral(columnDefaultValue)
             : Literals.varcharLiteral(length, columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:
       case JdbcTypeConverter.TEXT:
-        return Literals.stringLiteral(columnDefaultValue);
+        return quoted
+            ? Literals.stringLiteral(columnDefaultValue)
+            : UnparsedExpression.of(expression);
       default:
         throw new IllegalArgumentException("Unknown data type for literal: " + type);
     }

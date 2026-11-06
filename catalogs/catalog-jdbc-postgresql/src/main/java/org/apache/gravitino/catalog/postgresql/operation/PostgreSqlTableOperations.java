@@ -57,6 +57,7 @@ import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -72,6 +73,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.postgresql.PGConnection;
 
 /** Table operations for PostgreSQL. */
 public class PostgreSqlTableOperations extends JdbcTableOperations
@@ -845,7 +847,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
 
     boolean needsDeclarations = false;
+    Boolean standardConformingStrings = null;
     while (columns.next()) {
+      String defaultValue = columns.getString("COLUMN_DEF");
+      String escaped =
+          PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(defaultValue);
+      if (!Objects.equals(defaultValue, escaped)) {
+        if (standardConformingStrings == null) {
+          // pgJDBC's literal escaper uses the cached standard_conforming_strings setting.
+          // A single backslash stays unchanged only in standard mode. This public API also works
+          // with older drivers without the parameter-status API, with no query or session change.
+          standardConformingStrings =
+              "\\".equals(connection.unwrap(PGConnection.class).escapeLiteral("\\"));
+        }
+        if (!standardConformingStrings) {
+          columns.updateString("COLUMN_DEF", escaped);
+          columns.updateRow();
+        }
+      }
       String type = columns.getString("TYPE_NAME");
       if ("varchar".equals(type)
           || "bpchar".equals(type)
@@ -853,7 +872,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           || "_bpchar".equals(type)
           || (getAutoIncrementInfo(columns) && columns.getString("COLUMN_DEF") != null)) {
         needsDeclarations = true;
-        break;
       }
     }
     columns.beforeFirst();
