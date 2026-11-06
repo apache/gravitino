@@ -126,11 +126,19 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
+        if ("0000-00-00".equals(columnDefaultValue)) {
+          return UnparsedExpression.of("'" + columnDefaultValue + "'");
+        }
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
         return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
+        // MySQL permits zero-date defaults that Java temporal literals cannot represent.
+        // Preserve the SQL literal syntax in the unparsed expression.
+        if (columnDefaultValue.matches("0000-00-00 00:00:00(?:\\.[0-9]{1,6})?")) {
+          return UnparsedExpression.of("'" + columnDefaultValue + "'");
+        }
         if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
           return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
         }
