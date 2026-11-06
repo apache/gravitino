@@ -1090,9 +1090,11 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
     Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
 
-    // dropTable returns false because the table is already gone from the catalog, but the
-    // orphaned schema entities must still be cleaned up.
+    // dropTable returns false because the table is already gone from the catalog. Preserve the
+    // table entity because the same result can be caused by a concurrent rename or by a catalog
+    // user that cannot see the table, while still cleaning up orphaned schema entities.
     Assertions.assertFalse(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
     Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
     Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
@@ -1133,10 +1135,11 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
     Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
 
-    // purgeTable returns false because the table is already gone from the catalog, but the
-    // orphaned schema entities must still be cleaned up. A regression that re-guards the cleanup
-    // behind the catalog drop result would leave the stale schema entities behind.
+    // purgeTable returns false because the table is already gone from the catalog. Preserve the
+    // table entity because the same result can be caused by a concurrent rename or by a catalog
+    // user that cannot see the table, while still cleaning up orphaned schema entities.
     Assertions.assertFalse(tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
     Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
     Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
