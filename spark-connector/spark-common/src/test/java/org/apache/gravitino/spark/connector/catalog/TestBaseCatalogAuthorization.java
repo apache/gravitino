@@ -310,11 +310,18 @@ public class TestBaseCatalogAuthorization {
 
   private static class TestCatalog extends BaseCatalog {
 
+    private final Catalog gravitinoCatalog;
+
     private TestCatalog(
         Catalog gravitinoCatalog,
         org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog) {
-      this.gravitinoCatalogClient = gravitinoCatalog;
+      this.gravitinoCatalog = gravitinoCatalog;
       this.sparkCatalog = sparkCatalog;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
     }
 
     private Table loadForWriting(Identifier identifier) throws Exception {
