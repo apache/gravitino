@@ -286,10 +286,11 @@ identifiers = catalog.as_table_catalog().list_tables(Namespace.of("public"))
 Loading an external table preserves its complete source column comments in the returned
 metadata. The entity store keeps a bounded, NUL-free projection of each column comment,
 without changing the source comment, column identity, or column governance metadata.
-The projection is limited to 4096 UTF-16 units so it fits every supported store.
-CREATE and ALTER requests reject NUL column comments and comments exceeding 4096 UTF-16
+On branch-1.3, the projection is limited to 256 UTF-16 units to match the existing
+column-comment schema in every supported store.
+CREATE and ALTER requests reject NUL column comments and comments exceeding 256 UTF-16
 units before source DDL, including managed-table creation, ADD COLUMN and comment updates.
-Supplementary Unicode characters count as two units, so 2048 emoji fit while 4096 emoji do not.
+Supplementary Unicode characters count as two units, so 128 emoji fit while 256 emoji do not.
 Accepted request comments are stored without truncation. The UTF-16 bound is needed for H2's
 VARCHAR storage limit even though MySQL and PostgreSQL count code points. No store migration
 is required.

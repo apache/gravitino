@@ -409,12 +409,6 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-<<<<<<< HEAD
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-    applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
-
-=======
->>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
     }
@@ -447,14 +441,10 @@ public class CapabilityHelpers {
           (TableChange.UpdateColumnPosition) change;
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-<<<<<<< HEAD
-=======
         applyExistingColumnName(afterPosition.getColumn(), capabilities);
->>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        applyNameSpecification(Capability.Scope.COLUMN, afterFieldName, capabilities);
         return TableChange.updateColumnPosition(
             fieldName, TableChange.ColumnPosition.after(afterFieldName));
       }

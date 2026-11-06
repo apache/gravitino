@@ -35,13 +35,13 @@ public class TestColumnEntity {
     Assertions.assertNull(ColumnEntity.commentForStorage(null));
     Assertions.assertEquals("", ColumnEntity.commentForStorage(""));
     Assertions.assertEquals("ab", ColumnEntity.commentForStorage("a\0b"));
-    String limit = "a".repeat(4096);
+    String limit = "a".repeat(256);
     Assertions.assertEquals(limit, ColumnEntity.commentForStorage(limit));
     Assertions.assertEquals(limit, ColumnEntity.commentForStorage(limit + "trailing"));
     // A supplementary character must either fit completely or be excluded completely.
-    String prefix = "a".repeat(4095);
+    String prefix = "a".repeat(255);
     Assertions.assertEquals(prefix, ColumnEntity.commentForStorage(prefix + "😀"));
-    String exactFit = "a".repeat(4094) + "😀";
+    String exactFit = "a".repeat(254) + "😀";
     Assertions.assertEquals(exactFit, ColumnEntity.commentForStorage(exactFit + "trailing"));
   }
 

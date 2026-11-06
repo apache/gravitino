@@ -180,10 +180,10 @@ public class ColumnEntity implements Entity, Auditable {
         columnName);
     COMMENT.validate(comment, EntityType.COLUMN);
     Preconditions.checkArgument(
-        comment == null || comment.length() <= EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH,
+        comment == null || comment.length() <= EntityFieldLimits.MAX_COMMENT_LENGTH,
         "Column comment for %s must not exceed %s UTF-16 units",
         columnName,
-        EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+        EntityFieldLimits.MAX_COMMENT_LENGTH);
   }
 
   /**
@@ -199,7 +199,7 @@ public class ColumnEntity implements Entity, Auditable {
       return null;
     }
     String safe = comment.replace("\0", "");
-    int end = Math.min(safe.length(), EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+    int end = Math.min(safe.length(), EntityFieldLimits.MAX_COMMENT_LENGTH);
     if (end < safe.length() && end > 0 && Character.isHighSurrogate(safe.charAt(end - 1))) {
       end--;
     }

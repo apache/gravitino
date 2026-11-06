@@ -33,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -235,7 +236,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     String projection = ColumnEntity.commentForStorage(sourceComment);
     Assertions.assertEquals(projection, stored.columns().get(0).comment());
     Assertions.assertFalse(projection.contains("\0"));
-    Assertions.assertTrue(projection.length() <= EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+    Assertions.assertTrue(projection.length() <= EntityFieldLimits.MAX_COMMENT_LENGTH);
     long columnId = stored.columns().get(0).id();
     // A second native comment change exercises the existing-column update path.
     String updated = "b\0" + "x".repeat(5000);
@@ -285,7 +286,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                 tableOperationDispatcher, true, "columnDifferenceContent", changed, 0, stored);
     Assertions.assertFalse(difference.contains("\0"));
     Assertions.assertFalse(difference.contains("b".repeat(4097)));
-    Assertions.assertTrue(difference.contains("b".repeat(4096)));
+    Assertions.assertTrue(difference.contains("b".repeat(256)));
   }
 
   @Test
@@ -300,7 +301,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     TestCatalogOperations source = spy(original);
     FieldUtils.writeField(base, "ops", source, true);
     try {
-      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+      for (String comment : new String[] {"a".repeat(255) + "😀", "😀".repeat(256)}) {
         IllegalArgumentException error =
             Assertions.assertThrows(
                 IllegalArgumentException.class,
@@ -311,12 +312,12 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                         "comment",
                         Map.of("k1", "v1", "k2", "v2"),
                         new Transform[0]));
-        Assertions.assertTrue(error.getMessage().contains("4096 UTF-16"));
+        Assertions.assertTrue(error.getMessage().contains("256 UTF-16"));
       }
       verify(source, never()).createTable(any(), any(), any(), any(), any(Transform[].class));
       createTable(ident);
       clearInvocations(source);
-      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+      for (String comment : new String[] {"a".repeat(255) + "😀", "😀".repeat(256)}) {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->

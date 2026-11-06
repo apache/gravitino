@@ -82,6 +82,8 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         .thenReturn(CapabilityResult.unsupported("case insensitive"));
     Mockito.when(capability.specificationOnName(Mockito.any(), Mockito.anyString()))
         .thenReturn(CapabilityResult.SUPPORTED);
+    Mockito.when(capability.specificationOnExistingName(Mockito.any(), Mockito.anyString()))
+        .thenCallRealMethod();
     Mockito.when(catalog.capability()).thenReturn(capability);
     CatalogTestUtils.mockDoWithCatalog(manager, catalog);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);

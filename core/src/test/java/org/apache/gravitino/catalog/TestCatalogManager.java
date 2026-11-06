@@ -112,6 +112,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
@@ -183,10 +184,8 @@ public class TestCatalogManager {
     CountDownLatch releaseValidation = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
     RuntimeException failure = new IllegalArgumentException("backend validation failed");
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            Mockito.spy(
-                new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets))) {
+    try (CatalogManager manager =
+        Mockito.spy(new CatalogManager(config, entityStore, new RandomIdGenerator()))) {
       Mockito.doAnswer(
               invocation -> {
                 validationStarted.countDown();
@@ -202,13 +201,7 @@ public class TestCatalogManager {
           executor.submit(
               () ->
                   manager.createCatalog(
-                      ident,
-                      Catalog.Type.RELATIONAL,
-                      provider,
-                      "comment",
-                      catalogProps(),
-                      Map.of(PROPERTY_KEY4, new SecretBinding("memory", "password")),
-                      Map.of()));
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps()));
       try {
         Assertions.assertTrue(validationStarted.await(5, TimeUnit.SECONDS));
         Assertions.assertEquals(
@@ -263,9 +256,8 @@ public class TestCatalogManager {
             })
         .when(store)
         .put(any(CatalogEntity.class), eq(false));
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+    try (CatalogManager manager =
+        Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator()))) {
       Mockito.doAnswer(
               invocation -> {
                 loadStarted.countDown();
@@ -310,9 +302,8 @@ public class TestCatalogManager {
     IOException failure = new IOException("catalog insert failed");
     Mockito.doThrow(failure).when(store).put(any(CatalogEntity.class), eq(false));
     AtomicReference<CatalogManager.CatalogWrapper> initialized = new AtomicReference<>();
-    try (SecretManager secrets = memorySecretManager();
-        CatalogManager manager =
-            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+    try (CatalogManager manager =
+        Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator()))) {
       Mockito.doAnswer(
               invocation -> {
                 CatalogManager.CatalogWrapper wrapper =
@@ -1289,7 +1280,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
+  void testFailedCatalogValidationDoesNotSuppressRemoteInvalidation() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
     store.put(metalakeEntity, true);
@@ -1322,30 +1313,13 @@ public class TestCatalogManager {
     Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-<<<<<<< HEAD
-    // Simulate a subsequent local mutation (e.g. disableCatalog) that writes an ALTER record.
-    manager.markLocalMutation(ident);
-
-    // The poller delivers both records in one batch: the DROP from the failed-create cleanup and
-    // the ALTER from the local mutation. The cleanup DROP must carry its own local-mutation token
-    // (the fix); otherwise it consumes the ALTER's token, the ALTER is treated as remote, and the
-    // in-use cached wrapper is spuriously invalidated and asynchronously closed.
-=======
-    // A replayed DROP from an earlier incarnation and subsequent ALTER must both invalidate the
-    // new entry. No local marker may suppress either record; leases protect active operations.
->>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
+    // Validation failed before persistence, so no cleanup DROP or local token should exist.
+    // A remote ALTER must therefore invalidate the newly created catalog.
     store
         .listener
         .get()
         .onEntityChange(
             List.of(
-                new EntityChangeRecord(
-                    1L,
-                    "metalake",
-                    "CATALOG",
-                    "metalake.failed_create_cleanup",
-                    OperateType.DROP,
-                    0L),
                 new EntityChangeRecord(
                     2L,
                     "metalake",
@@ -1354,10 +1328,9 @@ public class TestCatalogManager {
                     OperateType.ALTER,
                     0L)));
 
-    Assertions.assertNotNull(
+    Assertions.assertNull(
         manager.getCatalogCache().getIfPresent(ident),
-        "Cache should NOT be invalidated: the failed-create cleanup DROP must be tracked as a "
-            + "local mutation so it does not steal the token meant for the later ALTER");
+        "Failed validation must not leave a local token that suppresses a remote ALTER");
     manager.close();
   }
 
@@ -2140,5 +2113,17 @@ public class TestCatalogManager {
         });
 
     Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+  }
+
+  private static Map<String, String> catalogProps() {
+    return ImmutableMap.of(
+        "provider",
+        "test",
+        PROPERTY_KEY1,
+        "value1",
+        PROPERTY_KEY2,
+        "value2",
+        PROPERTY_KEY5_PREFIX + "1",
+        "value3");
   }
 }

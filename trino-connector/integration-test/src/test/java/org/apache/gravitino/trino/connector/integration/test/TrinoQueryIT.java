@@ -505,12 +505,6 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       String testSetDirName, String filename, TrinoQueryRunner queryRunner, Duration timeout)
       throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
-<<<<<<< HEAD
-    String sqls = TrinoQueryITBase.readFileToString(path);
-    String resultFileName = path.replace(".sql", ".txt");
-    FileOutputStream outputStream = new FileOutputStream(resultFileName);
-
-=======
     String sqls = removeSqlComments(TrinoQueryITBase.readFileToString(path));
     Path resultFile = Path.of(path.replace(".sql", ".txt"));
     // Read the trusted baseline before opening the output. A transient staging table must never
@@ -518,7 +512,6 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     String previousResults = Files.exists(resultFile) ? Files.readString(resultFile) : "";
     // Match the check path's EOF normalization, including files written by this generator.
     Matcher resultMatcher = RESULT_PATTERN.matcher(previousResults + "\n\n");
->>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
     Matcher sqlMatcher =
         Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
     List<String> queries = new ArrayList<>();

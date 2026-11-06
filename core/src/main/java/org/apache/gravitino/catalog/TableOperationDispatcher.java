@@ -427,36 +427,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 return Pair.of(droppedFromCatalog, isManagedTable);
               }
 
-<<<<<<< HEAD
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band, or the catalog user may be unable to see it. Preserve the registration, because
-          // deleting it would lose Gravitino-only metadata such as tags and privileges, including
-          // DENY privileges, of a table that may still exist. A true out-of-band drop can therefore
-          // leave a stale registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
-=======
               // A false result is ambiguous: the external table may have been renamed or dropped
-              // out of band. Preserve the registration because deleting it after a rename would
-              // lose Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-              // registration that requires separate cleanup.
+              // out of band, or the catalog user may be unable to see it. Keep the registration
+              // to preserve Gravitino-only metadata such as tags and privileges,
+              // including DENY privileges, of a table that may still exist. A true out-of-band drop
+              // can therefore leave a stale registration that requires separate cleanup.
               if (droppedFromCatalog) {
                 try {
                   store.delete(ident, TABLE);
-                } catch (OptimisticLockException e) {
-                  throw e;
                 } catch (NoSuchEntityException e) {
                   LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
                 } catch (Exception e) {
@@ -471,7 +449,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       cleanUpOrphanedSchema(getCatalogIdentifier(ident), schemaIdentifier);
     }
     return result.getLeft();
->>>>>>> 61d5c8475 ([#14640] fix(core): preserve native comments and isolate metadata operations (#14641))
   }
 
   /**
