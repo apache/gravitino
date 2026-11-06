@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -37,6 +38,7 @@ import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -47,29 +49,20 @@ import org.mockito.Mockito;
 /** Tests for {@link HDFSFileSystemProxy} close lifecycle. */
 public class TestHDFSFileSystemProxy {
 
+  private static final Map<String, String> KERBEROS_CONFIG =
+      ImmutableMap.of(
+          AuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
+          KerberosConfig.PRINCIPAL_KEY, "test@EXAMPLE.COM",
+          KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
+
   @Test
   public void testClosingFileSystemStopsKerberosTicketRefresh() throws Exception {
-    KerberosClient client = mock(KerberosClient.class);
-    when(client.login(anyString())).thenReturn(UserGroupInformation.createRemoteUser("test"));
-    KerberosClient.Builder builder = mock(KerberosClient.Builder.class, Mockito.RETURNS_SELF);
-    when(builder.build()).thenReturn(client);
-    Map<String, String> config =
-        ImmutableMap.of(
-            AuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
-            KerberosConfig.PRINCIPAL_KEY, "test@EXAMPLE.COM",
-            KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
-
+    KerberosClient client = mockLoggedInClient();
     try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
         MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
-      clients.when(() -> KerberosClient.builder(anyString(), any())).thenReturn(builder);
-      authUtils
-          .when(
-              () ->
-                  KerberosAuthUtils.saveKeytabFromUri(
-                      anyString(), any(), anyInt(), anyBoolean(), any()))
-          .thenReturn(new File("test.keytab"));
+      stubKerberosLogin(clients, authUtils, client);
 
-      FileSystem fs = new HDFSFileSystemProxy(new Path("file:///"), config).getProxy();
+      FileSystem fs = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
       verify(client, never()).close();
 
       // Closing the FileSystem stops the ticket refresh that login started, and only once.
@@ -77,5 +70,41 @@ public class TestHDFSFileSystemProxy {
       fs.close();
       verify(client, times(1)).close();
     }
+  }
+
+  @Test
+  public void testFailedFileSystemCreationAfterLoginStopsKerberosTicketRefresh() throws Exception {
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, authUtils, client);
+
+      // The login succeeds, then FileSystem.newInstance fails on an unknown scheme.
+      assertThrows(
+          GravitinoRuntimeException.class,
+          () -> new HDFSFileSystemProxy(new Path("nosuchfs:///"), KERBEROS_CONFIG));
+      verify(client, times(1)).close();
+    }
+  }
+
+  private static KerberosClient mockLoggedInClient() throws Exception {
+    KerberosClient client = mock(KerberosClient.class);
+    when(client.login(anyString())).thenReturn(UserGroupInformation.createRemoteUser("test"));
+    return client;
+  }
+
+  private static void stubKerberosLogin(
+      MockedStatic<KerberosClient> clients,
+      MockedStatic<KerberosAuthUtils> authUtils,
+      KerberosClient client) {
+    KerberosClient.Builder builder = mock(KerberosClient.Builder.class, Mockito.RETURNS_SELF);
+    when(builder.build()).thenReturn(client);
+    clients.when(() -> KerberosClient.builder(anyString(), any())).thenReturn(builder);
+    authUtils
+        .when(
+            () ->
+                KerberosAuthUtils.saveKeytabFromUri(
+                    anyString(), any(), anyInt(), anyBoolean(), any()))
+        .thenReturn(new File("test.keytab"));
   }
 }

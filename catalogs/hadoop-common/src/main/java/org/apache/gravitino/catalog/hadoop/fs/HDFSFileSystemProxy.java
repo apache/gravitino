@@ -205,8 +205,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               false,
               configuration);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
-      this.kerberosRealm = client.getRealm();
+      // login() starts the ticket refresh, so record the client before anything else can fail.
       this.kerberosClient = client;
+      this.kerberosRealm = client.getRealm();
       return ugi;
     } catch (IOException e) {
       throw ExceptionMessages.wrap("Failed to login with Kerberos", e);
