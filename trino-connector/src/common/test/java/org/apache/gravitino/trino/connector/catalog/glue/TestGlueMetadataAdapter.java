@@ -430,6 +430,43 @@ class TestGlueMetadataAdapter {
   }
 
   @Test
+  void testCreateIcebergTableTakesSortFieldWithoutDirection() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("type", "ICEBERG");
+    properties.put("sorted_by", decodeSortedBy("id NULLS LAST"));
+
+    assertArrayEquals(
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field("id"), SortDirection.ASCENDING, NullOrdering.NULLS_LAST)
+        },
+        adapter.createTable(sortedTable(properties)).getSortOrders());
+  }
+
+  @Test
+  void testIcebergSortOrderOnQuotedColumnCanRecreateTable() {
+    SortOrder[] sortOrders = {SortOrders.descending(NamedReference.field("order-id"))};
+    Table mockTable =
+        mockTable(
+            "tbl",
+            new Column[] {Column.of("order-id", Types.LongType.get())},
+            Map.of("table_type", "ICEBERG"),
+            new Transform[0],
+            sortOrders,
+            Distributions.NONE);
+
+    Map<String, Object> shown =
+        adapter.getTableMetadata(new GravitinoTable("db", "tbl", mockTable)).getProperties();
+    assertEquals(ImmutableList.of("\"order-id\" DESC"), shown.get("sorted_by"));
+    Map<String, Object> properties = new HashMap<>();
+    properties.put("type", shown.get("type"));
+    properties.put(
+        "sorted_by", decodeSortedBy(((List<?>) shown.get("sorted_by")).toArray(new String[0])));
+
+    assertArrayEquals(sortOrders, adapter.createTable(sortedTable(properties)).getSortOrders());
+  }
+
+  @Test
   void testCreateHiveTableRefusesNullOrderingInSortedBy() {
     Map<String, Object> properties = new HashMap<>();
     properties.put("bucketed_by", ImmutableList.of("id"));

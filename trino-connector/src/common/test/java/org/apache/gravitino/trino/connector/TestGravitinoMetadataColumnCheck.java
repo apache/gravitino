@@ -33,6 +33,7 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.type.BigintType;
 import io.trino.spi.type.TimestampType;
 import java.util.Map;
 import org.apache.gravitino.rel.Column;
@@ -87,6 +88,13 @@ public class TestGravitinoMetadataColumnCheck {
     metadata.setColumnType(session, tableHandle, columnHandle, TimestampType.TIMESTAMP_MICROS);
     verify(catalogMetadata)
         .setColumnType(any(), eq("ts"), eq(Types.TimestampType.withoutTimeZone(6)));
+  }
+
+  @Test
+  public void testTableIsLoadedOnlyForTypesThatDependOnTableFormat() {
+    metadata.createColumn(
+        tableHandle, ColumnMetadata.builder().setName("id").setType(BigintType.BIGINT).build());
+    verify(catalogMetadata, never()).getTable(any(), any());
   }
 
   private void mockTableType(String tableType) {

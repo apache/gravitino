@@ -188,9 +188,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    * several formats override this to pick the converter of the table's format.
    *
    * @param ident the table identifier
+   * @param changes the changes to convert
    * @return the table change converter for the table
    */
-  protected SparkTableChangeConverter getSparkTableChangeConverter(Identifier ident) {
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      Identifier ident, TableChange[] changes) {
     return sparkTableChangeConverter;
   }
 
@@ -352,7 +354,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                         .columns();
                   })
               ::get;
-      SparkTableChangeConverter tableChangeConverter = getSparkTableChangeConverter(ident);
+      SparkTableChangeConverter tableChangeConverter =
+          getSparkTableChangeConverter(ident, changes);
       org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
           Arrays.stream(changes)
               .map(change -> tableChangeConverter.toGravitinoTableChange(change, columns))

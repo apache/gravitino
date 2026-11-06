@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
@@ -44,7 +45,14 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.types.ArrayType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -258,9 +266,16 @@ public class GravitinoGlueCatalog extends BaseCatalog {
         : super.getSparkTypeConverter(gravitinoTableProperties);
   }
 
-  /** {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. */
+  /**
+   * {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. Hive and Iceberg differ
+   * on timestamp types only, so the table is loaded just for changes that set one.
+   */
   @Override
-  protected SparkTableChangeConverter getSparkTableChangeConverter(Identifier ident) {
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      Identifier ident, TableChange[] changes) {
+    if (Arrays.stream(changes).noneMatch(GravitinoGlueCatalog::setsTimestampType)) {
+      return super.getSparkTableChangeConverter(ident, changes);
+    }
     try {
       if (isIcebergTable(loadGravitinoTable(ident))) {
         return getSparkTableChangeConverter(ICEBERG_TYPE_CONVERTER);
@@ -268,7 +283,30 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     } catch (NoSuchTableException e) {
       // The alter reports the missing table.
     }
-    return super.getSparkTableChangeConverter(ident);
+    return super.getSparkTableChangeConverter(ident, changes);
+  }
+
+  private static boolean setsTimestampType(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      return containsTimestampType(((TableChange.AddColumn) change).dataType());
+    }
+    return change instanceof TableChange.UpdateColumnType
+        && containsTimestampType(((TableChange.UpdateColumnType) change).newDataType());
+  }
+
+  private static boolean containsTimestampType(DataType type) {
+    if (type instanceof ArrayType) {
+      return containsTimestampType(((ArrayType) type).elementType());
+    }
+    if (type instanceof MapType) {
+      return containsTimestampType(((MapType) type).keyType())
+          || containsTimestampType(((MapType) type).valueType());
+    }
+    if (type instanceof StructType) {
+      return Arrays.stream(((StructType) type).fields())
+          .anyMatch(field -> containsTimestampType(field.dataType()));
+    }
+    return type instanceof TimestampType || type instanceof TimestampNTZType;
   }
 
   /**

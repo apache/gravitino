@@ -271,11 +271,18 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
         Optional.ofNullable(gravitinoTable.getComment()));
   }
 
-  /** A column of an existing Hive-format table follows the same type rules as at create. */
+  /**
+   * A column of an existing Hive-format table follows the same type rules as at create. The table
+   * is loaded only for a type those rules refuse, the one case where its format matters.
+   */
   @Override
   public void checkColumnType(GravitinoColumn column, Supplier<GravitinoTable> table) {
-    if (!isIcebergTable(table.get().getProperties())) {
+    try {
       checkHiveColumnType(column.getName(), column.getType());
+    } catch (TrinoException e) {
+      if (!isIcebergTable(table.get().getProperties())) {
+        throw e;
+      }
     }
   }
 
