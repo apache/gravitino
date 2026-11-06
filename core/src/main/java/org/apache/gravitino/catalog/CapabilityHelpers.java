@@ -34,6 +34,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
@@ -526,15 +527,23 @@ public class CapabilityHelpers {
     return TableChange.rename(newName, newSchemaName);
   }
 
+  private static void applyExistingColumnName(String name, Capability capabilities) {
+    CapabilityResult result =
+        capabilities.specificationOnExistingName(Capability.Scope.COLUMN, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-    applyNameSpecification(Capability.Scope.COLUMN, change.fieldName()[0], capabilities);
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
 
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    applyExistingColumnName(change.fieldName()[0], capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
@@ -559,7 +568,7 @@ public class CapabilityHelpers {
           (TableChange.UpdateColumnPosition) change;
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyNameSpecification(Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
+        applyExistingColumnName(afterPosition.getColumn(), capabilities);
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
@@ -630,7 +639,7 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
       newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);
