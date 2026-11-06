@@ -48,11 +48,15 @@ import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
 @Path("/idp/users")
 public class IdpUserOperations {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpUserOperations.class);
 
   private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
@@ -83,7 +87,10 @@ public class IdpUserOperations {
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
     if (request == null) {
-      return IdpRESTUtils.nullRequestBody();
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -115,7 +122,10 @@ public class IdpUserOperations {
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
     if (request == null) {
-      return IdpRESTUtils.nullRequestBody();
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -163,7 +173,10 @@ public class IdpUserOperations {
   @ResponseMetered(name = "update-idp-user-enabled", absolute = true)
   public Response updateEnabled(@PathParam("user") String user, UpdateUserEnabledRequest request) {
     if (request == null) {
-      return IdpRESTUtils.nullRequestBody();
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,

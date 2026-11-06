@@ -82,17 +82,6 @@ public final class IdpRESTUtils {
     return toErrorResponse(errorMsg, e);
   }
 
-  /**
-   * Returns HTTP 400 for a missing JSON request body, matching metalake REST handlers.
-   *
-   * @return a bad-request response with message {@code Request body cannot be null}
-   */
-  public static Response nullRequestBody() {
-    LOG.warn("Received IdP request with null request body");
-    return illegalArguments(
-        "Request body cannot be null", new IllegalArgumentException("Request body cannot be null"));
-  }
-
   public static Response illegalArguments(String message, Throwable throwable) {
     return json(
         Response.Status.BAD_REQUEST,

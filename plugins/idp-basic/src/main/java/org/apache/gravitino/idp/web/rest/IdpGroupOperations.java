@@ -43,11 +43,15 @@ import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST resource for built-in IdP group management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
 @Path("/idp/groups")
 public class IdpGroupOperations {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpGroupOperations.class);
 
   private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
@@ -78,7 +82,10 @@ public class IdpGroupOperations {
   @ResponseMetered(name = "add-idp-group", absolute = true)
   public Response addGroup(AddGroupRequest request) {
     if (request == null) {
-      return IdpRESTUtils.nullRequestBody();
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -116,7 +123,10 @@ public class IdpGroupOperations {
   public Response changeGroupMembership(
       @PathParam("group") String group, GroupMembershipChangeRequest request) {
     if (request == null) {
-      return IdpRESTUtils.nullRequestBody();
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
