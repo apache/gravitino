@@ -43,7 +43,7 @@ import org.apache.spark.unsafe.types.UTF8String;
 
 public class SparkPartitionUtils {
 
-  private static final String HIVE_DEFAULT_PARTITION_NAME = "__HIVE_DEFAULT_PARTITION__";
+  static final String HIVE_DEFAULT_PARTITION_NAME = "__HIVE_DEFAULT_PARTITION__";
   private static final String HIVE_DEFAULT_PARTITION_NAME_LEGACY = "HIVE_DEFAULT_PARTITION";
 
   private SparkPartitionUtils() {}

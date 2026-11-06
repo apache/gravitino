@@ -25,6 +25,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -282,6 +283,22 @@ public class OwnerMetaBaseSQLProvider {
         + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
         + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
+  }
+
+  public String softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    String now = currentTimestampMillisExpression();
+    // No deleted_at filter on the job rows: the template delete soft-deletes its jobs earlier in
+    // the same transaction, and filtering them out would make this a no-op.
+    return "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
+        + " WHERE deleted_at = 0 AND metadata_object_type = 'JOB' AND metadata_object_id IN ("
+        + " SELECT job_run_id FROM "
+        + JobMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId})";
   }
 
   public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {

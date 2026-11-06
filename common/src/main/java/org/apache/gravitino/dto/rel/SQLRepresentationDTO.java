@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Representation;
 
@@ -32,8 +33,10 @@ import org.apache.gravitino.rel.Representation;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SQLRepresentationDTO extends RepresentationDTO {
 
+  // Preserve the supplied discriminator so validation can reject missing or invalid types.
   @JsonProperty("type")
-  private final String type = Representation.TYPE_SQL;
+  @Nullable
+  private String type;
 
   @JsonProperty("dialect")
   private String dialect;
@@ -46,6 +49,7 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
   }
 
   private SQLRepresentationDTO(String dialect, String sql) {
+    this.type = Representation.TYPE_SQL;
     this.dialect = dialect;
     this.sql = sql;
   }
@@ -59,7 +63,17 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
     return new Builder();
   }
 
+  /**
+   * Returns the supplied representation type.
+   *
+   * <p>Before successful validation, a deserialized instance may contain a null or invalid type.
+   * Instances created by the builder or successfully validated by {@link #validate()} return {@link
+   * Representation#TYPE_SQL}.
+   *
+   * @return The supplied type, or {@code null} if it was omitted or explicitly null.
+   */
   @Override
+  @Nullable
   public String type() {
     return type;
   }
@@ -84,6 +98,7 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(Representation.TYPE_SQL.equals(type), "\"type\" must be \"sql\"");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(dialect), "\"dialect\" field is required and cannot be empty");
     Preconditions.checkArgument(

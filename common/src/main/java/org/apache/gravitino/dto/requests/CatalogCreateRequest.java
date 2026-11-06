@@ -146,6 +146,7 @@ public class CatalogCreateRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    RequestValidation.properties(properties);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(type != null, "\"type\" field is required and cannot be empty");

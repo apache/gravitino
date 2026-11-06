@@ -46,6 +46,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -72,6 +73,21 @@ public class TestSemanticModelNormalizeDispatcher {
     when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     dispatcher = new SemanticModelNormalizeDispatcher(delegate, catalogManager);
+  }
+
+  @Test
+  public void testMetricDiscoveryNormalizesOnlyParents() {
+    NameIdentifier[] names = {
+      NameIdentifier.of(Namespace.of("metalake", "catalog", "MIXEDSCHEMA", "SalesModel"), "Revenue")
+    };
+    SemanticModelMetric[] infos = {mock(SemanticModelMetric.class)};
+    when(delegate.listMetrics(NORMALIZED_NAMESPACE)).thenReturn(names);
+    when(delegate.listMetricInfos(NORMALIZED_NAMESPACE)).thenReturn(infos);
+    assertSame(names, dispatcher.listMetrics(INPUT_NAMESPACE));
+    assertSame(infos, dispatcher.listMetricInfos(INPUT_NAMESPACE));
+    verify(delegate).listMetrics(NORMALIZED_NAMESPACE);
+    verify(delegate).listMetricInfos(NORMALIZED_NAMESPACE);
+    verifyNoMoreInteractions(delegate);
   }
 
   @Test

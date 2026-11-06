@@ -18,6 +18,8 @@ Views are supported by the Hive, Iceberg, and Paimon catalogs.
 
 ## View Operations
 
+For client setup and configuration, see [Client Setup](./how-to-use-gravitino-client.md) and [Python Client](./how-to-use-python-client.md).
+
 ### Create a View
 
 A view carries its columns and one or more representations, each holding a query and the dialect it
@@ -32,13 +34,20 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "name": "active_customers",
   "comment": "Customers with orders in the last year",
-  "query": "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
-  "dialect": "spark",
   "columns": [
     {"name": "id", "type": "integer", "nullable": false},
     {"name": "name", "type": "varchar(500)", "nullable": true}
   ],
-  "properties": {}
+  "representations": [
+    {
+      "type": "sql",
+      "sql": "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
+      "dialect": "spark"
+    }
+  ],
+  "properties": {
+    "spark.sql.create.version": "3.5.0"
+  }
 }' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views
 ```
 
@@ -69,7 +78,37 @@ View view = views.createView(
     representations,
     "sales",
     "public",
-    ImmutableMap.of());
+    ImmutableMap.of("spark.sql.create.version", "3.5.0"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+catalog = client.load_catalog("sales")
+views = catalog.as_view_catalog()
+
+columns = [
+    Column.of("id", Types.IntegerType.get(), nullable=False),
+    Column.of("name", Types.VarCharType.of(500)),
+]
+
+representations = [
+    SQLRepresentation(
+        Dialects.SPARK,
+        "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
+    )
+]
+
+view = views.create_view(
+    NameIdentifier.of("public", "active_customers"),
+    columns=columns,
+    representations=representations,
+    comment="Customers with orders in the last year",
+    default_catalog="sales",
+    default_schema="public",
+    properties={"spark.sql.create.version": "3.5.0"},
+)
 ```
 
 </TabItem>
@@ -96,16 +135,23 @@ View view = views.loadView(NameIdentifier.of("public", "active_customers"));
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+view = views.load_view(NameIdentifier.of("public", "active_customers"))
+```
+
+</TabItem>
 </Tabs>
 
 ### Alter a View
 
-| Change             | JSON                                                         | Java                                       |
-|--------------------|--------------------------------------------------------------|--------------------------------------------|
-| Rename             | `{"@type":"rename","newName":"view_renamed"}`                | `ViewChange.rename("view_renamed")`        |
-| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`       | `ViewChange.updateComment("new_comment")`  |
-| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `ViewChange.setProperty("key1", "value1")` |
-| Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `ViewChange.removeProperty("key1")`        |
+| Change             | JSON                                                         | Java                                       | Python                                     |
+|--------------------|--------------------------------------------------------------|--------------------------------------------|--------------------------------------------|
+| Rename             | `{"@type":"rename","newName":"view_renamed"}`                | `ViewChange.rename("view_renamed")`        | `ViewChange.rename("view_renamed")`        |
+| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `ViewChange.setProperty("key1", "value1")` | `ViewChange.set_property("key1", "value1")` |
+| Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `ViewChange.removeProperty("key1")`        | `ViewChange.remove_property("key1")`       |
+| Replace a view     | `{"@type":"replaceView",...}`                                | `ViewChange.replaceView(...)`              | `ViewChange.replace_view(...)`             |
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -114,7 +160,7 @@ View view = views.loadView(NameIdentifier.of("public", "active_customers"));
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": [
-    {"@type": "updateComment", "newComment": "Customers active in the last year"}
+    {"@type": "setProperty", "property": "key1", "value": "value1"}
   ]
 }' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views/active_customers
 ```
@@ -125,7 +171,17 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 View view = views.alterView(
     NameIdentifier.of("public", "active_customers"),
-    ViewChange.updateComment("Customers active in the last year"));
+    ViewChange.setProperty("key1", "value1"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+view = views.alter_view(
+    NameIdentifier.of("public", "active_customers"),
+    ViewChange.set_property("key1", "value1"),
+)
 ```
 
 </TabItem>
@@ -151,6 +207,13 @@ boolean dropped = views.dropView(NameIdentifier.of("public", "active_customers")
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+dropped = views.drop_view(NameIdentifier.of("public", "active_customers"))
+```
+
+</TabItem>
 </Tabs>
 
 ### List Views
@@ -168,6 +231,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 NameIdentifier[] identifiers = views.listViews(Namespace.of("public"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+identifiers = views.list_views(Namespace.of("public"))
 ```
 
 </TabItem>

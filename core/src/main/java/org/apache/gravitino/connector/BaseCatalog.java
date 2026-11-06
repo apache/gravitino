@@ -223,6 +223,29 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Validates the initialized configuration without contacting the catalog backend.
+   *
+   * @throws IllegalArgumentException if the configuration is invalid
+   */
+  public final void validateConfiguration() {
+    validateConfiguration(conf);
+  }
+
+  /**
+   * Validates the complete proposed catalog configuration without contacting its backend.
+   *
+   * <p>Called on explicit create and alter operations, independently of optional backend
+   * verification, with the catalog ClassLoader installed. The configuration may differ from the
+   * current entity on alter. Implementations must not mutate it, initialize operations, open
+   * connections, or retain resources. The default accepts the configuration for compatibility.
+   * Existing catalogs are not validated on ordinary reads.
+   *
+   * @param configuration the complete effective configuration, with secret references resolved
+   * @throws IllegalArgumentException if the configuration is invalid
+   */
+  public void validateConfiguration(Map<String, String> configuration) {}
+
+  /**
    * Whether to validate this catalog against its backend at create time rather than on first use.
    *
    * @return {@code true} to validate at create; {@code false} (default) to defer
@@ -603,9 +626,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public Map<String, String> propertiesWithCredentialProviders() {
     // Entity storage keeps secret URNs; resolve to plaintext when SecretManager is available.
+    // toPlaintextOrMasked so a deleted/rotated secret does not block catalog load (disable, drop,
+    // list, re-bind). Unresolved secrets become the masked placeholder.
     Map<String, String> props = Maps.newHashMap(entity().getProperties());
     if (secretManager != null) {
-      props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
+      props = Maps.newHashMap(secretManager.toPlaintextOrMasked(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
