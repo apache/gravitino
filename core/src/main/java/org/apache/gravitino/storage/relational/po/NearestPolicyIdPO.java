@@ -18,56 +18,34 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import java.util.Objects;
+import lombok.Getter;
+
 /**
  * The enabled policies of one type matched on a table's nearest level.
  *
  * <p>{@code policyId} is the winner when {@code policyCount} is one.
  */
+@Getter
 public class NearestPolicyIdPO {
 
   private Long tableId;
   private Long policyCount;
   private Long policyId;
 
-  /**
-   * @return table id
-   */
-  public Long getTableId() {
-    return tableId;
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof NearestPolicyIdPO)) {
+      return false;
+    }
+    NearestPolicyIdPO that = (NearestPolicyIdPO) o;
+    return Objects.equals(tableId, that.tableId)
+        && Objects.equals(policyCount, that.policyCount)
+        && Objects.equals(policyId, that.policyId);
   }
 
-  /**
-   * @param tableId table id
-   */
-  public void setTableId(Long tableId) {
-    this.tableId = tableId;
-  }
-
-  /**
-   * @return number of distinct policies matched on the nearest level
-   */
-  public Long getPolicyCount() {
-    return policyCount;
-  }
-
-  /**
-   * @param policyCount number of distinct policies matched on the nearest level
-   */
-  public void setPolicyCount(Long policyCount) {
-    this.policyCount = policyCount;
-  }
-
-  /**
-   * @return smallest policy id matched on the nearest level
-   */
-  public Long getPolicyId() {
-    return policyId;
-  }
-
-  /**
-   * @param policyId smallest policy id matched on the nearest level
-   */
-  public void setPolicyId(Long policyId) {
-    this.policyId = policyId;
+  @Override
+  public int hashCode() {
+    return Objects.hash(tableId, policyCount, policyId);
   }
 }
