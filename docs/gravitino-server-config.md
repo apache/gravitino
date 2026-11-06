@@ -337,6 +337,76 @@ by default, and the properties below tune what it holds and how it evicts.
 | `gravitino.cache.enableStats`    | Whether to log hit count, miss count, and load failures every five minutes at INFO. | `false`            |
 | `gravitino.cache.lockSegments`   | Number of lock segments used to reduce contention.                                  | `16`               |
 
+##### Shared cache with Redis
+
+By default each server keeps its own Caffeine cache, so a write on one server does not clear the
+copies held by the others until the change log reaches them. Setting
+`gravitino.cache.implementation` to `redis` keeps one copy of every cached entity in Redis instead,
+shared by every server: a write on any server clears the shared copy once, and every other server
+observes the change immediately. Reads then cost a network round trip, so keep the default on a
+single server.
+
+The Redis cache is a shared cache, not a strongly consistent pair with the metadata database. The
+cache is only touched after the database has committed, and an invalidation never updates an entry
+in place, so most Redis failures degrade to a cache miss. Other servers can still be served the
+previous copy of an entity in these cases:
+
+- The invalidation after a commit does not reach Redis (Redis down, timed out, or the client lacks
+  permission). It is retried once; if that fails too, the write still succeeds, the server logs an
+  error naming the entity, and the `redis-entity-cache` metric `invalidation-failures-total` is
+  incremented.
+- A server dies between its database commit and the invalidation that follows it.
+- A Redis failover with asynchronous replication loses an invalidation Redis had acknowledged.
+
+Every server replays the entity change log for a Redis cache too, repeating each recorded
+invalidation, so in each case the previous copy is served for at most about
+`gravitino.entityChangeLog.pollIntervalSecs`, and never longer than
+`gravitino.cache.expireTimeInMs`. Operations that cannot tolerate that must read the database
+directly.
+
+Redis must run with `maxmemory-policy` set to `noeviction` or one of the `volatile-*` policies. The
+cache keeps its invalidation fences in keys without a TTL, which those policies never evict; under
+an `allkeys-*` policy Redis could evict a fence and let a stale entry back in, so a server refuses
+to start when Redis reports one. When `CONFIG GET` is not permitted, as on some managed offerings,
+the server logs a warning instead and the operator must check the policy.
+
+| Configuration Item                  | Description                                                                                                                                                                                     | Default Value                          |
+|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| `gravitino.cache.redis.address`     | Comma-separated `host:port` list. Required when the implementation is `redis`. A standalone Redis takes exactly one address; a Redis Cluster takes one or more seed nodes and `cluster = true`. | (none)                                 |
+| `gravitino.cache.redis.cluster`     | Whether the address points at a Redis Cluster.                                                                                                                                                  | `false`                                |
+| `gravitino.cache.redis.namespace`   | Prefix of every key the cache writes, so several Gravitino clusters can share one Redis. Letters, digits and `.`, `_`, `-`, `:` only; a namespace never matches keys of a longer namespace it prefixes. | `gravitino`                            |
+| `gravitino.cache.redis.ssl`         | Whether to connect over TLS. The JVM's default trust store verifies the server certificate.                                                                                                     | `false`                                |
+| `gravitino.cache.redis.serializer`  | Serialization format for cached entities. Only `kryo` is supported.                                                                                                                             | `kryo`                                 |
+| `gravitino.cache.redis.timeoutMs`   | Connection and command timeout in milliseconds. A read or write that exceeds it is treated as a miss.                                                                                           | `1000`                                 |
+| `gravitino.cache.redis.username`    | Optional Redis ACL user name.                                                                                                                                                                   | (none)                                 |
+| `gravitino.cache.redis.password`    | Optional Redis password.                                                                                                                                                                        | (none)                                 |
+
+`gravitino.cache.expireTimeInMs` is the value TTL for Redis as well and must be positive;
+`maxEntries` and `enableWeigher` apply only to the Caffeine cache, since Redis is sized by the
+operator. All keys of one metalake share a Redis Cluster hash slot, so a metalake's entries live on
+one cluster node. A server that cannot reach Redis at startup fails to start rather than running
+uncached. Anyone who can write to the Redis can write the bytes servers deserialize, so protect it
+with an ACL user and password, enable `ssl` on untrusted networks, and do not share it with
+unrelated tenants; servers only deserialize Gravitino entity classes and a fixed set of JDK and
+Guava value types.
+
+Each cached entry records the invalidation generations of its own identifier and of every
+container above it, and is served only while they are unchanged. Invalidating a container therefore
+takes constant time however much is cached below it: entries below stop being served at once and
+are removed by their next read or by their TTL. A cache fill is only performed when a read miss on
+the same thread bounded the load that produced it, so a load that began before an invalidation
+can never refill the key afterwards. A fill with no such bound, such as caching a freshly inserted
+entity, is skipped and the next read loads the entity instead; if an earlier miss of the same key
+on the same thread left a bound behind, the fill is checked against that bound, which is equally
+safe. Stopping a server releases only its own Redis client and leaves the shared entries for the
+other servers; clearing the shared cache is a separate maintenance operation that scans the
+keyspace.
+
+Each server registers `redis-entity-cache` metrics: `hits-total`, `misses-total`,
+`stale-reads-total`, `fills-written-total`, `fills-rejected-total`, `fills-skipped-total`,
+`redis-failures-total` and `invalidation-failures-total`. A cache whose fills are all rejected or
+skipped, or whose commands fail, is visible there.
+
 Two eviction limits apply at once. Time to live always applies: an entry older than
 `expireTimeInMs` expires and is cleaned up asynchronously. The clock starts when the entry is
 written and is not reset by reads, so in a multi-node deployment `expireTimeInMs` is also the upper

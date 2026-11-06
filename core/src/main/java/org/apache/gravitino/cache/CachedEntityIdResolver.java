@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.cache;
 
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -35,29 +39,55 @@ public class CachedEntityIdResolver implements EntityIdResolver {
     this.underlyingResolver = underlyingResolver;
   }
 
+  /**
+   * Resolves the ids of an identifier and its ancestors, looking all of them up in the cache at
+   * once. Levels are taken from the cache from the identifier upwards until the first one that is
+   * not cached; that level and everything above it is resolved by the underlying resolver.
+   */
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    return entityCache
-        .getIfPresent(nameIdentifier, type)
-        .map(
-            entity -> {
-              if (nameIdentifier.hasNamespace()) {
-                NamespacedEntityId namespaceIds =
-                    getEntityIds(
-                        NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
-                        NameIdentifierUtil.parentEntityType(type));
-                return new NamespacedEntityId(entity.id(), namespaceIds.fullIds());
-              } else {
-                return new NamespacedEntityId(entity.id());
-              }
-            })
-        .orElseGet(() -> underlyingResolver.getEntityIds(nameIdentifier, type));
+    if (!BaseEntityCache.isCacheable(type)) {
+      return underlyingResolver.getEntityIds(nameIdentifier, type);
+    }
+
+    // The identifier first, then each ancestor up to the metalake.
+    List<EntityCacheKey> chain = new ArrayList<>();
+    NameIdentifier ident = nameIdentifier;
+    Entity.EntityType levelType = type;
+    chain.add(EntityCacheKey.of(ident, levelType));
+    while (ident.hasNamespace()) {
+      ident = NameIdentifierUtil.parentNameIdentifier(ident, levelType);
+      levelType = NameIdentifierUtil.parentEntityType(levelType);
+      chain.add(EntityCacheKey.of(ident, levelType));
+    }
+
+    List<Optional<HasIdentifier>> cached = entityCache.peekAll(chain);
+    int firstMiss = 0;
+    while (firstMiss < chain.size() && cached.get(firstMiss).isPresent()) {
+      firstMiss++;
+    }
+
+    NamespacedEntityId ids;
+    int level;
+    if (firstMiss == chain.size()) {
+      level = chain.size() - 1;
+      ids = new NamespacedEntityId(cached.get(level).get().id());
+    } else {
+      EntityCacheKey missed = chain.get(firstMiss);
+      ids = underlyingResolver.getEntityIds(missed.identifier(), missed.entityType());
+      level = firstMiss;
+    }
+    for (int i = level - 1; i >= 0; i--) {
+      ids = new NamespacedEntityId(cached.get(i).get().id(), ids.fullIds());
+    }
+    return ids;
   }
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
     return entityCache
-        .getIfPresent(nameIdentifier, type)
+        .peekAll(ImmutableList.of(EntityCacheKey.of(nameIdentifier, type)))
+        .get(0)
         .map(HasIdentifier::id)
         .orElseGet(() -> underlyingResolver.getEntityId(nameIdentifier, type));
   }

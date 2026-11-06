@@ -39,10 +39,12 @@ import org.slf4j.LoggerFactory;
  * prefix, invalidating a container (for example a schema) cascades to its cached children on the
  * local node through that forward prefix scan; no reverse index is involved.
  *
- * <p>This listener is registered only for a {@link
- * org.apache.gravitino.cache.Coherence#LOCAL_PER_NODE} cache: a shared cache has a single
- * cluster-wide copy and nothing per-node to invalidate. It is called <em>synchronously</em> on the
- * poller thread, so it performs only fast, in-memory, idempotent invalidations.
+ * <p>This listener is registered for a {@link org.apache.gravitino.cache.Coherence#LOCAL_PER_NODE}
+ * cache, and for a {@link org.apache.gravitino.cache.Coherence#SHARED} cache, where every node
+ * repeating the invalidation of the single shared copy repairs one that failed or was lost after
+ * the commit. A shared cache reports a failed invalidation by returning instead of throwing, so the
+ * full-cache fallback below never runs against it. The listener is called <em>synchronously</em> on
+ * the poller thread, so it performs only fast, idempotent invalidations.
  *
  * <p>The two failure modes of a replayed row are handled separately, because they mean different
  * things:
