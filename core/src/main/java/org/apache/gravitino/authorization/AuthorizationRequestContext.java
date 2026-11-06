@@ -167,62 +167,6 @@ public class AuthorizationRequestContext {
         k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
   }
 
-<<<<<<< HEAD
-=======
-  /**
-   * Normalizes each raw metadata name at most once per request.
-   *
-   * <p>The key must include the metalake, object type and raw name. Successful results are a
-   * request-local snapshot; failures are not cached, so a later lookup may retry. A fresh request
-   * must resolve current catalog rules again. This map must not be shared across mutations.
-   *
-   * @param key the raw metadata object's cache key
-   * @param loader the normalization function, which must return a non-null object or throw
-   * @return the canonical metadata object
-   */
-  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
-      String key, Function<String, MetadataObject> loader) {
-    return normalizedMetadataObjects.computeIfAbsent(
-        key,
-        k -> Objects.requireNonNull(loader.apply(k), "Normalization loader must not return null"));
-  }
-
-  /**
-   * Normalizes a raw name while remembering normalization failures for its catalog in this request.
-   *
-   * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
-   * Any failure except not found is remembered for the whole catalog, including one that only
-   * concerns a single object, such as a physical table-name or stored-column read. Later objects in
-   * the same catalog then fail in this request, which denies them. Missing catalogs are not
-   * memoized; a fresh request retries every failure.
-   *
-   * @param key the raw metadata object's cache key
-   * @param catalogIdentifier the containing catalog, including its metalake
-   * @param loader the normalization function, which must return a non-null object or throw
-   * @return the canonical metadata object
-   * @throws RuntimeException if normalization failed for this catalog
-   */
-  public MetadataObject computeNormalizedMetadataObjectIfAbsent(
-      String key, NameIdentifier catalogIdentifier, Function<String, MetadataObject> loader) {
-    CatalogNormalizationState state =
-        catalogNormalizationStates.computeIfAbsent(
-            catalogIdentifier, ignored -> new CatalogNormalizationState());
-    synchronized (state) {
-      if (state.failure != null) {
-        throw state.failure;
-      }
-      try {
-        return computeNormalizedMetadataObjectIfAbsent(key, loader);
-      } catch (NotFoundException e) {
-        throw e;
-      } catch (RuntimeException e) {
-        state.failure = e;
-        throw e;
-      }
-    }
-  }
-
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */
   public Long computeMetadataIdIfAbsent(String key, Function<String, Long> loader) {
     return metadataIdCache.computeIfAbsent(

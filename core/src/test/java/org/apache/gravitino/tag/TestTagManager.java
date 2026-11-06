@@ -46,11 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
-<<<<<<< HEAD
-=======
-import java.util.List;
 import java.util.Locale;
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -68,6 +64,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -77,20 +74,13 @@ import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
-<<<<<<< HEAD
-import org.apache.gravitino.catalog.ViewDispatcher;
-=======
 import org.apache.gravitino.catalog.TopicDispatcher;
-import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.CatalogOperations;
-import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -111,14 +101,9 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.PolicyEntity;
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
@@ -127,8 +112,6 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.semantic.Dataset;
-import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -139,6 +122,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
 
 public class TestTagManager {
@@ -170,16 +154,8 @@ public class TestTagManager {
   private static final ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
   private static final FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
 
-  private static EntityStore entityStore;
-
-  private static IdGenerator idGenerator;
-
-  private static TagManager tagManager;
-
   private static final CatalogManager catalogManager = mock(CatalogManager.class);
   private static final BaseCatalog<?> backendCatalog = mock(BaseCatalog.class);
-  private static CatalogManager previousCatalogManager;
-
   private static final Capability CASE_INSENSITIVE_CAPABILITY =
       new Capability() {
         @Override
@@ -187,6 +163,14 @@ public class TestTagManager {
           return CapabilityResult.unsupported("case insensitive");
         }
       };
+
+  private static CatalogManager previousCatalogManager;
+
+  private static EntityStore entityStore;
+
+  private static IdGenerator idGenerator;
+
+  private static TagManager tagManager;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -524,7 +508,7 @@ public class TestTagManager {
         NoSuchMetadataObjectException.class,
         () -> tagManager.listTagsForMetadataObject(METALAKE, differentlyCased));
     Assertions.assertThrows(
-        NoSuchMetadataObjectException.class,
+        NotFoundException.class,
         () -> tagManager.getTagForMetadataObject(METALAKE, differentlyCased, tag.name()));
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
@@ -533,69 +517,6 @@ public class TestTagManager {
                 METALAKE, differentlyCased, null, new String[] {tag.name()}));
     Assertions.assertArrayEquals(
         new String[] {tag.name()}, tagManager.listTagsForMetadataObject(METALAKE, canonical));
-  }
-
-  @Test
-  void testTagOperationsPreserveQuotedNamesAndOriginalExistenceCheck() {
-    Capability quoteAware =
-        new Capability() {
-          @Override
-          public String normalizeName(Scope scope, String name) {
-            return name.startsWith("\"") && name.endsWith("\"")
-                ? name.substring(1, name.length() - 1)
-                : name.toUpperCase(Locale.ROOT);
-          }
-        };
-    NameIdentifier quotedTable =
-        NameIdentifier.of(METALAKE, CATALOG, "\"" + SCHEMA + "\"", "\"" + TABLE + "\"");
-    MetadataObject request =
-        NameIdentifierUtil.toMetadataObject(quotedTable, Entity.EntityType.TABLE);
-    when(backendCatalog.capability()).thenReturn(quoteAware);
-    when(tableDispatcher.tableExists(any()))
-        .thenAnswer(invocation -> quotedTable.equals(invocation.getArgument(0)));
-    try {
-      assertTagRoundTrip(request, request, tagTarget(Entity.EntityType.TABLE, false));
-    } finally {
-      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
-      when(tableDispatcher.tableExists(any())).thenReturn(true);
-    }
-  }
-
-  @ParameterizedTest
-  @EnumSource(
-      value = Entity.EntityType.class,
-      names = {"TABLE", "COLUMN"})
-  void testTagOperationsResolvePhysicalTableName(Entity.EntityType type) {
-    CatalogOperations ops =
-        mock(
-            CatalogOperations.class,
-            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
-    Mockito.doReturn(ops).when(backendCatalog).ops();
-    when(((SupportsTableNameResolution) ops).resolveTableName(any()))
-        .thenAnswer(
-            invocation -> {
-              NameIdentifier ident = invocation.getArgument(0);
-              return ident.name().equals("table_alias")
-                  ? NameIdentifier.of(ident.namespace(), TABLE)
-                  : ident;
-            });
-    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
-    NameIdentifier alias =
-        type == Entity.EntityType.TABLE
-            ? NameIdentifier.of(METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), "TABLE_ALIAS")
-            : NameIdentifier.of(
-                METALAKE,
-                CATALOG,
-                SCHEMA.toUpperCase(Locale.ROOT),
-                "TABLE_ALIAS",
-                COLUMN.toUpperCase(Locale.ROOT));
-    MetadataObject canonical = tagTarget(type, false);
-    try {
-      assertTagRoundTrip(NameIdentifierUtil.toMetadataObject(alias, type), canonical, canonical);
-    } finally {
-      when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
-      Mockito.doReturn(null).when(backendCatalog).ops();
-    }
   }
 
   @Test
@@ -656,20 +577,14 @@ public class TestTagManager {
   @EnumSource(
       value = Entity.EntityType.class,
       names = {"TABLE", "COLUMN"})
-  void testFailedTableNameResolutionLeavesTagsUnchanged(Entity.EntityType type) {
+  void testFailedCapabilityLookupLeavesTagsUnchanged(Entity.EntityType type) {
     MetadataObject canonical = tagTarget(type, false);
     Tag kept = tagManager.createTag(METALAKE, "kept_tag", null, null);
     Tag added = tagManager.createTag(METALAKE, "added_tag", null, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, canonical, new String[] {kept.name()}, null);
 
-    CatalogOperations ops =
-        mock(
-            CatalogOperations.class,
-            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
-    when(((SupportsTableNameResolution) ops).resolveTableName(any()))
-        .thenThrow(new IllegalStateException("source unavailable"));
-    Mockito.doReturn(ops).when(backendCatalog).ops();
+    when(backendCatalog.capability()).thenThrow(new IllegalStateException("catalog unavailable"));
     try {
       RuntimeException addError =
           Assertions.assertThrows(
@@ -683,91 +598,71 @@ public class TestTagManager {
           () ->
               tagManager.associateTagsForMetadataObject(
                   METALAKE, canonical, null, new String[] {kept.name()}));
-      Assertions.assertThrows(
-          RuntimeException.class,
-          () ->
-              tagManager.associateTagValuesForMetadataObject(
-                  METALAKE, canonical, new TagValue[] {TagValue.of(added.name(), "v")}, null));
     } finally {
-      Mockito.doReturn(null).when(backendCatalog).ops();
+      Mockito.doReturn(Capability.DEFAULT).when(backendCatalog).capability();
     }
     Assertions.assertArrayEquals(
         new String[] {kept.name()}, tagManager.listTagsForMetadataObject(METALAKE, canonical));
   }
 
   @Test
-  void testTagOperationsUseCustomNormalization() throws IOException {
-    NameIdentifier uppercase = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "CUSTOM_TABLE");
-    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    entityStore.put(
-        TableEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(uppercase.name())
-            .withNamespace(uppercase.namespace())
-            .withColumns(Lists.newArrayList())
-            .withAuditInfo(audit)
-            .build(),
-        false);
-    Capability uppercaseTables =
-        new Capability() {
-          @Override
-          public String normalizeName(Scope scope, String name) {
-            return scope == Scope.TABLE ? name.toUpperCase(Locale.ROOT) : name;
-          }
-        };
-    when(backendCatalog.capability()).thenReturn(uppercaseTables);
+  void testExistenceChecksUseOriginalIdentifier() {
+    MetadataObject request = tagTarget(Entity.EntityType.TABLE, true);
+    MetadataObject canonical = tagTarget(Entity.EntityType.TABLE, false);
+    NameIdentifier requestedTable =
+        NameIdentifier.of(
+            METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), TABLE.toUpperCase(Locale.ROOT));
+    when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
+    when(tableDispatcher.tableExists(any()))
+        .thenAnswer(invocation -> requestedTable.equals(invocation.getArgument(0)));
     try {
-      MetadataObject request =
-          NameIdentifierUtil.toMetadataObject(
-              NameIdentifier.of(uppercase.namespace(), "custom_table"), Entity.EntityType.TABLE);
-      MetadataObject canonical =
-          NameIdentifierUtil.toMetadataObject(uppercase, Entity.EntityType.TABLE);
-      assertTagRoundTrip(request, canonical, canonical);
+      assertTagRoundTrip(request, request, canonical);
     } finally {
       when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
-      entityStore.delete(uppercase, Entity.EntityType.TABLE);
+      when(tableDispatcher.tableExists(any())).thenReturn(true);
     }
   }
 
   @Test
-  void testTagOperationsPreserveSemanticModelName() throws IOException {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "SalesModel");
-    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    Dataset dataset =
-        Dataset.builder()
-            .withName("sales")
-            .withSource(NameIdentifier.of(CATALOG, SCHEMA, TABLE))
-            .build();
-    entityStore.put(
-        SemanticModelEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(ident.name())
-            .withNamespace(ident.namespace())
-            .withAuditInfo(audit)
-            .withDefinition(
-                SemanticModelDefinition.builder().withDatasets(new Dataset[] {dataset}).build())
-            .build(),
-        false);
+  void testFailedStoredColumnReadLeavesTagsUnchanged() throws IOException {
+    NameIdentifier table = putTableWithColumn("failed_column_read", "MyCol");
+    MetadataObject canonical =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, table.name(), "MyCol"),
+            Entity.EntityType.COLUMN);
+    Tag kept = tagManager.createTag(METALAKE, "kept_tag", null, null);
+    Tag added = tagManager.createTag(METALAKE, "added_tag", null, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, canonical, new String[] {kept.name()}, null);
+    EntityStore failingStore = mock(EntityStore.class, AdditionalAnswers.delegatesTo(entityStore));
+    IOException failure = new IOException("stored columns unavailable");
+    Mockito.doThrow(failure)
+        .when(failingStore)
+        .get(table, Entity.EntityType.TABLE, TableEntity.class);
+    TagManager failingManager = new TagManager(idGenerator, failingStore);
     when(backendCatalog.capability()).thenReturn(CASE_INSENSITIVE_CAPABILITY);
-    when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(true);
     try {
-      MetadataObject request =
-          NameIdentifierUtil.toMetadataObject(
-              NameIdentifier.of(METALAKE, CATALOG, SCHEMA.toUpperCase(Locale.ROOT), ident.name()),
-              Entity.EntityType.SEMANTIC_MODEL);
-      MetadataObject canonical =
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SEMANTIC_MODEL);
-      assertTagRoundTrip(request, canonical, canonical);
-      MetadataObject wrongCase =
-          NameIdentifierUtil.toMetadataObject(
-              NameIdentifier.of(ident.namespace(), "salesmodel"), Entity.EntityType.SEMANTIC_MODEL);
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  failingManager.associateTagsForMetadataObject(
+                      METALAKE, canonical, new String[] {added.name()}, null));
+      Assertions.assertSame(failure, error.getCause());
       Assertions.assertThrows(
-          NoSuchMetadataObjectException.class,
-          () -> tagManager.listTagsForMetadataObject(METALAKE, wrongCase));
+          RuntimeException.class,
+          () ->
+              failingManager.associateTagsForMetadataObject(
+                  METALAKE, canonical, null, new String[] {kept.name()}));
     } finally {
       when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
-      when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(false);
-      entityStore.delete(ident, Entity.EntityType.SEMANTIC_MODEL);
+    }
+    try {
+      Assertions.assertArrayEquals(
+          new String[] {kept.name()}, tagManager.listTagsForMetadataObject(METALAKE, canonical));
+      Mockito.verify(failingStore, Mockito.never()).relationOperations();
+    } finally {
+      entityStore.delete(table, Entity.EntityType.TABLE);
     }
   }
 
@@ -1411,234 +1306,6 @@ public class TestTagManager {
     Assertions.assertTrue(
         e3.getMessage().contains("Failed to get tag for metadata object " + nonExistentObject));
   }
-<<<<<<< HEAD
-=======
-
-  @Test
-  public void testSemanticModelIsSupportedForTags() {
-    Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
-
-    MetadataObject semanticModelObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofSemanticModel(METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL),
-            Entity.EntityType.SEMANTIC_MODEL);
-    Assertions.assertEquals(MetadataObject.Type.SEMANTIC_MODEL, semanticModelObject.type());
-    Assertions.assertEquals(
-        CATALOG + "." + SCHEMA + "." + SEMANTIC_MODEL, semanticModelObject.fullName());
-
-    // A Semantic Model is an accepted tag target, so an absent one must fail existence validation
-    // rather than be rejected as an unsupported metadata object type.
-    when(semanticModelDispatcher.semanticModelExists(any())).thenReturn(false);
-
-    Throwable e =
-        Assertions.assertThrows(
-            NoSuchMetadataObjectException.class,
-            () ->
-                tagManager.associateTagsForMetadataObject(
-                    METALAKE, semanticModelObject, new String[] {tag1.name()}, null));
-    Assertions.assertTrue(
-        e.getMessage()
-            .contains(
-                "Metadata object "
-                    + semanticModelObject.fullName()
-                    + " type SEMANTIC_MODEL doesn't exist"),
-        e.getMessage());
-
-    Assertions.assertThrows(
-        NoSuchMetadataObjectException.class,
-        () -> tagManager.listTagsForMetadataObject(METALAKE, semanticModelObject));
-    Assertions.assertThrows(
-        NoSuchMetadataObjectException.class,
-        () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
-  }
-
-  @Test
-  public void testPolicyAssociationsForTag() throws IOException {
-    String tagName = "policy_tag";
-    String policyName = "policy_for_tag";
-    Assertions.assertThrows(
-        NoSuchTagException.class, () -> tagManager.listPolicyAssociationsForTag(METALAKE, tagName));
-    tagManager.createTag(
-        METALAKE, tagName, null, null, TagValueConstraint.ofAllowedValues("finance", "risk"));
-    PolicyEntity policy =
-        PolicyEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(policyName)
-            .withNamespace(Namespace.of(METALAKE))
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withEnabled(true)
-            .withContent(
-                PolicyContents.custom(
-                    ImmutableMap.of("rule", "value"),
-                    ImmutableSet.of(MetadataObject.Type.TABLE),
-                    null))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
-    entityStore.put(policy, false);
-
-    try {
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get());
-      RelationalEntity<?>[] associations =
-          tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
-      Assertions.assertEquals(1, associations.length);
-      Assertions.assertEquals(policyName, associations[0].targetEntity().name());
-      Assertions.assertEquals(tagName, associations[0].source().name());
-      Assertions.assertSame(
-          AllValuesSelector.get(),
-          PolicyAssociationSelectorSerde.deserialize(
-              associations[0].relationValue().orElseThrow()));
-
-      Assertions.assertThrows(
-          PolicyAlreadyAssociatedException.class,
-          () -> tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get()));
-      Assertions.assertThrows(
-          PolicyAlreadyAssociatedException.class,
-          () ->
-              tagManager.addPolicyForTag(
-                  METALAKE, tagName, policyName, TagValueSelector.of("finance")));
-
-      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
-      Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
-
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
-      associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
-      Assertions.assertEquals(
-          TagValueSelector.of("engineering"),
-          PolicyAssociationSelectorSerde.deserialize(
-              associations[0].relationValue().orElseThrow()));
-      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
-    } finally {
-      entityStore.delete(
-          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
-    }
-  }
-
-  @Test
-  public void testTagOperationsDoNotWaitForMetalakeTreeLock() throws Exception {
-    MetadataObject tableObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-    String policyName = "lock_free_policy";
-    entityStore.put(
-        PolicyEntity.builder()
-            .withId(idGenerator.nextId())
-            .withName(policyName)
-            .withNamespace(Namespace.of(METALAKE))
-            .withPolicyType(Policy.BuiltInType.CUSTOM)
-            .withEnabled(true)
-            .withContent(
-                PolicyContents.custom(
-                    ImmutableMap.of("rule", "value"),
-                    ImmutableSet.of(MetadataObject.Type.TABLE),
-                    null))
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build(),
-        false);
-
-    // A metalake WRITE lock covers every tag, policy and metadata object below it. Tag operations
-    // are fenced by the entity store, so none of them may wait for it.
-    try (TreeLockTestSupport.HeldLock metalakeWriter =
-        TreeLockTestSupport.HeldLock.acquire(NameIdentifier.of(METALAKE), LockType.WRITE)) {
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.createTag(METALAKE, "lock_free_tag", null, null));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.getTag(METALAKE, "lock_free_tag"));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.listTagsInfo(METALAKE));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter,
-          () -> tagManager.alterTag(METALAKE, "lock_free_tag", TagChange.updateComment("changed")));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter,
-          () ->
-              tagManager.addPolicyForTag(
-                  METALAKE, "lock_free_tag", policyName, AllValuesSelector.get()));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.listPolicyAssociationsForTag(METALAKE, "lock_free_tag"));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter,
-          () -> tagManager.removePolicyFromTag(METALAKE, "lock_free_tag", policyName));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter,
-          () ->
-              tagManager.associateTagsForMetadataObject(
-                  METALAKE, tableObject, new String[] {"lock_free_tag"}, null));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.listTagsForMetadataObject(METALAKE, tableObject));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter,
-          () -> tagManager.getTagForMetadataObject(METALAKE, tableObject, "lock_free_tag"));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.listMetadataObjectsForTag(METALAKE, "lock_free_tag"));
-      TreeLockTestSupport.assertRunsConcurrentlyWith(
-          metalakeWriter, () -> tagManager.deleteTag(METALAKE, "lock_free_tag"));
-    } finally {
-      entityStore.delete(
-          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
-    }
-  }
-
-  @Test
-  public void testConcurrentCreateTagHasOneWinner() throws Exception {
-    List<Object> outcomes =
-        RaceTestUtils.runTogether(8, () -> tagManager.createTag(METALAKE, "race_tag", null, null));
-
-    Assertions.assertEquals(1, outcomes.stream().filter(o -> o instanceof Tag).count());
-    outcomes.stream()
-        .filter(o -> !(o instanceof Tag))
-        .forEach(o -> Assertions.assertInstanceOf(TagAlreadyExistsException.class, o));
-    Assertions.assertEquals("race_tag", tagManager.getTag(METALAKE, "race_tag").name());
-  }
-
-  @Test
-  public void testConcurrentDeleteTagAndAssociateLeavesNoAssignment() throws Exception {
-    MetadataObject tableObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-
-    for (int i = 0; i < 10; i++) {
-      String tagName = "race_delete_tag_" + i;
-      tagManager.createTag(METALAKE, tagName, null, null);
-
-      List<Object> outcomes =
-          RaceTestUtils.runTogether(
-              Arrays.asList(
-                  () -> tagManager.deleteTag(METALAKE, tagName),
-                  () ->
-                      tagManager.associateTagsForMetadataObject(
-                          METALAKE, tableObject, new String[] {tagName}, null)));
-
-      Assertions.assertEquals(Boolean.TRUE, outcomes.get(0));
-      Object associate = outcomes.get(1);
-      // A tag dropped while the association runs is ignored like a tag that never existed, so the
-      // association always succeeds, whichever change commits first.
-      Assertions.assertInstanceOf(String[].class, associate);
-      Assertions.assertThrows(NoSuchTagException.class, () -> tagManager.getTag(METALAKE, tagName));
-      Assertions.assertFalse(
-          Arrays.asList(tagManager.listTagsForMetadataObject(METALAKE, tableObject))
-              .contains(tagName));
-    }
-  }
-
-  private static Set<String> tagNames(Tag[] tags) {
-    return Arrays.stream(tags).map(Tag::name).collect(Collectors.toSet());
-  }
-
-  private static void assertTagMetadataEquals(Tag expected, Tag actual) {
-    Assertions.assertEquals(expected.name(), actual.name());
-    Assertions.assertEquals(expected.comment(), actual.comment());
-    Assertions.assertEquals(expected.properties(), actual.properties());
-    Assertions.assertEquals(expected.valueConstraint().type(), actual.valueConstraint().type());
-    Assertions.assertArrayEquals(
-        expected.valueConstraint().allowedValues(), actual.valueConstraint().allowedValues());
-  }
-
-  private static void assertAssignmentValues(Tag tag, String[] expectedValues) {
-    Assertions.assertTrue(tag.assignment().isPresent());
-    Assertions.assertArrayEquals(expectedValues, tag.assignment().get().values());
-  }
 
   private static NameIdentifier putTableWithColumn(String tableName, String columnName)
       throws IOException {
@@ -1712,19 +1379,6 @@ public class TestTagManager {
     Assertions.assertArrayEquals(
         names, tagManager.associateTagsForMetadataObject(METALAKE, request, names, null));
     tagManager.associateTagsForMetadataObject(METALAKE, alias, null, names);
-    TagValue[] values = {TagValue.of(tag.name(), "MixedCaseValue")};
-    Assertions.assertArrayEquals(
-        names, tagManager.associateTagValuesForMetadataObject(METALAKE, request, values, null));
-    Assertions.assertArrayEquals(
-        new String[] {"MixedCaseValue"},
-        tagManager
-            .getTagForMetadataObject(METALAKE, alias, tag.name())
-            .assignment()
-            .get()
-            .values());
-    Assertions.assertEquals(
-        0, tagManager.associateTagValuesForMetadataObject(METALAKE, request, null, values).length);
     Assertions.assertEquals(0, tagManager.listTagsInfoForMetadataObject(METALAKE, alias).length);
   }
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 }

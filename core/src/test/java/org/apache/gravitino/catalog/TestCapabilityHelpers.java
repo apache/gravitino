@@ -18,14 +18,10 @@
  */
 package org.apache.gravitino.catalog;
 
-<<<<<<< HEAD
-=======
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Locale;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -128,42 +124,6 @@ public class TestCapabilityHelpers {
 
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
   }
-<<<<<<< HEAD
-=======
-
-  @Test
-  void testSemanticModelUsesSchemaNamespaceCapabilities() {
-    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
-
-    Assertions.assertEquals(
-        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
-        CapabilityHelpers.applyCapabilities(
-            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
-    Assertions.assertEquals(
-        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
-        CapabilityHelpers.applyCaseSensitive(
-            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
-  }
-
-  @Test
-  void testModelUsesSchemaNamespaceCapabilities() {
-    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
-
-    Assertions.assertEquals(
-        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
-        CapabilityHelpers.applyCapabilities(
-            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
-    Assertions.assertEquals(
-        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
-        CapabilityHelpers.applyCaseSensitive(
-            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
-  }
-
-  @Test
-  void testSemanticModelUsesManagedStorageByDefault() {
-    Assertions.assertTrue(
-        Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
-  }
 
   @Test
   void testNormalizeMetadataIdentifierKeepsExactStoredColumnName() throws IOException {
@@ -244,5 +204,4 @@ public class TestCapabilityHelpers {
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     return catalogManager;
   }
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 }

@@ -249,9 +249,6 @@ public class TagManager implements TagDispatcher {
     NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-<<<<<<< HEAD
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
@@ -274,23 +271,6 @@ public class TagManager implements TagDispatcher {
             throw new RuntimeException(e);
           }
         });
-=======
-    try {
-      checkMetalake(NameIdentifier.of(metalake), entityStore);
-      List<TagEntity> tags =
-          entityStore
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, entityIdent, entityType);
-      return tags.toArray(new Tag[0]);
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchMetadataObjectException(
-          e, "Failed to list tags for metadata object %s due to not found", metadataObject);
-    } catch (IOException e) {
-      LOG.error("Failed to list tags for metadata object {}", metadataObject, e);
-      throw new RuntimeException(e);
-    }
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
   }
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
@@ -298,9 +278,6 @@ public class TagManager implements TagDispatcher {
     NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
-
-<<<<<<< HEAD
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -328,31 +305,6 @@ public class TagManager implements TagDispatcher {
             throw new RuntimeException(e);
           }
         });
-=======
-    try {
-      checkMetalake(NameIdentifier.of(metalake), entityStore);
-      return entityStore
-          .relationOperations()
-          .<TagEntity>getEntityByRelation(
-              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-              entityIdent,
-              entityType,
-              tagIdent);
-    } catch (NoSuchEntityException e) {
-      // The store reports a missing tag and a missing metadata object with the same
-      // exception type, so the message is the only thing that tells them apart.
-      if (isMissingEntity(e, Entity.EntityType.TAG, name)) {
-        throw new NoSuchTagException(
-            e, "Tag %s does not exist for metadata object %s", name, metadataObject);
-      } else {
-        throw new NoSuchMetadataObjectException(
-            e, "Failed to get tag for metadata object %s due to not found", metadataObject);
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to get tag for metadata object {}", metadataObject, e);
-      throw new RuntimeException(e);
-    }
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
   }
 
   public String[] associateTagsForMetadataObject(
@@ -366,23 +318,11 @@ public class TagManager implements TagDispatcher {
     NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-<<<<<<< HEAD
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-
     // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
     Set<String> tagsToRemoveSet =
         tagsToRemove == null ? Sets.newHashSet() : Sets.newHashSet(tagsToRemove);
     Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
-=======
-    Set<TagValue> tagsToAddSet =
-        tagsToAdd == null ? new LinkedHashSet<>() : new LinkedHashSet<>(Arrays.asList(tagsToAdd));
-    Set<TagValue> tagsToRemoveSet =
-        tagsToRemove == null
-            ? new LinkedHashSet<>()
-            : new LinkedHashSet<>(Arrays.asList(tagsToRemove));
-    Set<TagValue> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
     tagsToAddSet.removeAll(common);
     tagsToRemoveSet.removeAll(common);
 
@@ -414,7 +354,6 @@ public class TagManager implements TagDispatcher {
                                 tagsToAddIdent,
                                 tagsToRemoveIdent);
 
-<<<<<<< HEAD
                     return tags.stream().map(Tag::name).toArray(String[]::new);
                   } catch (NoSuchEntityException e) {
                     throw new NoSuchMetadataObjectException(
@@ -433,12 +372,13 @@ public class TagManager implements TagDispatcher {
                     throw new RuntimeException(e);
                   }
                 }));
-=======
+  }
+
   private NameIdentifier checkAndNormalizeMetadataObject(
       String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    // Existence checks use normalizing dispatchers and must see the original request. Applying
-    // normalization first would fold quoted names again after their quotes have been removed.
+    // Keep provider existence checks on the original request. The canonical identifier below is
+    // used for both relation access and tree locks, so equivalent names share the same lock.
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     if (!SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type())
         || metadataObject.type() == MetadataObject.Type.CATALOG) {
@@ -450,76 +390,6 @@ public class TagManager implements TagDispatcher {
         Capability.Scope.valueOf(metadataObject.type().name()),
         GravitinoEnv.getInstance().catalogManager(),
         () -> entityStore);
-  }
-
-  private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {
-    TagValueConstraint normalizedConstraint =
-        valueConstraint == null ? TagValueConstraint.anyValue() : valueConstraint;
-    switch (normalizedConstraint.type()) {
-      case ANY_VALUE:
-        return null;
-      case NO_VALUE:
-        return normalizedConstraint.allowedValues();
-      case ALLOWED_VALUES:
-        return Arrays.stream(normalizedConstraint.allowedValues())
-            .distinct()
-            .toArray(String[]::new);
-      default:
-        throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
-    }
-  }
-
-  private static void validateTagValuesToAdd(TagValue[] tagValues) {
-    if (tagValues == null) {
-      return;
-    }
-
-    Map<String, Boolean> valuedByTagName = Maps.newHashMap();
-    for (TagValue tagValue : tagValues) {
-      Preconditions.checkNotNull(tagValue, "Tag value to add must not be null");
-      boolean valued = tagValue.value().isPresent();
-      Boolean previous = valuedByTagName.putIfAbsent(tagValue.name(), valued);
-      Preconditions.checkArgument(
-          previous == null || previous == valued,
-          "Cannot add assignments both with and without values for tag %s",
-          tagValue.name());
-    }
-  }
-
-  private static void validateTagValuesToRemove(TagValue[] tagValues) {
-    if (tagValues == null) {
-      return;
-    }
-
-    for (TagValue tagValue : tagValues) {
-      Preconditions.checkNotNull(tagValue, "Tag value to remove must not be null");
-    }
-  }
-
-  private static TagValue[] toNoValue(String[] tags) {
-    if (tags == null) {
-      return new TagValue[0];
-    }
-
-    return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
-  }
-
-  private static NameIdentifier[] toNameIdentifiers(String metalake, TagValue[] tagValues) {
-    return Arrays.stream(tagValues)
-        .map(tagValue -> NameIdentifierUtil.ofTag(metalake, tagValue.name()))
-        .toArray(NameIdentifier[]::new);
-  }
-
-  private static RelationEdgeTarget[] toRelationEdgeTargets(String metalake, TagValue[] tagValues) {
-    return Arrays.stream(tagValues)
-        .map(
-            tagValue ->
-                RelationEdgeTarget.of(
-                    NameIdentifierUtil.ofTag(metalake, tagValue.name()),
-                    Entity.EntityType.TAG,
-                    tagValue.value().orElse(null)))
-        .toArray(RelationEdgeTarget[]::new);
->>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
   }
 
   private TagEntity updateTagEntity(TagEntity tagEntity, TagChange... changes) {
