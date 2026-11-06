@@ -18,13 +18,20 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.Locale;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -316,8 +323,8 @@ public class TestCapabilityHelpers {
     // Iceberg v3 load exposes write-default and initial-default on columns. Feeding those columns
     // straight into create/add-column (copy-table / load-then-create) must fail: Gravitino create
     // still rejects initial defaults, and Iceberg create still rejects write defaults via
-    // capability
-    // for catalogs that do not support them. Document the failure rather than silently dropping.
+    // capability for catalogs that do not support them. Document the failure rather than silently
+    // dropping.
     Column loadedLikeIcebergV3 =
         Column.of(
             "region",
@@ -338,5 +345,85 @@ public class TestCapabilityHelpers {
         thrown.getMessage().contains("initial default value is not supported"),
         thrown.getMessage());
     Assertions.assertTrue(thrown.getMessage().contains("region"), thrown.getMessage());
+  }
+
+  @Test
+  void testNormalizeMetadataIdentifierKeepsExactStoredColumnName() throws IOException {
+    CatalogManager catalogManager = foldingCatalogManager();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "orders");
+    TableEntity tableEntity = Mockito.mock(TableEntity.class);
+    ColumnEntity column = Mockito.mock(ColumnEntity.class);
+    Mockito.when(column.name()).thenReturn("MyCol");
+    Mockito.when(tableEntity.columns()).thenReturn(Collections.singletonList(column));
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class))
+        .thenReturn(tableEntity);
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "MyCol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "MyCol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "othercol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "OtherCol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Mockito.verify(store, Mockito.times(2)).get(table, Entity.EntityType.TABLE, TableEntity.class);
+
+    // A name that folding does not change needs no stored-column read.
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "mycol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "mycol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Mockito.verify(store, Mockito.times(2)).get(table, Entity.EntityType.TABLE, TableEntity.class);
+  }
+
+  @Test
+  void testNormalizeMetadataIdentifierHandlesMissingOrFailedStoredTable() throws IOException {
+    CatalogManager catalogManager = foldingCatalogManager();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "orders");
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class))
+        .thenThrow(new NoSuchEntityException("missing"));
+    NameIdentifier column = NameIdentifier.of("metalake", "catalog", "schema", "ORDERS", "MyCol");
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "mycol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            column, Capability.Scope.COLUMN, catalogManager, () -> store));
+
+    IOException failure = new IOException("store down");
+    Mockito.reset(store);
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class)).thenThrow(failure);
+    RuntimeException error =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                CapabilityHelpers.normalizeMetadataIdentifier(
+                    column, Capability.Scope.COLUMN, catalogManager, () -> store));
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(table.toString()));
+  }
+
+  private static CatalogManager foldingCatalogManager() {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("case insensitive");
+              }
+            });
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    return catalogManager;
   }
 }
