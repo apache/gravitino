@@ -788,7 +788,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         case "bit_col_1":
-          Assertions.assertEquals(UnparsedExpression.of("b'1'"), column.defaultValue());
+          Assertions.assertEquals(Literals.booleanLiteral(true), column.defaultValue());
           break;
         default:
           Assertions.fail(
