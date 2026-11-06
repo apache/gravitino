@@ -73,6 +73,7 @@ import org.apache.gravitino.dto.semantic.DatasetDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -950,7 +951,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
           response,
           Response.Status.BAD_REQUEST,
           ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
-          IllegalArgumentException.class.getSimpleName(),
+          IllegalMetadataObjectException.class.getSimpleName(),
           "Metadata object full name cannot be blank");
       verifyNoModelWrites();
       verifyNoInteractions(tables, views);

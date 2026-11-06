@@ -30,7 +30,6 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
-import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -1049,11 +1048,7 @@ public class ExceptionHandlers {
       String errorMsg = getSemanticModelErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
-      if (e instanceof IllegalMetadataObjectException) {
-        // Preserve the existing response type for source-name validation failures.
-        return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
-
-      } else if (e instanceof IllegalArgumentException) {
+      if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
