@@ -116,8 +116,9 @@ public class TestPostgreSqlColumnDefaultValueConverter {
         Literals.stringLiteral("true"), converter.toGravitino(text, "true", false, true));
     Assertions.assertEquals(
         Literals.varcharLiteral(20, "false"), converter.toGravitino(varchar, "false", false, true));
-    // Forms whose stored text could differ are not guessed.
-    for (String sql : new String[] {"1e3", ".5", "10 + 1", "TRUE AND false"}) {
+    // Forms that PostgreSQL never shows this way, or whose stored text could differ, are not
+    // guessed.
+    for (String sql : new String[] {"1e3", ".5", "10 + 1", "TRUE", "TRUE AND false"}) {
       Assertions.assertEquals(
           UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
     }

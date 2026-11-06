@@ -253,7 +253,8 @@ PostgreSQL escape literals so that `standard_conforming_strings` does not change
 On load, only complete supported constants are converted to literals; functions and other
 expressions remain `UnparsedExpression` values. `CURRENT_TIMESTAMP` loads as the
 `CURRENT_TIMESTAMP` default on any column type. A plain number or `true`/`false` on a string
-column, such as `varchar(20) DEFAULT 10`, loads as the string `10`. Quoted defaults are decoded using the reading
+column loads as a string. For example, `varchar(20) DEFAULT 10` loads as `10`, and
+`text DEFAULT true` loads as `true`. Quoted defaults are decoded using the reading
 connection's string mode without changing the session or adding a query. An unparsed default
 is preserved for inspection, but cannot be submitted as a PostgreSQL write expression.
 See [shared JDBC default restrictions](./tables-and-views.md#table-column-default-value) for the
