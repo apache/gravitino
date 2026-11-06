@@ -25,11 +25,13 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -210,5 +212,49 @@ public class TestCapabilityHelpers {
   void testSemanticModelUsesManagedStorageByDefault() {
     Assertions.assertTrue(
         Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
+  }
+
+  @Test
+  void testApplyCapabilitiesRejectsInitialDefaultEvenWhenWriteDefaultSupported() {
+    // Capability.DEFAULT supports write-default (like MySQL), but catalogs do not apply
+    // Iceberg-style initial defaults. Create must reject a set initialDefaultValue rather than
+    // accept a value the backend would silently drop.
+    Assertions.assertTrue(Capability.DEFAULT.columnDefaultValue().supported());
+
+    Column withInitialOnly =
+        Column.of(
+            "country",
+            Types.StringType.get(),
+            null,
+            true,
+            false,
+            Column.DEFAULT_VALUE_NOT_SET,
+            Literals.stringLiteral("US"));
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CapabilityHelpers.applyCapabilities(
+                    new Column[] {withInitialOnly}, Capability.DEFAULT));
+    Assertions.assertTrue(
+        thrown.getMessage().contains("initial default value is not supported"),
+        thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("country"), thrown.getMessage());
+
+    Column unsetInitial =
+        Column.of(
+            "country",
+            Types.StringType.get(),
+            null,
+            true,
+            false,
+            Literals.stringLiteral("US"),
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+    Column[] applied =
+        CapabilityHelpers.applyCapabilities(new Column[] {unsetInitial}, Capability.DEFAULT);
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertEquals(Column.INITIAL_DEFAULT_VALUE_NOT_SET, applied[0].initialDefaultValue());
+    Assertions.assertEquals(Literals.stringLiteral("US"), applied[0].defaultValue());
   }
 }

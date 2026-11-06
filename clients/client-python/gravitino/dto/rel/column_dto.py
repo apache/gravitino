@@ -65,6 +65,16 @@ class ColumnDTO(Column, DataClassJsonMixin):
     )
     """The default value of the column."""
 
+    _nullable: bool = field(default=True, metadata=config(field_name="nullable"))
+    """Whether the column value can be null."""
+
+    _auto_increment: bool = field(
+        default=False, metadata=config(field_name="autoIncrement")
+    )
+    """Whether the column is an auto-increment column."""
+
+    # Keep after _auto_increment so positional constructors stay compatible with the
+    # pre-initialDefaultValue field order (name, type, comment, default, nullable, autoIncrement).
     _initial_default_value: Optional[Union[Expression, List[Expression]]] = field(
         default_factory=lambda: Column.INITIAL_DEFAULT_VALUE_NOT_SET,
         metadata=config(
@@ -76,14 +86,6 @@ class ColumnDTO(Column, DataClassJsonMixin):
         ),
     )
     """The initial default value of the column."""
-
-    _nullable: bool = field(default=True, metadata=config(field_name="nullable"))
-    """Whether the column value can be null."""
-
-    _auto_increment: bool = field(
-        default=False, metadata=config(field_name="autoIncrement")
-    )
-    """Whether the column is an auto-increment column."""
 
     def name(self) -> str:
         return self._name

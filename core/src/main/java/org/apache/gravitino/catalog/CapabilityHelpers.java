@@ -622,7 +622,7 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
-    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue());
   }
 
   private static void applyColumnDefaultValue(
@@ -632,12 +632,17 @@ public class CapabilityHelpers {
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
   }
 
+  /**
+   * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
+   * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
+   * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
+   * catalog can write initial defaults, require the unset sentinel.
+   */
   private static void applyColumnInitialDefaultValue(
-      String columnName, Expression initialDefaultValue, Capability capabilities) {
+      String columnName, Expression initialDefaultValue) {
     Preconditions.checkArgument(
-        capabilities.columnDefaultValue().supported()
-            || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
-        capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+        INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        "Setting column initial default value is not supported. Illegal column: " + columnName);
   }
 
   private static void applyNameSpecification(
