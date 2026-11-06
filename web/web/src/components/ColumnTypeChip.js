@@ -22,13 +22,14 @@ import { ColumnTypeColorEnum } from '@/lib/enums/columnTypeEnum.js'
 import colors from '@/lib/theme/colors'
 import { alpha } from '@/lib/utils/color'
 import { isString } from 'lodash-es'
+import { formatColumnType } from '@/lib/utils/columnType'
 
 const ColumnTypeChip = props => {
   const { type = '' } = props
 
   const formatType = type && isString(type) ? type.replace(/\(.*\)/, '') : type
 
-  const label = isString(type) ? type : `${type?.type}`
+  const label = formatColumnType(type)
 
   const columnTypeColor = ColumnTypeColorEnum[formatType] || 'secondary'
   const color = colors[columnTypeColor]?.main || '#8592A3'
@@ -37,7 +38,14 @@ const ColumnTypeChip = props => {
   return (
     <>
       {label ? (
-        <Chip size='small' label={label} sx={{ backgroundColor: bgColor }} color={columnTypeColor} variant='outlined' />
+        <Chip
+          size='small'
+          label={label}
+          title={label}
+          sx={{ backgroundColor: bgColor }}
+          color={columnTypeColor}
+          variant='outlined'
+        />
       ) : null}
     </>
   )
