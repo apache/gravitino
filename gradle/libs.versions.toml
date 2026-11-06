@@ -81,6 +81,7 @@ experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
 iceberg4spark33 = "1.8.1"
 iceberg4spark35 = "1.11.0"
 iceberg4spark40 = "1.11.0"
+iceberg4spark41 = "1.11.0"
 paimon = '1.2.0'
 # spark33 and spark34 are pinned by modules other than the Spark connector for their own tests, so
 # they stay after the connector dropped 3.3 and 3.4; they say nothing about connector support.

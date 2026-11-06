@@ -85,7 +85,7 @@ class IcebergRestOAuthConfig {
       return applyBasicCredentials(sparkConf, result);
     }
     boolean hasExplicitLegacyOAuth2 =
-        StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
+        AUTH_TYPE_OAUTH2.equalsIgnoreCase(explicitAuthType)
             || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     // An explicit legacy OAuth2 configuration already decides how IRC is authenticated.
     if (!hasExplicitLegacyOAuth2) {
@@ -178,7 +178,14 @@ class IcebergRestOAuthConfig {
     }
   }
 
+  // Hand-rolled rather than StringUtils.removeEnd/removeStart: commons-lang3 deprecates both in
+  // 3.19.0, which the Spark 4.1 build resolves, and -Werror makes that a compile error. Their
+  // replacement, Strings.CS, does not exist in the 3.12.0 the Spark 3.5 build resolves, so no
+  // named helper compiles on every supported line.
   private static String joinUri(String serverUri, String tokenPath) {
-    return StringUtils.removeEnd(serverUri, "/") + "/" + StringUtils.removeStart(tokenPath, "/");
+    String base =
+        serverUri.endsWith("/") ? serverUri.substring(0, serverUri.length() - 1) : serverUri;
+    String path = tokenPath.startsWith("/") ? tokenPath.substring(1) : tokenPath;
+    return base + "/" + path;
   }
 }

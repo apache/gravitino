@@ -35,7 +35,6 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +151,7 @@ public class HiveGravitinoOperationOperator {
     return new GenericInternalRow(values);
   }
 
-  private @NotNull String getHivePartitionName(
+  private String getHivePartitionName(
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
     Preconditions.checkArgument(names != null, "Partition column names must not be null");
@@ -170,7 +169,7 @@ public class HiveGravitinoOperationOperator {
     return partitionName.toString();
   }
 
-  private @NotNull String getHivePartitionName(InternalRow ident, StructType partitionSchema) {
+  private String getHivePartitionName(InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
     int numFields = ident.numFields();
     for (int i = 0; i < numFields; i++) {
