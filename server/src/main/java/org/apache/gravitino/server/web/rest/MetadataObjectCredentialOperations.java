@@ -108,8 +108,6 @@ public class MetadataObjectCredentialOperations {
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-<<<<<<< HEAD
-=======
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
             // Catalog credentials are not restricted to individual tables or paths. Metadata access
             // alone must not grant the catalog account's source privileges.
@@ -127,7 +125,6 @@ public class MetadataObjectCredentialOperations {
                   "Catalog credentials require USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS");
             }
 
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
             Map<String, String> filteredFilesetHeaders =
                 Utils.filterFilesetCredentialHeaders(httpRequest);
             // set the fileset info into the thread local context

@@ -196,14 +196,10 @@ public abstract class SparkJwksAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.CreateTable.allow(),
-<<<<<<< HEAD
-                Privileges.SelectTable.allow()));
-=======
                 Privileges.SelectTable.allow(),
                 // Spark JDBC needs both secret privileges to receive catalog credentials.
                 Privileges.UseSecrets.allow(),
                 Privileges.IncludeCredentialSecrets.allow()));
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     metalake.createRole(ALICE_ROLE, new HashMap<>(), ImmutableList.of(catalogAccess));
     metalake.grantRolesToUser(ImmutableList.of(ALICE_ROLE), ALICE);
   }

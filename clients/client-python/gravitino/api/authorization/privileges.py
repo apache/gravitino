@@ -192,36 +192,12 @@ class Privilege(ABC):
         MODIFY_FUNCTION = (0, 1 << 32)
         """The privilege to alter a function's metadata."""
 
-<<<<<<< HEAD
-=======
-        PROBE_TABLE_LIKE = (0, 1 << 33)
-        """The privilege to probe whether a table-like object exists."""
-
-        VIEW_SECRET_PROVIDERS = (0, 1 << 36)
-        """The privilege to list configured secrets providers."""
-
         USE_SECRETS = (0, 1 << 37)
-        """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
-
-    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
-    """
+        """Required with INCLUDE_CREDENTIAL_SECRETS for catalog credentials."""
 
         INCLUDE_CREDENTIAL_SECRETS = (0, 1 << 38)
-        """With USE_SECRETS, include cloud credential secrets in getSecrets.
+        """Required with USE_SECRETS for catalog credentials."""
 
-    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
-    """
-
-        CREATE_SEMANTIC_MODEL = (0, 1 << 39)
-        """The privilege to create a Semantic Model."""
-
-        USE_SEMANTIC_MODEL = (0, 1 << 40)
-        """The privilege to discover a Semantic Model and load its definition."""
-
-        MODIFY_SEMANTIC_MODEL = (0, 1 << 41)
-        """The privilege to rename a Semantic Model or alter its definition and metadata."""
-
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1616,162 +1592,10 @@ class ModifyFunction(GenericPrivilege):
         return obj_type in Privileges.FUNCTION_SUPPORTED_TYPES
 
 
-<<<<<<< HEAD
-=======
-class ProbeTableLike(GenericPrivilege):
-    """
-    The privilege to probe whether a table-like object exists.
-    """
-
-    _ALLOW_INSTANCE: Optional[ProbeTableLike] = None
-    _DENY_INSTANCE: Optional[ProbeTableLike] = None
-
-    @staticmethod
-    def allow() -> ProbeTableLike:
-        """
-        Retrieve the instance with allow condition of the privilege.
-
-        Returns:
-            Privilege: The instance with allow condition of the privilege.
-        """
-        if ProbeTableLike._ALLOW_INSTANCE is None:
-            ProbeTableLike._ALLOW_INSTANCE = ProbeTableLike(
-                Privilege.Condition.ALLOW, Privilege.Name.PROBE_TABLE_LIKE
-            )
-        return ProbeTableLike._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> ProbeTableLike:
-        """
-        Retrieve the instance with deny condition of the privilege.
-
-        Returns:
-            Privilege: The instance with deny condition of the privilege.
-        """
-        if ProbeTableLike._DENY_INSTANCE is None:
-            ProbeTableLike._DENY_INSTANCE = ProbeTableLike(
-                Privilege.Condition.DENY, Privilege.Name.PROBE_TABLE_LIKE
-            )
-        return ProbeTableLike._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.TABLE_LIKE_SUPPORTED_TYPES
-
-
-class CreateSemanticModel(GenericPrivilege):
-    """The privilege to create a Semantic Model."""
-
-    _ALLOW_INSTANCE: Optional[CreateSemanticModel] = None
-    _DENY_INSTANCE: Optional[CreateSemanticModel] = None
-
-    @staticmethod
-    def allow() -> CreateSemanticModel:
-        """Return the privilege with the allow condition."""
-        if CreateSemanticModel._ALLOW_INSTANCE is None:
-            CreateSemanticModel._ALLOW_INSTANCE = CreateSemanticModel(
-                Privilege.Condition.ALLOW, Privilege.Name.CREATE_SEMANTIC_MODEL
-            )
-        return CreateSemanticModel._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> CreateSemanticModel:
-        """Return the privilege with the deny condition."""
-        if CreateSemanticModel._DENY_INSTANCE is None:
-            CreateSemanticModel._DENY_INSTANCE = CreateSemanticModel(
-                Privilege.Condition.DENY, Privilege.Name.CREATE_SEMANTIC_MODEL
-            )
-        return CreateSemanticModel._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.SCHEMA_SUPPORTED_TYPES
-
-
-class UseSemanticModel(GenericPrivilege):
-    """The privilege to discover a Semantic Model and load its definition."""
-
-    _ALLOW_INSTANCE: Optional[UseSemanticModel] = None
-    _DENY_INSTANCE: Optional[UseSemanticModel] = None
-
-    @staticmethod
-    def allow() -> UseSemanticModel:
-        """Return the privilege with the allow condition."""
-        if UseSemanticModel._ALLOW_INSTANCE is None:
-            UseSemanticModel._ALLOW_INSTANCE = UseSemanticModel(
-                Privilege.Condition.ALLOW, Privilege.Name.USE_SEMANTIC_MODEL
-            )
-        return UseSemanticModel._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> UseSemanticModel:
-        """Return the privilege with the deny condition."""
-        if UseSemanticModel._DENY_INSTANCE is None:
-            UseSemanticModel._DENY_INSTANCE = UseSemanticModel(
-                Privilege.Condition.DENY, Privilege.Name.USE_SEMANTIC_MODEL
-            )
-        return UseSemanticModel._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.SEMANTIC_MODEL_SUPPORTED_TYPES
-
-
-class ModifySemanticModel(GenericPrivilege):
-    """The privilege to rename a Semantic Model or alter its definition and metadata."""
-
-    _ALLOW_INSTANCE: Optional[ModifySemanticModel] = None
-    _DENY_INSTANCE: Optional[ModifySemanticModel] = None
-
-    @staticmethod
-    def allow() -> ModifySemanticModel:
-        """Return the privilege with the allow condition."""
-        if ModifySemanticModel._ALLOW_INSTANCE is None:
-            ModifySemanticModel._ALLOW_INSTANCE = ModifySemanticModel(
-                Privilege.Condition.ALLOW, Privilege.Name.MODIFY_SEMANTIC_MODEL
-            )
-        return ModifySemanticModel._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> ModifySemanticModel:
-        """Return the privilege with the deny condition."""
-        if ModifySemanticModel._DENY_INSTANCE is None:
-            ModifySemanticModel._DENY_INSTANCE = ModifySemanticModel(
-                Privilege.Condition.DENY, Privilege.Name.MODIFY_SEMANTIC_MODEL
-            )
-        return ModifySemanticModel._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.SEMANTIC_MODEL_SUPPORTED_TYPES
-
-
-class ViewSecretProviders(GenericPrivilege):
-    """The privilege to list configured secrets providers."""
-
-    _ALLOW_INSTANCE: Optional["ViewSecretProviders"] = None
-    _DENY_INSTANCE: Optional["ViewSecretProviders"] = None
-
-    @staticmethod
-    def allow() -> Privilege:
-        if ViewSecretProviders._ALLOW_INSTANCE is None:
-            ViewSecretProviders._ALLOW_INSTANCE = ViewSecretProviders(
-                Privilege.Condition.ALLOW, Privilege.Name.VIEW_SECRET_PROVIDERS
-            )
-        return ViewSecretProviders._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> Privilege:
-        if ViewSecretProviders._DENY_INSTANCE is None:
-            ViewSecretProviders._DENY_INSTANCE = ViewSecretProviders(
-                Privilege.Condition.DENY, Privilege.Name.VIEW_SECRET_PROVIDERS
-            )
-        return ViewSecretProviders._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type == MetadataObject.Type.METALAKE
-
-
 class UseSecrets(GenericPrivilege):
-    """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
+    """Required with INCLUDE_CREDENTIAL_SECRETS for catalog credentials, unless metalake owner.
 
-    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    Supports metalake and catalog grants on this branch; fileset access is unchanged.
     """
 
     _ALLOW_INSTANCE: Optional["UseSecrets"] = None
@@ -1794,13 +1618,13 @@ class UseSecrets(GenericPrivilege):
         return UseSecrets._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.SECRET_SUPPORTED_TYPES
+        return obj_type in {MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG}
 
 
 class IncludeCredentialSecrets(GenericPrivilege):
-    """With USE_SECRETS, include cloud credential secrets in getSecrets.
+    """Required with USE_SECRETS for catalog credentials, unless metalake owner.
 
-    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    Supports metalake and catalog grants on this branch; fileset access is unchanged.
     """
 
     _ALLOW_INSTANCE: Optional["IncludeCredentialSecrets"] = None
@@ -1823,14 +1647,15 @@ class IncludeCredentialSecrets(GenericPrivilege):
         return IncludeCredentialSecrets._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.SECRET_SUPPORTED_TYPES
+        return obj_type in {MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG}
 
 
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
         Privilege.Name.USE_CATALOG: UseCatalog,
+        Privilege.Name.USE_SECRETS: UseSecrets,
+        Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
         Privilege.Name.CREATE_SCHEMA: CreateSchema,
         Privilege.Name.USE_SCHEMA: UseSchema,
         Privilege.Name.CREATE_TABLE: CreateTable,

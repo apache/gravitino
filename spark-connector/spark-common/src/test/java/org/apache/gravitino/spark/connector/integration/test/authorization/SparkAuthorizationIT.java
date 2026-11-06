@@ -161,14 +161,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-<<<<<<< HEAD
-                Privileges.CreateTable.allow()));
-=======
                 Privileges.CreateTable.allow(),
                 // Spark JDBC needs both secret privileges to receive catalog credentials.
                 Privileges.UseSecrets.allow(),
                 Privileges.IncludeCredentialSecrets.allow()));
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
   }
@@ -322,16 +318,12 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
     // Create role with CREATE_TABLE but without SELECT_TABLE privilege
     SecurableObject catalogObject =
-<<<<<<< HEAD
-        SecurableObjects.ofCatalog(JDBC_CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
-=======
         SecurableObjects.ofCatalog(
             JDBC_CATALOG,
             ImmutableList.of(
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSecrets.allow(),
                 Privileges.IncludeCredentialSecrets.allow()));
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject,
@@ -380,13 +372,9 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-<<<<<<< HEAD
-                Privileges.CreateTable.allow()));
-=======
                 Privileges.CreateTable.allow(),
                 Privileges.UseSecrets.allow(),
                 Privileges.IncludeCredentialSecrets.allow()));
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
 

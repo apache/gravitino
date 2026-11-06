@@ -22,6 +22,7 @@ package org.apache.gravitino.utils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -101,9 +102,34 @@ public class JdbcUrlUtils {
     boolean mysqlUrl = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
     // Decoding a password can introduce '/', '?' or '#' and change the authority boundaries.
     // Inspect raw user information before scanning decoded parameter names.
-    return USER_INFO.matcher(url).find()
-        || decodedFormsForScan(url).stream()
-            .anyMatch(form -> containsCredentialParameters(form, mysqlUrl));
+    if (USER_INFO.matcher(url).find()) {
+      return true;
+    }
+    String form = lowerUrl;
+    // Inspect each decoding stage. Sanitize malformed escapes on every pass so they cannot
+    // hide a separately encoded credential parameter. Keep the existing URL validator unchanged.
+    for (int depth = 0; depth <= 5; depth++) {
+      if (containsCredentialParameters(form, mysqlUrl)) {
+        return true;
+      }
+      if (depth == 5) {
+        break;
+      }
+      String decoded;
+      try {
+        decoded =
+            URLDecoder.decode(form.replaceAll("%(?![0-9a-fA-F]{2})", "%25"), "UTF-8")
+                .toLowerCase(Locale.ROOT);
+      } catch (UnsupportedEncodingException e) {
+        // UTF-8 is required by the JVM specification.
+        throw new IllegalStateException(e);
+      }
+      if (decoded.equals(form)) {
+        break;
+      }
+      form = decoded;
+    }
+    return false;
   }
 
   /**

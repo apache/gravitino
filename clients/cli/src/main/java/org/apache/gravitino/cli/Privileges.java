@@ -31,6 +31,10 @@ public class Privileges {
   public static final String CREATE_CATALOG = "create_catalog";
   /** Represents the privilege to use a catalog. */
   public static final String USE_CATALOG = "use_catalog";
+  /** Required with INCLUDE_CREDENTIAL_SECRETS for catalog credential access. */
+  public static final String USE_SECRETS = "use_secrets";
+  /** Required with USE_SECRETS for catalog credential access. */
+  public static final String INCLUDE_CREDENTIAL_SECRETS = "include_credential_secrets";
   /** Represents the privilege to create a schema. */
   public static final String CREATE_SCHEMA = "create_schema";
   /** Represents the privilege to use a schema. */
@@ -65,6 +69,8 @@ public class Privileges {
   static {
     VALID_PRIVILEGES.add(CREATE_CATALOG);
     VALID_PRIVILEGES.add(USE_CATALOG);
+    VALID_PRIVILEGES.add(USE_SECRETS);
+    VALID_PRIVILEGES.add(INCLUDE_CREDENTIAL_SECRETS);
     VALID_PRIVILEGES.add(CREATE_SCHEMA);
     VALID_PRIVILEGES.add(USE_SCHEMA);
     VALID_PRIVILEGES.add(CREATE_TABLE);
@@ -103,6 +109,10 @@ public class Privileges {
         return Privilege.Name.CREATE_CATALOG;
       case USE_CATALOG:
         return Privilege.Name.USE_CATALOG;
+      case USE_SECRETS:
+        return Privilege.Name.USE_SECRETS;
+      case INCLUDE_CREDENTIAL_SECRETS:
+        return Privilege.Name.INCLUDE_CREDENTIAL_SECRETS;
       case CREATE_SCHEMA:
         return Privilege.Name.CREATE_SCHEMA;
       case USE_SCHEMA:

@@ -60,6 +60,27 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestPrivileges(unittest.TestCase):
+    def test_catalog_credential_privileges(self):
+        for name in (
+            Privilege.Name.USE_SECRETS,
+            Privilege.Name.INCLUDE_CREDENTIAL_SECRETS,
+        ):
+            for factory, condition in (
+                (Privileges.allow, Privilege.Condition.ALLOW),
+                (Privileges.deny, Privilege.Condition.DENY),
+            ):
+                privilege = factory(name.name)
+                self.assertEqual(name, privilege.name())
+                self.assertEqual(condition, privilege.condition())
+                for obj_type in MetadataObject.Type:
+                    self.assertEqual(
+                        obj_type
+                        in {MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG},
+                        privilege.can_bind_to(obj_type),
+                    )
+        self.assertEqual((0, 1 << 37), Privilege.Name.USE_SECRETS.value)
+        self.assertEqual((0, 1 << 38), Privilege.Name.INCLUDE_CREDENTIAL_SECRETS.value)
+
     def test_allow_and_deny_return_instances_for_all_privileges(self) -> None:
         for name in Privilege.Name:
             with self.subTest(privilege=name.name):

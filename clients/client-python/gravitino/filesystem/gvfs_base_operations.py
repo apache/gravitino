@@ -40,11 +40,6 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
-<<<<<<< HEAD
-=======
-    ForbiddenException,
-    NoSuchCredentialException,
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     NoSuchLocationNameException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
@@ -523,75 +518,6 @@ class BaseGVFSOperations(ABC):
         fileset_props.update(user_defined_configs)
         return fileset_props
 
-<<<<<<< HEAD
-=======
-    def _merge_static_catalog_credentials(
-        self, fileset_props: Dict[str, str], catalog
-    ) -> None:
-        """Overlay static catalog credential_info into fileset_props.
-
-        Called when a filesystem is created, so results are not cached here — rotated
-        keys are picked up on the next filesystem build.
-        """
-        loaded = self._load_static_catalog_credential_info(catalog)
-        if loaded:
-            fileset_props.update(loaded)
-
-    @staticmethod
-    def _load_static_catalog_credential_info(catalog) -> Optional[Dict[str, str]]:
-        """Load expire==0 credential_info and map keys to GVFS option names.
-
-        Returns an empty dict when catalog credentials are unsupported, absent, or denied.
-        Returns None on transient REST failure.
-        """
-        static_info: Dict[str, str] = {}
-        try:
-            supports_credentials = catalog.support_credentials()
-            for credential in supports_credentials.get_credentials() or []:
-                if credential is None:
-                    continue
-                if credential.expire_time_in_ms() != 0:
-                    continue
-                info = credential.credential_info() or {}
-                for key, value in info.items():
-                    if value is None:
-                        continue
-                    static_info[key] = value
-                    gvfs_key = _CREDENTIAL_INFO_TO_GVFS_KEYS.get(key)
-                    if gvfs_key:
-                        static_info[gvfs_key] = value
-        except (
-            AttributeError,
-            NotImplementedError,
-            TypeError,
-            NotFoundException,
-            NoSuchCredentialException,
-        ) as exc:
-            logger.debug(
-                "Catalog does not support credential recovery via get_credentials: %s",
-                exc,
-            )
-        except ForbiddenException:
-            # Catalog-wide credentials are optional; fileset path authorization is separate.
-            logger.debug(
-                "Catalog credentials are not permitted; using fileset credential vending"
-            )
-        except RESTException as exc:
-            logger.warning(
-                "Failed to load static credentials via get_credentials; continuing without them: %s",
-                exc,
-            )
-            return None
-        except URLError as exc:
-            # Transport failures (e.g. connection refused) are not wrapped as RESTException.
-            logger.warning(
-                "Failed to load static credentials via get_credentials; continuing without them: %s",
-                exc,
-            )
-            return None
-        return static_info
-
->>>>>>> 922ed7217 ([#14638] fix(jdbc): protect catalog credentials and reject URL secrets (#14639))
     def _get_actual_filesystem_by_location_name(
         self, fileset_ident: NameIdentifier, location_name: str
     ) -> AbstractFileSystem:
