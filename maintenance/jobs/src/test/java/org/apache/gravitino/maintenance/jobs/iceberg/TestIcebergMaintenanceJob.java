@@ -23,9 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for {@link IcebergMaintenanceJob}. */
@@ -79,5 +83,97 @@ public class TestIcebergMaintenanceJob {
             new String[] {
               "--maintenance-types", "expire_snapshots", "--policy-ids", "10", "--tables", "[]"
             }));
+  }
+
+  @Test
+  public void testSnapshotDriftGateOnlyForCompactionAndManifest() {
+    assertTrue(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REWRITE_DATA_FILES));
+    assertTrue(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REWRITE_MANIFESTS));
+    assertFalse(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.EXPIRE_SNAPSHOTS));
+    assertFalse(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REMOVE_ORPHAN_FILES));
+  }
+
+  @Test
+  public void testCompactionMetricsSchema() throws Exception {
+    Map<String, Object> metrics =
+        IcebergMaintenanceJob.compactionMetrics(1.23e15, 42L, 126877696D, 9876543210L, 80L);
+    Map<String, Object> parsed = parseJson(IcebergMaintenanceJob.toMetricsJson(metrics));
+    assertEquals(5, parsed.size());
+    assertEquals(
+        1.23e15,
+        ((Number) parsed.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
+    assertEquals(
+        42L,
+        ((Number) parsed.get(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC)).longValue());
+    assertEquals(
+        126877696D,
+        ((Number) parsed.get(IcebergMaintenanceJob.AVG_FILE_SIZE_METRIC)).doubleValue());
+    assertEquals(
+        9876543210L,
+        ((Number) parsed.get(IcebergMaintenanceJob.TOTAL_FILE_SIZE_METRIC)).longValue());
+    assertEquals(80L, ((Number) parsed.get(IcebergMaintenanceJob.FILE_NUMBER_METRIC)).longValue());
+    assertFalse(parsed.containsKey("maintenanceType"));
+    assertFalse(parsed.containsKey("snapshotId"));
+  }
+
+  @Test
+  public void testManifestBeforeAndAfterSchemas() throws Exception {
+    Map<String, Object> before = IcebergMaintenanceJob.manifestBeforeMetrics(120L, 8388608D);
+    Map<String, Object> beforeParsed = parseJson(IcebergMaintenanceJob.toMetricsJson(before));
+    assertEquals(2, beforeParsed.size());
+    assertEquals(
+        120L,
+        ((Number) beforeParsed.get(IcebergMaintenanceJob.MANIFEST_NUMBER_METRIC)).longValue());
+    assertEquals(
+        8388608D,
+        ((Number) beforeParsed.get(IcebergMaintenanceJob.AVG_MANIFEST_SIZE_METRIC)).doubleValue());
+
+    Map<String, Object> after = IcebergMaintenanceJob.manifestAfterMetrics(18750L);
+    Map<String, Object> afterParsed = parseJson(IcebergMaintenanceJob.toMetricsJson(after));
+    assertEquals(1, afterParsed.size());
+    assertEquals(
+        18750L,
+        ((Number) afterParsed.get(IcebergMaintenanceJob.MANIFESTS_REMOVED_METRIC)).longValue());
+    assertFalse(afterParsed.containsKey(IcebergMaintenanceJob.MANIFEST_NUMBER_METRIC));
+  }
+
+  @Test
+  public void testExpireBeforeAndAfterSchemas() throws Exception {
+    Map<String, Object> before = IcebergMaintenanceJob.expireBeforeMetrics(86L, 7800000000000L);
+    Map<String, Object> beforeParsed = parseJson(IcebergMaintenanceJob.toMetricsJson(before));
+    assertEquals(2, beforeParsed.size());
+    assertEquals(
+        86L, ((Number) beforeParsed.get(IcebergMaintenanceJob.SNAPSHOT_COUNT_METRIC)).longValue());
+    assertEquals(
+        7800000000000L,
+        ((Number) beforeParsed.get(IcebergMaintenanceJob.TOTAL_FILE_SIZE_METRIC)).longValue());
+
+    Map<String, Object> after =
+        IcebergMaintenanceJob.expireAfterMetrics(86L, 7800000000000L, 24L, 700000000000L);
+    Map<String, Object> afterParsed = parseJson(IcebergMaintenanceJob.toMetricsJson(after));
+    assertEquals(2, afterParsed.size());
+    assertEquals(
+        62L,
+        ((Number) afterParsed.get(IcebergMaintenanceJob.SNAPSHOTS_CLEARED_METRIC)).longValue());
+    assertEquals(
+        7100000000000L,
+        ((Number) afterParsed.get(IcebergMaintenanceJob.BYTES_RECLAIMED_METRIC)).longValue());
+    assertFalse(afterParsed.containsKey(IcebergMaintenanceJob.SNAPSHOT_COUNT_METRIC));
+  }
+
+  @Test
+  public void testOrphanAfterSchema() throws Exception {
+    Map<String, Object> after = IcebergMaintenanceJob.orphanAfterMetrics(288400L, 0L);
+    Map<String, Object> parsed = parseJson(IcebergMaintenanceJob.toMetricsJson(after));
+    assertEquals(2, parsed.size());
+    assertEquals(
+        288400L,
+        ((Number) parsed.get(IcebergMaintenanceJob.ORPHAN_FILES_REMOVED_METRIC)).longValue());
+    assertEquals(
+        0L, ((Number) parsed.get(IcebergMaintenanceJob.ORPHAN_BYTES_RECLAIMED_METRIC)).longValue());
+  }
+
+  private static Map<String, Object> parseJson(String json) throws Exception {
+    return JsonUtils.anyFieldMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
   }
 }

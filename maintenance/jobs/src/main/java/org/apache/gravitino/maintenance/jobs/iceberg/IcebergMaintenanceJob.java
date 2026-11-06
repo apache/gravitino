@@ -20,6 +20,7 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +42,7 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -50,11 +52,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TMS Spark job: sample before-metrics → gate → run Iceberg procedure → close soft slot.
+ * TMS Spark job: sample before-metrics → gate → run Iceberg procedure → after-metrics → close soft
+ * slot.
  *
  * <p>Started only from the built-in template (cron or commit-chain). {@code maintenance_types} is
  * one type or a comma-separated chain; {@code policy_ids} / {@code action_ids} align 1:1 with those
  * types. Soft-slot HTTP callbacks use {@code action_ids}.
+ *
+ * <p>{@code metricsJson} carries only metric fields (no {@code maintenanceType} / {@code
+ * snapshotId}; those live on the action/policy and {@code table_snapshot_metrics.snapshot_id}).
+ * Snapshot drift skips only compaction and manifest rewrite. Orphan cleanup reports after-metrics
+ * only.
  */
 public class IcebergMaintenanceJob implements BuiltInJob {
 
@@ -65,7 +73,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-task";
 
   // Bump when template behavior / args / class wiring changes (required by built-in registration).
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v2";
 
   /** JobConf: one wire name, or comma-separated commit chain. */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";
@@ -78,6 +86,42 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   /** JobConf: soft-slot action ids parallel to {@link #POLICY_IDS_KEY}. */
   public static final String ACTION_IDS_KEY = "action_ids";
+
+  /** Compaction / inventory: average data file size in bytes. */
+  public static final String AVG_FILE_SIZE_METRIC = "custom-avg-file-size";
+
+  /** Compaction / inventory: total data+delete file size in bytes. */
+  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
+
+  /** Compaction / inventory: total file count. */
+  public static final String FILE_NUMBER_METRIC = "custom-file-number";
+
+  /** Manifest rewrite S0: total manifest count across specs. */
+  public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
+
+  /** Manifest rewrite S0: average manifest size in bytes. */
+  public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
+
+  /** Manifest rewrite S1: manifests rewritten/removed by the procedure. */
+  public static final String MANIFESTS_REMOVED_METRIC = "custom-manifests-removed";
+
+  /** Snapshot expiry S0: snapshot count before expire. */
+  public static final String SNAPSHOT_COUNT_METRIC = "custom-snapshot-count";
+
+  /** Snapshot expiry S1: snapshots removed by expire. */
+  public static final String SNAPSHOTS_CLEARED_METRIC = "custom-snapshots-cleared";
+
+  /** Snapshot expiry S1: bytes reclaimed (file-size drop after expire). */
+  public static final String BYTES_RECLAIMED_METRIC = "custom-bytes-reclaimed";
+
+  /** Orphan cleanup S1: orphan files removed (or found in dry-run). */
+  public static final String ORPHAN_FILES_REMOVED_METRIC = "custom-orphan-files-removed";
+
+  /**
+   * Orphan cleanup S1: bytes reclaimed. The remove_orphan_files procedure returns paths only, so
+   * this is reported as {@code 0} until a size-aware collector is added.
+   */
+  public static final String ORPHAN_BYTES_RECLAIMED_METRIC = "custom-orphan-bytes-reclaimed";
 
   /** Values accepted in {@code maintenance_types}. */
   public enum MaintenanceType {
@@ -125,7 +169,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   public SparkJobTemplate jobTemplate() {
     return SparkJobTemplate.builder()
         .withName(NAME)
-        .withComment("TMS Iceberg maintenance (before-metrics gate, procedure, finish soft slot)")
+        .withComment(
+            "TMS Iceberg maintenance (before-metrics, gate, procedure, after-metrics, finish)")
         .withExecutable(resolveExecutable(IcebergMaintenanceJob.class))
         .withClassName(IcebergMaintenanceJob.class.getName())
         .withArguments(templateArguments())
@@ -198,40 +243,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               long actionId = actionIds.get(i);
               String slot = table.tableId + ":" + policyId;
               try {
-                BeforeSample before =
-                    sampleBefore(spark, table.catalogName, table.tableIdentifier, type);
-                if (!tryReportBeforeMetrics(client, actionId, table.tableId, policyId, before)) {
-                  LOG.info(
-                      "TMS type {} stopped for action_id {} table {} policy {}: before-metrics"
-                          + " failed (abandoned or unbound)",
-                      type.wireName,
-                      actionId,
-                      table.tableId,
-                      policyId);
-                  continue;
-                }
-                if (before.snapshotId != before.headSnapshotId) {
-                  LOG.info(
-                      "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
-                          + " (sampled={} head={})",
-                      type.wireName,
-                      actionId,
-                      table.tableId,
-                      policyId,
-                      before.snapshotId,
-                      before.headSnapshotId);
-                  continue;
-                }
-                if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson)) {
-                  LOG.info(
-                      "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
-                      type.wireName,
-                      actionId,
-                      table.tableId,
-                      policyId);
-                  continue;
-                }
-                runProcedure(spark, type, table.catalogName, table.tableIdentifier, argsByName);
+                maintainOneType(spark, client, type, table, policyId, actionId, argsByName);
               } finally {
                 closeSoftSlot(client, actionId, table.tableId, policyId);
                 closedSlots.add(slot);
@@ -255,6 +267,69 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         }
       }
     }
+  }
+
+  private static void maintainOneType(
+      SparkSession spark,
+      MaintenanceActionHttpClient client,
+      MaintenanceType type,
+      TargetTable table,
+      long policyId,
+      long actionId,
+      Map<String, String> argsByName)
+      throws Exception {
+    // Orphan cleanup: no S0 row (dashboard uses procedure outcomes only).
+    if (type == MaintenanceType.REMOVE_ORPHAN_FILES) {
+      AfterSample after =
+          runProcedure(spark, type, table.catalogName, table.tableIdentifier, argsByName, null);
+      tryReportAfterMetrics(client, actionId, table.tableId, policyId, after);
+      return;
+    }
+
+    BeforeSample before = sampleBefore(spark, table.catalogName, table.tableIdentifier, type);
+    if (!tryReportBeforeMetrics(client, actionId, table.tableId, policyId, before)) {
+      LOG.info(
+          "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
+              + " (abandoned or unbound)",
+          type.wireName,
+          actionId,
+          table.tableId,
+          policyId);
+      return;
+    }
+    if (usesSnapshotDriftGate(type) && before.snapshotId != before.headSnapshotId) {
+      LOG.info(
+          "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
+              + " (sampled={} head={})",
+          type.wireName,
+          actionId,
+          table.tableId,
+          policyId,
+          before.snapshotId,
+          before.headSnapshotId);
+      return;
+    }
+    if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson)) {
+      LOG.info(
+          "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
+          type.wireName,
+          actionId,
+          table.tableId,
+          policyId);
+      return;
+    }
+    AfterSample after =
+        runProcedure(spark, type, table.catalogName, table.tableIdentifier, argsByName, before);
+    tryReportAfterMetrics(client, actionId, table.tableId, policyId, after);
+  }
+
+  /**
+   * Snapshot drift skip applies only to compaction and manifest rewrite (inventory-sensitive).
+   * Expiry and orphan cleanup always proceed past HEAD drift.
+   */
+  @VisibleForTesting
+  static boolean usesSnapshotDriftGate(MaintenanceType type) {
+    return type == MaintenanceType.REWRITE_DATA_FILES || type == MaintenanceType.REWRITE_MANIFESTS;
   }
 
   private static List<TargetTable> parseTables(@Nullable String tablesJson) {
@@ -351,12 +426,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return ids;
   }
 
-  private static void runProcedure(
+  private static AfterSample runProcedure(
       SparkSession spark,
       MaintenanceType type,
       String catalogName,
       String tableIdentifier,
-      Map<String, String> argsByName)
+      Map<String, String> argsByName,
+      @Nullable BeforeSample before)
       throws Exception {
     switch (type) {
       case REWRITE_DATA_FILES:
@@ -375,7 +451,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                   IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
           LOG.info("Executing TMS rewrite_data_files: {}", sql);
           spark.sql(sql).collect();
-          break;
+          Map<String, Object> afterMetrics =
+              collectCompactionMetrics(spark, catalogName, tableIdentifier);
+          long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+          return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
         }
       case REWRITE_MANIFESTS:
         {
@@ -390,8 +469,16 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                   IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
                   IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
           LOG.info("Executing TMS rewrite_manifests: {}", sql);
-          spark.sql(sql).collect();
-          break;
+          List<Row> results = spark.sql(sql).collectAsList();
+          long rewritten = 0L;
+          if (!results.isEmpty()) {
+            Row result = results.get(0);
+            rewritten = ((Number) result.get(0)).longValue();
+            long added = ((Number) result.get(1)).longValue();
+            LOG.info("Rewrite manifests results: rewritten={}, added={}", rewritten, added);
+          }
+          long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+          return new AfterSample(afterSnapshotId, toMetricsJson(manifestAfterMetrics(rewritten)));
         }
       case EXPIRE_SNAPSHOTS:
         {
@@ -417,7 +504,16 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 results[0].getLong(1),
                 results[0].getLong(2));
           }
-          break;
+          long afterSnapshotCount = countSnapshots(spark, catalogName, tableIdentifier);
+          long afterTotalFileSize = collectTotalFileSize(spark, catalogName, tableIdentifier);
+          long beforeSnapshotCount = before == null ? afterSnapshotCount : before.snapshotCount;
+          long beforeTotalFileSize = before == null ? afterTotalFileSize : before.totalFileSize;
+          Map<String, Object> afterMetrics =
+              expireAfterMetrics(
+                  beforeSnapshotCount, beforeTotalFileSize, afterSnapshotCount, afterTotalFileSize);
+          long afterSnapshotId =
+              currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
+          return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
         }
       case REMOVE_ORPHAN_FILES:
         {
@@ -427,8 +523,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           putIfPresent(orphanOpts, "older-than", argsByName.get("older-than"));
           putIfPresent(orphanOpts, "location", argsByName.get("location"));
           putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
-          IcebergRemoveOrphanFilesJob.execute(spark, orphanOpts);
-          break;
+          long removed = IcebergRemoveOrphanFilesJob.execute(spark, orphanOpts);
+          long afterSnapshotId =
+              currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
+          return new AfterSample(afterSnapshotId, toMetricsJson(orphanAfterMetrics(removed, 0L)));
         }
       default:
         throw new IllegalStateException("Unhandled maintenance type: " + type);
@@ -437,32 +535,43 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   /**
    * Samples snapshot + metrics for the before-metrics gate. Re-reads HEAD after metrics so drift
-   * can be detected.
+   * can be detected for compaction / manifest rewrite.
    */
   private static BeforeSample sampleBefore(
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("maintenanceType", type.wireName());
-    payload.put("snapshotId", snapshotId);
-    if (type == MaintenanceType.REWRITE_DATA_FILES) {
-      payload.putAll(collectCompactionMetrics(spark, catalogName, tableIdentifier));
+    Map<String, Object> payload;
+    long snapshotCount = -1L;
+    long totalFileSize = -1L;
+    switch (type) {
+      case REWRITE_DATA_FILES:
+        payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+        break;
+      case REWRITE_MANIFESTS:
+        payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+        break;
+      case EXPIRE_SNAPSHOTS:
+        snapshotCount = countSnapshots(spark, catalogName, tableIdentifier);
+        totalFileSize = collectTotalFileSize(spark, catalogName, tableIdentifier);
+        payload = expireBeforeMetrics(snapshotCount, totalFileSize);
+        break;
+      case REMOVE_ORPHAN_FILES:
+        throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
+      default:
+        throw new IllegalStateException("Unhandled maintenance type: " + type);
     }
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    try {
-      return new BeforeSample(
-          snapshotId, headSnapshotId, JsonUtils.anyFieldMapper().writeValueAsString(payload));
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize metrics JSON", e);
-    }
+    return new BeforeSample(
+        snapshotId, headSnapshotId, toMetricsJson(payload), snapshotCount, totalFileSize);
   }
 
   /**
-   * Compaction metrics from the Iceberg files metadata table (same formulas as {@link
-   * IcebergUpdateStatsAndMetricsJob}). Partitioned tables use max partition MSE and sum of delete
-   * files so any hot partition can trip {@code trigger-expr}.
+   * Compaction S0/S1 metrics from the Iceberg files metadata table (same formulas as {@link
+   * IcebergUpdateStatsAndMetricsJob}). Partitioned tables use max partition MSE, sum of delete /
+   * file counts and sizes, and a file-count-weighted average size.
    */
-  private static Map<String, Object> collectCompactionMetrics(
+  @VisibleForTesting
+  static Map<String, Object> collectCompactionMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
     boolean partitioned =
         IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
@@ -470,33 +579,132 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       String sql =
           IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql(catalogName, tableIdentifier);
       Row[] rows = (Row[]) spark.sql(sql).collect();
-      Map<String, Object> metrics = new HashMap<>();
-      double maxMse = 0D;
-      long deleteFiles = 0L;
-      for (Row row : rows) {
-        maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
-        deleteFiles += numberAsLong(row, "delete-file-number");
-      }
-      metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, maxMse);
-      metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFiles);
-      return metrics;
+      return aggregatePartitionCompactionMetrics(rows);
     }
 
     String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
     Row[] rows = (Row[]) spark.sql(sql).collect();
-    Map<String, Object> metrics = new HashMap<>();
     if (rows.length == 0) {
-      metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, 0D);
-      metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, 0L);
-      return metrics;
+      return compactionMetrics(0D, 0L, 0D, 0L, 0L);
     }
     Row row = rows[0];
-    metrics.put(
-        IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, numberAsDouble(row, "data-file-mse"));
-    metrics.put(
-        IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC,
-        numberAsLong(row, "delete-file-number"));
+    return compactionMetrics(
+        numberAsDouble(row, "data-file-mse"),
+        numberAsLong(row, "delete-file-number"),
+        numberAsDouble(row, "avg-file-size"),
+        numberAsLong(row, "total-file-size"),
+        numberAsLong(row, "file-number"));
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> aggregatePartitionCompactionMetrics(Row[] rows) {
+    double maxMse = 0D;
+    long deleteFiles = 0L;
+    long fileNumber = 0L;
+    long totalFileSize = 0L;
+    double weightedAvgNumerator = 0D;
+    for (Row row : rows) {
+      maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
+      deleteFiles += numberAsLong(row, "delete-file-number");
+      long partitionFiles = numberAsLong(row, "file-number");
+      fileNumber += partitionFiles;
+      totalFileSize += numberAsLong(row, "total-file-size");
+      weightedAvgNumerator += numberAsDouble(row, "avg-file-size") * partitionFiles;
+    }
+    double avgFileSize = fileNumber == 0L ? 0D : weightedAvgNumerator / fileNumber;
+    return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> compactionMetrics(
+      double dataFileMse,
+      long deleteFileNumber,
+      double avgFileSize,
+      long totalFileSize,
+      long fileNumber) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
+    metrics.put(AVG_FILE_SIZE_METRIC, avgFileSize);
+    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    metrics.put(FILE_NUMBER_METRIC, fileNumber);
     return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> collectManifestBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Table table = loadIcebergTable(spark, catalogName, tableIdentifier);
+    Snapshot snapshot = table.currentSnapshot();
+    long count = 0L;
+    long totalSize = 0L;
+    if (snapshot != null) {
+      for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        count++;
+        totalSize += manifest.length();
+      }
+    }
+    return manifestBeforeMetrics(count, count == 0L ? 0D : (double) totalSize / count);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(MANIFEST_NUMBER_METRIC, manifestNumber);
+    metrics.put(AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestAfterMetrics(long manifestsRemoved) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(MANIFESTS_REMOVED_METRIC, manifestsRemoved);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireBeforeMetrics(long snapshotCount, long totalFileSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(SNAPSHOT_COUNT_METRIC, snapshotCount);
+    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> expireAfterMetrics(
+      long beforeSnapshotCount,
+      long beforeTotalFileSize,
+      long afterSnapshotCount,
+      long afterTotalFileSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(SNAPSHOTS_CLEARED_METRIC, Math.max(0L, beforeSnapshotCount - afterSnapshotCount));
+    metrics.put(BYTES_RECLAIMED_METRIC, Math.max(0L, beforeTotalFileSize - afterTotalFileSize));
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> orphanAfterMetrics(long filesRemoved, long bytesReclaimed) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(ORPHAN_FILES_REMOVED_METRIC, filesRemoved);
+    metrics.put(ORPHAN_BYTES_RECLAIMED_METRIC, bytesReclaimed);
+    return metrics;
+  }
+
+  private static long collectTotalFileSize(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Map<String, Object> compaction = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    Object value = compaction.get(TOTAL_FILE_SIZE_METRIC);
+    return value instanceof Number ? ((Number) value).longValue() : 0L;
+  }
+
+  private static long countSnapshots(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Table table = loadIcebergTable(spark, catalogName, tableIdentifier);
+    long count = 0L;
+    for (Snapshot ignored : table.snapshots()) {
+      count++;
+    }
+    return count;
   }
 
   private static double numberAsDouble(Row row, String field) {
@@ -511,22 +719,33 @@ public class IcebergMaintenanceJob implements BuiltInJob {
 
   private static long currentSnapshotId(
       SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    if (snapshot == null) {
+      throw new IllegalStateException(
+          "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
+    }
+    return snapshot.snapshotId();
+  }
+
+  /** After expiry/orphan, HEAD may briefly be empty; report {@code -1} in that case. */
+  private static long currentSnapshotIdAllowingEmpty(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    return snapshot == null ? -1L : snapshot.snapshotId();
+  }
+
+  private static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
     // Catch Exception (not Spark NoSuchTableException) so the Gravitino server can load this class
     // without Spark catalyst on the classpath.
     try {
-      Table table =
-          Spark3Util.loadIcebergTable(spark, String.format("%s.%s", catalogName, tableIdentifier));
-      Snapshot snapshot = table.currentSnapshot();
-      if (snapshot == null) {
-        throw new IllegalStateException(
-            "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
-      }
-      return snapshot.snapshotId();
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException(
-          "Failed to load Iceberg snapshot for " + catalogName + "." + tableIdentifier, e);
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
     }
   }
 
@@ -572,6 +791,45 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           sample.snapshotId,
           e.toString());
       return false;
+    }
+  }
+
+  private static void tryReportAfterMetrics(
+      MaintenanceActionHttpClient client,
+      long actionId,
+      long tableId,
+      long policyId,
+      AfterSample sample) {
+    if (sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
+      LOG.warn(
+          "TMS after metrics skipped for action_id {} table {} policy {}: empty metrics JSON",
+          actionId,
+          tableId,
+          policyId);
+      return;
+    }
+    try {
+      client.reportAfterMetrics(
+          actionId,
+          new MaintenanceActionMetricsRequest(
+              tableId, policyId, sample.snapshotId, sample.metricsJson));
+    } catch (Exception e) {
+      LOG.warn(
+          "TMS after metrics failed for action_id {} table {} policy {} snapshot {}: {}",
+          actionId,
+          tableId,
+          policyId,
+          sample.snapshotId,
+          e.toString());
+    }
+  }
+
+  @VisibleForTesting
+  static String toMetricsJson(Map<String, Object> metrics) {
+    try {
+      return JsonUtils.anyFieldMapper().writeValueAsString(metrics);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to serialize metrics JSON", e);
     }
   }
 
@@ -653,10 +911,30 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     private final long snapshotId;
     private final long headSnapshotId;
     private final String metricsJson;
+    private final long snapshotCount;
+    private final long totalFileSize;
 
-    private BeforeSample(long snapshotId, long headSnapshotId, String metricsJson) {
+    private BeforeSample(
+        long snapshotId,
+        long headSnapshotId,
+        String metricsJson,
+        long snapshotCount,
+        long totalFileSize) {
       this.snapshotId = snapshotId;
       this.headSnapshotId = headSnapshotId;
+      this.metricsJson = metricsJson;
+      this.snapshotCount = snapshotCount;
+      this.totalFileSize = totalFileSize;
+    }
+  }
+
+  /** After-metrics sample for S1 reporting. */
+  private static final class AfterSample {
+    private final long snapshotId;
+    private final String metricsJson;
+
+    private AfterSample(long snapshotId, String metricsJson) {
+      this.snapshotId = snapshotId;
       this.metricsJson = metricsJson;
     }
   }
