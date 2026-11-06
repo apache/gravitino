@@ -43,6 +43,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import scala.collection.JavaConverters;
 
 public class SparkJdbcTable extends JDBCTable {
 
@@ -62,9 +63,29 @@ public class SparkJdbcTable extends JDBCTable {
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
-    super(identifier, jdbcTable.schema(), readOptions(jdbcTable, gravitinoTable));
-    this.unsafePushDown = hasUnsafePushDown(jdbcTable, gravitinoTable);
+    this(
+        identifier,
+        gravitinoTable,
+        jdbcTable,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter,
+        hasUnsafePushDown(jdbcTable, gravitinoTable));
+  }
 
+  private SparkJdbcTable(
+      Identifier identifier,
+      Table gravitinoTable,
+      JDBCTable jdbcTable,
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter,
+      SparkTypeConverter sparkTypeConverter,
+      boolean unsafePushDown) {
+    super(
+        identifier,
+        jdbcTable.schema(),
+        unsafePushDown ? safeReadOptions(jdbcTable.jdbcOptions()) : jdbcTable.jdbcOptions());
+    this.unsafePushDown = unsafePushDown;
     this.gravitinoTable = gravitinoTable;
     this.gravitinoTableInfoHelper =
         new GravitinoTableInfoHelper(
@@ -159,15 +180,11 @@ public class SparkJdbcTable extends JDBCTable {
     return safe;
   }
 
-  private static JDBCOptions readOptions(JDBCTable table, Table source) {
-    if (!hasUnsafePushDown(table, source)) {
-      return table.jdbcOptions();
-    }
+  private static JDBCOptions safeReadOptions(JDBCOptions options) {
     // Disable source evaluation on affected tables; the same query must retain Spark semantics.
     Map<String, String> original =
-        scala.collection.JavaConverters.mapAsJavaMapConverter(
-                table.jdbcOptions().parameters().originalMap())
-            .asJava();
+        JavaConverters.mapAsJavaMapConverter(options.parameters().originalMap()).asJava();
+    // Fully qualified because java.util.Map is already imported.
     scala.collection.immutable.Map<String, String> parameters =
         new scala.collection.immutable.HashMap<>();
     for (Map.Entry<String, String> entry : safeOptions(original).entrySet()) {

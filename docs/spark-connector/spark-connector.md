@@ -155,24 +155,20 @@ writer for these tables. Other PostgreSQL column types retain their existing wri
 
 ### JDBC query consistency
 
-For JDBC tables containing string, fixed/variable character, binary, UUID, or external-type
-columns, predicates, aggregates, Top-N/limits, and offsets are evaluated by Spark. This
-conservative table-level policy avoids source collation differences and unsupported binary
-literals. It also disables numeric predicate/aggregate pushdown on those tables and can
-increase transferred data. User options do not re-enable the unsafe operations. Finer-grained
-pushdown requires a separate assessment of expression and source semantics.
+Some JDBC tables are read without pushdown. For these tables, Spark evaluates predicates,
+aggregates, Top-N, limits, and offsets itself. This keeps query results the same as Spark
+semantics. A table is affected when it has a column of one of these types:
 
-The standard JDBC catalog uses Spark `TimestampNTZType` for PostgreSQL timestamps without
-time zone, and the underlying Spark JDBC reader receives `preferTimestampNTZ=true`. Zoned
-timestamps remain instants. Other providers retain their existing timestamp mapping.
-Custom JDBC type converters can opt into zone-free timestamp handling using the appropriate
-`SparkJdbcTypeConverter` constructor.
+- String, char, varchar, binary, UUID, or an external type. The source database can compare
+  strings with a different collation, and Spark cannot always write binary literals in SQL.
+- Timestamp without time zone, when the JDBC dialect cannot write `TIMESTAMP_NTZ` literals in
+  SQL. The PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
 
-Tables with NTZ columns also use Spark evaluation when their JDBC dialect cannot compile
-`LocalDateTime` literals, including the built-in PostgreSQL dialect in Spark 3.5. Spark 4 can
-retain pushdown on timestamp/numeric-only tables. Tables containing only compatible numeric,
-date, or zoned timestamp columns keep their existing pushdown behavior.
+The rule applies to the whole table. Filters on numeric columns are not pushed down either, so
+Spark can read more data from the source. You cannot turn pushdown back on with the
+`pushDownPredicate`, `pushDownAggregate`, `pushDownLimit`, or `pushDownOffset` options. Tables
+that only have numeric, date, or timestamp with time zone columns keep pushdown.
 
-Configuration and credential snapshot invalidation from #14642 remains unresolved and is
-deferred to a 2.0 follow-up. This change does not add per-planning catalog reloads or a stale
-catalog guard.
+For PostgreSQL catalogs, a timestamp without time zone maps to Spark `TIMESTAMP_NTZ`. The
+value does not change with the Spark session time zone. A timestamp with time zone still maps
+to Spark `TIMESTAMP`. Other JDBC catalogs keep their old timestamp mapping.

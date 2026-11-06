@@ -41,6 +41,10 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
   /**
    * Creates a converter with provider-specific timestamp handling.
    *
+   * <p>When {@code useTimestampNtz} is true, the Spark JDBC reader of the same catalog must also
+   * use {@code preferTimestampNTZ=true}. Otherwise the table schema and the scanned rows use
+   * different timestamp types.
+   *
    * @param useTimestampNtz whether zone-free timestamps use Spark TimestampNTZType
    */
   public SparkJdbcTypeConverter(boolean useTimestampNtz) {
