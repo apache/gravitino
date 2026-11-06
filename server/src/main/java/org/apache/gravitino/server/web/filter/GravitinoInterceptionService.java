@@ -302,9 +302,6 @@ public class GravitinoInterceptionService implements InterceptionService {
       } catch (IllegalNameIdentifierException ex) {
         LOG.warn("Invalid metadata object identifier during authorization", ex);
         return Utils.illegalArguments(ex.getMessage(), ex);
-      } catch (IllegalArgumentException ex) {
-        LOG.warn("Invalid request arguments during authorization", ex);
-        return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (Exception ex) {
         String currentUser = PrincipalUtils.getCurrentUserName();
         String methodName = methodInvocation.getMethod().getName();
