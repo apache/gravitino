@@ -1,10 +1,21 @@
 version: 2
 updates:
-  # GitHub Actions
+  # GitHub Actions. `directory: "/"` makes Dependabot scan
+  # `.github/workflows/` as well as root-level action files, which is what
+  # keeps the SHA-pinned third-party actions (e.g. pnpm/action-setup) fresh.
+  # The trailing `# vX.Y.Z` comment on each pin is what Dependabot uses to
+  # resolve the currently pinned version, so keep it in sync.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    # ASF only permits the exact action revisions its allowlist has approved,
+    # so a bump proposed before the approval lands fails `asf-allowlist-check`
+    # and cannot be merged. Wait out the window before proposing an update, as
+    # recommended by
+    # https://github.com/apache/infrastructure-actions#dependabot-cooldown-period
+    cooldown:
+      default-days: 7
 
   # Java (Gradle) : Single root entry is enough because settings.gradle.kts includes all submodules
   - package-ecosystem: "gradle"
