@@ -158,6 +158,34 @@ public class TestRoleOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Rejects initial role grants on internal tags at the REST boundary. */
+  @Test
+  public void testCreateRoleRejectsInternalTag() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {
+              DTOConverters.toDTO(
+                  SecurableObjects.ofTag(
+                      "GRAVITINO_HIDDEN_123", Lists.newArrayList(Privileges.ApplyTag.allow())))
+            });
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
   @Test
   public void testCreateRoleWithNullRequest() {
     Response resp =

@@ -58,6 +58,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -71,6 +72,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -107,6 +109,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.AllValuesSelector;
@@ -165,11 +168,15 @@ public class TestTagManager {
 
   private static IdGenerator idGenerator;
 
+  @Nullable private static IdGenerator previousIdGenerator;
+
   private static TagManager tagManager;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
     idGenerator = new RandomIdGenerator();
+    previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
 
     File dbDir = new File(DB_DIR);
     dbDir.mkdirs();
@@ -329,13 +336,17 @@ public class TestTagManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
-    }
+  public static void tearDown() throws IOException, IllegalAccessException {
+    try {
+      if (entityStore != null) {
+        entityStore.close();
+        entityStore = null;
+      }
 
-    FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+      FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+    }
   }
 
   @AfterEach
@@ -1242,6 +1253,53 @@ public class TestTagManager {
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
         () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
+  }
+
+  /** The old generic reserved prefix is available for ordinary tags. */
+  @Test
+  public void testLegacyReservedTagsRemainAccessible() throws Exception {
+    MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
+    for (String name : new String[] {"reserved_legacy", "Reserved_legacy"}) {
+      TagEntity legacy =
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(Namespace.of(METALAKE))
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+      entityStore.put(legacy, false);
+      Assertions.assertTrue(Arrays.asList(tagManager.listTags(METALAKE)).contains(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertEquals(
+          "updated",
+          tagManager.alterTag(METALAKE, name, TagChange.updateComment("updated")).comment());
+      tagManager.associateTagsForMetadataObject(METALAKE, object, new String[] {name}, null);
+      Assertions.assertEquals(
+          name, tagManager.getTagForMetadataObject(METALAKE, object, name).name());
+      Assertions.assertArrayEquals(
+          new MetadataObject[] {object}, tagManager.listMetadataObjectsForTag(METALAKE, name));
+      Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, name).length);
+      tagManager.associateTagsForMetadataObject(METALAKE, object, null, new String[] {name});
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+
+      entityStore.put(
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(legacy.namespace())
+              .withAuditInfo(legacy.auditInfo())
+              .build(),
+          false);
+      String newName = "legacy_" + name;
+      tagManager.alterTag(METALAKE, name, TagChange.rename(newName));
+      Assertions.assertEquals(newName, tagManager.getTag(METALAKE, newName).name());
+      tagManager.alterTag(METALAKE, newName, TagChange.rename(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+      Assertions.assertEquals(name, tagManager.createTag(METALAKE, name, null, null).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+    }
   }
 
   @Test

@@ -36,6 +36,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
@@ -62,6 +63,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
@@ -105,6 +107,37 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Verifies that both association request versions reject internal tag names. */
+  @Test
+  public void testInternalTagAssociationsAreHidden() throws Exception {
+    MetadataObjectTagOperations operations = new MetadataObjectTagOperations(tagManager);
+    operations.setHttpRequest(mock(HttpServletRequest.class));
+    String name = "GRAVITINO_HIDDEN_123";
+    try (Response response = operations.getTagForObject(metalake, "catalog", "catalog", name)) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    }
+    for (boolean adding : new boolean[] {true, false}) {
+      String[] names = new String[] {name};
+      TagValue[] values = new TagValue[] {TagValue.noValue(name)};
+      try (Response v1 =
+              operations.associateTagsForObject(
+                  metalake,
+                  "catalog",
+                  "catalog",
+                  new TagsAssociateRequest(adding ? names : null, adding ? null : names));
+          Response v2 =
+              operations.associateTagValuesForObject(
+                  metalake,
+                  "catalog",
+                  "catalog",
+                  new TagValuesAssociateRequest(adding ? values : null, adding ? null : values))) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), v1.getStatus());
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), v2.getStatus());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
+  }
+
   @Test
   public void testListTagsForObject() {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
@@ -117,11 +150,18 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     MetadataObject function =
         MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
 
+    Tag hidden =
+        TagEntity.builder()
+            .withName("GRAVITINO_HIDDEN_123")
+            .withId(123L)
+            .withAuditInfo(testAuditInfo1)
+            .build();
     Tag[] catalogTagInfos =
         new Tag[] {
           TagEntity.builder().withName("tag1").withId(1L).withAuditInfo(testAuditInfo1).build()
         };
-    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog)).thenReturn(catalogTagInfos);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog))
+        .thenReturn(ArrayUtils.add(catalogTagInfos, hidden));
 
     Tag[] schemaTagInfos =
         new Tag[] {
@@ -133,7 +173,8 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
         new Tag[] {
           TagEntity.builder().withName("tag5").withId(1L).withAuditInfo(testAuditInfo1).build()
         };
-    when(tagManager.listTagsInfoForMetadataObject(metalake, table)).thenReturn(tableTagInfos);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, table))
+        .thenReturn(ArrayUtils.add(tableTagInfos, hidden));
 
     Tag[] columnTagInfos =
         new Tag[] {
@@ -977,7 +1018,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     String[] tagsToRemove = new String[] {"tag3", "tag4"};
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
-        .thenReturn(tagsToAdd);
+        .thenReturn(new String[] {"tag1", "gravitino_hidden_123", "tag2"});
 
     TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
     Response response =
@@ -1102,7 +1143,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
     TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
     when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
-        .thenReturn(new String[] {"pii", "data_domain"});
+        .thenReturn(new String[] {"pii", "GRAVITINO_HIDDEN_123", "data_domain"});
 
     TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
     Response response =

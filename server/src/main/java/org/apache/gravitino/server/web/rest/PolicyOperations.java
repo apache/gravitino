@@ -59,6 +59,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyDispatcher;
@@ -350,6 +351,11 @@ public class PolicyOperations {
           () -> {
             RelationalEntity<?>[] associations =
                 policyDispatcher.listTagAssociationsForPolicy(metalake, policyName);
+            associations =
+                Arrays.stream(associations)
+                    .filter(
+                        relation -> !HiddenPolicyTag.isReservedName(relation.targetEntity().name()))
+                    .toArray(RelationalEntity<?>[]::new);
             associations =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
