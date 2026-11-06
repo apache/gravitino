@@ -773,6 +773,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check)
+      throws IOException {
+    return DomainMetaService.getInstance().deleteDomain(ident, check);
+  }
+
+  @Override
   public DomainEntity updateDomainBackingTagAndGet(
       NameIdentifier ident,
       @Nullable TagValue backingTag,

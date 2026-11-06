@@ -57,6 +57,16 @@ import org.apache.gravitino.tag.TagValue;
 public interface SupportsDomainOperations {
 
   /**
+   * Deletes a domain after checking its current state under the domain row lock.
+   *
+   * @param ident The domain identifier.
+   * @param check The authorization check; throwing rolls back the deletion.
+   * @return Whether a domain was deleted.
+   * @throws IOException If the domain cannot be deleted.
+   */
+  boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check) throws IOException;
+
+  /**
    * Inserts a domain backed by an existing tag. If the domain has a parent, it is inserted as a
    * sub-domain of that parent, together with its parent edge.
    *

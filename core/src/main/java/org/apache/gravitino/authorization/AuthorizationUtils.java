@@ -98,6 +98,7 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
+          MetadataObject.Type.DOMAIN,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.VIEW,
           // Semantic models live only in Gravitino, underlying connectors know nothing about

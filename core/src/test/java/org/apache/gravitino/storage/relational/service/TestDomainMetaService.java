@@ -44,6 +44,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -55,12 +56,16 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -76,6 +81,63 @@ public class TestDomainMetaService extends TestJDBCBackend {
   private static final String METALAKE_NAME = "metalake_for_domain_meta_service_test";
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+  /** Verifies transactional authorization cache records for domain rename and deletion. */
+  @TestTemplate
+  public void testRenameAndDeleteRecordAuthorizationCacheChanges() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService service = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance.v1", "comment");
+    service.insertDomain(finance, false);
+    Long highWater =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId);
+    DomainEntity renamed =
+        service.updateDomain(
+            finance.nameIdentifier(),
+            (DomainEntity domain) -> domain.toBuilder().withName("Markets.v1").build());
+    Assertions.assertTrue(service.deleteDomain(renamed.nameIdentifier(), domain -> {}));
+    List<EntityChangeRecord> changes =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.selectEntityChanges(highWater == null ? 0 : highWater, 100));
+    List<EntityChangeRecord> domainChanges =
+        changes.stream()
+            .filter(change -> change.getEntityType().equals(Entity.EntityType.DOMAIN.name()))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(2, domainChanges.size());
+    Assertions.assertEquals(OperateType.ALTER, domainChanges.get(0).getOperateType());
+    Assertions.assertEquals(
+        finance.nameIdentifier(),
+        EntityChangeLogNameIdentifierCodec.decode(domainChanges.get(0).getFullName()));
+    Assertions.assertEquals(OperateType.DROP, domainChanges.get(1).getOperateType());
+    Assertions.assertEquals(
+        renamed.nameIdentifier(),
+        EntityChangeLogNameIdentifierCodec.decode(domainChanges.get(1).getFullName()));
+  }
+
+  /** Verifies that a failed authorization check preserves the domain. */
+  @TestTemplate
+  public void testDeleteAuthorizationFailureRollsBack() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService service = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "comment");
+    service.insertDomain(finance, false);
+    Assertions.assertThrows(
+        ForbiddenException.class,
+        () ->
+            service.deleteDomain(
+                finance.nameIdentifier(),
+                current -> {
+                  Assertions.assertEquals(finance.id(), current.id());
+                  throw new ForbiddenException("Denied");
+                }));
+    Assertions.assertEquals(finance, service.getDomainByIdentifier(finance.nameIdentifier()));
+    Assertions.assertTrue(
+        service.deleteDomain(
+            finance.nameIdentifier(),
+            current -> Assertions.assertEquals(finance.id(), current.id())));
+  }
 
   @TestTemplate
   public void testInsertGetAndListDomains() throws IOException {
