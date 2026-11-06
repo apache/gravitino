@@ -33,6 +33,20 @@ public class TestTransformTableChange {
       new SparkTableChangeConverter(new SparkTypeConverter());
 
   @Test
+  void testTransformWithoutLoadingTargetSchema() {
+    org.apache.gravitino.rel.TableChange change =
+        sparkTableChangeConverter.toGravitinoTableChange(
+            TableChange.setProperty("key", "value"),
+            () -> {
+              throw new AssertionError("Spark 3.3 table changes must not load the schema");
+            });
+    org.apache.gravitino.rel.TableChange.SetProperty property =
+        Assertions.assertInstanceOf(org.apache.gravitino.rel.TableChange.SetProperty.class, change);
+    Assertions.assertEquals("key", property.getProperty());
+    Assertions.assertEquals("value", property.getValue());
+  }
+
+  @Test
   void testTransformSetProperty() {
     TableChange sparkSetProperty = TableChange.setProperty("key", "value");
     org.apache.gravitino.rel.TableChange tableChange =

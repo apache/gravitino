@@ -21,11 +21,12 @@ package org.apache.gravitino.catalog.jdbc.converter;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.io.BaseEncoding;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -83,14 +84,35 @@ public class JdbcColumnDefaultValueConverter {
           value = validateNumericLiteral(value);
         }
         return value;
-      } else if (type instanceof Types.TimestampType) {
-        /**
-         * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
-         */
-        if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
-          return quoteStringLiteral(literal.value().toString().replace("T", " "));
+      } else if (type instanceof Types.BinaryType && literal.value() instanceof byte[]) {
+        return binaryLiteral((byte[]) literal.value());
+      } else if (type instanceof Types.BinaryType
+          && literal.value() instanceof String
+          && ((String) literal.value()).startsWith("0x")) {
+        byte[] value;
+        try {
+          value =
+              BaseEncoding.base16()
+                  .lowerCase()
+                  .decode(((String) literal.value()).substring(2).toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(
+              "Invalid binary column default value: use 0x followed by hexadecimal byte pairs", e);
         }
-        return quoteStringLiteral(String.valueOf(literal.value()));
+        return binaryLiteral(value);
+      } else if (type instanceof Types.TimestampType) {
+        // java.time omits seconds for whole-minute values, but MySQL requires them.
+        String value =
+            literal
+                .value()
+                .toString()
+                .replace("T", " ")
+                .replaceFirst("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})(?=$|Z|[+-])", "$1:00");
+        if (((Types.TimestampType) type).hasTimeZone() && value.endsWith("Z")) {
+          // MySQL accepts numeric offsets but rejects the equivalent ISO UTC suffix.
+          value = value.substring(0, value.length() - 1) + "+00:00";
+        }
+        return quoteStringLiteral(value);
       } else {
         return quoteStringLiteral(String.valueOf(literal.value()));
       }
@@ -117,6 +139,16 @@ public class JdbcColumnDefaultValueConverter {
    */
   protected String quoteStringLiteral(String value) {
     return "'" + escapeSqlLiteral(value, '\'') + "'";
+  }
+
+  /**
+   * Renders binary bytes as a SQL literal. Dialects can override their binary literal syntax.
+   *
+   * @param value the bytes to preserve
+   * @return a SQL expression containing the binary value
+   */
+  protected String binaryLiteral(byte[] value) {
+    return "X'" + BaseEncoding.base16().lowerCase().encode(value) + "'";
   }
 
   private static String validateNumericLiteral(String value) {

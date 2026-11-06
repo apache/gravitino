@@ -19,6 +19,8 @@
 package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
+import java.util.function.Supplier;
+import org.apache.gravitino.rel.Column;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter {
@@ -91,6 +93,21 @@ public class SparkTableChangeConverter {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));
     }
+  }
+
+  /**
+   * Converts a table change with a lazy supplier for target column information.
+   *
+   * <p>Version-specific converters may use the schema for defaults supported by that Spark version.
+   * The Spark 3.3 converter does not load the schema.
+   *
+   * @param change the Spark table change
+   * @param columns supplies the current table columns only when required by the change
+   * @return the converted Gravitino table change
+   */
+  public org.apache.gravitino.rel.TableChange toGravitinoTableChange(
+      TableChange change, Supplier<Column[]> columns) {
+    return toGravitinoTableChange(change);
   }
 
   private org.apache.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(
