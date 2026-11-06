@@ -120,12 +120,18 @@ public class CommitJobPlanner {
 
       List<PolicyEntity> chain = new ArrayList<>();
       for (Policy.BuiltInType type : CHAIN_ORDER) {
-        Long winnerId =
+        List<Long> nearestIds =
             policyMetaService.resolveNearestPolicyIds(List.of(tableId), type).get(tableId);
-        if (winnerId == null) {
+        if (nearestIds == null || nearestIds.isEmpty()) {
           continue;
         }
-        PolicyEntity policy = policyMetaService.getPolicyById(winnerId);
+        Preconditions.checkArgument(
+            nearestIds.size() == 1,
+            "ambiguous %s policies on the nearest level of table %s: %s",
+            type,
+            tableId,
+            nearestIds);
+        PolicyEntity policy = policyMetaService.getPolicyById(nearestIds.get(0));
         if (policy == null || !policy.enabled()) {
           continue;
         }

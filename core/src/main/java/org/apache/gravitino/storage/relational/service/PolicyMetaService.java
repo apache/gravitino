@@ -116,25 +116,26 @@ public class PolicyMetaService {
   }
 
   /**
-   * Resolves the unique nearest enabled policy id of {@code policyType} for each table with one SQL
+   * Resolves the nearest enabled policy ids of {@code policyType} for each table with one SQL
    * statement.
    *
    * <p>A table inherits from its schema, that schema's hierarchical ancestors, and its catalog. The
    * nearest assignment of a tag wins, a policy matches through its tag selector, and the nearest
-   * level with a matching policy decides, as in {@code ObjectPolicyResolver}.
+   * level with a matching policy decides, as in {@code ObjectPolicyResolver}. Callers that require
+   * a unique winner (built-in {@code uniqueAtSameLevel} types) should reject lists with size not
+   * equal to one.
    *
    * @param tableIds table entity ids
    * @param policyType built-in policy type
-   * @return winner policy id per table; tables without a matching policy are absent
-   * @throws IllegalArgumentException when two or more policies tie on a table's nearest level
+   * @return nearest-level policy ids per table; tables without a matching policy are absent
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "resolveNearestPolicyIds")
-  public Map<Long, Long> resolveNearestPolicyIds(
+  public Map<Long, List<Long>> resolveNearestPolicyIds(
       List<Long> tableIds, Policy.BuiltInType policyType) {
     Preconditions.checkNotNull(policyType, "policyType");
-    Map<Long, Long> result = new LinkedHashMap<>();
+    Map<Long, List<Long>> result = new LinkedHashMap<>();
     if (tableIds == null || tableIds.isEmpty()) {
       return result;
     }
@@ -143,14 +144,7 @@ public class PolicyMetaService {
             PolicyMetaMapper.class,
             mapper -> mapper.listNearestPolicyIds(tableIds, policyType.policyType()));
     for (NearestPolicyIdPO row : rows) {
-      Preconditions.checkArgument(
-          row.getPolicyCount() == 1,
-          "ambiguous %s policies on the nearest level of table %s: %s policies, including %s",
-          policyType,
-          row.getTableId(),
-          row.getPolicyCount(),
-          row.getPolicyId());
-      result.put(row.getTableId(), row.getPolicyId());
+      result.computeIfAbsent(row.getTableId(), ignored -> new ArrayList<>()).add(row.getPolicyId());
     }
     return result;
   }

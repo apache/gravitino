@@ -68,9 +68,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Flow: {@code policy → tags → tagged objects}. Catalog/schema tags expand to tables (including
  * hierarchical child schemas). A table is kept only when {@link
- * PolicyMetaService#resolveNearestPolicyIds} picks this policy and {@link ShouldSkipTable} allows
- * schedule. Stops after {@code limit} accepted tables (skipped cooldown / in-flight tables do not
- * count).
+ * PolicyMetaService#resolveNearestPolicyIds} returns this policy as the unique nearest winner and
+ * {@link ShouldSkipTable} allows schedule. Stops after {@code limit} accepted tables (skipped
+ * cooldown / in-flight tables do not count).
  *
  * <p>Catalog/schema expansion prefers live {@code listSchemas}/{@code listTables}, then imports
  * only missing entities with {@code loadSchema}/{@code loadTable}. On list failure, falls back to
@@ -535,10 +535,20 @@ public final class NearestPolicyTableEnumerator {
     }
 
     Policy.BuiltInType policyType = scan.policy.policyType();
-    final Long winnerId;
+    final long winnerId;
     try {
-      winnerId =
+      List<Long> nearestIds =
           scan.policyMetaService.resolveNearestPolicyIds(List.of(tableId), policyType).get(tableId);
+      if (nearestIds == null || nearestIds.isEmpty()) {
+        return;
+      }
+      Preconditions.checkArgument(
+          nearestIds.size() == 1,
+          "ambiguous %s policies on the nearest level of table %s: %s",
+          policyType,
+          tableObject.fullName(),
+          nearestIds);
+      winnerId = nearestIds.get(0);
     } catch (IllegalArgumentException e) {
       LOG.error(
           "Skip table {} for maintenance type {}: {}",
@@ -547,7 +557,7 @@ public final class NearestPolicyTableEnumerator {
           e.getMessage());
       return;
     }
-    if (winnerId == null || winnerId.longValue() != scan.policy.id()) {
+    if (winnerId != scan.policy.id()) {
       return;
     }
     if (scan.shouldSkip.shouldSkip(tableId, scan.policy.id(), scan.minIntervalMs, scan.nowMs)) {

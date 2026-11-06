@@ -119,7 +119,7 @@ class TestNearestPolicyTableEnumerator {
 
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(100L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(100L, 10L));
+        .thenReturn(Map.of(100L, List.of(10L)));
 
     Assertions.assertEquals(
         List.of(100L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -163,10 +163,10 @@ class TestNearestPolicyTableEnumerator {
 
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(100L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(100L, 11L));
+        .thenReturn(Map.of(100L, List.of(11L)));
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(101L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(101L, 10L));
+        .thenReturn(Map.of(101L, List.of(10L)));
 
     Assertions.assertEquals(
         List.of(101L), tableIds(enumerator.listTableIds(catalogPolicy, 10, allowAll(), 0L)));
@@ -208,7 +208,7 @@ class TestNearestPolicyTableEnumerator {
 
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(200L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(200L, 10L));
+        .thenReturn(Map.of(200L, List.of(10L)));
 
     Assertions.assertEquals(
         List.of(200L), tableIds(enumerator.listTableIds(policy, 10, allowAll(), 0L)));
@@ -262,9 +262,9 @@ class TestNearestPolicyTableEnumerator {
             invocation -> {
               @SuppressWarnings("unchecked")
               List<Long> ids = invocation.getArgument(0);
-              Map<Long, Long> winners = new HashMap<>();
+              Map<Long, List<Long>> winners = new HashMap<>();
               for (Long id : ids) {
-                winners.put(id, 10L);
+                winners.put(id, List.of(10L));
               }
               return winners;
             });
@@ -294,10 +294,10 @@ class TestNearestPolicyTableEnumerator {
 
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(500L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(500L, 10L));
+        .thenReturn(Map.of(500L, List.of(10L)));
     when(policyMetaService.resolveNearestPolicyIds(
             eq(List.of(501L)), eq(Policy.BuiltInType.ICEBERG_COMPACTION)))
-        .thenReturn(Map.of(501L, 10L));
+        .thenReturn(Map.of(501L, List.of(10L)));
 
     Assertions.assertEquals(
         List.of(500L, 501L),
