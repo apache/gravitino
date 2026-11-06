@@ -21,6 +21,7 @@ package org.apache.gravitino.domain;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
 import org.apache.gravitino.exceptions.DomainAlreadyExistsException;
@@ -262,6 +263,34 @@ public interface DomainDispatcher {
    * @throws NoSuchDomainException If the domain does not exist.
    */
   DomainEntity[] listSubdomainInfos(String metalake, String name) throws NoSuchDomainException;
+
+  /**
+   * Lists recorded leaf objects in a domain's scope, with every applicable relation. Authorization
+   * and visibility filtering are supplied by the authorization dispatcher.
+   *
+   * <p>This operation is unpaginated. Catalog and schema assignments enumerate recorded leaf
+   * objects, and each candidate requires effective-tag resolution, including ancestor lookups and
+   * object existence checks. Query work grows with the candidate count and schema depth; type and
+   * name filters do not impose a bound on the number of objects enumerated.
+   *
+   * @param metalake The metalake name.
+   * @param name The listed domain.
+   * @param filter The member filter.
+   * @return The matching members.
+   * @throws NoSuchDomainException If the domain does not exist.
+   */
+  DomainMember[] listMembers(String metalake, String name, DomainMemberFilter filter);
+
+  /**
+   * Lists domains whose scopes contain a leaf object, including its relations to each domain.
+   * Authorization and visibility filtering are supplied by the authorization dispatcher.
+   *
+   * @param metalake The metalake name.
+   * @param object The leaf metadata object.
+   * @return The domains with their relations.
+   * @throws IllegalArgumentException If the object is not a supported leaf type.
+   */
+  DomainEntity[] listDomainsForMetadataObject(String metalake, MetadataObject object);
 
   /**
    * Attaches a domain under a parent, or moves a sub-domain to another parent. Attaching a domain
