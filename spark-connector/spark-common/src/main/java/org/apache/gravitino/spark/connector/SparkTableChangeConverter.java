@@ -21,6 +21,8 @@ package org.apache.gravitino.spark.connector;
 import com.google.common.base.Preconditions;
 import java.util.function.Supplier;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter {
@@ -47,12 +49,15 @@ public class SparkTableChangeConverter {
       return org.apache.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      Type dataType = sparkTypeConverter.toGravitinoType(addColumn.dataType());
       return org.apache.gravitino.rel.TableChange.addColumn(
           addColumn.fieldNames(),
-          sparkTypeConverter.toGravitinoType(addColumn.dataType()),
+          dataType,
           addColumn.comment(),
           transformColumnPosition(addColumn.position()),
-          addColumn.isNullable());
+          addColumn.isNullable(),
+          false,
+          convertAddColumnDefaultValue(addColumn, dataType));
     } else if (change instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
       return org.apache.gravitino.rel.TableChange.deleteColumn(
@@ -108,6 +113,19 @@ public class SparkTableChangeConverter {
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(
       TableChange change, Supplier<Column[]> columns) {
     return toGravitinoTableChange(change);
+  }
+
+  /**
+   * Converts an added column's default when supported by the Spark version. Spark 3.3 exposes no
+   * add-column default API, so the base converter leaves the default unset.
+   *
+   * @param addColumn the Spark add-column change
+   * @param dataType the new column's Gravitino type
+   * @return the converted default, or {@link Column#DEFAULT_VALUE_NOT_SET} when absent
+   */
+  protected Expression convertAddColumnDefaultValue(
+      TableChange.AddColumn addColumn, Type dataType) {
+    return Column.DEFAULT_VALUE_NOT_SET;
   }
 
   private org.apache.gravitino.rel.TableChange.ColumnPosition transformColumnPosition(

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
@@ -142,6 +143,8 @@ public class TestTransformTableChange {
 
     Assertions.assertArrayEquals(
         sparkAddColumnFirst.fieldNames(), gravitinoAddColumnFirst.fieldName());
+    Assertions.assertEquals(
+        Column.DEFAULT_VALUE_NOT_SET, gravitinoAddColumnFirst.getDefaultValue());
     Assertions.assertTrue(
         "string".equalsIgnoreCase(gravitinoAddColumnFirst.getDataType().simpleString()));
     Assertions.assertTrue(
