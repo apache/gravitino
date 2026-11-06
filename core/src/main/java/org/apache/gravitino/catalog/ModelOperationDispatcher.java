@@ -56,6 +56,22 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     super(catalogManager, store, idGenerator, secretManager);
   }
 
+  /**
+   * Checks whether a model exists in a catalog that supports models.
+   *
+   * @param ident the model identifier
+   * @return whether the model exists
+   */
+  @Override
+  public boolean modelExists(NameIdentifier ident) {
+    boolean supportsModels =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof ModelCatalog),
+            RuntimeException.class);
+    return supportsModels && ModelDispatcher.super.modelExists(ident);
+  }
+
   @Override
   public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
     return doWithCatalog(

@@ -42,6 +42,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
@@ -68,6 +69,22 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       IdGenerator idGenerator,
       SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
+  }
+
+  /**
+   * Checks whether a topic exists in a catalog that supports topics.
+   *
+   * @param ident the topic identifier
+   * @return whether the topic exists
+   */
+  @Override
+  public boolean topicExists(NameIdentifier ident) {
+    boolean supportsTopics =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TopicCatalog),
+            RuntimeException.class);
+    return supportsTopics && TopicDispatcher.super.topicExists(ident);
   }
 
   /**
