@@ -122,6 +122,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
@@ -562,6 +563,40 @@ public class TestGravitinoInterceptionService {
     Assertions.assertTrue(errorResponse.getMessage().contains("bogusType"));
     Assertions.assertFalse(
         errorResponse.getMessage().contains("Authorization failed due to system internal error"));
+    verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "table,a.b",
+    "table,a.b.c.d",
+    "schema,a",
+    "schema,a.b.c",
+    "column,a.b.c",
+    "column,a.b.c.d.e",
+    "catalog,a.b"
+  })
+  void testMalformedMetadataObjectNameReturnsBadRequest(String type, String fullName)
+      throws Throwable {
+    Method method =
+        TestMetadataObjectTagAssociationOperations.class.getMethod(
+            "associateTagValuesForObject",
+            String.class,
+            String.class,
+            String.class,
+            TagValuesAssociateRequest.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake", type, fullName, null});
+    MethodInterceptor interceptor =
+        new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+    try (Response response = (Response) interceptor.invoke(invocation)) {
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertFalse(error.getMessage().contains("system internal error"));
+    }
     verify(invocation, never()).proceed();
   }
 
