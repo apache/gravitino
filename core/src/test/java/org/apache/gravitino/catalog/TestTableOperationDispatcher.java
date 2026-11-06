@@ -33,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -59,6 +60,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -119,6 +121,259 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
+  }
+
+  /** Checks blocked source DDL permits warm sibling metadata reads. */
+  @Test
+  public void testBlockedSourceDropDoesNotBlockSiblingMetadataReads() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "drop_source_lock_scope");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier target = NameIdentifier.of(ns, "target");
+    NameIdentifier sibling = NameIdentifier.of(ns, "sibling");
+    createTable(target);
+    createTable(sibling);
+    NameIdentifier completedDrop = NameIdentifier.of(ns, "completed_drop");
+    createTable(completedDrop);
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    TestCatalog base =
+        catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source = spy(original);
+    FieldUtils.writeField(base, "ops", source, true);
+    doAnswer(
+            invocation -> {
+              started.countDown();
+              Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(source)
+        .dropTable(target);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Boolean> drop = executor.submit(() -> tableOperationDispatcher.dropTable(target));
+    try {
+      Assertions.assertTrue(started.await(5, TimeUnit.SECONDS));
+      // Cleanup for a completed drop must not queue a schema writer behind the blocked drop.
+      Assertions.assertTrue(
+          executor
+              .submit(() -> tableOperationDispatcher.dropTable(completedDrop))
+              .get(3, TimeUnit.SECONDS));
+      executor
+          .submit(
+              () -> {
+                Assertions.assertEquals(2, tableOperationDispatcher.listTables(ns).length);
+                Assertions.assertEquals(
+                    "sibling", tableOperationDispatcher.loadTable(sibling).name());
+              })
+          .get(3, TimeUnit.SECONDS);
+      Assertions.assertFalse(drop.isDone());
+      release.countDown();
+      Assertions.assertTrue(drop.get(5, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  @Test
+  void testSchemaCleanupProbeFailureAndRecreatedSchemaPreserveRegistration() throws Exception {
+    for (boolean failProbe : new boolean[] {true, false}) {
+      Namespace ns = Namespace.of(metalake, catalog, "cleanup_probe_" + failProbe);
+      NameIdentifier schemaIdent = NameIdentifier.of(ns.levels());
+      schemaOperationDispatcher.createSchema(
+          schemaIdent, "comment", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier tableIdent = NameIdentifier.of(ns, "t");
+      createTable(tableIdent);
+      TestCatalog base =
+          catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+      TestCatalogOperations original = (TestCatalogOperations) base.ops();
+      TestCatalogOperations source = spy(original);
+      FieldUtils.writeField(base, "ops", source, true);
+      try {
+        if (failProbe) {
+          doThrow(new IllegalStateException("schema probe failed"))
+              .when(source)
+              .schemaExists(schemaIdent);
+        } else {
+          // The schema reappears between the read probe and the write-locked recheck.
+          doReturn(false, true).when(source).schemaExists(schemaIdent);
+        }
+        clearInvocations(entityStore);
+        Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+        verify(source, times(failProbe ? 1 : 2)).schemaExists(schemaIdent);
+        verify(entityStore, never()).delete(eq(schemaIdent), eq(SCHEMA), anyBoolean());
+      } finally {
+        FieldUtils.writeField(base, "ops", original, true);
+      }
+    }
+  }
+
+  /** Checks external comments preserve complete responses and column identities. */
+  @Test
+  public void testExternalCommentsAreProjectedForStorageAndPreservedInResponses() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "external_comment_projection");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    String sourceComment = "a\0" + "😀".repeat(3000) + "tail";
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          TestCatalogOperations ops = (TestCatalogOperations) c.ops();
+          ops.createTable(
+              ident,
+              new Column[] {Column.of("c", Types.StringType.get(), sourceComment)},
+              "comment",
+              Map.of("k1", "v1", "k2", "v2"),
+              new Transform[0]);
+          return null;
+        });
+    Table imported = tableOperationDispatcher.loadTable(ident);
+    Assertions.assertEquals(sourceComment, imported.columns()[0].comment());
+    TableEntity stored = entityStore.get(ident, TABLE, TableEntity.class);
+    String projection = ColumnEntity.commentForStorage(sourceComment);
+    Assertions.assertEquals(projection, stored.columns().get(0).comment());
+    Assertions.assertFalse(projection.contains("\0"));
+    Assertions.assertTrue(projection.length() <= EntityFieldLimits.MAX_COMMENT_LENGTH);
+    long columnId = stored.columns().get(0).id();
+    // A second native comment change exercises the existing-column update path.
+    String updated = "b\0" + "x".repeat(5000);
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          ((TestCatalogOperations) c.ops())
+              .alterTable(ident, TableChange.updateColumnComment(new String[] {"c"}, updated));
+          return null;
+        });
+    Assertions.assertEquals(
+        updated, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    TableEntity reloaded = entityStore.get(ident, TABLE, TableEntity.class);
+    Assertions.assertEquals(columnId, reloaded.columns().get(0).id());
+    Assertions.assertEquals(
+        ColumnEntity.commentForStorage(updated), reloaded.columns().get(0).comment());
+    clearInvocations(entityStore);
+    Assertions.assertEquals(
+        updated, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    String changedSuffix = updated + "different suffix";
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          ((TestCatalogOperations) c.ops())
+              .alterTable(
+                  ident, TableChange.updateColumnComment(new String[] {"c"}, changedSuffix));
+          return null;
+        });
+    Assertions.assertEquals(
+        changedSuffix, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    verify(entityStore, never()).update(eq(ident), eq(TableEntity.class), eq(TABLE), any());
+  }
+
+  @Test
+  void testColumnDifferenceUsesBoundedCommentProjection() throws Exception {
+    Column source = Column.of("c", Types.StringType.get(), "a".repeat(5000));
+    ColumnEntity stored = ColumnEntity.toColumnEntity(source, 0, 1L, AuditInfo.EMPTY);
+    String same =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", source, 0, stored);
+    Assertions.assertEquals("", same);
+    Column changed = Column.of("c", Types.StringType.get(), "b\0" + "b".repeat(5000));
+    String difference =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", changed, 0, stored);
+    Assertions.assertFalse(difference.contains("\0"));
+    Assertions.assertFalse(difference.contains("b".repeat(4097)));
+    Assertions.assertTrue(difference.contains("b".repeat(256)));
+  }
+
+  @Test
+  void testUnicodeCommentsExceedingStorageFailBeforeSourceDdl() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "unicode_comment_request");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog base =
+        catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source = spy(original);
+    FieldUtils.writeField(base, "ops", source, true);
+    try {
+      for (String comment : new String[] {"a".repeat(255) + "😀", "😀".repeat(256)}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tableOperationDispatcher.createTable(
+                        ident,
+                        new Column[] {Column.of("c", Types.StringType.get(), comment)},
+                        "comment",
+                        Map.of("k1", "v1", "k2", "v2"),
+                        new Transform[0]));
+        Assertions.assertTrue(error.getMessage().contains("256 UTF-16"));
+      }
+      verify(source, never()).createTable(any(), any(), any(), any(), any(Transform[].class));
+      createTable(ident);
+      clearInvocations(source);
+      for (String comment : new String[] {"a".repeat(255) + "😀", "😀".repeat(256)}) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), comment)));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, comment)));
+      }
+      verify(source, never()).alterTable(any(), any(TableChange[].class));
+    } finally {
+      FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  /** Checks invalid request comments cannot partially apply source DDL. */
+  @Test
+  public void testNulColumnCommentsFailBeforeSourceDdl() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "nul_comment_request");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    IllegalArgumentException createError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    ident,
+                    new Column[] {Column.of("c", Types.StringType.get(), "bad\0comment")},
+                    "comment",
+                    Map.of("k1", "v1", "k2", "v2"),
+                    new Transform[0]));
+    Assertions.assertTrue(createError.getMessage().contains("Column comment for c"));
+    Assertions.assertFalse(tableOperationDispatcher.tableExists(ident));
+    createTable(ident);
+    IllegalArgumentException addError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), "bad\0comment")));
+    Assertions.assertTrue(addError.getMessage().contains("Column comment for added"));
+    IllegalArgumentException alterError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, "bad\0comment")));
+    Assertions.assertTrue(alterError.getMessage().contains("Column comment for col1"));
+    Assertions.assertEquals(1, tableOperationDispatcher.loadTable(ident).columns().length);
   }
 
   @Test

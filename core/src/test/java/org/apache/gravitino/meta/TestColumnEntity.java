@@ -31,6 +31,21 @@ import org.junit.jupiter.api.Test;
 public class TestColumnEntity {
 
   @Test
+  void testCommentStorageProjectionBoundaries() {
+    Assertions.assertNull(ColumnEntity.commentForStorage(null));
+    Assertions.assertEquals("", ColumnEntity.commentForStorage(""));
+    Assertions.assertEquals("ab", ColumnEntity.commentForStorage("a\0b"));
+    String limit = "a".repeat(256);
+    Assertions.assertEquals(limit, ColumnEntity.commentForStorage(limit));
+    Assertions.assertEquals(limit, ColumnEntity.commentForStorage(limit + "trailing"));
+    // A supplementary character must either fit completely or be excluded completely.
+    String prefix = "a".repeat(255);
+    Assertions.assertEquals(prefix, ColumnEntity.commentForStorage(prefix + "😀"));
+    String exactFit = "a".repeat(254) + "😀";
+    Assertions.assertEquals(exactFit, ColumnEntity.commentForStorage(exactFit + "trailing"));
+  }
+
+  @Test
   public void testColumnEntityFields() {
     ColumnEntity columnEntity =
         ColumnEntity.builder()

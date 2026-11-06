@@ -86,7 +86,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
    * Mirrors the JDBC override: runs a real {@code testConnection} probe at create time instead of
    * only eagerly initializing {@code ops()}. {@code ops()} is still invoked (so a failing {@code
    * initialize()} still surfaces here), and the probe additionally throws when the catalog was
-   * created with {@code need-fail=true}, exercising the create-time verification/rollback path.
+   * created with {@code need-fail=true}, exercising the create-time verification failure path.
    */
   @Override
   public void validateOnCreate() {

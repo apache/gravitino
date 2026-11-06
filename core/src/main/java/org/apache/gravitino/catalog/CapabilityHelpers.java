@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.model.ModelChange;
@@ -399,15 +400,24 @@ public class CapabilityHelpers {
     return TableChange.rename(newName, newSchemaName);
   }
 
+  private static void applyExistingColumnName(String name, Capability capabilities) {
+    CapabilityResult result =
+        capabilities.specificationOnExistingName(Capability.Scope.COLUMN, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-    applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
-
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
 
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    // Preserve branch-1.3 validation after case folding for case-insensitive providers.
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+    applyExistingColumnName(fieldName[0], capabilities);
+
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
@@ -435,7 +445,7 @@ public class CapabilityHelpers {
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        applyNameSpecification(Capability.Scope.COLUMN, afterFieldName, capabilities);
+        applyExistingColumnName(afterFieldName, capabilities);
         return TableChange.updateColumnPosition(
             fieldName, TableChange.ColumnPosition.after(afterFieldName));
       }
@@ -503,7 +513,7 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
       newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);

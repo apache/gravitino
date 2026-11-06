@@ -122,6 +122,65 @@ public class TestManagedTableOperations {
   }
 
   @Test
+  void testUnicodeCommentValidationAndRoundTrip() {
+    NameIdentifier ident =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "unicode_comments");
+    for (String comment : new String[] {"a".repeat(255) + "😀", "😀".repeat(256), "bad\0comment"}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.createTable(
+                  ident,
+                  new Column[] {Column.of("c", Types.StringType.get(), comment)},
+                  "comment",
+                  StringIdentifier.newPropertiesWithId(
+                      StringIdentifier.fromId(idGenerator.nextId()), Map.of()),
+                  new Transform[0],
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  Indexes.EMPTY_INDEXES));
+    }
+    String comment = "😀".repeat(128);
+    Table created =
+        tableOperations.createTable(
+            ident,
+            new Column[] {Column.of("c", Types.StringType.get(), comment)},
+            "comment",
+            StringIdentifier.newPropertiesWithId(
+                StringIdentifier.fromId(idGenerator.nextId()), Map.of()),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            Indexes.EMPTY_INDEXES);
+    Assertions.assertEquals(comment, created.columns()[0].comment());
+    Assertions.assertEquals(comment, tableOperations.loadTable(ident).columns()[0].comment());
+    String mixed = "a".repeat(254) + "😀";
+    Table altered =
+        tableOperations.alterTable(
+            ident,
+            TableChange.updateColumnComment(new String[] {"c"}, mixed),
+            TableChange.addColumn(new String[] {"added"}, Types.StringType.get(), comment));
+    Assertions.assertEquals(mixed, altered.columns()[0].comment());
+    Assertions.assertEquals(comment, altered.columns()[1].comment());
+    for (String invalid : new String[] {"a".repeat(255) + "😀", "😀".repeat(256), "bad\0comment"}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.alterTable(
+                  ident, TableChange.updateColumnComment(new String[] {"c"}, invalid)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.alterTable(
+                  ident,
+                  TableChange.addColumn(
+                      new String[] {"rejected"}, Types.StringType.get(), invalid)));
+      Assertions.assertEquals(mixed, tableOperations.loadTable(ident).columns()[0].comment());
+      Assertions.assertEquals(2, tableOperations.loadTable(ident).columns().length);
+    }
+  }
+
+  @Test
   public void testCreateAndListTables() {
     // Create a table
     NameIdentifier table1Ident =

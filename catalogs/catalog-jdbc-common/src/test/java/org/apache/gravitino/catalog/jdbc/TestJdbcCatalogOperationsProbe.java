@@ -55,8 +55,8 @@ public class TestJdbcCatalogOperationsProbe {
 
   /**
    * A probe against a server that accepts the TCP connection but never replies must fail within the
-   * configured read timeout, not hang. This is the metalake-write-lock-starvation case: before the
-   * read timeout was injected on the probe, the driver's handshake read waited forever.
+   * configured read timeout, not hang and starve catalog operations. Before the read timeout was
+   * injected on the probe, the driver's handshake read waited forever.
    */
   @Test
   public void testProbeAgainstAcceptButSilentServerIsBounded() throws Exception {

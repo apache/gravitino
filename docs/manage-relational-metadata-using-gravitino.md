@@ -280,3 +280,35 @@ identifiers = catalog.as_table_catalog().list_tables(Namespace.of("public"))
 
 </TabItem>
 </Tabs>
+
+### External column comments and existing names
+
+Loading an external table preserves its complete source column comments in the returned
+metadata. The entity store keeps a bounded, NUL-free projection of each column comment,
+without changing the source comment, column identity, or column governance metadata.
+On branch-1.3, the projection is limited to 256 UTF-16 units to match the existing
+column-comment schema in every supported store.
+CREATE and ALTER requests reject NUL comments and comments exceeding 256 UTF-16 units on
+top-level columns before source DDL, including managed-table creation, ADD COLUMN and comment
+updates. Nested-field ALTER comments retain provider behavior.
+Supplementary Unicode characters count as two units, so 128 emoji fit while 256 emoji do not.
+Accepted request comments are stored without truncation. The UTF-16 bound is needed for H2's
+VARCHAR storage limit even though MySQL and PostgreSQL count code points. No store migration
+is required.
+
+Existing top-level column references use the provider's existing-name specification; new
+top-level columns and top-level rename targets still use creation rules. PostgreSQL accepts quoted
+native column names while retaining its UTF-8 name-length, NUL, and wildcard restrictions. Other providers
+retain their default validation until they explicitly support native-name operations.
+
+Catalog creation takes the target catalog lock, permitting sibling catalogs to operate
+while source verification runs. Catalog wrapper initialization, configuration checks, and any
+enabled create-time backend verification complete before the entity is persisted; local cache
+publication is coordinated with catalog loading. Failed verification does not expose a transient
+catalog through listing. Table DROP holds the target table lock for source DDL and registration
+removal. After releasing that table lock, best-effort cleanup checks schema
+existence under a read lock and only takes a write lock if the schema is missing, rechecking
+before deleting orphaned registrations. This does not add SQL statement timeouts or
+cancel blocked source DDL. Cold table import retains its existing locking behavior. Table PURGE
+and view DROP also retain their schema write lock across source DDL and can still block sibling
+operations; this change narrows only table DROP.

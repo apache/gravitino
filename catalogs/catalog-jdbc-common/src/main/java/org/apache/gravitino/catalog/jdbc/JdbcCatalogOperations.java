@@ -267,9 +267,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * pool, whose connections carry only a connect timeout so normal operations stay unbounded), this
    * probe applies both the connect timeout and the socket-read (and, for PostgreSQL, login) timeout
    * from {@link JdbcConnectionTimeouts#probeConnectionProperties}. That matters because the probe
-   * runs under the metalake write lock during catalog creation: a backend that accepts the TCP
-   * connection but never speaks the database protocol would otherwise block forever and starve the
-   * whole metalake. The connection is opened, validated and closed within this call.
+   * runs under the target catalog write lock during catalog creation: a backend that accepts the
+   * TCP connection but never speaks the database protocol would otherwise block forever, delaying
+   * operations that need this catalog lock or an ancestor write lock. The connection is opened,
+   * validated and closed within this call.
    *
    * @param catalogIdent the identifier of the catalog being verified
    * @throws ConnectionFailedException if the backend cannot be reached within the bounded timeout
@@ -310,7 +311,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       properties.setProperty("password", password);
     }
     // Bound both the connect and the read/login timeout for this probe so an accept-but-silent
-    // backend fails fast instead of hanging under the metalake write lock.
+    // backend fails fast instead of hanging under the target catalog write lock.
     JdbcConnectionTimeouts.probeConnectionProperties(jdbcConfig, jdbcUrl)
         .forEach(properties::setProperty);
 

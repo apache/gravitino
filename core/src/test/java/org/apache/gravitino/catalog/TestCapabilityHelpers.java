@@ -21,12 +21,70 @@ package org.apache.gravitino.catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestCapabilityHelpers {
+
+  @Test
+  void testNewColumnDoesNotUseExistingNameRules() {
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            throw new AssertionError("New columns must use creation rules");
+          }
+        };
+    TableChange[] changes =
+        CapabilityHelpers.applyCapabilities(
+            capability,
+            TableChange.addColumn(new String[] {"new_column"}, Types.IntegerType.get()));
+    Assertions.assertEquals(1, changes.length);
+  }
+
+  /** Checks existing references and new names use their respective provider rules. */
+  @Test
+  public void testExistingColumnReferencesDoNotUseCreationPattern() {
+    Capability strict =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnName(Scope scope, String name) {
+            return name.matches("[a-zA-Z_][a-zA-Z0-9_]*")
+                ? CapabilityResult.SUPPORTED
+                : CapabilityResult.unsupported("invalid new name");
+          }
+
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            return CapabilityResult.SUPPORTED;
+          }
+        };
+    TableChange[] changes =
+        CapabilityHelpers.applyCapabilities(
+            strict,
+            TableChange.updateColumnComment(new String[] {"native col"}, "comment"),
+            TableChange.renameColumn(new String[] {"native col"}, "valid_name"),
+            TableChange.deleteColumn(new String[] {"native col"}, false),
+            TableChange.updateColumnPosition(
+                new String[] {"native col"}, TableChange.ColumnPosition.after("other native col")));
+    Assertions.assertEquals(4, changes.length);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CapabilityHelpers.applyCapabilities(
+                strict, TableChange.addColumn(new String[] {"new col"}, Types.IntegerType.get())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CapabilityHelpers.applyCapabilities(
+                strict, TableChange.renameColumn(new String[] {"native col"}, "new col")));
+  }
 
   @Test
   void testGetCapabilityPropagatesNoSuchCatalogException() {

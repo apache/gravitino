@@ -56,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -826,65 +827,70 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .build();
 
     return TreeLockUtils.doWithTreeLock(
-        metalakeIdent,
+        ident,
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, store);
+          // Keep close() from retiring resources between initialization and publication. The
+          // lock order remains tree lock, lifecycle lock, then the per-key cache operation.
           lifecycleLock.readLock().lock();
-          boolean needClean = false;
           try {
             checkOpen();
-            needClean = true;
-            store.put(e, false /* overwrite */);
-            try (CatalogLease lease =
-                createAndCacheCatalogLease(ident, () -> createCatalogWrapper(e, mergedConfig))) {
-              Catalog catalog = toCatalogInfo(lease.wrapper());
-              needClean = false;
-              return catalog;
-            }
-
-          } catch (EntityAlreadyExistsException e1) {
-            needClean = false;
-            LOG.warn("Catalog {} already exists", ident, e1);
-            throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
-
-          } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
-            throw e2;
-
-          } catch (Exception e3) {
-            catalogCache.invalidate(ident);
-            LOG.error("Failed to create catalog {}", ident, e3);
-            if (e3 instanceof RuntimeException) {
-              throw (RuntimeException) e3;
-            }
-            throw new RuntimeException(e3);
-
-          } finally {
+            checkMetalake(metalakeIdent, store);
+            AtomicBoolean entityStored = new AtomicBoolean(false);
             try {
-              if (needClean) {
-                // since we put the catalog entity into the store but failed to create the catalog
-                // instance,
-                // we need to clean up the entity stored.
-                try {
-                  if (store.delete(ident, EntityType.CATALOG, true)) {
-                    // This cleanup deletion writes a DROP record to the entity change log. Mark it
-                    // as
-                    // a local mutation so the change-log poller consumes that record's token
-                    // instead
-                    // of one meant for a later mutation of the same identifier. Without this, the
-                    // poller could treat a subsequent local change as remote and spuriously
-                    // invalidate (and asynchronously close) a cached catalog wrapper that is still
-                    // in
-                    // use, causing a NullPointerException.
-                    markLocalMutation(ident);
-                  }
-                } catch (IOException e4) {
-                  LOG.error("Failed to clean up catalog {}", ident, e4);
+              // Reject known duplicates before contacting the backend; store.put still arbitrates
+              // concurrent creates from other server instances.
+              if (store.exists(ident, EntityType.CATALOG)) {
+                throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+              }
+              CatalogWrapper wrapper = createCatalogWrapper(e, mergedConfig);
+              boolean published = false;
+              try {
+                Preconditions.checkState(
+                    wrapper.tryAcquire(), "A new catalog wrapper cannot be retired");
+                try (CatalogLease lease = new CatalogLease(wrapper)) {
+                  // Snapshot construction can also fail; finish it before making the row visible.
+                  Catalog info = toCatalogInfo(lease.wrapper());
+                  // Initializing outside compute keeps slow backend verification out of cache
+                  // locks. Serialize the short store/cache publication with acquireCatalogLease
+                  // so a listCatalogsInfo reader cannot build a second wrapper in between them.
+                  catalogCache
+                      .asMap()
+                      .compute(
+                          ident,
+                          (key, previous) -> {
+                            try {
+                              store.put(e, false /* overwrite */);
+                            } catch (NoSuchEntityException missing) {
+                              throw new NoSuchMetalakeException(
+                                  missing, "Metalake %s does not exist", metalakeIdent);
+                            } catch (EntityAlreadyExistsException duplicate) {
+                              throw new CatalogAlreadyExistsException(
+                                  duplicate, "Catalog %s already exists", ident);
+                            } catch (IOException ioe) {
+                              throw new RuntimeException("Failed to store catalog " + ident, ioe);
+                            }
+                            entityStored.set(true);
+                            return wrapper;
+                          });
+                  published = true;
+                  return info;
+                }
+              } finally {
+                if (!published) {
+                  wrapper.retire();
                 }
               }
-            } finally {
-              lifecycleLock.readLock().unlock();
+            } catch (RuntimeException re) {
+              rollbackFailedCatalogCreate(ident, entityStored.get());
+              throw re;
+            } catch (Exception ex) {
+              rollbackFailedCatalogCreate(ident, entityStored.get());
+              LOG.error("Failed to create catalog {}", ident, ex);
+              throw new RuntimeException(ex);
             }
+          } finally {
+            lifecycleLock.readLock().unlock();
           }
         });
   }
@@ -2079,6 +2085,25 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (IOException ioe) {
       LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /**
+   * Removes the catalog entity left behind by a failed publication when {@code store.put}
+   * succeeded.
+   */
+  private void rollbackFailedCatalogCreate(NameIdentifier ident, boolean entityStored) {
+    if (!entityStored) {
+      return;
+    }
+    catalogCache.invalidate(ident);
+    try {
+      if (store.delete(ident, EntityType.CATALOG, true)) {
+        // The cleanup DROP must consume its own token, not a later local mutation's token.
+        markLocalMutation(ident);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to clean up catalog {}", ident, e);
     }
   }
 }

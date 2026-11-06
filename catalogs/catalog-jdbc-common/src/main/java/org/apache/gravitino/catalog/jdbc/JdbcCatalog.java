@@ -136,21 +136,21 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   /**
    * Verifies the backend is reachable at create time with a dedicated, time-bounded one-off probe
    * connection (see {@link JdbcCatalogOperations#probeConnection}). On failure the probe raises a
-   * {@link ConnectionFailedException}, which propagates so {@code CatalogManager} rolls back the
-   * just-persisted catalog entity.
+   * {@link ConnectionFailedException}, which propagates so {@code CatalogManager} rejects creation
+   * before persisting the catalog entity.
    *
    * <p>The probe does not borrow from the lazy pool: it opens its own connection bounded by both
    * the connect and the read/login timeout, so a backend that accepts the socket but never speaks
-   * the protocol fails fast instead of blocking the metalake write lock. The probe connection is
-   * opened, validated and closed within the call, so there is no pool or connection leak.
+   * the protocol fails fast instead of blocking the target catalog write lock. The probe connection
+   * is opened, validated and closed within the call, so there is no pool or connection leak.
    */
   @Override
   public void validateOnCreate() {
     try {
       ((JdbcCatalogOperations) ops()).probeConnection(entity().nameIdentifier());
     } catch (RuntimeException e) {
-      // Includes ConnectionFailedException; rethrow unchanged so CatalogManager rolls back and the
-      // connection-failed taxonomy the caller relies on is preserved.
+      // Includes ConnectionFailedException; rethrow unchanged so CatalogManager rejects creation
+      // before publication and preserves the connection-failed taxonomy the caller relies on.
       throw e;
     } catch (Exception e) {
       // Defensive: the probe only throws runtime exceptions, so wrap any unexpected checked

@@ -41,11 +41,11 @@ import org.slf4j.LoggerFactory;
  *       query).
  *   <li>{@link #probeConnectionProperties} — used for the one-off <b>create-time verification
  *       probe</b>. It bounds the connect timeout <em>and</em> the socket-read (and, for PostgreSQL,
- *       login) timeout, because that probe runs under the metalake write lock: a backend that
+ *       login) timeout, because that probe runs under the target catalog write lock: a backend that
  *       accepts the TCP connection but never speaks the database protocol (a load balancer with a
  *       dead backend, a wrong port, a proxy that accepts and never forwards) would otherwise make
  *       the connect-only bound wait on the driver's default read timeout, which is "wait forever",
- *       and hold the lock for the whole metalake.
+ *       and hold the target catalog lock.
  * </ul>
  *
  * <p>DBCP has no portable timeout; the real bound lives in the driver, and both the parameter name
@@ -139,7 +139,8 @@ public final class JdbcConnectionTimeouts {
    * {@link JdbcConfig#getConnectTimeoutMs()} value, or an empty map when the driver family is
    * unknown or the operator has already set the properties. Bounding the read timeout here (but not
    * on the pool, see {@link #connectionProperties}) ensures a backend that accepts the socket but
-   * never speaks the protocol fails the probe instead of blocking the metalake write lock forever.
+   * never speaks the protocol fails the probe instead of blocking the target catalog write lock
+   * forever.
    *
    * @param config the catalog JDBC configuration; must not be null
    * @param jdbcUrl the JDBC URL whose query parameters are inspected for operator-set timeouts; may

@@ -54,6 +54,8 @@ import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -82,6 +84,8 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         .thenReturn(CapabilityResult.unsupported("case insensitive"));
     Mockito.when(capability.specificationOnName(Mockito.any(), Mockito.anyString()))
         .thenReturn(CapabilityResult.SUPPORTED);
+    Mockito.when(capability.specificationOnExistingName(Mockito.any(), Mockito.anyString()))
+        .thenCallRealMethod();
     Mockito.when(catalog.capability()).thenReturn(capability);
     CatalogTestUtils.mockDoWithCatalog(manager, catalog);
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
@@ -123,6 +127,57 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     // One rename pass makes three capability probes in 1.3. A second operation-dispatcher pass
     // would double those probes even though lowercasing itself is idempotent on this branch.
     Mockito.verify(capability, Mockito.times(3)).caseSensitiveOnName(Capability.Scope.COLUMN);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testExistingColumnReferencesAreCaseFoldedBeforeValidation(boolean uppercaseReference)
+      throws Exception {
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return scope == Scope.COLUMN
+                ? CapabilityResult.unsupported("case insensitive columns")
+                : CapabilityResult.SUPPORTED;
+          }
+
+          @Override
+          public CapabilityResult specificationOnName(Scope scope, String name) {
+            return scope != Scope.COLUMN || name.matches("[a-z_][a-z0-9_]*")
+                ? CapabilityResult.SUPPORTED
+                : CapabilityResult.unsupported("lowercase column names required");
+          }
+        };
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(delegate, manager);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    String[] column = {uppercaseReference ? "COL" : "col"};
+    String previous = uppercaseReference ? "previous" : "PREVIOUS";
+    dispatcher.alterTable(
+        ident,
+        TableChange.updateColumnComment(column, "comment"),
+        TableChange.renameColumn(column, "RENAMED"),
+        TableChange.deleteColumn(column, false),
+        TableChange.updateColumnPosition(column, TableChange.ColumnPosition.after(previous)));
+
+    ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+    Mockito.verify(delegate).alterTable(Mockito.eq(ident), captor.capture());
+    TableChange[] changes = captor.getValue();
+    Assertions.assertEquals(4, changes.length);
+    for (TableChange change : changes) {
+      Assertions.assertArrayEquals(
+          new String[] {"col"}, ((TableChange.ColumnChange) change).fieldName());
+    }
+    Assertions.assertEquals("renamed", ((TableChange.RenameColumn) changes[1]).getNewName());
+    Assertions.assertEquals(
+        "previous",
+        ((TableChange.After) ((TableChange.UpdateColumnPosition) changes[3]).getPosition())
+            .getColumn());
   }
 
   @Test
