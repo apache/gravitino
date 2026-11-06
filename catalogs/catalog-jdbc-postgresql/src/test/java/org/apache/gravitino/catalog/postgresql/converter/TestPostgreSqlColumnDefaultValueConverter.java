@@ -76,4 +76,20 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertEquals(
         Literals.stringLiteral(""), converter.toGravitino(type, "''::bpchar", false, true));
   }
+
+  @Test
+  void testUnboundedVarcharDefaultIsString() {
+    for (Integer length : new Integer[] {null, 0, Integer.MAX_VALUE}) {
+      JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("varchar");
+      type.setColumnSize(length);
+      Assertions.assertEquals(
+          Literals.stringLiteral("value"),
+          converter.toGravitino(type, "'value'::character varying", false, true));
+    }
+    JdbcTypeConverter.JdbcTypeBean bounded = new JdbcTypeConverter.JdbcTypeBean("varchar");
+    bounded.setColumnSize(12);
+    Assertions.assertEquals(
+        Literals.varcharLiteral(12, "value"),
+        converter.toGravitino(bounded, "'value'::character varying", false, true));
+  }
 }

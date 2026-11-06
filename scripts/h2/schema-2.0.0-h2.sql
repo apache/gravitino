@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_name` VARCHAR(300) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` CLOB NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
@@ -781,3 +781,17 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
 ) COMMENT='table snapshot metrics metadata';
 CREATE INDEX IF NOT EXISTS `idx_tsm_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`)
+) COMMENT='current semantic model dataset source associations';
+CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);

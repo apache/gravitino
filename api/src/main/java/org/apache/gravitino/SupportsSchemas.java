@@ -100,6 +100,12 @@ public interface SupportsSchemas {
    *
    * <p>Delegates to {@link #createSchema(String, String, Map, Map, Map)} with empty secret maps.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
+   *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
@@ -118,6 +124,12 @@ public interface SupportsSchemas {
    *
    * <p>The default implementation rejects create-time secrets. Implementations that support secrets
    * must override this method.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source schema creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadSchema(String)} to import it
+   * instead of repeating creation. An existing Gravitino registration must be reconciled first;
+   * creation never proves that an older source identity was deleted.
    *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.

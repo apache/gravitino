@@ -143,7 +143,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include server-side stack traces in `detail`. Set this to `false` in new deployments | true | No |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether eligible backend errors include stack traces in `detail`; request/validation errors always omit them. Set this to `false` in new deployments | true | No |
 | `gravitino.lance-rest.trustedProxies`     | Comma-separated IP addresses or CIDR blocks of reverse proxies whose `X-Forwarded-For` is trusted for audit client addresses | (none) | No |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
@@ -198,7 +198,7 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.gravitino-metalake`     | Gravitino metalake name                      | (none)                 | Yes      |
 | `gravitino.lance-rest.httpPort`               | Service port number                          | 9101                   | No       |
 | `gravitino.lance-rest.host`                   | Service hostname                             | 0.0.0.0                | No       |
-| `gravitino.lance-rest.includeErrorStackTrace` | Whether error responses include stack traces | true                   | No       |
+| `gravitino.lance-rest.includeErrorStackTrace` | Whether eligible backend errors include stack traces; request/validation errors always omit them | true                   | No       |
 | `gravitino.lance-rest.metrics.enabled`        | Enable standalone metrics endpoints          | false                  | No       |
 | `gravitino.lance-rest.trustedProxies`         | Reverse proxies trusted for X-Forwarded-For  | (none)                 | No       |
 
@@ -246,7 +246,8 @@ Access the service at `http://localhost:9101/lance`.
 The Lance REST service exposes `/lance/health/live`, `/lance/health/ready`, and
 `/lance/health` on its own port. Root aliases `/health/live`, `/health/ready`, `/health`,
 and `/health.html` are also available. Readiness checks whether the namespace wrapper
-is initialized.
+is initialized. The top-level `status` and each `checks[].status` use lowercase
+`up` or `down`, as on the main Gravitino server.
 
 After an observed `OutOfMemoryError`, all these endpoints return HTTP 503 with a
 `jvm` failure until restart, even if the wrapper remains initialized. See
@@ -296,6 +297,18 @@ URL encoded:        lance_catalog%24schema%24table01
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Namespace deletion defaults to `restrict`; use `cascade` to remove child metadata
 :::
+
+## Error responses
+
+Malformed requests and backend validation errors return HTTP `400` without stack traces in `detail`,
+regardless of `gravitino.lance-rest.includeErrorStackTrace`. Details explicitly supplied by a backend
+Lance exception are preserved. Expected backend client errors are logged at INFO; server failures
+are logged at ERROR with the original exception for diagnosis.
+
+Unrecognized or unimplemented routes under the Lance REST servlet return HTTP `406` with Lance
+error code `0` (`Unsupported`), allowing clients to select a fallback. The error identifies the HTTP
+method and path. Parameter conversion failures remain HTTP `400` (`InvalidInput`); missing tables
+and namespaces reported by operation handlers retain HTTP `404` and their entity-specific codes.
 
 ## Authentication and authorization
 

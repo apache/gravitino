@@ -299,6 +299,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               public boolean authorizationCompleted() {
                 return true;
               }
+
+              @Override
+              public Entity.EntityType entityType() {
+                return Entity.EntityType.SCHEMA;
+              }
             });
     TestInvocation invocation = invocation("alwaysDenied", "authorized by handler");
 
@@ -358,6 +363,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
               public boolean authorizationCompleted() {
                 return false;
               }
+
+              @Override
+              public Entity.EntityType entityType() {
+                return Entity.EntityType.SCHEMA;
+              }
             });
     TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
@@ -406,6 +416,58 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     assertEquals("helper result", new TestInterceptor(Entity.EntityType.SCHEMA).invoke(invocation));
     verify(invocation).proceed();
+  }
+
+  @Test
+  public void testHandlerDenialIsRecordedAgainstHandlerTarget() throws Throwable {
+    NameIdentifier table = NameIdentifierUtil.ofTable("metalake", "catalog", "schema", "table");
+    EventBus eventBus = mock(EventBus.class);
+    try (MockedStatic<GravitinoEnv> envStatic = mockGravitinoEnv(eventBus)) {
+      TestInterceptor interceptor =
+          new TestInterceptor(Entity.EntityType.SCHEMA) {
+            @Override
+            protected AuthorizationTarget resolveAuthorizationTarget(
+                Method method,
+                AuthorizationExpression annotation,
+                Parameter[] parameters,
+                Object[] args) {
+              AuthorizationTarget target =
+                  super.resolveAuthorizationTarget(method, annotation, parameters, args);
+              // Bound before process so denial attribution can use handler.entityType().
+              target.nameIdentifiers().put(Entity.EntityType.TABLE, table);
+              return target;
+            }
+          };
+      interceptor.denialEventSource = Optional.of(EventSource.GRAVITINO_ICEBERG_REST_SERVER);
+      interceptor.handler =
+          Optional.of(
+              new BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler() {
+                @Override
+                public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+                  throw new ForbiddenException("denied by handler");
+                }
+
+                @Override
+                public boolean authorizationCompleted() {
+                  return true;
+                }
+
+                @Override
+                public Entity.EntityType entityType() {
+                  return Entity.EntityType.TABLE;
+                }
+              });
+
+      assertInstanceOf(
+          ForbiddenException.class,
+          interceptor.invoke(invocation("canAccessMetadata", "authorized")));
+
+      ArgumentCaptor<BaseEvent> event = ArgumentCaptor.forClass(BaseEvent.class);
+      verify(eventBus).dispatchEvent(event.capture());
+      assertEquals(
+          table,
+          assertInstanceOf(AuthorizationDenialFailureEvent.class, event.getValue()).identifier());
+    }
   }
 
   /** Entry authorization, parent checks and worker filtering share one user lookup. */
@@ -579,10 +641,13 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     @Override
     protected Optional<AuthorizationHandler> createAuthorizationHandler(
-        Method method, Parameter[] parameters, Object[] args) {
+        Method method,
+        Parameter[] parameters,
+        Object[] args,
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
       return handler.isPresent()
           ? handler
-          : super.createAuthorizationHandler(method, parameters, args);
+          : super.createAuthorizationHandler(method, parameters, args, nameIdentifierMap);
     }
 
     @Override

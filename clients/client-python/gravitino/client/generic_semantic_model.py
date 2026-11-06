@@ -20,18 +20,24 @@ from typing import Optional
 from gravitino.api.audit import Audit
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.semantic.semantic_model_dto import SemanticModelDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericSemanticModel(SemanticModel, SupportsTags):
+class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
     """An immutable client-side Semantic Model returned by the Gravitino REST API."""
 
     def __init__(
@@ -57,6 +63,9 @@ class GenericSemanticModel(SemanticModel, SupportsTags):
             MetadataObject.Type.SEMANTIC_MODEL,
         )
         self._model_tag_operations = MetadataObjectTagOperations(
+            semantic_model_ns.level(0), model_object, rest_client
+        )
+        self._model_policy_operations = MetadataObjectPolicyOperations(
             semantic_model_ns.level(0), model_object, rest_client
         )
 
@@ -97,6 +106,21 @@ class GenericSemanticModel(SemanticModel, SupportsTags):
         )
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> list[str]:
+        return self._model_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._model_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> list[Policy]:
+        return self._model_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._model_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def list_tags(self) -> list[str]:

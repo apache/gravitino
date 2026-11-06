@@ -44,6 +44,7 @@ import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
 import software.amazon.awssdk.services.glue.model.ThrottlingException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /** Tests for {@link GlueExceptionConverter}. */
 public class TestGlueExceptionConverter {
@@ -501,5 +502,54 @@ public class TestGlueExceptionConverter {
     String message = GlueExceptionConverter.toConnectionException(regionError).getMessage();
     assertTrue(message.contains(GlueConstants.AWS_REGION), message);
     assertFalse(message.contains("rejected the configured credentials"), message);
+  }
+
+  @Test
+  void testIcebergS3FailuresMapByStatus() {
+    assertInstanceOf(
+        NotFoundException.class,
+        GlueExceptionConverter.toIcebergException(s3Exception(404, "NoSuchBucket"), "table t"));
+    assertInstanceOf(
+        ServiceUnavailableException.class,
+        GlueExceptionConverter.toIcebergException(s3Exception(503, "SlowDown"), "table t"));
+    assertInstanceOf(
+        IllegalArgumentException.class,
+        GlueExceptionConverter.toIcebergException(
+            s3Exception(301, "PermanentRedirect"), "table t"));
+    RuntimeException other =
+        GlueExceptionConverter.toIcebergException(s3Exception(500, "InternalError"), "table t");
+    assertTrue(other.getMessage().startsWith("S3 error"), other.getMessage());
+    assertTrue(other.getMessage().contains("[InternalError]"), other.getMessage());
+  }
+
+  @Test
+  void testIcebergS3RedirectPointsAtBucketRegion() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(s3Exception(301, "PermanentRedirect"), "table t");
+    assertInstanceOf(IllegalArgumentException.class, converted);
+    assertTrue(converted.getMessage().contains("different region"), converted.getMessage());
+    assertTrue(converted.getMessage().contains("table t"), converted.getMessage());
+  }
+
+  @Test
+  void testIcebergClientFailureDoesNotBlameGlue() {
+    RuntimeException converted =
+        GlueExceptionConverter.toIcebergException(
+            new RuntimeException(
+                "wrapped",
+                SdkClientException.create("Unable to execute HTTP request: Read timed out")),
+            "Iceberg metadata of table t");
+    assertInstanceOf(ConnectionFailedException.class, converted);
+    assertTrue(converted.getMessage().contains("AWS (Glue or S3)"), converted.getMessage());
+  }
+
+  private static RuntimeException s3Exception(int status, String code) {
+    return new RuntimeException(
+        "wrapped",
+        S3Exception.builder()
+            .statusCode(status)
+            .awsErrorDetails(
+                AwsErrorDetails.builder().errorCode(code).errorMessage("message").build())
+            .build());
   }
 }

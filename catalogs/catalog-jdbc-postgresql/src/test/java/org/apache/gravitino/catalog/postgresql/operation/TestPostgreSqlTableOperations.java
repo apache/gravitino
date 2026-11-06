@@ -20,7 +20,9 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import com.google.common.collect.Maps;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -201,6 +204,83 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+  void testLoadMetadataWithoutSchemaUsage() throws SQLException {
+    String role = RandomNameUtils.genRandomName("metadata_reader");
+    String schema = RandomNameUtils.genRandomName("metadata_schema");
+    String table = RandomNameUtils.genRandomName("metadata_table");
+    try (Connection admin = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          admin, "CREATE ROLE " + role + " LOGIN PASSWORD 'test-only-password'");
+      try {
+        JdbcConnectorUtils.executeUpdate(admin, "CREATE SCHEMA " + schema);
+        JdbcConnectorUtils.executeUpdate(admin, "REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
+        JdbcConnectorUtils.executeUpdate(
+            admin,
+            "CREATE TABLE "
+                + schema
+                + "."
+                + table
+                + " (id serial, label varchar, tags varchar(12)[])");
+        JdbcConnectorUtils.executeUpdate(
+            admin, "GRANT SELECT ON " + schema + "." + table + " TO " + role);
+        Map<String, String> properties = new HashMap<>();
+        properties.put("jdbc-driver", CONTAINER.getDriverClassName());
+        properties.put("jdbc-url", CONTAINER.getJdbcUrl());
+        properties.put("jdbc-database", admin.getCatalog());
+        properties.put("jdbc-user", role);
+        properties.put("jdbc-password", "test-only-password");
+        properties.put("jdbc.pool.max-size", "1");
+        properties.put("jdbc.pool.min-size", "1");
+        try (BasicDataSource limitedSource =
+            (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+          PostgreSqlTableOperations limited = new PostgreSqlTableOperations();
+          limited.initialize(
+              limitedSource,
+              JDBC_EXCEPTION_CONVERTER,
+              new PostgreSqlTypeConverter(),
+              new PostgreSqlColumnDefaultValueConverter(),
+              properties);
+          try (Connection connection = limitedSource.getConnection();
+              Statement statement = connection.createStatement()) {
+            try (ResultSet privileges =
+                statement.executeQuery(
+                    "SELECT pg_catalog.has_schema_privilege(current_user, '"
+                        + schema
+                        + "', 'USAGE')")) {
+              Assertions.assertTrue(privileges.next());
+              Assertions.assertFalse(privileges.getBoolean(1));
+            }
+            try (ResultSet columns =
+                connection.getMetaData().getColumns(connection.getCatalog(), schema, table, null)) {
+              int count = 0;
+              while (columns.next()) {
+                count++;
+              }
+              Assertions.assertEquals(3, count);
+            }
+            SQLException denied =
+                Assertions.assertThrows(
+                    SQLException.class,
+                    () -> statement.executeQuery("SELECT * FROM " + schema + "." + table));
+            Assertions.assertEquals("42501", denied.getSQLState());
+          }
+          JdbcTable loaded = limited.load(schema, table);
+          Assertions.assertEquals(3, loaded.columns().length);
+          Assertions.assertEquals(Types.IntegerType.get(), loaded.columns()[0].dataType());
+          Assertions.assertTrue(loaded.columns()[0].autoIncrement());
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, loaded.columns()[0].defaultValue());
+          Assertions.assertEquals(Types.StringType.get(), loaded.columns()[1].dataType());
+          Assertions.assertEquals(
+              Types.ListType.nullable(Types.VarCharType.of(12)), loaded.columns()[2].dataType());
+        }
+      } finally {
+        JdbcConnectorUtils.executeUpdate(admin, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(admin, "DROP ROLE " + role);
+      }
+    }
+  }
+
+  @Test
   void testLeastPrivilegeCreateDistinguishesMissingSchemaFromForbidden() throws SQLException {
     String role = RandomNameUtils.genRandomName("limited_role");
     String schema = RandomNameUtils.genRandomName("restricted_schema");
@@ -345,6 +425,449 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
           Literals.NULL, TABLE_OPERATIONS.load(TEST_DB_NAME, table).columns()[0].defaultValue());
     } finally {
       TABLE_OPERATIONS.drop(TEST_DB_NAME, table);
+    }
+  }
+
+  @Test
+  void testNativeSerialColumnsRetainIntegerTypesAndAutoIncrement() throws SQLException {
+    String name = RandomNameUtils.genRandomName("serial_types");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (small_id smallserial, id serial, big_id bigserial)");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(Types.ShortType.get(), table.columns()[0].dataType());
+        Assertions.assertEquals(Types.IntegerType.get(), table.columns()[1].dataType());
+        Assertions.assertEquals(Types.LongType.get(), table.columns()[2].dataType());
+        for (Column column : table.columns()) {
+          Assertions.assertTrue(column.autoIncrement());
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "smallserial",
+        "serial",
+        "bigserial",
+        "smallint GENERATED BY DEFAULT AS IDENTITY",
+        "integer GENERATED ALWAYS AS IDENTITY",
+        "bigint GENERATED BY DEFAULT AS IDENTITY"
+      })
+  void testNativeAutoIncrementColumnsCanBeRecreated(String declaration) throws SQLException {
+    String source = RandomNameUtils.genRandomName("serial_source") + "_'\"\\%_";
+    String target = RandomNameUtils.genRandomName("serial_copy");
+    String qualifiedSource = TEST_DB_NAME + ".\"" + source.replace("\"", "\"\"") + "\"";
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "CREATE TABLE "
+              + qualifiedSource
+              + " (id "
+              + declaration
+              + ", ordinary int DEFAULT 42, label varchar DEFAULT 'value')");
+      try {
+        statement.executeUpdate("INSERT INTO " + qualifiedSource + " DEFAULT VALUES");
+        if (declaration.contains("GENERATED ALWAYS")) {
+          SQLException error =
+              Assertions.assertThrows(
+                  SQLException.class,
+                  () ->
+                      statement.executeUpdate(
+                          "INSERT INTO " + qualifiedSource + " (id) VALUES (1000)"));
+          Assertions.assertEquals("428C9", error.getSQLState());
+        }
+        JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME, source);
+        Column id = loaded.columns()[0];
+        Assertions.assertTrue(id.autoIncrement());
+        Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, id.defaultValue());
+        Assertions.assertFalse(id.nullable());
+        TABLE_OPERATIONS.create(
+            TEST_DB_NAME,
+            target,
+            Arrays.stream(loaded.columns()).map(JdbcColumn.class::cast).toArray(JdbcColumn[]::new),
+            null,
+            Map.of(),
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        TABLE_OPERATIONS.alterTable(
+            TEST_DB_NAME,
+            target,
+            TableChange.addColumn(
+                new String[] {"added_id"},
+                id.dataType(),
+                null,
+                TableChange.ColumnPosition.defaultPos(),
+                false,
+                true,
+                id.defaultValue()));
+        // Recreation preserves basic generation through BY DEFAULT, including for an ALWAYS
+        // source. Explicit values remain accepted by both the copied and added identity columns.
+        try (ResultSet rows =
+            statement.executeQuery(
+                "INSERT INTO "
+                    + TEST_DB_NAME
+                    + "."
+                    + target
+                    + " (id, added_id) VALUES (1000, 2000) RETURNING id, added_id")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(1000, rows.getLong("id"));
+          Assertions.assertEquals(2000, rows.getLong("added_id"));
+          Assertions.assertFalse(rows.next());
+        }
+        for (int expected = 1; expected <= 3; expected++) {
+          if (expected == 3) {
+            // Dropping the original table must not remove either generator on the new table.
+            TABLE_OPERATIONS.drop(TEST_DB_NAME, source);
+          }
+          try (ResultSet rows =
+              statement.executeQuery(
+                  "INSERT INTO "
+                      + TEST_DB_NAME
+                      + "."
+                      + target
+                      + " DEFAULT VALUES RETURNING id, added_id, ordinary, label")) {
+            Assertions.assertTrue(rows.next());
+            Assertions.assertEquals(expected, rows.getLong("id"));
+            Assertions.assertEquals(expected, rows.getLong("added_id"));
+            Assertions.assertEquals(42, rows.getInt("ordinary"));
+            Assertions.assertEquals("value", rows.getString("label"));
+          }
+        }
+        JdbcTable copy = TABLE_OPERATIONS.load(TEST_DB_NAME, target);
+        for (int index : new int[] {0, 3}) {
+          Assertions.assertEquals(id.dataType(), copy.columns()[index].dataType());
+          Assertions.assertTrue(copy.columns()[index].autoIncrement());
+          Assertions.assertEquals(
+              Column.DEFAULT_VALUE_NOT_SET, copy.columns()[index].defaultValue());
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, target);
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, source);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"shared", "owned_custom", "nullable_owned"})
+  void testNonSerialSequenceDefaultsRemainUnparsed(String scenario) throws SQLException {
+    boolean ownedCustomExpression = scenario.equals("owned_custom");
+    boolean ownedSequence = !scenario.equals("shared");
+    String source = RandomNameUtils.genRandomName("sequence_default");
+    String target = source + "_copy";
+    String sequence = source + "_seq";
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("CREATE SEQUENCE " + TEST_DB_NAME + "." + sequence);
+      try {
+        statement.executeUpdate(
+            "CREATE TABLE "
+                + TEST_DB_NAME
+                + "."
+                + source
+                + " (id integer "
+                + (scenario.equals("nullable_owned") ? "" : "NOT NULL ")
+                + "DEFAULT nextval('"
+                + TEST_DB_NAME
+                + "."
+                + sequence
+                + "'::regclass)"
+                + (ownedCustomExpression ? " + 1" : "")
+                + ")");
+        if (ownedSequence) {
+          statement.executeUpdate(
+              "ALTER SEQUENCE "
+                  + TEST_DB_NAME
+                  + "."
+                  + sequence
+                  + " OWNED BY "
+                  + TEST_DB_NAME
+                  + "."
+                  + source
+                  + ".id");
+        }
+        JdbcColumn id = (JdbcColumn) TABLE_OPERATIONS.load(TEST_DB_NAME, source).columns()[0];
+        Assertions.assertTrue(id.autoIncrement());
+        Assertions.assertInstanceOf(UnparsedExpression.class, id.defaultValue());
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    TABLE_OPERATIONS.create(
+                        TEST_DB_NAME,
+                        target,
+                        new JdbcColumn[] {id},
+                        null,
+                        Map.of(),
+                        null,
+                        Distributions.NONE,
+                        Indexes.EMPTY_INDEXES));
+        Assertions.assertTrue(error.getMessage().contains("Not a supported column default value"));
+        Assertions.assertFalse(TABLE_OPERATIONS.listTables(TEST_DB_NAME).contains(target));
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, source);
+        if (!ownedSequence) {
+          try (ResultSet rows =
+              statement.executeQuery(
+                  "SELECT nextval('" + TEST_DB_NAME + "." + sequence + "'::regclass)")) {
+            Assertions.assertTrue(rows.next());
+            Assertions.assertEquals(1, rows.getLong(1));
+          }
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, target);
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, source);
+        statement.executeUpdate("DROP SEQUENCE IF EXISTS " + TEST_DB_NAME + "." + sequence);
+      }
+    }
+  }
+
+  @Test
+  void testArrayElementMetadataFromSource() throws SQLException {
+    String name = RandomNameUtils.genRandomName("array_metadata");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + "(c char(3)[], v varchar(12)[], n numeric(10,2)[], ts timestamp(3)[], wide numeric(39,0)[], "
+              + "unbounded varchar[], unconstrained numeric[], t time(0)[], tz timestamptz(6)[], "
+              + "max_precision numeric(1000,0)[])");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.FixedCharType.of(3)), table.columns()[0].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.VarCharType.of(12)), table.columns()[1].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.DecimalType.of(10, 2)), table.columns()[2].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimestampType.withoutTimeZone(3)),
+            table.columns()[3].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric(39,0)")),
+            table.columns()[4].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.StringType.get()), table.columns()[5].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric")),
+            table.columns()[6].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimeType.of(0)), table.columns()[7].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.TimestampType.withTimeZone(6)),
+            table.columns()[8].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("numeric(1000,0)")),
+            table.columns()[9].dataType());
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @Test
+  void testNativeUnboundedBpcharPreservesSemanticsOnRoundTrip() throws SQLException {
+    String name = RandomNameUtils.genRandomName("unbounded_bpchar");
+    String copy = RandomNameUtils.genRandomName("bpchar_copy");
+    try (Connection connection = DATA_SOURCE.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (label bpchar, labels bpchar[], bounded char(3))");
+      try {
+        JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+        Assertions.assertEquals(Types.ExternalType.of("bpchar"), table.columns()[0].dataType());
+        Assertions.assertEquals(
+            Types.ListType.nullable(Types.ExternalType.of("bpchar")),
+            table.columns()[1].dataType());
+        Assertions.assertEquals(Types.FixedCharType.of(3), table.columns()[2].dataType());
+        TABLE_OPERATIONS.create(
+            TEST_DB_NAME,
+            copy,
+            Arrays.stream(table.columns()).map(JdbcColumn.class::cast).toArray(JdbcColumn[]::new),
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + copy
+                + " (label, labels) VALUES ('a', '{a}'), ('a ', '{\"a \"}')");
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT count(DISTINCT label), count(DISTINCT labels) FROM "
+                    + TEST_DB_NAME
+                    + "."
+                    + copy)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(1, result.getInt(1));
+          Assertions.assertEquals(1, result.getInt(2));
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, copy);
+        TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 12, 255, Integer.MAX_VALUE})
+  void testCharacterDeclarationsDoNotDependOnDriverUnknownLength(int unknownLength)
+      throws SQLException {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
+    String jdbcUrl = CONTAINER.getJdbcUrl();
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        jdbcUrl + (jdbcUrl.contains("?") ? "&" : "?") + "unknownLength=" + unknownLength);
+    properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
+    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
+    DataSource dataSource = DataSourceUtils.createDataSource(properties);
+    PostgreSqlTableOperations operations = new PostgreSqlTableOperations();
+    operations.initialize(
+        dataSource,
+        JDBC_EXCEPTION_CONVERTER,
+        new PostgreSqlTypeConverter(),
+        new PostgreSqlColumnDefaultValueConverter(),
+        Map.of(JdbcConfig.JDBC_DATABASE.getKey(), CONTAINER.getDatabaseName()));
+    operations.setDatabaseOperation(DATABASE_OPERATIONS);
+    String name = RandomNameUtils.genRandomName("character_lengths");
+    String copy = RandomNameUtils.genRandomName("character_copy");
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "CREATE TABLE "
+              + TEST_DB_NAME
+              + "."
+              + name
+              + " (label varchar DEFAULT 'value', labels varchar[], "
+              + "bounded varchar(12) DEFAULT 'bound', bounded_array varchar(12)[], "
+              + "fixed char(12), fixed_array char(12)[], "
+              + "bounded_255 varchar(255), bounded_255_array varchar(255)[])");
+      try {
+        JdbcTable table = operations.load(TEST_DB_NAME, name);
+        Type[] types = {
+          Types.StringType.get(), Types.ListType.nullable(Types.StringType.get()),
+          Types.VarCharType.of(12), Types.ListType.nullable(Types.VarCharType.of(12)),
+          Types.FixedCharType.of(12), Types.ListType.nullable(Types.FixedCharType.of(12)),
+          Types.VarCharType.of(255), Types.ListType.nullable(Types.VarCharType.of(255))
+        };
+        for (int i = 0; i < types.length; i++) {
+          Assertions.assertEquals(types[i], table.columns()[i].dataType());
+        }
+        Assertions.assertEquals(Literals.stringLiteral("value"), table.columns()[0].defaultValue());
+        Assertions.assertEquals(
+            Literals.varcharLiteral(12, "bound"), table.columns()[2].defaultValue());
+        operations.create(
+            TEST_DB_NAME,
+            copy,
+            Arrays.stream(table.columns()).map(JdbcColumn.class::cast).toArray(JdbcColumn[]::new),
+            null,
+            Collections.emptyMap(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + name
+                + " (label, labels) VALUES (repeat('x', 300), ARRAY[repeat('x', 300)])");
+        statement.executeUpdate(
+            "INSERT INTO "
+                + TEST_DB_NAME
+                + "."
+                + copy
+                + " SELECT * FROM "
+                + TEST_DB_NAME
+                + "."
+                + name);
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT char_length(label), char_length(labels[1]) FROM "
+                    + TEST_DB_NAME
+                    + "."
+                    + copy)) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(300, result.getInt(1));
+          Assertions.assertEquals(300, result.getInt(2));
+        }
+      } finally {
+        operations.drop(TEST_DB_NAME, copy);
+        operations.drop(TEST_DB_NAME, name);
+      }
+    } finally {
+      DataSourceUtils.closeDataSource(dataSource);
+    }
+  }
+
+  @Test
+  void testCharacterMetadataEscapesSchemaAndTablePatterns() throws SQLException {
+    String schema = RandomNameUtils.genRandomName("character_schema") + "\\_%";
+    String table = "character\"\\_%";
+    String qualified =
+        "\"" + schema.replace("\"", "\"\"") + "\".\"" + table.replace("\"", "\"\"") + "\"";
+    DATABASE_OPERATIONS.create(schema, null, Map.of());
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE "
+              + qualified
+              + " (v varchar, vs varchar[], b bpchar, bs bpchar[], bounded varchar(12))");
+      try {
+        JdbcTable loaded = TABLE_OPERATIONS.load(schema, table);
+        Type[] expected = {
+          Types.StringType.get(),
+          Types.ListType.nullable(Types.StringType.get()),
+          Types.ExternalType.of("bpchar"),
+          Types.ListType.nullable(Types.ExternalType.of("bpchar")),
+          Types.VarCharType.of(12)
+        };
+        Assertions.assertEquals(expected.length, loaded.columns().length);
+        for (int i = 0; i < expected.length; i++) {
+          Assertions.assertEquals(expected[i], loaded.columns()[i].dataType());
+        }
+      } finally {
+        TABLE_OPERATIONS.drop(schema, table);
+      }
+    } finally {
+      DATABASE_OPERATIONS.delete(schema, false);
+    }
+  }
+
+  @Test
+  void testNativeUnboundedVarcharLoadsAsString() throws SQLException {
+    String name = RandomNameUtils.genRandomName("unbounded_varchar");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "CREATE TABLE " + TEST_DB_NAME + "." + name + " (label varchar, bounded varchar(255))");
+    }
+    try {
+      JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, name);
+      Assertions.assertEquals(Types.StringType.get(), table.columns()[0].dataType());
+      Assertions.assertEquals(Types.VarCharType.of(255), table.columns()[1].dataType());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME, name);
     }
   }
 
@@ -915,7 +1438,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_1")
-            .withType(Types.ShortType.get())
+            .withType(Types.BooleanType.get())
             .withComment("increment key")
             .withNullable(false)
             .withAutoIncrement(true)
@@ -928,7 +1451,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             .withComment("set test key")
             .build());
 
-    // Testing does not support auto increment column types
+    // Boolean columns remain unsupported; smallint is covered by the native round-trip tests.
     String randomName = RandomNameUtils.genRandomName("increment_table_");
     JdbcColumn[] jdbcColumns = columns.toArray(new JdbcColumn[0]);
     IllegalArgumentException illegalArgumentException =
@@ -948,6 +1471,21 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
 
     Assertions.assertTrue(
         StringUtils.contains(illegalArgumentException.getMessage(), "Unsupported auto-increment"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME,
+                tableName,
+                TableChange.addColumn(
+                    new String[] {"invalid_identity"},
+                    Types.BooleanType.get(),
+                    null,
+                    TableChange.ColumnPosition.defaultPos(),
+                    false,
+                    true,
+                    Column.DEFAULT_VALUE_NOT_SET)));
+    Assertions.assertEquals(2, TABLE_OPERATIONS.load(TEST_DB_NAME, tableName).columns().length);
   }
 
   @Test

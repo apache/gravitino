@@ -714,6 +714,24 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testOverridePrivilegesRejectsMissingAndNullOverrides() {
+    for (String json : new String[] {"{}", "{\"overrides\":null}", "{\"overrides\":[null]}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/permissions/roles/role1")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("overrides"));
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).overridePrivilegesInRole(any(), any(), any());
+  }
+
+  @Test
   public void testOverridePrivileges() throws IOException {
     // Mock metalake with in-use property
     BaseMetalake metalake = mock(BaseMetalake.class);
