@@ -58,8 +58,10 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.Executable;
@@ -207,6 +209,17 @@ public class RelationalEntityStore
   }
 
   @Override
+  public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    return backend.listSemanticModelMetrics(namespace);
+  }
+
+  @Override
+  public List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    return backend.listSemanticModelMetricInfos(namespace);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
     return backend.list(namespace, entityType, false);
@@ -331,6 +344,19 @@ public class RelationalEntityStore
       throw ExceptionUtils.lockWaitTimeoutAsConflict(re, entityType, ident);
     } finally {
       invalidateCache(ident, entityType);
+    }
+  }
+
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteSchemaAndGet(ident, cascadeFunctions, postDeleteAction);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.SCHEMA, ident);
+    } finally {
+      invalidateCache(ident, Entity.EntityType.SCHEMA);
     }
   }
 

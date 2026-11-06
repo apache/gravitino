@@ -22,12 +22,18 @@ from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
 )
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
@@ -48,7 +54,8 @@ class GenericFileset(
     SupportsRoles,
     SupportsSecrets,
     SupportsTags,
-):
+    SupportsPolicies,
+):  # pylint: disable=too-many-ancestors
     _fileset: FilesetDTO
     """The fileset data transfer object"""
 
@@ -73,6 +80,9 @@ class GenericFileset(
             full_namespace.level(0), metadata_object, rest_client
         )
         self._object_tag_operations = MetadataObjectTagOperations(
+            full_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_policy_operations = MetadataObjectPolicyOperations(
             full_namespace.level(0), metadata_object, rest_client
         )
         self._object_role_operations = MetadataObjectRoleOperations(
@@ -101,6 +111,21 @@ class GenericFileset(
         return self
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> List[str]:
+        return self._object_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._object_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> List[Policy]:
+        return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._object_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def supports_roles(self) -> SupportsRoles:

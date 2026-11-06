@@ -29,6 +29,7 @@ dependencies {
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
+  compileOnly(libs.aws.dynamodb)
   compileOnly(libs.lombok)
 
   implementation(project(":catalogs:catalog-common")) {
@@ -44,7 +45,7 @@ dependencies {
   implementation(libs.iceberg.api)
   implementation(libs.iceberg.aws)
   implementation(libs.iceberg.core)
-  runtimeOnly(project(":bundles:aws"))
+  implementation(project(":bundles:aws"))
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)

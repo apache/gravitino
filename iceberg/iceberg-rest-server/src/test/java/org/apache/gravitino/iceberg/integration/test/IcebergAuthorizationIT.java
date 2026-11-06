@@ -178,7 +178,7 @@ public class IcebergAuthorizationIT extends BaseIT {
             "gravitino.authorization.serviceAdmins",
             SUPER_USER,
             "gravitino.authenticators",
-            "simple",
+            authenticator(),
             // BaseIT will use SimpleAuthUserName to create Gravitino client
             "SimpleAuthUserName",
             SUPER_USER,
@@ -205,6 +205,11 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   protected Map<String, String> getCustomProperties() {
     return Maps.newHashMap();
+  }
+
+  /** Returns the authenticator used by the Gravitino server in this test suite. */
+  protected String authenticator() {
+    return "simple";
   }
 
   protected boolean supportsCredentialVending() {

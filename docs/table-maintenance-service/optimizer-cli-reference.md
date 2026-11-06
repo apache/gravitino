@@ -17,33 +17,33 @@ directory. Use `--conf-path` only when you need a custom config file.
 
 ## Command Quick Reference
 
-| Command (`--type`) | Required options | Optional options | Purpose |
-| --- | --- | --- | --- |
-| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit` | Recommend and optionally submit jobs |
-| `update-statistics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and persist statistics |
-| `append-metrics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and append metrics |
-| `monitor-metrics` | `--identifiers`, `--action-time` | `--range-seconds`, `--partition-path` | Evaluate rules with before/after metrics |
-| `list-table-metrics` | `--identifiers` | `--partition-path` | Query stored table or partition metrics |
-| `list-job-metrics` | `--identifiers` | None | Query stored job metrics |
-| `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
+| Command (`--type`)        | Required options                   | Optional options                                                  | Purpose                                                 |
+|---------------------------|------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|
+| `submit-strategy-jobs`    | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit`                                            | Recommend and optionally submit jobs                    |
+| `update-statistics`       | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and persist statistics                        |
+| `append-metrics`          | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and append metrics                            |
+| `monitor-metrics`         | `--identifiers`, `--action-time`   | `--range-seconds`, `--partition-path`                             | Evaluate rules with before/after metrics                |
+| `list-table-metrics`      | `--identifiers`                    | `--partition-path`                                                | Query stored table or partition metrics                 |
+| `list-job-metrics`        | `--identifiers`                    | None                                                              | Query stored job metrics                                |
+| `submit-update-stats-job` | `--identifiers`                    | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
 
 ## Option Field Meanings
 
-| Option | Meaning | Used by |
-| --- | --- | --- |
-| `--identifiers` | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands |
-| `--strategy-name` | Policy name to evaluate, for example `iceberg_compaction_default`. | `submit-strategy-jobs` |
-| `--dry-run` | Preview mode. Prints recommendations or job configs without submitting jobs. | `submit-strategy-jobs`, `submit-update-stats-job` |
-| `--limit` | Maximum number of strategy jobs to process. Must be `> 0`. | `submit-strategy-jobs` |
-| `--calculator-name` | Statistics/metrics calculator implementation name (for example `local-stats-calculator`). | `update-statistics`, `append-metrics` |
-| `--statistics-payload` | Inline JSON Lines content as input. Mutually exclusive with `--file-path`. | `update-statistics`, `append-metrics` |
-| `--file-path` | Path to JSON Lines input file. Mutually exclusive with `--statistics-payload`. | `update-statistics`, `append-metrics` |
-| `--action-time` | Action timestamp in epoch seconds used as evaluation anchor. | `monitor-metrics` |
-| `--range-seconds` | Time window (seconds) for monitor evaluation. Default is `86400` (24h). | `monitor-metrics` |
-| `--partition-path` | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier. | `monitor-metrics`, `list-table-metrics` |
-| `--update-mode` | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default). | `submit-update-stats-job` |
-| `--updater-options` | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`. | `submit-update-stats-job` |
-| `--spark-conf` | Flat JSON map of Spark and Iceberg catalog configs used by the job. | `submit-update-stats-job` |
+| Option                 | Meaning                                                                                              | Used by                                           |
+|------------------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| `--identifiers`        | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands                                      |
+| `--strategy-name`      | Policy name to evaluate, for example `iceberg_compaction_default`.                                   | `submit-strategy-jobs`                            |
+| `--dry-run`            | Preview mode. Prints recommendations or job configs without submitting jobs.                         | `submit-strategy-jobs`, `submit-update-stats-job` |
+| `--limit`              | Maximum number of strategy jobs to process. Must be `> 0`.                                           | `submit-strategy-jobs`                            |
+| `--calculator-name`    | Statistics/metrics calculator implementation name (for example `local-stats-calculator`).            | `update-statistics`, `append-metrics`             |
+| `--statistics-payload` | Inline JSON Lines content as input. Mutually exclusive with `--file-path`.                           | `update-statistics`, `append-metrics`             |
+| `--file-path`          | Path to JSON Lines input file. Mutually exclusive with `--statistics-payload`.                       | `update-statistics`, `append-metrics`             |
+| `--action-time`        | Action timestamp in epoch seconds used as evaluation anchor.                                         | `monitor-metrics`                                 |
+| `--range-seconds`      | Time window (seconds) for monitor evaluation. Default is `86400` (24h).                              | `monitor-metrics`                                 |
+| `--partition-path`     | Partition path JSON array, for example `'[{"dt":"2026-01-01"}]'`. Requires exactly one identifier.   | `monitor-metrics`, `list-table-metrics`           |
+| `--update-mode`        | Controls what built-in update job updates: `stats`, `metrics`, or `all` (default).                   | `submit-update-stats-job`                         |
+| `--updater-options`    | Flat JSON map passed to updater logic. For `stats`/`all`, include `gravitino_uri` and `metalake`.    | `submit-update-stats-job`                         |
+| `--spark-conf`         | Flat JSON map of Spark and Iceberg catalog configs used by the job.                                  | `submit-update-stats-job`                         |
 
 Global option:
 
@@ -182,7 +182,10 @@ Notes:
 - For `stats` or `all`, `--updater-options` must include `gravitino_uri` and `metalake`.
 - If `--updater-options` includes external JDBC metrics settings
   (`gravitino.optimizer.jdbcMetrics.*`), ensure the JDBC driver JAR is available to Spark
-  runtime classpath (for example via `spark.jars` in `--spark-conf`).
+  runtime classpath of the driver: with the k8s job executor, for example via `spark.jars` in
+  `--spark-conf`, which replaces a `spark.jars` default of the k8s job executor, so list the
+  Iceberg runtime there too if that default provides it; with the local job executor, by installing
+  it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts.
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
 ## List Table Metrics
@@ -229,7 +232,7 @@ Examples:
 SUMMARY: statistics totalRecords=3 tableRecords=2 partitionRecords=1 jobRecords=0
 DRY-RUN: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1}
 SUBMIT: strategy=iceberg-data-compaction identifier=rest_catalog.db.t1 score=95 jobTemplate=builtin-iceberg-rewrite-data-files jobOptions={catalog_name=rest_catalog, table_identifier=db.t1} jobId=1f54c6d3-4e27-4cc8-bdfa-b05ecf59a4c2
-DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}}
+DRY-RUN: identifier=rest_catalog.db.t1 jobTemplate=builtin-iceberg-update-stats jobConfig={catalog_name=rest_catalog, table_identifier=db.t1, update_mode=all, updater_options={"gravitino_uri":"http://localhost:8090","metalake":"test"}, spark_conf={"spark.hadoop.fs.defaultFS":"file:///"}}
 SUMMARY: submit-update-stats-job total=1 submitted=1 dryRun=false
 MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, metrics={row_count=[{timestamp=1735689600, value=100}]}}
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
@@ -239,13 +242,13 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 
 The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
-| Job template                          | What it does                             |
-|---------------------------------------|-------------------------------------------|
-| `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
-| `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
-| `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
-| `builtin-iceberg-remove-orphan-files` | Removes unreferenced files from storage   |
-| `builtin-iceberg-rewrite-manifests`   | Consolidates small manifest files         |
+| Job template                            | What it does                             |
+|-----------------------------------------|------------------------------------------|
+| `builtin-iceberg-update-stats`          | Collects file statistics and metrics     |
+| `builtin-iceberg-rewrite-data-files`    | Compacts small data files                |
+| `builtin-iceberg-expire-snapshots`      | Removes old snapshot metadata            |
+| `builtin-iceberg-remove-orphan-files`   | Removes unreferenced files from storage  |
+| `builtin-iceberg-rewrite-manifests`     | Consolidates small manifest files        |
 | `builtin-iceberg-update-manifest-stats` | Collects complete per-spec manifest maps |
 
 Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
@@ -254,7 +257,12 @@ These templates set Iceberg Spark session and catalog classes, but they do not l
 runtime in `jars`. `gravitino-jobs` also excludes that runtime from its shaded JAR, so the version
 that runs with your Spark cluster is yours to supply. Provide a matching
 `iceberg-spark-runtime-<sparkMajor>_<scala>` JAR on the Spark classpath used by the job executor —
-commonly through `spark.jars` in `spark_conf`, or by installing it into `SPARK_HOME`. Align the
+commonly by installing it into `SPARK_HOME` or the Spark image, or, with the k8s job executor,
+through `spark.jars` in `spark_conf`, which the k8s job executor sets when it submits the job. It
+replaces a `spark.jars` default of the k8s job executor rather than adding to it, so list every jar
+the job needs there.
+With the local job executor, `spark.jars` in `spark_conf` doesn't add it, as the driver applies
+`spark_conf` only after spark-submit has built its classpath. Align the
 artifact with the Spark, Scala, and Iceberg versions you actually run. A reference coordinate used
 in Gravitino's own jobs tests is `org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.11.0`.
 Without that runtime, built-in Iceberg jobs fail after Spark starts instead of continuing without
@@ -265,17 +273,24 @@ left out, and a submission that misses a required key is rejected with an error 
 missing keys. An empty string is a value, not an omission: it overrides the default and means
 "not set" to these jobs.
 
-| Job template                         | Required keys                                                                           | Optional keys and defaults                                                                                         |
-|--------------------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (`local[*]`), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
-| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                   |
-| `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                    |
-| `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                            |
-| `builtin-iceberg-remove-orphan-files` | —                                                                                       | `older_than` (empty), `location` (empty), `dry_run` (`false`)                                                      |
-| `builtin-iceberg-rewrite-manifests`   | —                                                                                       | `use_caching` (empty), `spec_id` (empty)                                                                           |
+| Job template                          | Required keys                                                                           | Optional keys and defaults                                                                                                                                                 |
+|---------------------------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
+| `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                                                                           |
+| `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                                                                            |
+| `builtin-iceberg-expire-snapshots`    | —                                                                                       | `older_than` (empty), `retain_last` (empty), `stream_results` (`false`)                                                                                                    |
+| `builtin-iceberg-remove-orphan-files` | —                                                                                       | `older_than` (empty), `location` (empty), `dry_run` (`false`)                                                                                                              |
+| `builtin-iceberg-rewrite-manifests`   | —                                                                                       | `use_caching` (empty), `spec_id` (empty)                                                                                                                                   |
 
 `where_clause` has no default on purpose: an empty where clause compacts every data file in the
 table, so it must be asked for explicitly.
+
+An empty `spark_master` leaves the master to the job executor: the local job executor runs the job
+with the spark-submit default `local[*]`, and the k8s job executor rejects any other master than a
+Kubernetes one. `spark.master` and `spark.submit.deployMode` in `spark_conf` are ignored, as the job
+is submitted with them already set. So are the `spark.kubernetes.*` configurations in `spark_conf`,
+such as the namespace, the image, the service account, Secrets, and volumes: whoever runs a job sets
+`spark_conf`, so only the job executor configurations and job templates may set them.
 
 ## Update Statistics
 
@@ -288,9 +303,9 @@ Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-
 `builtin-iceberg-update-manifest-stats` is a separate Spark job that collects two table-level
 statistics, including for partitioned tables:
 
-| Statistic | Object entry for each decimal spec ID |
-| --- | --- |
-| `custom-manifest-number-by-spec` | Long manifest count |
+| Statistic                          | Object entry for each decimal spec ID |
+|------------------------------------|---------------------------------------|
+| `custom-manifest-number-by-spec`   | Long manifest count                   |
 | `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
 
 The job reads manifest metadata without scanning file statistics. It works after partition
@@ -413,14 +428,14 @@ The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 
 `catalog_name` and `table_identifier` are required. The rest are optional.
 
-| Key              | Description                                                          | Default                     |
-|------------------|-----------------------------------------------------------------------|-----------------------------|
-| `catalog_name`   | Iceberg catalog name as registered in Spark                          | Required                    |
-| `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
-| `older_than`     | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp     | Five days ago               |
-| `retain_last`    | Minimum number of recent snapshots to keep regardless of age         | `1`                         |
-| `stream_results` | Streams intermediate delete results when present                     | Disabled                    |
-| `spark_conf`     | JSON map of Spark configuration                                      | None                        |
+| Key                | Description                                                      | Default       |
+|--------------------|------------------------------------------------------------------|---------------|
+| `catalog_name`     | Iceberg catalog name as registered in Spark                      | Required      |
+| `table_identifier` | Fully qualified table name, such as `db.sample`                  | Required      |
+| `older_than`       | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp | Five days ago |
+| `retain_last`      | Minimum number of recent snapshots to keep regardless of age     | `1`           |
+| `stream_results`   | Streams intermediate delete results when present                 | Disabled      |
+| `spark_conf`       | JSON map of Spark configuration                                  | None          |
 
 `older_than` and `retain_last` work together, and `retain_last` wins. Setting `older_than` to yesterday with `retain_last` at `5` keeps five snapshots even if all five are older than yesterday.
 
@@ -509,7 +524,7 @@ Leave `use_caching` unset to use the installed Iceberg version's default (`false
 
 ### How to find `spec_id`
 
-Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read `default-spec-id` and the `partition-specs` array from the table's current Iceberg metadata JSON. The array maps each `spec-id` to its partition fields and transforms; `default-spec-id` identifies the current spec. These are Iceberg table metadata fields, not Gravitino catalog properties.
+Omit `spec_id` for routine maintenance of the current partition spec. Do not guess IDs such as `0` or `1`. Read the reserved, read-only Gravitino table property `default-spec-id` for the current default. Use the `partition-specs` array in the table's Iceberg metadata JSON to see each `spec-id`'s partition fields and transforms.
 
 To discover which specs have manifests in the current snapshot, run:
 
@@ -518,7 +533,7 @@ SELECT DISTINCT partition_spec_id
 FROM rest_catalog.db.t1.manifests;
 ```
 
-This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use the metadata JSON to identify the default and interpret the transforms.
+This query lists represented specs, not which one is current. A defined spec with no manifests may be absent; use `default-spec-id` to identify the current default and the metadata JSON to interpret the transforms.
 
 For example, suppose metadata shows spec `0` uses `day(event_time)` and the current spec `1` uses `hour(event_time)`. Omitting `spec_id` rewrites eligible manifests for spec `1`. Passing `"spec_id": "0"` consolidates the old day-spec manifests. Neither run converts day-partitioned data files to hour partitioning or rewrites manifests belonging to the other spec.
 
@@ -571,6 +586,9 @@ Rewrite Manifests Results: Rewritten manifests: 24, Added manifests: 2
 ```
 
 Both counts at zero indicate a successful no-op, for example when no manifests for the selected spec need rewriting. Other specs remain unchanged.
+
+The [manifest rewrite policy](../iceberg-rewrite-manifests-policy.md) evaluates fresh per-spec
+measurements from the table-wide collector and submits this job with the evaluated `spec_id`.
 
 ## Related
 

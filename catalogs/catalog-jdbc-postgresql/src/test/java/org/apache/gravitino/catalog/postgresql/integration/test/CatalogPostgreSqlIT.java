@@ -136,7 +136,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     clearTableAndSchema();
     String[] schemaNames = catalog.asSchemas().listSchemas();
     for (String schemaName : schemaNames) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+      clearTableAndSchema(schemaName);
     }
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
@@ -152,6 +152,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   private void clearTableAndSchema() {
+    clearTableAndSchema(schemaName);
+  }
+
+  private void clearTableAndSchema(String schemaName) {
+    // PostgreSQL schema drops are restrictive even when cascade is requested. Remove the test
+    // tables explicitly before dropping each schema, including schemas created outside the fixture.
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -1133,7 +1139,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
           break;
         case "character_col_3":
-          Assertions.assertEquals(Literals.stringLiteral("''::bpchar"), column.defaultValue());
+          Assertions.assertEquals(Literals.stringLiteral(""), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());

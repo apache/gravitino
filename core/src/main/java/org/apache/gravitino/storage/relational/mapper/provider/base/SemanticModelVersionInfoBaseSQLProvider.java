@@ -32,14 +32,17 @@ public class SemanticModelVersionInfoBaseSQLProvider {
     return "INSERT INTO "
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " (metalake_id, catalog_id, schema_id, semantic_model_id, version,"
-        + " semantic_model_name, semantic_model_comment, semantic_model_definition,"
+        + " semantic_model_name, semantic_model_comment, datasets, relationships, metrics,"
+        + " ai_context, custom_extensions,"
         + " properties, audit_info, deleted_at)"
         + " VALUES (#{semanticModelVersionInfo.metalakeId},"
         + " #{semanticModelVersionInfo.catalogId}, #{semanticModelVersionInfo.schemaId},"
         + " #{semanticModelVersionInfo.semanticModelId}, #{semanticModelVersionInfo.version},"
         + " #{semanticModelVersionInfo.semanticModelName},"
         + " #{semanticModelVersionInfo.semanticModelComment},"
-        + " #{semanticModelVersionInfo.semanticModelDefinition},"
+        + " #{semanticModelVersionInfo.datasets}, #{semanticModelVersionInfo.relationships},"
+        + " #{semanticModelVersionInfo.metrics}, #{semanticModelVersionInfo.aiContext},"
+        + " #{semanticModelVersionInfo.customExtensions},"
         + " #{semanticModelVersionInfo.properties}, #{semanticModelVersionInfo.auditInfo},"
         + " #{semanticModelVersionInfo.deletedAt})";
   }
@@ -51,7 +54,8 @@ public class SemanticModelVersionInfoBaseSQLProvider {
         + " schema_id as schemaId, semantic_model_id as semanticModelId, version as version,"
         + " semantic_model_name as semanticModelName,"
         + " semantic_model_comment as semanticModelComment,"
-        + " semantic_model_definition as semanticModelDefinition, properties as properties,"
+        + " datasets as datasets, relationships as relationships, metrics as metrics,"
+        + " ai_context as aiContext, custom_extensions as customExtensions, properties as properties,"
         + " audit_info as auditInfo, deleted_at as deletedAt FROM "
         + SemanticModelVersionInfoMapper.TABLE_NAME
         + " WHERE semantic_model_id = #{semanticModelId}"

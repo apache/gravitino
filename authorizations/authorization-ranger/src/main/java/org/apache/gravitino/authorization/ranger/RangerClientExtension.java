@@ -20,10 +20,10 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.sun.jersey.api.client.GenericType;
 import com.sun.jersey.api.client.UniformInterfaceException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Date;
 import java.util.Map;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.Response;
@@ -67,10 +67,6 @@ public class RangerClientExtension extends RangerClient {
 
   // apache/ranger/intg/src/main/java/org/apache/ranger/RangerClient.java
   // The private method callAPI of Ranger is called by reflection
-  // private <T> T callAPI(API api, Map<String, String> params, Object request, GenericType<T>
-  // responseType) throws RangerServiceException
-  private Method callAPIMethodGenericResponseType;
-
   // private <T> T callAPI(API api, Map<String, String> params, Object request, Class<T>
   // responseType) throws RangerServiceException
   private Method callAPIMethodClassResponseType;
@@ -82,11 +78,6 @@ public class RangerClientExtension extends RangerClient {
 
     // initialize callAPI method
     try {
-      callAPIMethodGenericResponseType =
-          RangerClient.class.getDeclaredMethod(
-              "callAPI", API.class, Map.class, Object.class, GenericType.class);
-      callAPIMethodGenericResponseType.setAccessible(true);
-
       callAPIMethodNonResponse =
           RangerClient.class.getDeclaredMethod("callAPI", API.class, Map.class);
       callAPIMethodNonResponse.setAccessible(true);
@@ -104,7 +95,7 @@ public class RangerClientExtension extends RangerClient {
   public RangerPolicy createPolicy(RangerPolicy policy) throws RangerServiceException {
     Preconditions.checkArgument(
         policy.getResources().size() > 0, "Ranger policy resources cannot be empty!");
-    return super.createPolicy(policy);
+    return withoutServerManagedTimes(policy, () -> super.createPolicy(policy));
   }
 
   @Override
@@ -112,7 +103,7 @@ public class RangerClientExtension extends RangerClient {
       throws RangerServiceException {
     Preconditions.checkArgument(
         policy.getResources().size() > 0, "Ranger policy resources cannot be empty!");
-    return super.updatePolicy(policyId, policy);
+    return withoutServerManagedTimes(policy, () -> super.updatePolicy(policyId, policy));
   }
 
   public Boolean createUser(VXUser user) throws RuntimeException {
@@ -195,5 +186,29 @@ public class RangerClientExtension extends RangerClient {
       throw new RuntimeException(e);
     }
     return true;
+  }
+
+  /**
+   * Sends the policy without createTime and updateTime, which Ranger Admin sets itself. Since
+   * Ranger 2.8 the client writes dates as "yyyyMMdd-HH:mm:ss.SSS-Z", which Ranger Admin 2.4 rejects
+   * with HTTP 400. The caller's policy is left unchanged.
+   */
+  private RangerPolicy withoutServerManagedTimes(RangerPolicy policy, PolicyCall call)
+      throws RangerServiceException {
+    Date createTime = policy.getCreateTime();
+    Date updateTime = policy.getUpdateTime();
+    policy.setCreateTime(null);
+    policy.setUpdateTime(null);
+    try {
+      return call.run();
+    } finally {
+      policy.setCreateTime(createTime);
+      policy.setUpdateTime(updateTime);
+    }
+  }
+
+  @FunctionalInterface
+  private interface PolicyCall {
+    RangerPolicy run() throws RangerServiceException;
   }
 }

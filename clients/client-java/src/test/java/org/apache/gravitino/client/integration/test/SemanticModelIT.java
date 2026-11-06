@@ -88,6 +88,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
@@ -268,6 +269,110 @@ public class SemanticModelIT extends BaseIT {
     assertThrows(
         NoSuchSemanticModelException.class,
         () -> semanticModelCatalog.loadSemanticModel(renamedIdent));
+  }
+
+  @Test
+  void testMetricDiscoveryPreservesCompleteMetricsAndStructuredOrdering() {
+    assertMetricDiscovery(new NameIdentifier[0]);
+    Metric revenue = initialDefinition().metrics()[0];
+    Metric upperCase =
+        Metric.builder()
+            .withName("Revenue")
+            .withExpression(expression(Dialects.ANSI_SQL, "COUNT(orders.order_id)"))
+            .build();
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "a-b"), null, metricDefinition(revenue), Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "a"), null, metricDefinition(revenue, upperCase), Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "absent"),
+        null,
+        metricDefinition((Metric[]) null),
+        Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "empty"), null, metricDefinition(), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, "a", "Revenue"),
+          NameIdentifier.of(SCHEMA_NAME, "a", "revenue"),
+          NameIdentifier.of(SCHEMA_NAME, "a-b", "revenue")
+        },
+        upperCase,
+        revenue,
+        revenue);
+  }
+
+  @Test
+  void testMetricDiscoveryTracksReplacementRenameAndRecreation() {
+    NameIdentifier model = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
+    Metric original = initialDefinition().metrics()[0];
+    semanticModelCatalog.createSemanticModel(model, null, metricDefinition(original), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, original.name())},
+        original);
+    Metric replacement =
+        Metric.builder()
+            .withName(original.name())
+            .withExpression(expression(Dialects.ANSI_SQL, "COUNT(orders.order_id)"))
+            .withDescription("Updated calculation")
+            .build();
+    Metric added =
+        Metric.builder().withName("收入.total").withExpression(original.expression()).build();
+    semanticModelCatalog.alterSemanticModel(
+        model, SemanticModelChange.replaceDefinition(metricDefinition(replacement, added)));
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, replacement.name()),
+          NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, added.name())
+        },
+        replacement,
+        added);
+    semanticModelCatalog.alterSemanticModel(model, SemanticModelChange.rename(RENAMED_MODEL_NAME));
+    NameIdentifier renamed = NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME);
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, replacement.name()),
+          NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, added.name())
+        },
+        replacement,
+        added);
+    semanticModelCatalog.alterSemanticModel(
+        renamed, SemanticModelChange.replaceDefinition(metricDefinition(added)));
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, added.name())},
+        added);
+    assertTrue(semanticModelCatalog.dropSemanticModel(renamed));
+    assertMetricDiscovery(new NameIdentifier[0]);
+    semanticModelCatalog.createSemanticModel(renamed, null, metricDefinition(original), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, original.name())},
+        original);
+  }
+
+  @Test
+  void testMetricDiscoverySchemaIsolationAndMissingSchema() {
+    String otherSchema = "metric_discovery_other";
+    Namespace namespace = Namespace.of(otherSchema);
+    catalog.asSchemas().createSchema(otherSchema, null, Map.of());
+    try {
+      Metric metric = initialDefinition().metrics()[0];
+      semanticModelCatalog.createSemanticModel(
+          NameIdentifier.of(otherSchema, MODEL_NAME), null, metricDefinition(metric), Map.of());
+      assertMetricDiscovery(new NameIdentifier[0]);
+      assertArrayEquals(
+          new NameIdentifier[] {NameIdentifier.of(otherSchema, MODEL_NAME, metric.name())},
+          semanticModelCatalog.listMetrics(namespace));
+      SemanticModelMetric[] infos = semanticModelCatalog.listMetricInfos(namespace);
+      assertEquals(1, infos.length);
+      assertEquals(Namespace.of(otherSchema, MODEL_NAME), infos[0].namespace());
+      assertEquals(metric, infos[0].metric());
+    } finally {
+      semanticModelCatalog.dropSemanticModel(NameIdentifier.of(otherSchema, MODEL_NAME));
+      catalog.asSchemas().dropSchema(otherSchema, false);
+    }
+    assertThrows(NoSuchSchemaException.class, () -> semanticModelCatalog.listMetrics(namespace));
+    assertThrows(
+        NoSuchSchemaException.class, () -> semanticModelCatalog.listMetricInfos(namespace));
   }
 
   @Test
@@ -1234,6 +1339,29 @@ public class SemanticModelIT extends BaseIT {
             INVALID_MODEL_NAME,
             source,
             primaryKey == null ? "" : "    primary_key: [" + primaryKey + "]\n"));
+  }
+
+  private void assertMetricDiscovery(NameIdentifier[] identifiers, Metric... metrics) {
+    assertEquals(
+        identifiers.length,
+        metrics.length,
+        "Expected identifiers and metric definitions must have the same length");
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    assertArrayEquals(identifiers, semanticModelCatalog.listMetrics(namespace));
+    SemanticModelMetric[] infos = semanticModelCatalog.listMetricInfos(namespace);
+    assertEquals(metrics.length, infos.length);
+    for (int i = 0; i < infos.length; i++) {
+      assertEquals(
+          identifiers[i], NameIdentifier.of(infos[i].namespace(), infos[i].metric().name()));
+      assertEquals(metrics[i], infos[i].metric());
+    }
+  }
+
+  private static SemanticModelDefinition metricDefinition(@Nullable Metric... metrics) {
+    return SemanticModelDefinition.builder()
+        .withDatasets(initialDefinition().datasets())
+        .withMetrics(metrics)
+        .build();
   }
 
   private static SemanticModelDefinition initialDefinition() {

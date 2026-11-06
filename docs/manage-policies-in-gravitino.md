@@ -27,6 +27,11 @@ creation. Updating custom policy content replaces the whole content and can chan
 Object policy lookup does not filter by this field; consumers decide which policy types they can
 use.
 
+`policyType` accepts the known wire values case-insensitively (for example `CUSTOM` and
+`System_Iceberg_Compaction`). Gravitino stores and returns the canonical lowercase value listed in
+the OpenAPI schema. Unknown types such as `system_iceberg_bogus` return HTTP 400 that names the
+type.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
