@@ -288,23 +288,25 @@ metadata. The entity store keeps a bounded, NUL-free projection of each column c
 without changing the source comment, column identity, or column governance metadata.
 On branch-1.3, the projection is limited to 256 UTF-16 units to match the existing
 column-comment schema in every supported store.
-CREATE and ALTER requests reject NUL column comments and comments exceeding 256 UTF-16
-units before source DDL, including managed-table creation, ADD COLUMN and comment updates.
+CREATE and ALTER requests reject NUL comments and comments exceeding 256 UTF-16 units on
+top-level columns before source DDL, including managed-table creation, ADD COLUMN and comment
+updates. Nested-field ALTER comments retain provider behavior.
 Supplementary Unicode characters count as two units, so 128 emoji fit while 256 emoji do not.
 Accepted request comments are stored without truncation. The UTF-16 bound is needed for H2's
 VARCHAR storage limit even though MySQL and PostgreSQL count code points. No store migration
 is required.
 
-Existing column references use the provider's existing-name specification; new columns
-and rename targets still use creation rules. PostgreSQL accepts quoted native column
-names while retaining its UTF-8 name-length, NUL, and wildcard restrictions. Other providers
+Existing top-level column references use the provider's existing-name specification; new
+top-level columns and top-level rename targets still use creation rules. PostgreSQL accepts quoted
+native column names while retaining its UTF-8 name-length, NUL, and wildcard restrictions. Other providers
 retain their default validation until they explicitly support native-name operations.
 
 Catalog creation takes the target catalog lock, permitting sibling catalogs to operate
-while source verification runs. New catalogs are initialized and validated before their entity
-is persisted; local cache publication is coordinated with catalog loading. Failed verification
-does not expose a transient catalog through listing. Table DROP holds the target table lock for source DDL
-and registration removal. After releasing that table lock, best-effort cleanup checks schema
+while source verification runs. Catalog wrapper initialization, configuration checks, and any
+enabled create-time backend verification complete before the entity is persisted; local cache
+publication is coordinated with catalog loading. Failed verification does not expose a transient
+catalog through listing. Table DROP holds the target table lock for source DDL and registration
+removal. After releasing that table lock, best-effort cleanup checks schema
 existence under a read lock and only takes a write lock if the schema is missing, rechecking
 before deleting orphaned registrations. This does not add SQL statement timeouts or
 cancel blocked source DDL. Cold table import retains its existing locking behavior. Table PURGE
