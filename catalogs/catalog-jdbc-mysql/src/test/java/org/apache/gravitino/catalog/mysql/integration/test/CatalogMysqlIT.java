@@ -26,7 +26,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -540,6 +544,132 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  void testBooleanDefaultValues() throws SQLException {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("bool_defaults"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            new Column[] {
+              Column.of(
+                  "enabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("true", Types.BooleanType.get())),
+              Column.of(
+                  "disabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("false", Types.BooleanType.get()))
+            },
+            null,
+            ImmutableMap.of());
+    Table created = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(true), created.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(false), created.columns()[1].defaultValue());
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            ident,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"enabled"}, Literals.of("0", Types.BooleanType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {"disabled"}, Literals.of("1", Types.BooleanType.get())));
+    Table altered = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(false), altered.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(true), altered.columns()[1].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
+
+    // MODIFY COLUMN re-renders the loaded BIT(1) default. Before Boolean reloading, the loaded
+    // b'0' value was an unparsed expression and this comment change failed.
+    catalog
+        .asTableCatalog()
+        .alterTable(ident, TableChange.updateColumnComment(new String[] {"enabled"}, "flag"));
+    Table commented = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals("flag", commented.columns()[0].comment());
+    Assertions.assertEquals(Literals.booleanLiteral(false), commented.columns()[0].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
+  }
+
+  @Test
+  void testColumnDefaultValueWithDatetimePrecision() {
+    // MySQL rejects `DATETIME(6) DEFAULT CURRENT_TIMESTAMP`: once a column declares a fractional
+    // seconds precision, CURRENT_TIMESTAMP has to carry the same one.
+    Column col1 =
+        Column.of(
+            "col_1",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_1_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col2 =
+        Column.of(
+            "col_2",
+            Types.TimestampType.withTimeZone(3),
+            "col_2_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column col3 =
+        Column.of(
+            "col_3",
+            Types.TimestampType.withoutTimeZone(),
+            "col_3_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(tableIdent, new Column[] {col1, col2, col3}, null, ImmutableMap.of());
+
+    // An added column is rendered the same way as the ones above.
+    Column col4 =
+        Column.of(
+            "col_4",
+            Types.TimestampType.withoutTimeZone(6),
+            "col_4_comment",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    tableCatalog.alterTable(
+        tableIdent,
+        TableChange.addColumn(
+            new String[] {col4.name()},
+            col4.dataType(),
+            col4.comment(),
+            TableChange.ColumnPosition.defaultPos(),
+            col4.nullable(),
+            col4.autoIncrement(),
+            col4.defaultValue()));
+
+    Table createdTable = tableCatalog.loadTable(tableIdent);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(3), createdTable.columns()[1].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(0), createdTable.columns()[2].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(6), createdTable.columns()[3].dataType());
+    for (Column column : createdTable.columns()) {
+      Assertions.assertEquals(
+          DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue(), column.name());
+    }
+  }
+
+  @Test
+>>>>>>> 171ce25fc ([#14687] fix(mysql): render and reload Boolean defaults (#14688))
   // MySQL support column default value expression after 8.0.13
   // see https://dev.mysql.com/doc/refman/8.0/en/data-type-defaults.html
   @EnabledIf("SupportColumnDefaultValueExpression")
@@ -671,7 +801,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         case "bit_col_1":
-          Assertions.assertEquals(UnparsedExpression.of("b'1'"), column.defaultValue());
+          Assertions.assertEquals(Literals.booleanLiteral(true), column.defaultValue());
           break;
         default:
           Assertions.fail(
@@ -2485,6 +2615,26 @@ public class CatalogMysqlIT extends BaseIT {
           "loadTable must succeed for table that appeared in listTables");
     } finally {
       mysqlService.executeQuery("DROP DATABASE IF EXISTS `" + dottedSchemaName + "`");
+    }
+  }
+
+  private void assertBooleanDefaultInsert(NameIdentifier ident, boolean enabled, boolean disabled)
+      throws SQLException {
+    String qualified = "`" + schemaName + "`.`" + ident.name() + "`";
+    try (Connection connection =
+            DriverManager.getConnection(
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                MYSQL_CONTAINER.getUsername(),
+                MYSQL_CONTAINER.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM " + qualified);
+      statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+      try (ResultSet rows = statement.executeQuery("SELECT enabled, disabled FROM " + qualified)) {
+        Assertions.assertTrue(rows.next());
+        Assertions.assertEquals(enabled, rows.getBoolean("enabled"));
+        Assertions.assertEquals(disabled, rows.getBoolean("disabled"));
+        Assertions.assertFalse(rows.next());
+      }
     }
   }
 }
