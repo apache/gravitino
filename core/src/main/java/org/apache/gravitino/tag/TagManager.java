@@ -259,8 +259,7 @@ public class TagManager implements TagDispatcher {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    if (policy != null
-        && ObjectPolicyResolver.UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+    if (policy != null && policy.policyType().uniqueAtSameLevel()) {
       List<String> conflicting = new ArrayList<>();
       IllegalArgumentException first = null;
       for (MetadataObject object : listMetadataObjectsForTag(metalake, tagName)) {

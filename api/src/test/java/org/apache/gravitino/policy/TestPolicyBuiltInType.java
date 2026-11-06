@@ -95,4 +95,20 @@ public class TestPolicyBuiltInType {
     Assertions.assertEquals(
         AccessControlContent.class, Policy.BuiltInType.ACCESS_CONTROL.contentClass());
   }
+
+  @Test
+  void testUniqueAtSameLevelMaintenanceTypes() {
+    Assertions.assertTrue(Policy.BuiltInType.ICEBERG_COMPACTION.uniqueAtSameLevel());
+    Assertions.assertTrue(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL.uniqueAtSameLevel());
+    Assertions.assertTrue(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS.uniqueAtSameLevel());
+    Assertions.assertTrue(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION.uniqueAtSameLevel());
+    Assertions.assertFalse(Policy.BuiltInType.ROW_FILTER.uniqueAtSameLevel());
+    Assertions.assertFalse(Policy.BuiltInType.COLUMN_MASK.uniqueAtSameLevel());
+    Assertions.assertFalse(Policy.BuiltInType.ACCESS_CONTROL.uniqueAtSameLevel());
+    Assertions.assertFalse(Policy.BuiltInType.CUSTOM.uniqueAtSameLevel());
+    Assertions.assertEquals(4, Policy.BuiltInType.UNIQUE_MAINTENANCE_TYPES.size());
+    Assertions.assertTrue(
+        Policy.BuiltInType.UNIQUE_MAINTENANCE_TYPES.contains(
+            Policy.BuiltInType.ICEBERG_COMPACTION));
+  }
 }
