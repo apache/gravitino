@@ -330,6 +330,48 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+  void testDropWithoutSchemaUsageIsForbiddenAndKeepsTable() throws SQLException {
+    String role = RandomNameUtils.genRandomName("drop_role");
+    String schema = RandomNameUtils.genRandomName("drop_schema");
+    String table = RandomNameUtils.genRandomName("drop_table");
+    try (Connection admin = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(
+          admin, "CREATE ROLE " + role + " LOGIN PASSWORD 'test-only-password'");
+      JdbcConnectorUtils.executeUpdate(admin, "CREATE SCHEMA " + schema);
+      try {
+        JdbcConnectorUtils.executeUpdate(admin, "REVOKE ALL ON SCHEMA " + schema + " FROM PUBLIC");
+        JdbcConnectorUtils.executeUpdate(
+            admin, "CREATE TABLE " + schema + "." + table + " (id int)");
+        Map<String, String> properties = new HashMap<>();
+        properties.put("jdbc-driver", CONTAINER.getDriverClassName());
+        properties.put("jdbc-url", CONTAINER.getJdbcUrl());
+        properties.put("jdbc-database", admin.getCatalog());
+        properties.put("jdbc-user", role);
+        properties.put("jdbc-password", "test-only-password");
+        properties.put("jdbc.pool.max-size", "1");
+        properties.put("jdbc.pool.min-size", "1");
+        try (BasicDataSource limitedSource =
+            (BasicDataSource) DataSourceUtils.createDataSource(properties)) {
+          PostgreSqlTableOperations limited = new PostgreSqlTableOperations();
+          limited.initialize(
+              limitedSource,
+              JDBC_EXCEPTION_CONVERTER,
+              new PostgreSqlTypeConverter(),
+              new PostgreSqlColumnDefaultValueConverter(),
+              properties);
+          Assertions.assertThrows(ForbiddenException.class, () -> limited.drop(schema, table));
+          Assertions.assertEquals(table, TABLE_OPERATIONS.load(schema, table).name());
+        }
+        Assertions.assertTrue(TABLE_OPERATIONS.drop(schema, table));
+        Assertions.assertFalse(TABLE_OPERATIONS.drop(schema, table));
+      } finally {
+        JdbcConnectorUtils.executeUpdate(admin, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(admin, "DROP ROLE IF EXISTS " + role);
+      }
+    }
+  }
+
+  @Test
   void testLeastPrivilegeCreateDistinguishesMissingSchemaFromForbidden() throws SQLException {
     String role = RandomNameUtils.genRandomName("limited_role");
     String schema = RandomNameUtils.genRandomName("restricted_schema");
