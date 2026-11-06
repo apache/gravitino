@@ -199,6 +199,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    * the manager's cache, and returns a catalog bound to a live client after the cache has evicted
    * and closed an earlier one.
    *
+   * <p>The lookup does not keep the client alive for the rest of the request. If the cache evicts
+   * it while the request runs, by size or by idle time, that request fails and the next lookup
+   * returns a catalog bound to a new client.
+   *
    * @return the Gravitino catalog for this Spark catalog's name and identity
    */
   protected Catalog gravitinoCatalog() {

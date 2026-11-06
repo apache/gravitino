@@ -197,8 +197,16 @@ public class GravitinoCatalogManager {
         gravitinoCatalogs.get(
             key, k -> new CachedCatalog(client, loadCatalog(client, identity, name)));
     if (cached.client != client) {
-      cached = new CachedCatalog(client, loadCatalog(client, identity, name));
-      gravitinoCatalogs.put(key, cached);
+      // Reload once per key: a caller that waited for another one's reload reuses its result.
+      cached =
+          gravitinoCatalogs
+              .asMap()
+              .compute(
+                  key,
+                  (k, current) ->
+                      current != null && current.client == client
+                          ? current
+                          : new CachedCatalog(client, loadCatalog(client, identity, name)));
     }
     return cached.catalog;
   }

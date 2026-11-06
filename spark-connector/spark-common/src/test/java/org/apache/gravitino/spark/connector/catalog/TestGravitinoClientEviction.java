@@ -36,8 +36,13 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -168,6 +173,52 @@ public class TestGravitinoClientEviction {
     assertThrows(NoSuchCatalogException.class, catalog::listNamespaces);
   }
 
+  @Test
+  void testConcurrentLookupsReloadOnce() throws Exception {
+    GravitinoIdentity identity = GravitinoIdentity.application("simple");
+    GravitinoCatalogManager manager = createManager(client -> {});
+    manager.getGravitinoCatalogInfo(identity, CATALOG_NAME);
+    ticker.advance(CLIENT_TTL_SEC + 1);
+    GravitinoClient current = manager.getClient(identity);
+
+    // Hold the reload through the new client until both callers have asked for the catalog.
+    AtomicInteger reloads = new AtomicInteger();
+    CountDownLatch release = new CountDownLatch(1);
+    clients.get(1).onLoad =
+        () -> {
+          reloads.incrementAndGet();
+          try {
+            release.await(10, TimeUnit.SECONDS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        };
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<Catalog> first =
+          pool.submit(() -> manager.getGravitinoCatalogInfo(identity, CATALOG_NAME));
+      assertTrue(await(() -> reloads.get() == 1), "The first caller should start the reload");
+      Thread second = new Thread(() -> manager.getGravitinoCatalogInfo(identity, CATALOG_NAME));
+      second.start();
+      // The second caller either waits for the first reload or starts its own.
+      assertTrue(
+          await(
+              () ->
+                  reloads.get() == 2
+                      || second.getState() == Thread.State.BLOCKED
+                      || second.getState() == Thread.State.WAITING),
+          "The second caller should reach the reload");
+      release.countDown();
+      second.join(10_000);
+
+      assertSame(current, clientOf(first.get(10, TimeUnit.SECONDS)));
+      assertEquals(1, reloads.get(), "Concurrent lookups should share one reload");
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
   private GravitinoCatalogManager createManager(Consumer<FakeClient> customizer) {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(
@@ -210,7 +261,7 @@ public class TestGravitinoClientEviction {
     private final GravitinoClient client = mock(GravitinoClient.class);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final List<Catalog> catalogs = new ArrayList<>();
-    private Runnable onLoad = () -> {};
+    private volatile Runnable onLoad = () -> {};
 
     private FakeClient() {
       when(client.loadCatalog(anyString()))
