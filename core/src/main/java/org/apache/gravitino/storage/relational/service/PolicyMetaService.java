@@ -551,33 +551,13 @@ public class PolicyMetaService {
     if (tag == null) {
       return;
     }
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            TagMetaMapper.class,
-            mapper ->
-                mapper.softDeleteTagMetaByIdAndVersion(tag.getTagId(), tag.getCurrentVersion()));
+    NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tag.getTagName());
     Preconditions.checkState(
-        deleted == 1,
+        TagMetaService.getInstance().deleteTag(tagIdentifier, tag),
         "Failed to delete hidden tag %s for policy %s",
         tag.getTagName(),
         policy.getPolicyId());
-    SessionUtils.doWithoutCommit(
-        TagMetadataObjectRelMapper.class,
-        mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tag.getTagId()));
-    SessionUtils.doWithoutCommit(
-        OwnerMetaMapper.class,
-        mapper ->
-            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                tag.getTagId(), MetadataObject.Type.TAG.name()));
-    SessionUtils.doWithoutCommit(
-        SecurableObjectMapper.class,
-        mapper ->
-            mapper.softDeleteObjectRelsByMetadataObject(
-                tag.getTagId(), MetadataObject.Type.TAG.name()));
-    EntityChangeLogWriter.append(
-        NameIdentifierUtil.ofTag(metalake, tag.getTagName()),
-        Entity.EntityType.TAG,
-        OperateType.DROP);
+    EntityChangeLogWriter.append(tagIdentifier, Entity.EntityType.TAG, OperateType.DROP);
   }
 
   private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {

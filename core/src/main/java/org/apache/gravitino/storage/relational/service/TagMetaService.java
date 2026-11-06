@@ -678,10 +678,9 @@ public class TagMetaService {
    * deletes or renames the observed tag first, this method returns {@code false}, preserving the
    * idempotent delete contract.
    *
-   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
-   * use {@link #deleteTag(NameIdentifier)}, which reads it first.
+   * <p>Callers that already hold the tag row lock can supply that row directly. Other callers use
+   * {@link #deleteTag(NameIdentifier)}, which reads it first.
    */
-  @VisibleForTesting
   boolean deleteTag(NameIdentifier identifier, TagPO tagPO) {
     long tagId = tagPO.getTagId();
 
