@@ -39,16 +39,12 @@ import org.apache.gravitino.rel.types.Types;
 
 public class JdbcColumnDefaultValueConverter {
 
-<<<<<<< HEAD
-  protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
-=======
   /** The DDL rendering of the current timestamp default value function. */
-  public static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+  protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
 
   private static final Pattern FUNCTION_NAME =
       Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_$]*+(?:\\.[\\p{L}_][\\p{L}\\p{N}_$]*+){0,2}");
 
->>>>>>> 6086b7e4f ([#14631] fix(jdbc): harden table DDL and normalize ALTER defaults (#14632))
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
       new DateTimeFormatterBuilder()
