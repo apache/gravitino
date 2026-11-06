@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +72,8 @@ import org.apache.iceberg.types.Types.TimestampType;
 import org.junit.jupiter.api.Test;
 
 class TestGlueIcebergTableHelper {
+
+  private static final String METADATA_FILE = "s3://bucket/db1/t1/metadata/00001.metadata.json";
 
   // -------------------------------------------------------------------------
   // fromIcebergType — primitive types
@@ -228,8 +229,9 @@ class TestGlueIcebergTableHelper {
     when(mockIcebergTable.sortOrder()).thenReturn(SortOrder.unsorted());
     when(mockIcebergTable.properties()).thenReturn(new HashMap<>());
 
-    Catalog mockCatalog = mock(Catalog.class);
-    when(mockCatalog.loadTable(any(TableIdentifier.class))).thenReturn(mockIcebergTable);
+    GravitinoGlueCatalog mockCatalog = mock(GravitinoGlueCatalog.class);
+    when(mockCatalog.loadStaticTable(TableIdentifier.of("db1", "t1"), METADATA_FILE))
+        .thenReturn(mockIcebergTable);
 
     // GlueTable with wrong Hive-style column types (as Glue would store them).
     GlueColumn[] glueCols = {
@@ -245,7 +247,7 @@ class TestGlueIcebergTableHelper {
             .withAuditInfo(AuditInfo.EMPTY)
             .build();
 
-    GlueIcebergTableHelper.loadTable(mockCatalog, "db1", "t1", table);
+    GlueIcebergTableHelper.loadTable(mockCatalog, "db1", "t1", METADATA_FILE, table);
 
     Column[] cols = table.columns();
     assertEquals(3, cols.length);
