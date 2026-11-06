@@ -25,6 +25,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -105,6 +107,75 @@ public class TestJdbcColumnDefaultValueConverter {
         "Invalid binary column default value: use 0x followed by hexadecimal byte pairs",
         exception.getMessage());
     Assertions.assertNotNull(exception.getCause());
+  }
+
+  @Test
+  void testFunctionArgumentsAreRenderedAsSqlLiterals() {
+    Assertions.assertEquals(
+        "(abs(-3))",
+        converter.fromGravitino(FunctionExpression.of("abs", Literals.integerLiteral(-3))));
+    Assertions.assertEquals(
+        "(pg_catalog.abs(-3))",
+        converter.fromGravitino(
+            FunctionExpression.of("pg_catalog.abs", Literals.integerLiteral(-3))));
+    Assertions.assertEquals(
+        "(coalesce(NULL, 'O''Brien'))",
+        converter.fromGravitino(
+            FunctionExpression.of("coalesce", Literals.NULL, Literals.stringLiteral("O'Brien"))));
+    Assertions.assertEquals(
+        "(date_trunc('day', (now())))",
+        converter.fromGravitino(
+            FunctionExpression.of(
+                "date_trunc", Literals.stringLiteral("day"), FunctionExpression.of("now"))));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "abs(1)); CREATE TABLE injected_marker(id int); --",
+        "abs, extra int",
+        "abs/*comment*/",
+        "abs--comment",
+        "abs()",
+        "",
+        "pg_catalog..abs"
+      })
+  void testFunctionNameMustBeAnIdentifier(String name) {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> converter.fromGravitino(FunctionExpression.of(name)));
+  }
+
+  @Test
+  void testDeeplyQualifiedFunctionNameIsRejected() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("schema.".repeat(10000) + "abs")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> converter.fromGravitino(FunctionExpression.of(null)));
+  }
+
+  @Test
+  void testFunctionArgumentsMustBeRenderableValues() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            converter.fromGravitino(
+                FunctionExpression.of(
+                    "abs", UnparsedExpression.of("1); CREATE TABLE injected_marker(id int); --"))));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", DEFAULT_VALUE_NOT_SET)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", new Expression[] {null})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", (Expression[]) null)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            converter.fromGravitino(
+                FunctionExpression.of("CURRENT_TIMESTAMP", Literals.integerLiteral(1))));
   }
 
   @Test

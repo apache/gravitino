@@ -21,12 +21,14 @@ package org.apache.gravitino.catalog.jdbc.converter;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.base.Preconditions;
 import com.google.common.io.BaseEncoding;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -39,6 +41,9 @@ public class JdbcColumnDefaultValueConverter {
 
   /** The DDL rendering of the current timestamp default value function. */
   public static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+
+  private static final Pattern FUNCTION_NAME =
+      Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_$]*+(?:\\.[\\p{L}_][\\p{L}\\p{N}_$]*+){0,2}");
 
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
@@ -62,12 +67,32 @@ public class JdbcColumnDefaultValueConverter {
 
     if (defaultValue instanceof FunctionExpression) {
       FunctionExpression functionExpression = (FunctionExpression) defaultValue;
-      if (functionExpression.functionName().equalsIgnoreCase(CURRENT_TIMESTAMP)) {
-        // CURRENT_TIMESTAMP is a special case(key word), it should not be wrapped in parentheses
+      String name = functionExpression.functionName();
+      Preconditions.checkArgument(
+          name != null && FUNCTION_NAME.matcher(name).matches(),
+          "JDBC column default function name must be a plain or qualified identifier: %s",
+          name);
+      Expression[] arguments = functionExpression.arguments();
+      Preconditions.checkArgument(
+          arguments != null, "JDBC default function arguments must not be null");
+      if (name.equalsIgnoreCase(CURRENT_TIMESTAMP)) {
+        Preconditions.checkArgument(
+            arguments.length == 0, "CURRENT_TIMESTAMP default does not accept arguments");
         return CURRENT_TIMESTAMP;
-      } else {
-        return String.format("(%s)", functionExpression);
       }
+      String[] sqlArguments = new String[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        Preconditions.checkArgument(
+            arguments[i] instanceof Literal || arguments[i] instanceof FunctionExpression,
+            "Unsupported JDBC column default function argument at index %s",
+            i);
+        sqlArguments[i] = fromGravitino(arguments[i]);
+        Preconditions.checkArgument(
+            sqlArguments[i] != null,
+            "JDBC column default function argument at index %s must have a value",
+            i);
+      }
+      return "(" + name + "(" + String.join(", ", sqlArguments) + "))";
     }
 
     if (defaultValue instanceof Literal) {
