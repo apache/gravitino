@@ -1166,6 +1166,13 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
     Assertions.assertTrue(logicalNames.contains(logicalLeaf));
 
+    for (SchemaEntity schema : schemas) {
+      boolean leaf = schema.name().equals(logicalLeaf);
+      Assertions.assertEquals(leaf ? AUDIT_INFO.creator() : null, schema.auditInfo().creator());
+      Assertions.assertEquals(
+          leaf ? AUDIT_INFO.createTime() : null, schema.auditInfo().createTime());
+    }
+
     SchemaEntity loaded =
         schemaMetaService.getSchemaByIdentifier(
             NameIdentifier.of(metalakeName, catalogName, logicalLeaf));

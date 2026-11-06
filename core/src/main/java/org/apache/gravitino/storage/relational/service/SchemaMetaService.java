@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
@@ -178,7 +179,7 @@ public class SchemaMetaService {
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
                   .withProperties(Collections.emptyMap())
-                  .withAuditInfo(schemaEntity.auditInfo())
+                  .withAuditInfo(AuditInfo.EMPTY)
                   .build();
           rowsToInsert.add(ancestor);
         }

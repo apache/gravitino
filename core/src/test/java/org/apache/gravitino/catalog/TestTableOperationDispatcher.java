@@ -139,6 +139,108 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
+  /**
+   * The first import writes creator information without a separate store update.
+   *
+   * @param scenario whether the catalog supplies a creator, supplies modification information, or
+   *     the caller performs an ordinary load
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
+  public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
+    Instant importTime = Instant.EPOCH.plusSeconds(60);
+    AuditInfo importAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
+    AuditInfo catalogAudit =
+        "reported".equals(scenario)
+            ? AuditInfo.builder().withCreator("catalog_user").withCreateTime(Instant.EPOCH).build()
+            : "modified".equals(scenario)
+                ? AuditInfo.builder()
+                    .withCreateTime(Instant.EPOCH)
+                    .withLastModifier("modifier")
+                    .withLastModifiedTime(Instant.EPOCH)
+                    .build()
+                : AuditInfo.EMPTY;
+    String expectedCreator =
+        "reported".equals(scenario) ? "catalog_user" : "load".equals(scenario) ? null : "alice";
+    Instant expectedTime =
+        "reported".equals(scenario) || "modified".equals(scenario)
+            ? Instant.EPOCH
+            : "load".equals(scenario) ? null : importTime;
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_audit_table_" + scenario);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "table_import_audit");
+    Column[] columns = {
+      TestColumn.builder().withName("col").withPosition(0).withType(Types.StringType.get()).build()
+    };
+    tableOperationDispatcher.createTable(identifier, columns, "comment", props, new Transform[0]);
+    TestTable catalogTable = (TestTable) operations.loadTable(identifier);
+    FieldUtils.writeField(catalogTable, "auditInfo", catalogAudit, true);
+    entityStore.delete(identifier, TABLE);
+    clearInvocations(entityStore);
+
+    if ("raced".equals(scenario)) {
+      tableOperationDispatcher.loadTable(identifier);
+      clearInvocations(entityStore);
+    }
+    Table loaded =
+        "load".equals(scenario)
+            ? tableOperationDispatcher.loadTable(identifier)
+            : tableOperationDispatcher.importTable(identifier, importAudit);
+
+    TableEntity imported = entityStore.get(identifier, TABLE, TableEntity.class);
+    Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
+    Assertions.assertEquals(expectedCreator, loaded.auditInfo().creator());
+    Assertions.assertEquals(expectedTime, loaded.auditInfo().createTime());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? "modifier" : null, imported.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? Instant.EPOCH : null,
+        imported.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+
+    clearInvocations(entityStore);
+    tableOperationDispatcher.importTable(
+        identifier,
+        AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? "bob" : expectedCreator,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().createTime());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+  }
+
+  /** Explicit imports require audit information. */
+  @Test
+  public void testImportRejectsNullAudit() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableOperationDispatcher.importTable(
+                NameIdentifier.of(metalake, catalog, "schema", "missing"), null));
+  }
+
   @Test
   public void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");
@@ -455,11 +557,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   /**
    * Verifies a native table is imported from one source read and keeps its identity on warm loads.
    *
+   * @param explicitImport whether to import with caller-provided audit information
    * @throws Exception if fixture setup or concurrent verification fails
    */
-  @Test
-  public void testNativeTableImportLoadsSourceOnce() throws Exception {
-    Namespace ns = Namespace.of(metalake, catalog, "schema_import_once");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNativeTableImportLoadsSourceOnce(boolean explicitImport) throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_once_" + explicitImport);
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
     NameIdentifier ident = NameIdentifier.of(ns, "native_table");
@@ -476,12 +580,22 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Distributions.NONE,
         new SortOrder[0],
         Indexes.EMPTY_INDEXES);
+    FieldUtils.writeField(original.loadTable(ident), "auditInfo", AuditInfo.EMPTY, true);
     TestCatalogOperations operations = spy(original);
     FieldUtils.writeField(source, "ops", operations, true);
     try {
-      Table loaded = tableOperationDispatcher.loadTable(ident);
+      AuditInfo importAudit =
+          AuditInfo.builder().withCreator("alice").withCreateTime(Instant.EPOCH).build();
+      Table loaded =
+          explicitImport
+              ? tableOperationDispatcher.importTable(ident, importAudit)
+              : tableOperationDispatcher.loadTable(ident);
       Assertions.assertEquals("native", loaded.comment());
       Assertions.assertTrue(entityStore.exists(ident, TABLE));
+      Assertions.assertEquals(explicitImport ? "alice" : null, loaded.auditInfo().creator());
+      Assertions.assertEquals(
+          explicitImport ? "alice" : null,
+          entityStore.get(ident, TABLE, TableEntity.class).auditInfo().creator());
       verify(operations, times(1)).loadTable(ident);
       long importedId = entityStore.get(ident, TABLE, TableEntity.class).id();
       clearInvocations(entityStore);
@@ -490,6 +604,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       verify(entityStore, times(2)).get(ident, TABLE, TableEntity.class);
       verify(operations, times(2)).loadTable(ident);
       Assertions.assertEquals(importedId, entityStore.get(ident, TABLE, TableEntity.class).id());
+      Assertions.assertEquals(
+          explicitImport ? "alice" : null,
+          entityStore.get(ident, TABLE, TableEntity.class).auditInfo().creator());
     } finally {
       FieldUtils.writeField(source, "ops", original, true);
     }

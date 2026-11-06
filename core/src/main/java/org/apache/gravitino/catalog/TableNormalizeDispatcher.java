@@ -32,6 +32,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -51,6 +52,13 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public TableNormalizeDispatcher(TableDispatcher dispatcher, CatalogManager catalogManager) {
     this.catalogManager = catalogManager;
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    return dispatcher.importTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager), auditInfo);
   }
 
   @Override

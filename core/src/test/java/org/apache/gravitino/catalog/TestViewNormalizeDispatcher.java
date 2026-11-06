@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -34,6 +35,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
   private static ViewNormalizeDispatcher viewNormalizeDispatcher;
@@ -48,6 +50,20 @@ public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
             TestViewOperationDispatcher.schemaOperationDispatcher, catalogManager);
+  }
+
+  /** Explicit imports normalize names while preserving their audit arguments. */
+  @Test
+  public void testImportNormalizesIdentifierAndPassesAudit() {
+    ViewDispatcher delegate = Mockito.mock(ViewDispatcher.class);
+    ViewNormalizeDispatcher normalizer = new ViewNormalizeDispatcher(delegate, catalogManager);
+    AuditInfo audit = AuditInfo.builder().withCreator("creator").build();
+    NameIdentifier requested = NameIdentifier.of(metalake, catalog, "schema", "MiXeD");
+    normalizer.importView(requested, audit);
+    Mockito.verify(delegate)
+        .importView(
+            Mockito.eq(NameIdentifier.of(metalake, catalog, "schema", "mixed")),
+            Mockito.same(audit));
   }
 
   @Test
