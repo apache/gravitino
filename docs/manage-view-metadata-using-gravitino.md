@@ -18,6 +18,8 @@ Views are supported by the Hive, Iceberg, and Paimon catalogs.
 
 ## View Operations
 
+For client setup and configuration, see [Client Setup](./how-to-use-gravitino-client.md) and [Python Client](./how-to-use-python-client.md).
+
 ### Create a View
 
 A view carries its columns and one or more representations, each holding a query and the dialect it
@@ -32,13 +34,20 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "name": "active_customers",
   "comment": "Customers with orders in the last year",
-  "query": "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
-  "dialect": "spark",
   "columns": [
     {"name": "id", "type": "integer", "nullable": false},
     {"name": "name", "type": "varchar(500)", "nullable": true}
   ],
-  "properties": {}
+  "representations": [
+    {
+      "type": "sql",
+      "sql": "SELECT * FROM customers WHERE last_order_at > current_date - interval 365 day",
+      "dialect": "spark"
+    }
+  ],
+  "properties": {
+    "spark.sql.create.version": "3.5.0"
+  }
 }' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/views
 ```
 
@@ -69,7 +78,7 @@ View view = views.createView(
     representations,
     "sales",
     "public",
-    ImmutableMap.of());
+    ImmutableMap.of("spark.sql.create.version", "3.5.0"));
 ```
 
 </TabItem>
@@ -98,7 +107,7 @@ view = views.create_view(
     comment="Customers with orders in the last year",
     default_catalog="sales",
     default_schema="public",
-    properties={},
+    properties={"spark.sql.create.version": "3.5.0"},
 )
 ```
 

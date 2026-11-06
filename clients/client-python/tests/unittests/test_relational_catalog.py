@@ -109,6 +109,8 @@ class TestRelationalCatalog(unittest.TestCase):
         columns: Optional[list[ColumnDTO]] = None,
         representations: Optional[list[SQLRepresentationDTO]] = None,
         properties: Optional[dict[str, str]] = None,
+        default_catalog: Optional[str] = "test_catalog",
+        default_schema: Optional[str] = "test_schema",
     ) -> ViewDTO:
         return ViewDTO(
             _name=name,
@@ -119,8 +121,8 @@ class TestRelationalCatalog(unittest.TestCase):
                 else cls._default_representations()
             ),
             _comment=comment,
-            _default_catalog="test_catalog",
-            _default_schema="test_schema",
+            _default_catalog=default_catalog,
+            _default_schema=default_schema,
             _properties=properties if properties is not None else {},
             _audit=AuditDTO(
                 "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
@@ -746,6 +748,8 @@ class TestRelationalCatalog(unittest.TestCase):
             "new comment",
             new_columns,
             new_reps,
+            default_catalog=None,
+            default_schema=None,
         )
 
         req = ViewUpdateRequest.ReplaceViewRequest(
@@ -756,7 +760,7 @@ class TestRelationalCatalog(unittest.TestCase):
             _comment="new comment",
         )
         new_rep_api = SQLRepresentation(Dialects.TRINO, "SELECT 3")
-        self._run_alter_view(
+        altered = self._run_alter_view(
             ident,
             req,
             updated,
@@ -768,6 +772,8 @@ class TestRelationalCatalog(unittest.TestCase):
                 "new comment",
             ),
         )
+        self.assertIsNone(altered.default_catalog())
+        self.assertIsNone(altered.default_schema())
 
     def test_alter_view_invalid_identifier(self):
         with self.assertRaises(IllegalNamespaceException):
