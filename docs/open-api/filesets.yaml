@@ -37,7 +37,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
@@ -59,19 +59,7 @@ paths:
         "200":
           $ref: "#/components/responses/FilesetResponse"
         "400":
-          description: >-
-            Bad Request - The fileset creation request is invalid. For multiple storage
-            locations, properties.default-location-name must name one of the location keys.
-          content:
-            application/json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              example:
-                code: 1001
-                type: IllegalArgumentException
-                message: >-
-                  The fileset property default-location-name must be set and must be one of
-                  the fileset locations, location names: [primary, secondary], default location name: null
+          $ref: "#/components/responses/FilesetCreateBadRequestResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "409":
@@ -83,7 +71,7 @@ paths:
               examples:
                 FilesetAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/FilesetAlreadyExistsException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
@@ -122,7 +110,7 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
@@ -169,7 +157,7 @@ paths:
               examples:
                 FilesetAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/FilesetAlreadyExistsException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
@@ -184,7 +172,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/location:
@@ -250,7 +238,7 @@ paths:
                   $ref: "#/components/examples/NoSuchFilesetException"
                 NoSuchLocationNameException:
                   $ref: "#/components/examples/NoSuchLocationNameException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/files:
@@ -320,7 +308,7 @@ paths:
                   $ref: "#/components/examples/NoSuchLocationNameException"
         "501":
           $ref: "#/components/responses/FilesystemOperationsDisabledErrorResponse"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
@@ -398,17 +386,21 @@ components:
           nullable: true
         storageLocation:
           type: string
-          description: The location of the fileset. If the storage location of managed fileset is empty, it will \
-            use the location of namespace. The storage location of external fileset must be set.
+          description: >-
+            The location of the fileset. When omitted for a managed fileset, the location is
+            derived from its schema, which may inherit locations from the catalog. External
+            filesets must specify a storage location.
           nullable: true
         storageLocations:
           type: object
           description: >-
-            The named storage locations of the fileset. If the storage location of a managed
-            fileset is empty, it uses the location of the namespace. External filesets must
-            specify storage locations. When the resulting fileset has more than one location,
-            including inherited locations, properties must include default-location-name
-            with a value matching one of the resolved location keys.
+            The named storage locations of the fileset. Locations are resolved by name:
+            request locations override schema locations, which override catalog locations
+            with the same name. Other inherited location names are retained. Managed filesets
+            may omit storageLocations and use locations derived from their schema and catalog.
+            External filesets must specify storage locations. When the resulting fileset has
+            more than one location, including inherited locations, properties must include
+            default-location-name with a value matching one of the resolved location keys.
           nullable: true
           default: { }
           additionalProperties:
@@ -419,7 +411,7 @@ components:
             The properties of the fileset. When the resulting fileset has multiple storage locations,
             default-location-name is required and must match one of the resolved location keys;
             otherwise creation returns HTTP 400. Managed filesets may inherit locations from the
-            catalog or schema even when storageLocations is omitted.
+            schema or catalog even when storageLocations is omitted.
           nullable: true
           default: {}
           properties:
@@ -665,6 +657,21 @@ components:
       }
 
   responses:
+    FilesetCreateBadRequestResponse:
+      description: >-
+        Bad Request - The fileset creation request is invalid. For multiple storage
+        locations, properties.default-location-name must name one of the location keys.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1001
+            type: IllegalArgumentException
+            message: >-
+              The fileset property default-location-name must be set and must be one of
+              the fileset locations, location names: [primary, secondary], default location name: null
+
     FilesystemOperationsDisabledErrorResponse:
       description: Not Implemented - Filesystem operations are disabled by the catalog property disable-filesystem-ops
       content:

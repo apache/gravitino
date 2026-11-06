@@ -442,8 +442,7 @@ components:
         Accept header cannot be served by this operation. When Accept has no Gravitino
         API version, including application/json, */*, or an absent header, the server
         uses the version from Content-Type if present, otherwise the default API version.
-        An unsupported version returns IllegalArgumentException; failed content negotiation
-        returns RESTException.
+        Both cases return HTTP 406 with a JSON ErrorModel response.
       content:
         application/json:
           schema:
