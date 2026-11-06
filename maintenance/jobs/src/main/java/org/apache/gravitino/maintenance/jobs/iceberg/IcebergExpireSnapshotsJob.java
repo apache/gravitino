@@ -345,17 +345,17 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   // TMS metrics helpers (not used by CLI {@link #main})
   // -------------------------------------------------------------------------
 
-  /** TMS S0: snapshot count before expire. */
-  public static final String SNAPSHOT_COUNT_METRIC = "custom-snapshot-count";
+  /** TMS S0: snapshot number before expire. */
+  public static final String SNAPSHOT_NUMBER_METRIC = "custom-snapshot-number";
 
   /** TMS S0: distinct reachable content-file bytes across history. */
   public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
 
   /** TMS S1: snapshots present in S0 but absent after expire. */
-  public static final String SNAPSHOTS_CLEARED_METRIC = "custom-snapshots-cleared";
+  public static final String EXPIRED_SNAPSHOT_NUMBER_METRIC = "custom-expired-snapshot-number";
 
   /** TMS S1: content-file bytes present in S0 but absent after expire. */
-  public static final String BYTES_RECLAIMED_METRIC = "custom-bytes-reclaimed";
+  public static final String RECLAIMED_FILE_SIZE_METRIC = "custom-reclaimed-file-size";
 
   /**
    * Snapshot-expiry inventory for TMS S0 and set-difference S1. Concurrent commits only add
@@ -393,9 +393,9 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireBeforeMetrics(long snapshotCount, long totalFileSize) {
+  static Map<String, Object> expireBeforeMetrics(long snapshotNumber, long totalFileSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOT_COUNT_METRIC, snapshotCount);
+    metrics.put(SNAPSHOT_NUMBER_METRIC, snapshotNumber);
     metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
     return metrics;
   }
@@ -408,10 +408,11 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(long snapshotsCleared, long bytesReclaimed) {
+  static Map<String, Object> expireAfterMetrics(
+      long expiredSnapshotNumber, long reclaimedFileSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOTS_CLEARED_METRIC, snapshotsCleared);
-    metrics.put(BYTES_RECLAIMED_METRIC, bytesReclaimed);
+    metrics.put(EXPIRED_SNAPSHOT_NUMBER_METRIC, expiredSnapshotNumber);
+    metrics.put(RECLAIMED_FILE_SIZE_METRIC, reclaimedFileSize);
     return metrics;
   }
 

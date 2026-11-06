@@ -57,7 +57,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final String VERSION = "v4";
 
   /** TMS S1: orphan files removed (or found in dry-run). */
-  public static final String ORPHAN_FILES_REMOVED_METRIC = "custom-orphan-files-removed";
+  public static final String REMOVED_ORPHAN_NUMBER_METRIC = "custom-removed-orphan-number";
 
   /**
    * TMS S1: bytes reclaimed. Measured from orphan paths before delete (procedure returns locations
@@ -206,9 +206,9 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> orphanAfterMetrics(long filesRemoved, long bytesReclaimed) {
+  static Map<String, Object> orphanAfterMetrics(long removedOrphanNumber, long bytesReclaimed) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(ORPHAN_FILES_REMOVED_METRIC, filesRemoved);
+    metrics.put(REMOVED_ORPHAN_NUMBER_METRIC, removedOrphanNumber);
     metrics.put(ORPHAN_BYTES_RECLAIMED_METRIC, bytesReclaimed);
     return metrics;
   }

@@ -456,6 +456,7 @@ public class TestIcebergRewriteManifestsJob {
     assertEquals(1, after.size());
     assertEquals(
         18750L,
-        ((Number) after.get(IcebergRewriteManifestsJob.MANIFESTS_REMOVED_METRIC)).longValue());
+        ((Number) after.get(IcebergRewriteManifestsJob.REWRITTEN_MANIFEST_NUMBER_METRIC))
+            .longValue());
   }
 }

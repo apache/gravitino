@@ -283,8 +283,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   public static final String AVG_MANIFEST_SIZE_METRIC =
       IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC;
 
-  /** TMS S1: manifests rewritten/removed by the procedure. */
-  public static final String MANIFESTS_REMOVED_METRIC = "custom-manifests-removed";
+  /** TMS S1: manifests rewritten by the procedure. */
+  public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
 
   /**
    * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
@@ -315,9 +315,9 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> manifestAfterMetrics(long manifestsRemoved) {
+  static Map<String, Object> manifestAfterMetrics(long rewrittenManifestNumber) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(MANIFESTS_REMOVED_METRIC, manifestsRemoved);
+    metrics.put(REWRITTEN_MANIFEST_NUMBER_METRIC, rewrittenManifestNumber);
     return metrics;
   }
 

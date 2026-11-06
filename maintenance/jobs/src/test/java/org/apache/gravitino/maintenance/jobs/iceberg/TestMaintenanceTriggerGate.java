@@ -35,7 +35,7 @@ public class TestMaintenanceTriggerGate {
   public void testExpireSnapshotsAlwaysMaintain() {
     assertTrue(
         MaintenanceTriggerGate.shouldMaintain(
-            MaintenanceType.EXPIRE_SNAPSHOTS, new HashMap<>(), "{\"custom-snapshot-count\":1}"));
+            MaintenanceType.EXPIRE_SNAPSHOTS, new HashMap<>(), "{\"custom-snapshot-number\":1}"));
   }
 
   @Test
