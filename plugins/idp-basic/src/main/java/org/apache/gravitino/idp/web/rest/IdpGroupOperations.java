@@ -35,27 +35,31 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.RemoveResponse;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST resource for built-in IdP group management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
 @Path("/idp/groups")
 public class IdpGroupOperations {
 
-  private final IdpUserGroupManager userGroupManager;
+  private static final Logger LOG = LoggerFactory.getLogger(IdpGroupOperations.class);
+
+  private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IdpGroupOperations(IdpUserGroupManager userGroupManager) {
-    this.userGroupManager = userGroupManager;
+  public IdpGroupOperations(IdpUserGroupEventDispatcher userGroupDispatcher) {
+    this.userGroupDispatcher = userGroupDispatcher;
   }
 
   @GET
@@ -66,7 +70,7 @@ public class IdpGroupOperations {
   public Response getGroup(@PathParam("group") String group) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new IdpGroupResponse(userGroupManager.getGroup(group).toDTO())),
+        () -> IdpRESTUtils.ok(new IdpGroupResponse(userGroupDispatcher.getGroup(group).toDTO())),
         "group",
         IdpOperationType.GET,
         group);
@@ -77,16 +81,23 @@ public class IdpGroupOperations {
   @Timed(name = "add-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-group", absolute = true)
   public Response addGroup(AddGroupRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
           request.validate();
           return IdpRESTUtils.ok(
+<<<<<<< HEAD
               new IdpGroupResponse(userGroupManager.addGroup(request.getGroup()).toDTO()));
+=======
+              new IdpGroupResponse(
+                  userGroupDispatcher.addGroup(request.getGroup(), request.getComment()).toDTO()));
+>>>>>>> a9b281254 ([#14692] fix(idp-basic): Emit typed audit events for IdP mutations (#14693))
         },
         "group",
         IdpOperationType.ADD,
@@ -102,7 +113,7 @@ public class IdpGroupOperations {
       @PathParam("group") String group, @DefaultValue("false") @QueryParam("force") boolean force) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeGroup(group, force))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupDispatcher.removeGroup(group, force))),
         "group",
         IdpOperationType.REMOVE,
         group);
@@ -115,9 +126,11 @@ public class IdpGroupOperations {
   @ResponseMetered(name = "change-idp-group-users", absolute = true)
   public Response changeGroupMembership(
       @PathParam("group") String group, GroupMembershipChangeRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -127,7 +140,7 @@ public class IdpGroupOperations {
           String[] usersToRemove = request.getUsersToRemove();
           return IdpRESTUtils.ok(
               new IdpGroupResponse(
-                  userGroupManager
+                  userGroupDispatcher
                       .changeGroupMembership(
                           group,
                           usersToAdd == null ? null : Arrays.asList(usersToAdd),

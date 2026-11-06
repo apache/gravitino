@@ -38,28 +38,32 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
 @Path("/idp/users")
 public class IdpUserOperations {
 
-  private final IdpUserGroupManager userGroupManager;
+  private static final Logger LOG = LoggerFactory.getLogger(IdpUserOperations.class);
+
+  private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IdpUserOperations(IdpUserGroupManager userGroupManager) {
-    this.userGroupManager = userGroupManager;
+  public IdpUserOperations(IdpUserGroupEventDispatcher userGroupDispatcher) {
+    this.userGroupDispatcher = userGroupDispatcher;
   }
 
   @GET
@@ -70,7 +74,7 @@ public class IdpUserOperations {
   public Response getUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO())),
+        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO())),
         "user",
         IdpOperationType.GET,
         user);
@@ -81,9 +85,11 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -91,7 +97,13 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
+<<<<<<< HEAD
                   userGroupManager.addUser(request.getUser(), request.getPassword()).toDTO()));
+=======
+                  userGroupDispatcher
+                      .addUser(request.getUser(), request.getPassword(), request.enabledOrDefault())
+                      .toDTO()));
+>>>>>>> a9b281254 ([#14692] fix(idp-basic): Emit typed audit events for IdP mutations (#14693))
         },
         "user",
         IdpOperationType.ADD,
@@ -112,9 +124,11 @@ public class IdpUserOperations {
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -132,21 +146,66 @@ public class IdpUserOperations {
             Preconditions.checkArgument(
                 StringUtils.isNotBlank(request.getOldPassword()),
                 "\"oldPassword\" is required when changing your own password");
-            userGroupManager.changePassword(
+            userGroupDispatcher.changePassword(
                 user, request.getNewPassword(), request.getOldPassword());
           } else {
             Preconditions.checkArgument(
                 request.getOldPassword() == null,
                 "\"oldPassword\" is only allowed when changing your own password");
-            userGroupManager.changePassword(user, request.getNewPassword());
+            userGroupDispatcher.changePassword(user, request.getNewPassword());
           }
-          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,
         user);
   }
 
+<<<<<<< HEAD
+=======
+  /**
+   * Updates a user's enabled flag. Only service admins may call this API, and the target must not
+   * be a configured service admin.
+   *
+   * @param user the username whose enabled flag is updated
+   * @param request the enabled-flag update request
+   * @return the updated user response
+   */
+  @PUT
+  @Path("{user}/enabled")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "update-idp-user-enabled." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-idp-user-enabled", absolute = true)
+  public Response updateEnabled(@PathParam("user") String user, UpdateUserEnabledRequest request) {
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+    return IdpRESTUtils.doAs(
+        httpRequest,
+        () -> {
+          request.validate();
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          List<String> serviceAdmins =
+              GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS);
+          if (!IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, currentUser)) {
+            throw new ForbiddenException("Only service admins can update the enabled flag");
+          }
+          Preconditions.checkArgument(
+              !IdpAuthorizationFilter.isServiceAdmin(serviceAdmins, user),
+              "Cannot update the enabled flag of service admin %s",
+              user);
+          userGroupDispatcher.updateEnabled(user, request.getEnabled());
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO()));
+        },
+        "user",
+        IdpOperationType.UPDATE,
+        user);
+  }
+
+>>>>>>> a9b281254 ([#14692] fix(idp-basic): Emit typed audit events for IdP mutations (#14693))
   @DELETE
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -155,7 +214,7 @@ public class IdpUserOperations {
   public Response removeUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupDispatcher.removeUser(user))),
         "user",
         IdpOperationType.REMOVE,
         user);
