@@ -140,7 +140,14 @@ public class CatalogUtils {
     }
   }
 
-  private static void checkPaimonConfig(PaimonConfig paimonConfig) {
+  /**
+   * Validates the Paimon catalog configuration without contacting the catalog backend.
+   *
+   * @param paimonConfig The Paimon configuration.
+   * @throws IllegalArgumentException if a required setting is missing or the JDBC driver cannot be
+   *     loaded
+   */
+  public static void checkPaimonConfig(PaimonConfig paimonConfig) {
     String metastore = paimonConfig.get(CATALOG_BACKEND);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metastore), "Paimon Catalog metastore cannot be null or empty");
