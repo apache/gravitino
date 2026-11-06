@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Representation;
 
@@ -34,6 +35,7 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
 
   // Preserve the supplied discriminator so validation can reject missing or invalid types.
   @JsonProperty("type")
+  @Nullable
   private String type;
 
   @JsonProperty("dialect")
@@ -61,7 +63,17 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
     return new Builder();
   }
 
+  /**
+   * Returns the supplied representation type.
+   *
+   * <p>Before successful validation, a deserialized instance may contain a null or invalid type.
+   * Instances created by the builder or successfully validated by {@link #validate()} return {@link
+   * Representation#TYPE_SQL}.
+   *
+   * @return The supplied type, or {@code null} if it was omitted or explicitly null.
+   */
   @Override
+  @Nullable
   public String type() {
     return type;
   }
