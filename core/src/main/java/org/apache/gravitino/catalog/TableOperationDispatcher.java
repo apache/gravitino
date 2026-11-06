@@ -499,9 +499,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               }
 
               // A false result is ambiguous: the external table may have been renamed or dropped
-              // out of
-              // band. Preserve the registration because deleting it after a rename would lose
-              // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+              // out of band. Preserve the registration because deleting it after a rename would
+              // lose Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
               // registration that requires separate cleanup.
               if (droppedFromCatalog) {
                 try {
