@@ -53,6 +53,8 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "406":
           $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -85,6 +87,8 @@ paths:
               examples:
                 PartitionAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/PartitionAlreadyExistsErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -128,6 +132,8 @@ paths:
                   $ref: "#/components/examples/NoSuchPartitionException"
         "406":
           $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -149,7 +155,7 @@ paths:
         "406":
           $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "501":
-          $ref: "#/components/responses/PartitionPurgeUnsupportedErrorResponse"
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -369,16 +375,32 @@ components:
           $ref: "#/components/schemas/Properties"
 
   responses:
-    PartitionPurgeUnsupportedErrorResponse:
-      description: Not Implemented - The catalog provider does not support partition purging with purge=true
+    PartitionUnsupportedOperationErrorResponse:
+      description: >-
+        Not Implemented - The table does not support partition operations or the requested
+        partition operation is unsupported. For DELETE with purge=true, this also includes
+        tables that do not support partition purging.
       content:
         application/json:
           schema:
             $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-          example:
-            code: 1006
-            type: UnsupportedOperationException
-            message: Partition purging is not supported
+          examples:
+            PartitionOperationsUnsupported:
+              summary: The table does not support partition operations
+              value:
+                code: 1006
+                type: UnsupportedOperationException
+                message: >-
+                  Failed to operate partition(s) operation [LIST] of table [table1], reason
+                  [Table does not support partition operations.]
+            PartitionPurgeUnsupported:
+              summary: Partition purging is unsupported for DELETE with purge=true
+              value:
+                code: 1006
+                type: UnsupportedOperationException
+                message: >-
+                  Failed to operate partition(s) operation [DROP] of table [table1], reason
+                  [Partition purging is not supported]
 
 
     PartitionListResponse:

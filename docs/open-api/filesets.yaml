@@ -37,6 +37,8 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -62,6 +64,8 @@ paths:
           $ref: "#/components/responses/FilesetCreateBadRequestResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target fileset already exists
           content:
@@ -110,6 +114,8 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -148,6 +154,8 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target fileset already exists
           content:
@@ -172,6 +180,8 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -238,6 +248,8 @@ paths:
                   $ref: "#/components/examples/NoSuchFilesetException"
                 NoSuchLocationNameException:
                   $ref: "#/components/examples/NoSuchLocationNameException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -306,6 +318,8 @@ paths:
                   $ref: "#/components/examples/NoSuchFilesetException"
                 NoSuchLocationNameException:
                   $ref: "#/components/examples/NoSuchLocationNameException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "501":
           $ref: "#/components/responses/FilesystemOperationsDisabledErrorResponse"
         "5XX":
