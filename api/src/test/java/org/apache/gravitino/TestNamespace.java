@@ -60,6 +60,7 @@ public class TestNamespace {
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString(".a"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString("a."));
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString("a..b"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString(" "));
   }
 
   @Test
