@@ -413,8 +413,9 @@ public class CapabilityHelpers {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
     }
 
-    applyExistingColumnName(change.fieldName()[0], capabilities);
+    // Preserve branch-1.3 validation after case folding for case-insensitive providers.
     String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+    applyExistingColumnName(fieldName[0], capabilities);
 
     if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
@@ -441,10 +442,10 @@ public class CapabilityHelpers {
           (TableChange.UpdateColumnPosition) change;
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyExistingColumnName(afterPosition.getColumn(), capabilities);
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
+        applyExistingColumnName(afterFieldName, capabilities);
         return TableChange.updateColumnPosition(
             fieldName, TableChange.ColumnPosition.after(afterFieldName));
       }
