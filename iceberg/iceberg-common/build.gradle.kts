@@ -29,6 +29,10 @@ dependencies {
   constraints {
     implementation(libs.thrift)
   }
+  // Keep the xnio-api pulled in by kerb-admin on the latest patch of its line.
+  constraints {
+    implementation(libs.xnio.api)
+  }
 
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
