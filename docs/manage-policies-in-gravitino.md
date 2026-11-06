@@ -234,6 +234,9 @@ association has a selector:
 | `ALL_VALUES` | The effective tag is present, with or without assignment values.       |
 | `TAG_VALUE`  | One effective tag assignment value equals the specified value.         |
 
+Like tag assignment values, a `TAG_VALUE` value cannot contain double quotes (`"`), backslashes
+(`\`), or control characters.
+
 The selector belongs to the association, not to the policy or the tag. An existing association
 cannot be replaced by another add request. Remove it and add it again to change its selector.
 
@@ -347,7 +350,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v2+json" \
 The response includes policies derived from effective tags assigned to the object or its ancestors.
 With `details=true`, the response returns full policy objects instead of policy names.
 Each policy includes an `inherited` field, which is `true` when it matches only through a tag
-assigned to an ancestor of the object. Disabled policies do not appear in this result.
+assigned to an ancestor of the object. Assigning a tag, linking a policy, or enabling a disabled
+policy that would put two Iceberg maintenance policies of the same type (compaction, orphan-file
+removal, rewrite manifests, snapshot expiration) on the same object level is rejected. Disabled
+policies do not appear in this result.
 Both response modes include `hasInaccessiblePolicies`. Gravitino resolves policies from direct and
 inherited tag assignments before authorization filtering, so the flag also covers policies omitted
 from inherited associations. The flag reveals only that at least one policy was omitted; it does not

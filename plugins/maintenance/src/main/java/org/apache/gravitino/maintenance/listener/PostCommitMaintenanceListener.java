@@ -70,8 +70,7 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
             gravitinoConfig,
             MaintenanceActionManager.getInstance(),
             TableMetaService.getInstance(),
-            PolicyMetaService.getInstance(),
-            env.entityStore());
+            PolicyMetaService.getInstance());
     this.commitJobClient = new CommitJobClient(AutocommitDataSources.entityStore(), planner);
     LOG.info("PostCommitMaintenanceListener started");
   }

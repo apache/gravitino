@@ -25,8 +25,10 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,10 +58,14 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -75,6 +81,8 @@ public class TagManager implements TagDispatcher {
   private final IdGenerator idGenerator;
 
   private final EntityStore entityStore;
+
+  private final ObjectPolicyResolver objectPolicyResolver;
 
   private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
       Sets.newHashSet(
@@ -92,6 +100,7 @@ public class TagManager implements TagDispatcher {
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
+    this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
   public String[] listTags(String metalake) {
@@ -238,7 +247,51 @@ public class TagManager implements TagDispatcher {
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    if (selector instanceof TagValueSelector) {
+      checkValueCharacters(((TagValueSelector) selector).value(), "Selector value");
+    }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    PolicyEntity policy = null;
+    try {
+      policy = entityStore.get(policyIdentifier, Entity.EntityType.POLICY, PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      // The write path reports missing policies; skip the maintenance pre-check here.
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    if (policy != null && policy.policyType().uniqueAtSameLevel()) {
+      List<String> conflicting = new ArrayList<>();
+      IllegalArgumentException first = null;
+      for (MetadataObject object : listMetadataObjectsForTag(metalake, tagName)) {
+        Tag tagOnObject;
+        try {
+          tagOnObject = getTagForMetadataObject(metalake, object, tagName);
+        } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
+          continue;
+        }
+        try {
+          objectPolicyResolver.checkMaintenanceTypeUniqueness(
+              metalake,
+              object,
+              tagOnObject.assignment().orElseGet(TagAssignment::noValue),
+              policy,
+              selector);
+        } catch (IllegalArgumentException e) {
+          conflicting.add(object.toString());
+          if (first == null) {
+            first = e;
+          }
+        }
+      }
+      if (first != null) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Associating the policy with tag %s would create same-type policy conflicts on"
+                    + " metadata objects %s. %s",
+                tagName, conflicting, first.getMessage()),
+            first);
+      }
+    }
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -436,6 +489,67 @@ public class TagManager implements TagDispatcher {
     TagValue[] tagValuesToAdd = tagsToAddSet.toArray(new TagValue[0]);
     TagValue[] tagValuesToRemove = tagsToRemoveSet.toArray(new TagValue[0]);
 
+    if (tagValuesToAdd.length > 0) {
+      Map<String, LinkedHashSet<String>> valuesByTag = new LinkedHashMap<>();
+      Set<String> noValueTags = new LinkedHashSet<>();
+      for (Tag tag : listTagsInfoForMetadataObject(metalake, metadataObject)) {
+        TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
+        if (assignment.hasValues()) {
+          valuesByTag
+              .computeIfAbsent(tag.name(), ignored -> new LinkedHashSet<>())
+              .addAll(Arrays.asList(assignment.values()));
+        } else {
+          noValueTags.add(tag.name());
+        }
+      }
+      for (TagValue toRemove : tagValuesToRemove) {
+        if (mode == TagAssociationMode.TAG_NAMES || !toRemove.value().isPresent()) {
+          valuesByTag.remove(toRemove.name());
+          noValueTags.remove(toRemove.name());
+          continue;
+        }
+        LinkedHashSet<String> values = valuesByTag.get(toRemove.name());
+        if (values != null) {
+          values.remove(toRemove.value().get());
+          if (values.isEmpty()) {
+            valuesByTag.remove(toRemove.name());
+          }
+        }
+      }
+      for (TagValue toAdd : tagValuesToAdd) {
+        if (!toAdd.value().isPresent()) {
+          if (!valuesByTag.containsKey(toAdd.name())) {
+            noValueTags.add(toAdd.name());
+          }
+          continue;
+        }
+        noValueTags.remove(toAdd.name());
+        valuesByTag
+            .computeIfAbsent(toAdd.name(), ignored -> new LinkedHashSet<>())
+            .add(toAdd.value().get());
+      }
+      List<ResolvedTag> projected = new ArrayList<>();
+      Set<String> names = new LinkedHashSet<>();
+      names.addAll(noValueTags);
+      names.addAll(valuesByTag.keySet());
+      for (String projectedTagName : names) {
+        TagEntity tagEntity;
+        try {
+          tagEntity = loadTagEntity(metalake, projectedTagName);
+        } catch (NoSuchTagException e) {
+          // Matching the store: unknown tag names in an association request are ignored.
+          continue;
+        }
+        TagAssignment assignment =
+            valuesByTag.containsKey(projectedTagName)
+                ? TagAssignment.ofValues(valuesByTag.get(projectedTagName).toArray(new String[0]))
+                : TagAssignment.noValue();
+        projected.add(new ResolvedTag(tagEntity.copyWithAssignment(assignment), metadataObject));
+      }
+      objectPolicyResolver.checkMaintenanceTypeUniqueness(
+          metalake, metadataObject, projected.toArray(new ResolvedTag[0]));
+    }
+
     try {
       List<TagEntity> tags;
       if (mode == TagAssociationMode.TAG_VALUES) {
@@ -506,6 +620,9 @@ public class TagManager implements TagDispatcher {
       case NO_VALUE:
         return normalizedConstraint.allowedValues();
       case ALLOWED_VALUES:
+        for (String allowedValue : normalizedConstraint.allowedValues()) {
+          checkValueCharacters(allowedValue, "Allowed tag value");
+        }
         return Arrays.stream(normalizedConstraint.allowedValues())
             .distinct()
             .toArray(String[]::new);
@@ -522,12 +639,28 @@ public class TagManager implements TagDispatcher {
     Map<String, Boolean> valuedByTagName = Maps.newHashMap();
     for (TagValue tagValue : tagValues) {
       Preconditions.checkNotNull(tagValue, "Tag value to add must not be null");
+      tagValue.value().ifPresent(value -> checkValueCharacters(value, "Tag value"));
       boolean valued = tagValue.value().isPresent();
       Boolean previous = valuedByTagName.putIfAbsent(tagValue.name(), valued);
       Preconditions.checkArgument(
           previous == null || previous == valued,
           "Cannot add assignments both with and without values for tag %s",
           tagValue.name());
+    }
+  }
+
+  /**
+   * Rejects double quotes, backslashes, and control characters, which the selector JSON escapes and
+   * the nearest-policy SQL compares as plain text.
+   */
+  private static void checkValueCharacters(String value, String kind) {
+    for (int i = 0; i < value.length(); i++) {
+      char c = value.charAt(i);
+      Preconditions.checkArgument(
+          c != '"' && c != '\\' && !Character.isISOControl(c),
+          "%s %s must not contain double quotes, backslashes, or control characters",
+          kind,
+          value);
     }
   }
 

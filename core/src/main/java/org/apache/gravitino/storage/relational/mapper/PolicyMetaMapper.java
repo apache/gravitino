@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.po.NearestPolicyIdPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -217,4 +218,24 @@ public interface PolicyMetaMapper {
       method = "batchSelectPolicyByIdentifier")
   List<PolicyPO> batchSelectPolicyByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
+
+  /**
+   * Lists each distinct enabled policy of {@code policyType} matched on a table's nearest level.
+   *
+   * <p>Tables without a matching policy are absent. A table may appear on more than one row when
+   * several policies tie.
+   *
+   * @param tableIds table ids
+   * @param policyType policy type wire value
+   * @return one row per {@code (tableId, policyId)}
+   */
+  @Results(
+      id = "nearestPolicyIdPOResultMap",
+      value = {
+        @Result(property = "tableId", column = "tableId"),
+        @Result(property = "policyId", column = "policyId")
+      })
+  @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "listNearestPolicyIds")
+  List<NearestPolicyIdPO> listNearestPolicyIds(
+      @Param("tableIds") List<Long> tableIds, @Param("policyType") String policyType);
 }

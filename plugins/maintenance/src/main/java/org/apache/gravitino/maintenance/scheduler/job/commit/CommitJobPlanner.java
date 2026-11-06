@@ -25,9 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -40,7 +37,6 @@ import org.apache.gravitino.maintenance.scheduler.MaintenanceSchedulerPools;
 import org.apache.gravitino.maintenance.scheduler.MaintenanceTaskIds;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceAuthConsistency;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
-import org.apache.gravitino.maintenance.scheduler.policy.NearestMaintenancePolicyResolver;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.policy.ExecutablePolicyContent;
@@ -48,7 +44,6 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,27 +66,23 @@ public class CommitJobPlanner {
   private final MaintenanceJobSpecFactory specFactory;
   private final TableMetaService tableMetaService;
   private final PolicyMetaService policyMetaService;
-  private final EntityStore entityStore;
 
   /**
    * @param gravitinoConfig server config for auth overlay and minInterval fallbacks
    * @param actionManager occupancy / cooldown gate
    * @param tableMetaService table lookup
-   * @param policyMetaService policy lookup
-   * @param entityStore store used by nearest-policy resolution
+   * @param policyMetaService policy lookup and nearest-policy resolution
    */
   public CommitJobPlanner(
       Config gravitinoConfig,
       MaintenanceActionManager actionManager,
       TableMetaService tableMetaService,
-      PolicyMetaService policyMetaService,
-      EntityStore entityStore) {
+      PolicyMetaService policyMetaService) {
     this.gravitinoConfig = Preconditions.checkNotNull(gravitinoConfig);
     this.actionManager = Preconditions.checkNotNull(actionManager);
     this.specFactory = new MaintenanceJobSpecFactory(gravitinoConfig);
     this.tableMetaService = Preconditions.checkNotNull(tableMetaService);
     this.policyMetaService = Preconditions.checkNotNull(policyMetaService);
-    this.entityStore = Preconditions.checkNotNull(entityStore);
   }
 
   /**
@@ -127,18 +118,20 @@ public class CommitJobPlanner {
         }
       }
 
-      MetadataObject tableObject =
-          NameIdentifierUtil.toMetadataObject(identifier, Entity.EntityType.TABLE);
-      String metalake = namespace.level(0);
-
-      NearestMaintenancePolicyResolver nearest = new NearestMaintenancePolicyResolver(entityStore);
       List<PolicyEntity> chain = new ArrayList<>();
       for (Policy.BuiltInType type : CHAIN_ORDER) {
-        Optional<Long> winnerId = nearest.resolveWinnerId(metalake, tableObject, type);
-        if (winnerId.isEmpty()) {
+        List<Long> nearestIds =
+            policyMetaService.resolveNearestPolicyIds(List.of(tableId), type).get(tableId);
+        if (nearestIds == null || nearestIds.isEmpty()) {
           continue;
         }
-        PolicyEntity policy = policyMetaService.getPolicyById(winnerId.get());
+        Preconditions.checkArgument(
+            nearestIds.size() == 1,
+            "ambiguous %s policies on the nearest level of table %s: %s",
+            type,
+            tableId,
+            nearestIds);
+        PolicyEntity policy = policyMetaService.getPolicyById(nearestIds.get(0));
         if (policy == null || !policy.enabled()) {
           continue;
         }

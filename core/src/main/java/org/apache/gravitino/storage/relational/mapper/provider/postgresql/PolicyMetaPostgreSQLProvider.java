@@ -45,6 +45,11 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   }
 
   @Override
+  protected String schemaSeparatorLiteral() {
+    return "CHR(1)";
+  }
+
+  @Override
   public String deletePolicyMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return "DELETE FROM "
         + POLICY_META_TABLE_NAME

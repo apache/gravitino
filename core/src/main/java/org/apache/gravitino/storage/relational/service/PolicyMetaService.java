@@ -40,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
 import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -50,6 +51,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.NearestPolicyIdPO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -111,6 +113,40 @@ public class PolicyMetaService {
       return null;
     }
     return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(policyPO.getMetalakeName()));
+  }
+
+  /**
+   * Resolves the nearest enabled policy ids of {@code policyType} for each table with one SQL
+   * statement.
+   *
+   * <p>A table inherits from its schema, that schema's hierarchical ancestors, and its catalog. The
+   * nearest assignment of a tag wins, a policy matches through its tag selector, and the nearest
+   * level with a matching policy decides, as in {@code ObjectPolicyResolver}. Callers that require
+   * a unique winner (built-in {@code uniqueAtSameLevel} types) should reject lists with size not
+   * equal to one.
+   *
+   * @param tableIds table entity ids
+   * @param policyType built-in policy type
+   * @return nearest-level policy ids per table; tables without a matching policy are absent
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "resolveNearestPolicyIds")
+  public Map<Long, List<Long>> resolveNearestPolicyIds(
+      List<Long> tableIds, Policy.BuiltInType policyType) {
+    Preconditions.checkNotNull(policyType, "policyType");
+    Map<Long, List<Long>> result = new LinkedHashMap<>();
+    if (tableIds == null || tableIds.isEmpty()) {
+      return result;
+    }
+    List<NearestPolicyIdPO> rows =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper -> mapper.listNearestPolicyIds(tableIds, policyType.policyType()));
+    for (NearestPolicyIdPO row : rows) {
+      result.computeIfAbsent(row.getTableId(), ignored -> new ArrayList<>()).add(row.getPolicyId());
+    }
+    return result;
   }
 
   @Monitored(

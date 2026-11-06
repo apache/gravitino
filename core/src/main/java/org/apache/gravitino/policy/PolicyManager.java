@@ -35,15 +35,20 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -182,6 +187,11 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public void enablePolicy(String metalake, String policyName) throws NoSuchPolicyException {
+    NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
+    if (!policyEnabled(metalake, policyName)) {
+      requireNoConflictBeforeEnable(metalake, policyName);
+    }
     changePolicyEnabledState(metalake, policyName, true);
   }
 
@@ -287,6 +297,70 @@ public class PolicyManager implements PolicyDispatcher {
       LOG.error(
           "Failed to change policy {} enabled state under metalake {}", policyName, metalake, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /**
+   * Rejects enabling a maintenance policy when that would create a same-level same-type conflict on
+   * any metadata object reached through the policy's tag associations.
+   */
+  private void requireNoConflictBeforeEnable(String metalake, String policyName) {
+    PolicyEntity policy = loadPolicyEntity(metalake, policyName);
+    if (!policy.policyType().uniqueAtSameLevel()) {
+      return;
+    }
+
+    for (RelationalEntity<?> association : listTagAssociationsForPolicy(metalake, policyName)) {
+      TagEntity tag = (TagEntity) association.targetEntity();
+      PolicyAssociationSelector selector =
+          association
+              .relationValue()
+              .map(PolicyAssociationSelectorSerde::deserialize)
+              .orElseGet(AllValuesSelector::get);
+      for (MetadataObject object : listMetadataObjectsForTag(metalake, tag.name())) {
+        TagAssignment assignment = assignmentOnObject(metalake, object, tag.name());
+        if (assignment == null) {
+          continue;
+        }
+        objectPolicyResolver.checkMaintenanceTypeUniqueness(
+            metalake, object, assignment, policy, selector);
+      }
+    }
+  }
+
+  private List<MetadataObject> listMetadataObjectsForTag(String metalake, String tagName) {
+    try {
+      return MetadataObjectService.fromGenericEntities(
+          entityStore
+              .relationOperations()
+              .listEntitiesByRelation(
+                  RelationQuery.of(
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                      NameIdentifierUtil.ofTag(metalake, tagName),
+                      Entity.EntityType.TAG,
+                      true,
+                      null)));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Returns the tag assignment on {@code object}, or {@code null} if the tag is not present. */
+  private TagAssignment assignmentOnObject(String metalake, MetadataObject object, String tagName) {
+    try {
+      return entityStore
+          .relationOperations()
+          .<TagEntity>getEntityByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(metalake, object),
+              MetadataObjectUtil.toEntityType(object),
+              NameIdentifierUtil.ofTag(metalake, tagName))
+          .assignment()
+          .orElseGet(TagAssignment::noValue);
+    } catch (NoSuchEntityException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

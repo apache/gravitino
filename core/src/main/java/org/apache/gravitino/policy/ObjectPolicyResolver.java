@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -50,6 +51,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The resolver evaluates relation selectors, filters disabled policies, and deduplicates
  * repeated matches by policy entity ID while preserving contributing metadata-object sources.
+ * Same-level conflicts for Iceberg maintenance policy types are rejected when associating tags or
+ * policies.
  */
 public class ObjectPolicyResolver {
 
@@ -98,7 +101,6 @@ public class ObjectPolicyResolver {
     if (effectiveTags.length == 0) {
       return new Match[0];
     }
-
     List<NameIdentifier> tagIdentifiers =
         Arrays.stream(effectiveTags)
             .map(resolvedTag -> resolvedTag.tag().name())
@@ -162,6 +164,86 @@ public class ObjectPolicyResolver {
           result.put(object, policies(selectMatches(tags, objectRelations)));
         });
     return result;
+  }
+
+  /**
+   * Ensures projected direct tags on {@code metadataObject} would not yield two Iceberg maintenance
+   * policies of the same type at that object level.
+   *
+   * @param metalake metalake name
+   * @param metadataObject object the tags would be assigned to
+   * @param directTags projected direct tags with {@code source == metadataObject}
+   * @throws IllegalArgumentException when a same-level same-type conflict would exist
+   */
+  public void checkMaintenanceTypeUniqueness(
+      String metalake, MetadataObject metadataObject, ResolvedTag[] directTags) {
+    if (directTags.length == 0) {
+      return;
+    }
+    List<NameIdentifier> tagIdentifiers =
+        Arrays.stream(directTags)
+            .map(resolvedTag -> resolvedTag.tag().name())
+            .distinct()
+            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
+            .collect(Collectors.toList());
+    Match[] matches = selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject));
+    Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
+    for (Match match : matches) {
+      Policy.BuiltInType type = match.policy().policyType();
+      if (type.uniqueAtSameLevel()) {
+        byType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(match);
+      }
+    }
+    for (Map.Entry<Policy.BuiltInType, List<Match>> entry : byType.entrySet()) {
+      TreeSet<String> names = new TreeSet<>();
+      for (Match match : entry.getValue()) {
+        if (match.sources().contains(metadataObject)) {
+          names.add(match.policy().name());
+        }
+      }
+      if (names.size() > 1) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Metadata object %s has conflicting %s policies at the same level: %s",
+                metadataObject, entry.getKey().policyType(), names));
+      }
+    }
+  }
+
+  /**
+   * Ensures {@code policy} would not share an Iceberg maintenance type with another policy already
+   * effective on {@code metadataObject} through the given tag assignment and selector.
+   *
+   * @param metalake metalake name
+   * @param metadataObject object that already has the tag
+   * @param assignment current tag assignment on the object
+   * @param policy policy that would become effective
+   * @param selector policy-to-tag selector
+   * @throws IllegalArgumentException when a same-level same-type conflict would exist
+   */
+  public void checkMaintenanceTypeUniqueness(
+      String metalake,
+      MetadataObject metadataObject,
+      TagAssignment assignment,
+      PolicyEntity policy,
+      PolicyAssociationSelector selector) {
+    if (!policy.policyType().uniqueAtSameLevel() || !matches(selector, assignment)) {
+      return;
+    }
+    TreeSet<String> names = new TreeSet<>();
+    for (Match match : resolveMatches(metalake, metadataObject)) {
+      if (match.policy().policyType() == policy.policyType()
+          && match.sources().contains(metadataObject)) {
+        names.add(match.policy().name());
+      }
+    }
+    names.add(policy.name());
+    if (names.size() > 1) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Metadata object %s has conflicting %s policies at the same level: %s",
+              metadataObject, policy.policyType().policyType(), names));
+    }
   }
 
   private List<RelationalEntity<?>> loadRelations(
