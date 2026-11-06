@@ -228,3 +228,41 @@ You can't submit the `RenameTable` operation at the same time as other operation
 PostgreSQL doesn't support the `UpdateColumnPosition` operation, so you can only use `ColumnPosition.defaultPosition()` when `AddColumn`.
 If you update a nullability column to non nullability, there may be compatibility issues.
 :::
+
+### Native type declarations and column defaults
+
+`ExternalType` on CREATE or ALTER accepts a single PostgreSQL type declaration: an unquoted
+or double-quoted type name, optionally schema-qualified, with numeric or identifier type
+modifiers (for example `geometry(Point,4326)`) and array suffixes (`[]` or `ARRAY`). Standard
+multiword types such as `double precision`, `character varying`, `national character(3)`,
+`timestamp with time zone`, and interval field declarations are also accepted. Quote type
+names containing spaces or punctuation. Extra column definitions, constraints, defaults,
+comments, and statements are rejected before DDL execution. Unsupported declaration syntax
+must be expressed using one of the supported forms; arbitrary SQL fragments are not accepted.
+The native type read path remains unchanged.
+
+Function defaults accept an unquoted function identifier, optionally qualified, with literal
+or nested-function arguments. Arguments are rendered as SQL values rather than Java object
+strings. `CURRENT_TIMESTAMP` remains a no-argument keyword default. Raw SQL expressions and
+SQL syntax in function names are rejected. String values containing backslashes use explicit
+PostgreSQL escape literals so that `standard_conforming_strings` does not change their meaning.
+On load, only complete supported constants are converted to literals; functions and other
+expressions remain `UnparsedExpression` values. `CURRENT_TIMESTAMP` loads as the
+`CURRENT_TIMESTAMP` default on any column type. A plain number or `true`/`false` on a string
+column loads as a string. For example, `varchar(20) DEFAULT 10` loads as `10`, and
+`text DEFAULT true` loads as `true`. Quoted defaults are decoded using the reading
+connection's string mode without changing the session or adding a query. An unparsed default
+is preserved for inspection, but cannot be submitted as a PostgreSQL write expression.
+See [shared JDBC default restrictions](./tables-and-views.md#table-column-default-value) for the
+other affected catalogs and the limits of this validation.
+
+ALTER requests normalize explicit NULL default literals in the same way as CREATE requests.
+A string literal containing `NULL` remains a string, and omitting a default when adding a
+column still leaves the default unset.
+
+### Deleting unique indexes
+
+The table index API drops PostgreSQL primary-key and unique constraints. A standalone
+`CREATE UNIQUE INDEX` is visible in table metadata, but deleting it through this API is
+unsupported. Both strict and `ifExists` deletion requests fail explicitly before applying
+any changes in the request. Remove standalone indexes directly in PostgreSQL.

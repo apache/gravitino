@@ -36,6 +36,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -412,7 +414,15 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.addColumn(
-          fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
+          fieldName,
+          dataType,
+          comment,
+          position,
+          nullable,
+          autoIncrement,
+          defaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) defaultValue)
+              : defaultValue);
     }
   }
 
@@ -524,7 +534,11 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+      return TableChange.updateColumnDefaultValue(
+          fieldName,
+          newDefaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) newDefaultValue)
+              : newDefaultValue);
     }
   }
 

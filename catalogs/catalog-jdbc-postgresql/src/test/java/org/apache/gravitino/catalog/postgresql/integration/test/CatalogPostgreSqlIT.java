@@ -1093,12 +1093,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_DATE"), column.defaultValue());
+          // An expression default must not be mistaken for a string literal of the same text.
+          Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_TIMESTAMP"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
