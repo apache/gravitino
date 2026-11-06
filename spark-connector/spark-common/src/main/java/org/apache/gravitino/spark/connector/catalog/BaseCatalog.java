@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -47,6 +49,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.JavaImpl;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -305,11 +308,31 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        Arrays.stream(changes)
-            .map(sparkTableChangeConverter::toGravitinoTableChange)
-            .toArray(org.apache.gravitino.rel.TableChange[]::new);
     try {
+      Supplier<Column[]> columns =
+          Suppliers.memoize(
+                  () -> {
+                    // A schema-changing batch needs sequential schema evolution before coercion.
+                    // Reject it before any write rather than resolve against stale column types.
+                    Preconditions.checkArgument(
+                        Arrays.stream(changes)
+                            .noneMatch(
+                                change ->
+                                    change instanceof TableChange.AddColumn
+                                        || change instanceof TableChange.DeleteColumn
+                                        || change instanceof TableChange.RenameColumn
+                                        || change instanceof TableChange.UpdateColumnType),
+                        "Timestamp, date, and string defaults cannot be combined with column schema changes");
+                    return gravitinoCatalogClient
+                        .asTableCatalog()
+                        .loadTable(NameIdentifier.of(getDatabase(ident), ident.name()))
+                        .columns();
+                  })
+              ::get;
+      org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
+          Arrays.stream(changes)
+              .map(change -> sparkTableChangeConverter.toGravitinoTableChange(change, columns))
+              .toArray(org.apache.gravitino.rel.TableChange[]::new);
       invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
@@ -570,9 +593,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalogClient
               .asFunctionCatalog()
               .listFunctionInfos(Namespace.of(gravitinoNamespace));
-      // Filter functions that have Spark runtime implementation
+      // Only list functions that loadFunction can load
       return Arrays.stream(functions)
-          .filter(this::hasSparkImplementation)
+          .filter(this::hasSparkJavaImplementation)
           .map(f -> Identifier.of(new String[] {gravitinoNamespace}, f.name()))
           .toArray(Identifier[]::new);
     } catch (NoSuchSchemaException e) {
@@ -595,10 +618,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalogClient.asFunctionCatalog().getFunction(gravitinoIdentifier);
       for (FunctionDefinition definition : function.definitions()) {
         for (FunctionImpl impl : definition.impls()) {
-          if (!isSparkImplementation(impl)) {
+          if (!isSparkJavaImplementation(impl)) {
             continue;
           }
-          String className = extractClassName(impl);
+          String className = ((JavaImpl) impl).className();
           if (StringUtils.isBlank(className)) {
             continue;
           }
@@ -678,10 +701,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return gravitinoIdentifier.namespace().level(0);
   }
 
-  private boolean hasSparkImplementation(Function function) {
+  private boolean hasSparkJavaImplementation(Function function) {
     for (FunctionDefinition definition : function.definitions()) {
       for (FunctionImpl impl : definition.impls()) {
-        if (isSparkImplementation(impl)) {
+        if (isSparkJavaImplementation(impl)) {
           return true;
         }
       }
@@ -689,16 +712,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return false;
   }
 
-  private boolean isSparkImplementation(FunctionImpl impl) {
-    return FunctionImpl.RuntimeType.SPARK.equals(impl.runtime());
-  }
-
-  private String extractClassName(FunctionImpl impl) {
-    if (impl instanceof JavaImpl) {
-      return ((JavaImpl) impl).className();
-    }
-    throw new IllegalArgumentException(
-        String.format("Unsupported function implementation %s", impl.getClass().getName()));
+  private boolean isSparkJavaImplementation(FunctionImpl impl) {
+    return FunctionImpl.RuntimeType.SPARK.equals(impl.runtime()) && impl instanceof JavaImpl;
   }
 
   private UnboundFunction instantiateFunction(String className, Identifier ident)

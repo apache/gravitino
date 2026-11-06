@@ -22,6 +22,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Maps;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,12 +35,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -60,6 +66,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestDorisTableOperations extends TestDoris {
@@ -191,6 +199,43 @@ public class TestDorisTableOperations extends TestDoris {
 
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(databaseName, newName), "table should be non-existent");
+  }
+
+  @Test
+  public void testUpdateColumnPositionAfterReservedWordColumn() {
+    String tableName = GravitinoITUtils.genRandomName("doris_position_test_table");
+    // The wide col_2 keeps status and key out of the default key columns.
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder().withName("col_1").withType(INT).build(),
+          JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).build(),
+          JdbcColumn.builder().withName("status").withType(VARCHAR_255).build(),
+          JdbcColumn.builder().withName("key").withType(VARCHAR_255).build()
+        };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        "test_comment",
+        createProperties(),
+        null,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+        new Index[0]);
+
+    // A null position moves the column after the last column `key`, a reserved word.
+    TABLE_OPERATIONS.alterTable(
+        databaseName, tableName, TableChange.updateColumnPosition(new String[] {"status"}, null));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                Assertions.assertArrayEquals(
+                    new String[] {"col_1", "col_2", "key", "status"},
+                    Arrays.stream(TABLE_OPERATIONS.load(databaseName, tableName).columns())
+                        .map(Column::name)
+                        .toArray(String[]::new)));
   }
 
   @Test
@@ -410,6 +455,45 @@ public class TestDorisTableOperations extends TestDoris {
                     indexes,
                     Transforms.EMPTY_TRANSFORM,
                     TABLE_OPERATIONS.load(databaseName, tableName)));
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = GravitinoITUtils.genRandomName("doris_clear_comment_table");
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+
+    try {
+      TABLE_OPERATIONS.create(
+          databaseName,
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          createProperties(),
+          null,
+          Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+          Indexes.EMPTY_INDEXES);
+
+      // Doris rejects table and column comment changes in the same ALTER statement.
+      TABLE_OPERATIONS.alterTable(
+          databaseName, tableName, TableChange.updateColumnComment(new String[] {"col_1"}, null));
+      TABLE_OPERATIONS.alterTable(databaseName, tableName, TableChange.updateComment(null));
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+                // Doris reports the engine name (OLAP) as the comment of a table without a comment.
+                Assertions.assertTrue(
+                    StringUtils.isEmpty(load.comment()) || "OLAP".equals(load.comment()),
+                    load.comment());
+                Assertions.assertTrue(
+                    StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+              });
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 
   @Test
@@ -764,5 +848,50 @@ public class TestDorisTableOperations extends TestDoris {
         3,
         operationsWithOldDriver.calculateDatetimePrecision("DATETIME(3)", 0, 0),
         "DATETIME(3) should return 3 even with unsupported driver version");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "O'Brien",
+        "quote\\' and \\new\\path; \"double\"",
+        "owner's a\"\"b \"value\"\\path",
+        "ends with \\"
+      })
+  void testCreateTableStringDefaultIsStoredVerbatim(String defaultValue) throws SQLException {
+    String tableName = GravitinoITUtils.genRandomName("doris_default_round_trip");
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+      JdbcColumn.builder()
+          .withName("col1")
+          .withType(VARCHAR_255)
+          .withNullable(true)
+          .withDefaultValue(Literals.varcharLiteral(255, defaultValue))
+          .build()
+    };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("id")),
+        Indexes.EMPTY_INDEXES);
+    try {
+      try (Connection connection = DATA_SOURCE.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate(
+            String.format("INSERT INTO `%s`.`%s` (id) VALUES (1)", databaseName, tableName));
+        try (ResultSet result =
+            statement.executeQuery(
+                String.format("SELECT col1 FROM `%s`.`%s`", databaseName, tableName))) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(defaultValue, result.getString(1));
+        }
+      }
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 }

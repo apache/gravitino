@@ -21,6 +21,9 @@ concurrency:
 
 jobs:
   lance-matrix:
+    # Forks inherit the weekly schedule; only run it upstream, but keep manual runs anywhere.
+    # Other copies of the repository set ENABLE_SCHEDULED_TESTS to run it on schedule.
+    if: github.event_name != 'schedule' || github.repository == 'apache/gravitino' || vars.ENABLE_SCHEDULED_TESTS == 'true'
     uses: ./.github/workflows/lance-compatibility-matrix-test-action.yml
     with:
       lance_spark_versions: ${{ github.event.inputs.lance_spark_versions || '0.2.0,0.4.0,0.5.1' }}

@@ -20,6 +20,8 @@ package org.apache.gravitino.dto.rel;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
@@ -55,6 +57,7 @@ public class ColumnDTO implements Column {
   private boolean autoIncrement = false;
 
   @JsonProperty("defaultValue")
+  @JsonSetter(nulls = Nulls.SKIP)
   // the NON_EMPTY annotation is used to avoid serializing the defaultValue field if it is not set
   // or null.
   @JsonInclude(JsonInclude.Include.NON_EMPTY)

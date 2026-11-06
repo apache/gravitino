@@ -19,10 +19,14 @@
 package org.apache.gravitino.tag;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_BATCH_SIZE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES;
+import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
@@ -61,6 +65,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
@@ -184,6 +189,10 @@ public class TestTagManager {
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_BATCH_SIZE))
         .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_POLL_BATCH_SIZE);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_WINDOW_SECS);
+    Mockito.when(config.get(ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES))
+        .thenReturn(DEFAULT_ENTITY_CHANGE_LOG_REPLAY_MAX_ENTRIES);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -528,6 +537,37 @@ public class TestTagManager {
 
     Assertions.assertEquals("tag1", tagManager.getTag(METALAKE, "tag1").name());
     Assertions.assertEquals("tag2", tagManager.getTag(METALAKE, "tag2").name());
+  }
+
+  @Test
+  void testAlterTagMultipleRenamesToExistingTag() {
+    Tag source = tagManager.createTag(METALAKE, "tag1", "source", ImmutableMap.of("key", "source"));
+    Tag target = tagManager.createTag(METALAKE, "tag2", "target", ImmutableMap.of("key", "target"));
+
+    TagAlreadyExistsException exception =
+        Assertions.assertThrows(
+            TagAlreadyExistsException.class,
+            () ->
+                tagManager.alterTag(
+                    METALAKE,
+                    "tag1",
+                    TagChange.rename("intermediate"),
+                    TagChange.updateComment("changed"),
+                    TagChange.setProperty("key", "changed"),
+                    TagChange.rename("tag2")));
+
+    Assertions.assertEquals(
+        "Tag with name tag2 under metalake metalake_for_tag_test already exists",
+        exception.getMessage());
+    Assertions.assertInstanceOf(EntityAlreadyExistsException.class, exception.getCause());
+    for (Tag original : new Tag[] {source, target}) {
+      Tag unchanged = tagManager.getTag(METALAKE, original.name());
+      Assertions.assertEquals(original.name(), unchanged.name());
+      Assertions.assertEquals(original.comment(), unchanged.comment());
+      Assertions.assertEquals(original.properties(), unchanged.properties());
+    }
+    Assertions.assertThrows(
+        NoSuchTagException.class, () -> tagManager.getTag(METALAKE, "intermediate"));
   }
 
   @Test

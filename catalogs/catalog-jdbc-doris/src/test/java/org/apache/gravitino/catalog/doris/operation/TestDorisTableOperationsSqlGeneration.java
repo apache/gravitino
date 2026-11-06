@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.converter.DorisExceptionConverter;
@@ -42,6 +43,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -56,6 +58,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -154,6 +157,31 @@ public class TestDorisTableOperationsSqlGeneration {
     }
   }
 
+  /** Verifies a nullable column cannot be changed to not null. */
+  @Test
+  public void testUpdateColumnNullabilityRejectsNullableToNotNull() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build();
+    ops.setTableForAlter(
+        JdbcTable.builder().withName("test_table").withColumns(new JdbcColumn[] {column}).build());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.updateColumnNullability(new String[] {"col1"}, false)));
+    Assertions.assertEquals(
+        "Doris does not support changing nullable column col1 to not null", exception.getMessage());
+  }
+
   /** Verifies string defaults and unchanged column attributes are preserved. */
   @Test
   public void testUpdateColumnTypePreservesStringDefaultAndColumnAttributes() {
@@ -224,6 +252,105 @@ public class TestDorisTableOperationsSqlGeneration {
         sql);
   }
 
+  /**
+   * Verifies nullability and position changes use the same default encoding as MODIFY COLUMN.
+   *
+   * @param version the Doris version
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"1.2.7", "2.1.0", "3.0.6.2", "4.0.6"})
+  public void testNullabilityAndPositionPreserveEscapedDefaults(String version) throws Exception {
+    for (String value : new String[] {"O'Brien", "a\"\"b", "\\path", "trailing\\"}) {
+      TestableDorisTableOperations ops = new TestableDorisTableOperations(version);
+      DataSource versionDataSource = mockVersionDataSource(version);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn column =
+          JdbcColumn.builder()
+              .withName("col1")
+              .withType(Types.VarCharType.of(64))
+              .withNullable(false)
+              .withComment("column comment")
+              .withDefaultValue(Literals.varcharLiteral(64, value))
+              .build();
+      ops.setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+
+      String sql =
+          ops.alterTableSql(
+              "test_table",
+              TableChange.updateColumnNullability(new String[] {"col1"}, true),
+              TableChange.updateColumnPosition(
+                  new String[] {"col1"}, TableChange.ColumnPosition.first()),
+              TableChange.updateColumnType(new String[] {"col1"}, Types.VarCharType.of(128)));
+
+      boolean isDoris3x = version.startsWith("3.");
+      String expectedDefault =
+          new DorisColumnDefaultValueConverter()
+              .fromGravitinoForModifyColumn(column.defaultValue(), isDoris3x, isDoris3x);
+      Assertions.assertEquals(
+          "ALTER TABLE `test_table`\n"
+              + "MODIFY COLUMN `col1` varchar(64) NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' ,\n"
+              + "MODIFY COLUMN `col1` varchar(64) NOT NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' FIRST,\n"
+              + "MODIFY COLUMN `col1` varchar(128) NOT NULL DEFAULT "
+              + expectedDefault
+              + " COMMENT 'column comment' ;",
+          sql);
+      if (value.contains("\\") || value.contains("\"")) {
+        Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+      } else {
+        Mockito.verifyNoInteractions(versionDataSource);
+      }
+    }
+  }
+
+  /** Verifies ordinary defaults do not add a version query for nullability or position changes. */
+  @Test
+  public void testNullabilityAndPositionSkipVersionLookupForPlainDefaults() {
+    for (Expression defaultValue :
+        new Expression[] {DEFAULT_VALUE_NOT_SET, Literals.NULL, Literals.integerLiteral(7)}) {
+      TestableDorisTableOperations ops = new TestableDorisTableOperations();
+      DataSource versionDataSource = Mockito.mock(DataSource.class);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn column =
+          JdbcColumn.builder()
+              .withName("col1")
+              .withType(Types.IntegerType.get())
+              .withDefaultValue(defaultValue)
+              .build();
+      ops.setTableForAlter(
+          JdbcTable.builder()
+              .withName("test_table")
+              .withColumns(new JdbcColumn[] {column})
+              .build());
+      String sql =
+          ops.alterTableSql(
+              "test_table",
+              TableChange.updateColumnNullability(new String[] {"col1"}, true),
+              TableChange.updateColumnPosition(
+                  new String[] {"col1"}, TableChange.ColumnPosition.first()));
+      String expectedDefault =
+          DEFAULT_VALUE_NOT_SET.equals(defaultValue)
+              ? ""
+              : "DEFAULT " + (Literals.NULL.equals(defaultValue) ? "NULL" : "7") + " ";
+      Assertions.assertTrue(
+          sql.contains(
+              "int NULL "
+                  + expectedDefault
+                  + ",\nMODIFY COLUMN `col1` int NULL "
+                  + expectedDefault
+                  + "FIRST;"),
+          sql);
+      Mockito.verifyNoInteractions(versionDataSource);
+    }
+  }
+
   /** Verifies native unparsed defaults pass through without interpretation. */
   @Test
   public void testUpdateColumnTypePassesThroughUnparsedDefault() {
@@ -266,19 +393,19 @@ public class TestDorisTableOperationsSqlGeneration {
         ops.updateColumnTypeSql(unsetDefault, Types.LongType.get()).contains("bigint NULL ;"));
   }
 
-  /** Verifies nested column names remain unsupported for type changes. */
-  @Test
-  public void testUpdateColumnTypeRejectsNestedColumnName() {
+  /**
+   * Verifies rejected nested-column changes follow the alter-table exception contract.
+   *
+   * @param change the nested-column change to reject
+   */
+  @ParameterizedTest
+  @MethodSource("nestedColumnChanges")
+  public void testRejectsNestedColumnName(TableChange change) {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
 
-    UnsupportedOperationException exception =
+    IllegalArgumentException exception =
         Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                ops.alterTableSql(
-                    "test_table",
-                    TableChange.updateColumnType(
-                        new String[] {"parent", "child"}, Types.LongType.get())));
+            IllegalArgumentException.class, () -> ops.alterTableSql("test_table", change));
 
     Assertions.assertEquals("Doris does not support nested column names.", exception.getMessage());
   }
@@ -461,6 +588,19 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testClearCommentsWithNull() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    String columnSql =
+        ops.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, null));
+    Assertions.assertTrue(columnSql.contains("MODIFY COLUMN `col1` COMMENT ''"), columnSql);
+
+    String tableSql = ops.alterTableSql("test_table", TableChange.updateComment(null));
+    Assertions.assertTrue(tableSql.contains("MODIFY COMMENT \"\""), tableSql);
+  }
+
+  @Test
   public void testEscapeAddColumnCommentInGeneratedSql() {
     TestableDorisTableOperations ops = new TestableDorisTableOperations();
     String comment = "owner\\'s \"comment\"; --";
@@ -472,6 +612,30 @@ public class TestDorisTableOperationsSqlGeneration {
 
     Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
     Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
+  }
+
+  @Test
+  public void testAddAutoIncrementColumnIsRejected() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTableSql(
+                    "test_table",
+                    TableChange.addColumn(
+                        new String[] {"id"},
+                        Types.LongType.get(),
+                        null,
+                        TableChange.ColumnPosition.defaultPos(),
+                        false,
+                        true)));
+
+    Assertions.assertEquals(
+        "Doris does not support adding auto-increment column `id`; "
+            + "define auto-increment columns when creating the table",
+        exception.getMessage());
   }
 
   @Test
@@ -1504,6 +1668,73 @@ public class TestDorisTableOperationsSqlGeneration {
     return dataSource;
   }
 
+  @Test
+  public void testCreateTableStringDefaultUsesVersionLiteralForm() throws Exception {
+    String singleQuoted = "'O''Brien \\\\ \"x\"'";
+    String doubleQuoted = "\"O'Brien \\\\ \\\"x\\\"\"";
+    Map<String, String> expectedDefaults = new LinkedHashMap<>();
+    expectedDefaults.put("doris-1.2.7-1-Unknown", singleQuoted);
+    expectedDefaults.put("doris-2.1.0-rc11-1", doubleQuoted);
+    expectedDefaults.put("doris-3.0.6.2-rc01-910c4249c5", doubleQuoted);
+    expectedDefaults.put("doris-4.0.6-release-a851eab4", doubleQuoted);
+    for (Map.Entry<String, String> entry : expectedDefaults.entrySet()) {
+      String version = entry.getKey();
+      String expectedDefault = entry.getValue();
+      TestableDorisTableOperations ops = new TestableDorisTableOperations();
+      DataSource versionDataSource = mockVersionDataSource(version);
+      ops.setDataSource(versionDataSource);
+      JdbcColumn[] columns = {
+        JdbcColumn.builder().withName("id").withType(Types.IntegerType.get()).build(),
+        JdbcColumn.builder()
+            .withName("owner")
+            .withType(Types.VarCharType.of(64))
+            .withDefaultValue(Literals.varcharLiteral(64, "O'Brien \\ \"x\""))
+            .build()
+      };
+
+      String sql =
+          ops.generateCreateTableSql(
+              "test_table",
+              columns,
+              null,
+              Collections.singletonMap(REPLICATION_FACTOR, "1"),
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.hash(1, NamedReference.field("id")),
+              Indexes.EMPTY_INDEXES);
+
+      Assertions.assertTrue(sql.contains("DEFAULT " + expectedDefault + " "), sql);
+      Mockito.verify(versionDataSource, Mockito.times(1)).getConnection();
+    }
+  }
+
+  @Test
+  public void testCreateTablePlainStringDefaultSkipsVersionLookup() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource versionDataSource = Mockito.mock(DataSource.class);
+    ops.setDataSource(versionDataSource);
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(Types.IntegerType.get()).build(),
+      JdbcColumn.builder()
+          .withName("owner")
+          .withType(Types.VarCharType.of(64))
+          .withDefaultValue(Literals.varcharLiteral(64, "plain"))
+          .build()
+    };
+
+    String sql =
+        ops.generateCreateTableSql(
+            "test_table",
+            columns,
+            null,
+            Collections.singletonMap(REPLICATION_FACTOR, "1"),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.hash(1, NamedReference.field("id")),
+            Indexes.EMPTY_INDEXES);
+
+    Assertions.assertTrue(sql.contains("DEFAULT 'plain' "), sql);
+    Mockito.verifyNoInteractions(versionDataSource);
+  }
+
   private static DataSource mockVersionDataSource(String dorisVersion) throws Exception {
     // FRONTENDS() exposes the Doris version instead of the MySQL protocol version.
     DataSource dataSource = Mockito.mock(DataSource.class);
@@ -1516,5 +1747,30 @@ public class TestDorisTableOperationsSqlGeneration {
     Mockito.when(resultSet.next()).thenReturn(true);
     Mockito.when(resultSet.getString(1)).thenReturn(dorisVersion);
     return dataSource;
+  }
+
+  private static Stream<TableChange> nestedColumnChanges() {
+    String[] fieldName = {"parent", "child"};
+    return Stream.of(
+        TableChange.addColumn(fieldName, Types.LongType.get()),
+        TableChange.updateColumnComment(fieldName, "new comment"),
+        TableChange.updateColumnPosition(fieldName, TableChange.ColumnPosition.first()),
+        TableChange.deleteColumn(fieldName, false),
+        TableChange.updateColumnType(fieldName, Types.LongType.get()));
+  }
+
+  @Test
+  public void testSetPropertyEscapesKeyAndValue() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.setProperty("key\"name", "owner's \"comment\" C:\\tmp\"); --"),
+            TableChange.setProperty("plain", "value"));
+    Assertions.assertEquals(
+        "ALTER TABLE `test_table`\n"
+            + "set (\"key\"\"name\" = \"owner's \"\"comment\"\" C:\\\\tmp\"\"); --\",\n"
+            + "\"plain\" = \"value\");",
+        sql);
   }
 }

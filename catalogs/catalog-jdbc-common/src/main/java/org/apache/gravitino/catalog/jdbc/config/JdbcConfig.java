@@ -26,6 +26,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 
 public class JdbcConfig extends Config {
 
@@ -161,7 +162,12 @@ public class JdbcConfig extends Config {
           .createWithDefault(true);
 
   public String getJdbcUrl() {
-    return get(JDBC_URL);
+    String url = get(JDBC_URL);
+    if (JdbcUrlUtils.containsCredentials(url)) {
+      throw new IllegalArgumentException(
+          "Credentials in jdbc-url are not supported; use jdbc-user and jdbc-password properties");
+    }
+    return url;
   }
 
   public String getJdbcDriver() {
@@ -198,7 +204,7 @@ public class JdbcConfig extends Config {
   }
 
   public boolean getTestOnBorrow() {
-    return get(TEST_ON_BORROW);
+    return strictBoolean(TEST_ON_BORROW);
   }
 
   public long getMaxWaitMs() {
@@ -220,11 +226,21 @@ public class JdbcConfig extends Config {
    * @return {@code true} to verify the backend at create (default); {@code false} to skip the check
    */
   public boolean getVerifyOnCreate() {
-    return get(VERIFY_ON_CREATE);
+    return strictBoolean(VERIFY_ON_CREATE);
   }
 
   public JdbcConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
+  }
+
+  private boolean strictBoolean(ConfigEntry<Boolean> entry) {
+    String value = getAllConfig().get(entry.getKey());
+    if (value != null
+        && !"true".equalsIgnoreCase(value.trim())
+        && !"false".equalsIgnoreCase(value.trim())) {
+      throw new IllegalArgumentException(entry.getKey() + " must be true or false");
+    }
+    return get(entry);
   }
 }

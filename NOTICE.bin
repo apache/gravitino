@@ -31,7 +31,7 @@ AWS EventStream for Java
 Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 Apache Iceberg
-Copyright 2017-2022 The Apache Software Foundation
+Copyright 2017-2026 The Apache Software Foundation
 
 Apache Kafka
 Copyright 2011-2023 The Apache Software Foundation
@@ -602,6 +602,14 @@ Copyright 2017-2022 The Apache Software Foundation
 This project includes code from Kite, developed at Cloudera, Inc. with
 the following copyright notice:
   Copyright 2013 Cloudera Inc.
+
+This project includes code from Presto, developed at Facebook, with the
+following copyright notice:
+  Copyright 2016 Facebook and contributors.
+
+This project includes code from Delta Lake, developed at The Delta Lake Project,
+with the following copyright notice:
+  Copyright (2021) The Delta Lake Project Authors.
 
 Apache Ivy (TM)
 Copyright 2007-2014 The Apache Software Foundation

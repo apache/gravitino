@@ -66,8 +66,12 @@ public class GravitinoClientConfiguration {
   public static final String CLIENT_SOCKET_TIMEOUT_MS =
       GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs";
 
+  /** Maximum automatic HTTP retries after the initial request; zero disables retries. */
+  public static final String CLIENT_RETRY_TIMES = GRAVITINO_CLIENT_CONFIG_PREFIX + "retryTimes";
+
   private static final Set<String> SUPPORT_CLIENT_CONFIG_KEYS =
       ImmutableSet.of(
+          CLIENT_RETRY_TIMES,
           CLIENT_CONNECTION_TIMEOUT_MS,
           CLIENT_SOCKET_TIMEOUT_MS,
           CLIENT_MAX_CONNECTIONS,
@@ -94,6 +98,17 @@ public class GravitinoClientConfiguration {
     GravitinoClientConfiguration config = new GravitinoClientConfiguration(properties);
     config.validateConnectionPoolSettings();
     return config;
+  }
+
+  /**
+   * Returns the maximum automatic HTTP retries after the initial request.
+   *
+   * @return nonnegative retry count, defaulting to one as in Apache HttpClient
+   */
+  public int getClientRetryTimes() {
+    int retryTimes = MapUtils.propertyAsInt(properties, CLIENT_RETRY_TIMES, 1);
+    checkValue(value -> value >= 0, CLIENT_RETRY_TIMES, retryTimes, POSITIVE_NUMBER_ERROR_MSG);
+    return retryTimes;
   }
 
   /**

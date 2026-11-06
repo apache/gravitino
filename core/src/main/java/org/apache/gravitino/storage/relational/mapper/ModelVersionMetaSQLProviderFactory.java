@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.h2.ModelVersionMetaH2Provider;
@@ -49,6 +50,25 @@ public class ModelVersionMetaSQLProviderFactory {
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
     return MODEL_VERSION_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+  }
+
+  /**
+   * Returns a single-statement query for version URI rows and alias rows of the observed model.
+   *
+   * @param modelId the observed model ID
+   * @param schemaId the observed schema ID
+   * @param modelName the model name
+   * @param version the version number, or null for alias selection or listing
+   * @param alias the alias, or null for numeric selection or listing
+   * @return the snapshot SQL; version and alias must not both be set
+   */
+  public static String selectModelVersionSnapshot(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Nullable @Param("version") Integer version,
+      @Nullable @Param("alias") String alias) {
+    return getProvider().selectModelVersionSnapshot(modelId, schemaId, modelName, version, alias);
   }
 
   public static String insertModelVersionMetas(

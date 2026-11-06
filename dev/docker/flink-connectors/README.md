@@ -59,13 +59,14 @@ server version, or keep it lower.
 
 ## Supported versions
 
-Each Flink minor version ships as its own directory under `/connectors`
-(Scala 2.12; Flink does not support Scala 2.13). The exact set baked into an
+Flink 1.19, 1.20, 2.1, and 2.2 are supported. Each Flink minor version ships as its own directory under
+`/connectors`. Flink 1.x runtime JAR names include the `_2.12` Scala suffix;
+Flink 2.x runtime JAR names have no Scala suffix. The exact set baked into an
 image depends on the Gravitino source branch it was built from; list them
 with:
 
 ```bash
-docker run --rm apache/gravitino-flink-connector:{version}
+docker run --rm -e LIST_VERSIONS=true apache/gravitino-flink-connector:{version}
 ```
 
 Each directory contains one shaded runtime JAR. Do not mix JARs from

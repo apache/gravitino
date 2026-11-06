@@ -51,6 +51,11 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
     return "hive";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link HiveCatalogOperations} with the provided configuration.
    *

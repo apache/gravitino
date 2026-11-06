@@ -59,6 +59,7 @@ import {
   deleteTopic,
   deleteTable,
   deleteView,
+  deleteSemanticModel,
   getTableDetails,
   getCurrentEntityOwner
 } from '@/lib/store/metalakes'
@@ -70,6 +71,8 @@ import CreateFilesetDialog from '../CreateFilesetDialog'
 import RegisterModelDialog from '../RegisterModelDialog'
 import CreateTopicDialog from '../CreateTopicDialog'
 import CreateTableDialog from '../CreateTableDialog'
+import CreateSemanticModelDialog from '../CreateSemanticModelDialog'
+import ImportSemanticModelDialog from '../ImportSemanticModelDialog'
 import Functions from './Functions'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
@@ -89,6 +92,9 @@ export default function SchemaDetailsPage() {
   const [openTopic, setOpenTopic] = useState(false)
   const [openOwner, setOpenOwner] = useState(false)
   const [openModel, setOpenModel] = useState(false)
+  const [openSemanticModel, setOpenSemanticModel] = useState(false)
+  const [openImportSemanticModel, setOpenImportSemanticModel] = useState(false)
+  const [editSemanticModel, setEditSemanticModel] = useState('')
   const [editTable, setEditTable] = useState('')
   const [editFileset, setEditFileset] = useState('')
   const [editTopic, setEditTopic] = useState('')
@@ -103,6 +109,10 @@ export default function SchemaDetailsPage() {
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
   const store = useAppSelector(state => state.metalakes)
+
+  const semanticModelRequest =
+    store.semanticModelRequests[`{{${currentMetalake}}}{{${catalog}}}{{relational}}{{${schema}}}`]
+  const semanticModelListLoading = !!semanticModelRequest?.inFlight.includes(store.semanticModelListRequestId)
   const dispatch = useAppDispatch()
   const [search, setSearch] = useState('')
   const [tabOptions, setTabOptions] = useState([])
@@ -193,12 +203,14 @@ export default function SchemaDetailsPage() {
             ? [
                 { label: 'Tables', key: 'Tables' },
                 { label: 'Views', key: 'Views' },
+                { label: 'Semantic Models', key: 'Semantic Models' },
                 { label: 'Functions', key: 'Functions' },
                 { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Tables', key: 'Tables' },
                 { label: 'Views', key: 'Views' },
+                { label: 'Semantic Models', key: 'Semantic Models' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
@@ -353,6 +365,18 @@ export default function SchemaDetailsPage() {
       children: undefined
     }))
 
+  const semanticModelData = [...(store.semanticModels || [])]
+    .filter(c => {
+      if (search === '') return true
+
+      return c.name.includes(search)
+    })
+    .map(entity => ({
+      ...entity,
+      key: entity.name,
+      children: undefined
+    }))
+
   const subSchemaData = [...subSchemas]
     .filter(item => {
       if (search === '') return true
@@ -488,8 +512,10 @@ export default function SchemaDetailsPage() {
       validateFn = fn
     }
 
+    const typeLabel = type === 'semanticModel' ? 'semantic model' : type
+
     modalToUse.confirm({
-      title: `Are you sure to delete the ${type} ${entity}?`,
+      title: `Are you sure to delete the ${typeLabel} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
         <ConfirmInput name={entity} isManaged={isManaged} location={location} registerValidate={registerValidate} />
@@ -513,6 +539,10 @@ export default function SchemaDetailsPage() {
             case 'relational':
               if (type === 'view') {
                 await dispatch(deleteView({ metalake: currentMetalake, catalog, schema, view: entity }))
+              } else if (type === 'semanticModel') {
+                await dispatch(
+                  deleteSemanticModel({ metalake: currentMetalake, catalog, schema, semanticModel: entity })
+                )
               } else {
                 await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
               }
@@ -631,6 +661,81 @@ export default function SchemaDetailsPage() {
     [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
   )
 
+  const semanticModelColumns = useMemo(
+    () => [
+      {
+        title: 'Semantic Model Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`semantic-model-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&semanticModel=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      },
+      {
+        title: 'Tags',
+        dataIndex: 'tags',
+        key: 'tags',
+        render: (_, record) => (
+          <Tags metadataObjectType={'semantic_model'} metadataObjectFullName={`${catalog}.${schema}.${record.name}`} />
+        )
+      },
+      {
+        title: 'Actions',
+        dataIndex: 'action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <Space size={4}>
+            <Tooltip title='Edit'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Edit Semantic Model'
+                data-refer={`edit-semantic-model-${record.name}`}
+                icon={<Icons.Pencil className='size-4' />}
+                onClick={() => {
+                  setEditSemanticModel(record.name)
+                  setOpenSemanticModel(true)
+                }}
+              />
+            </Tooltip>
+            <Tooltip title='Delete'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Delete Semantic Model'
+                data-refer={`delete-semantic-model-${record.name}`}
+                icon={<Icons.Trash2Icon className='size-4' />}
+                onClick={() => showDeleteConfirm(record, 'semanticModel')}
+              />
+            </Tooltip>
+            {anthEnable && (
+              <Tooltip title='Set Owner'>
+                <Button
+                  type='text'
+                  size='small'
+                  aria-label='Set Owner'
+                  data-refer={`set-owner-semantic-model-${record.name}`}
+                  icon={<Icons.UserPen className='size-4' />}
+                  onClick={() => handleSetOwner('semantic_model', `${catalog}.${schema}.${record.name}`)}
+                />
+              </Tooltip>
+            )}
+          </Space>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog, schema, anthEnable]
+  )
+
   const subSchemaColumns = useMemo(() => {
     return buildSchemaColumns({
       currentMetalake,
@@ -659,6 +764,14 @@ export default function SchemaDetailsPage() {
   } = useAntdColumnResize(() => {
     return { columns: viewColumns, minWidth: 100 }
   }, [viewColumns])
+
+  const {
+    resizableColumns: semanticModelResizableColumns,
+    components: semanticModelComponents,
+    tableWidth: semanticModelTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: semanticModelColumns, minWidth: 100 }
+  }, [semanticModelColumns])
 
   const {
     resizableColumns: subSchemaResizableColumns,
@@ -803,6 +916,62 @@ export default function SchemaDetailsPage() {
             columns={viewResizableColumns}
             components={viewComponents}
           />
+        </>
+      ) : tabKey === 'Semantic Models' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4' gap='middle' wrap>
+            <Search
+              className='w-full sm:w-64'
+              name='searchSemanticModelInput'
+              placeholder='Search...'
+              value={search}
+              onChange={onSearchTable}
+            />
+            <Space wrap>
+              <Button onClick={() => setOpenImportSemanticModel(true)}>Import OSSIE</Button>
+              <Button
+                data-refer='create-semantic-model-btn'
+                type='primary'
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditSemanticModel('')
+                  setOpenSemanticModel(true)
+                }}
+              >
+                Create Semantic Model
+              </Button>
+            </Space>
+          </Flex>
+          <Spin spinning={store.tableLoading || semanticModelListLoading}>
+            <Table
+              data-refer='semantic-model-list-grid'
+              size='small'
+              scroll={{ x: semanticModelTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
+              dataSource={semanticModelData}
+              pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+              columns={semanticModelResizableColumns}
+              components={semanticModelComponents}
+            />
+          </Spin>
+          {openImportSemanticModel && (
+            <ImportSemanticModelDialog
+              open={openImportSemanticModel}
+              setOpen={setOpenImportSemanticModel}
+              metalake={currentMetalake}
+              catalog={catalog}
+              schema={schema}
+            />
+          )}
+          {openSemanticModel && (
+            <CreateSemanticModelDialog
+              open={openSemanticModel}
+              setOpen={setOpenSemanticModel}
+              metalake={currentMetalake}
+              catalog={catalog}
+              schema={schema}
+              editSemanticModel={editSemanticModel}
+            />
+          )}
         </>
       ) : (
         <>

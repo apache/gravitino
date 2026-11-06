@@ -105,6 +105,47 @@ public class TestEntityChangeLogMapper {
   }
 
   @Test
+  void testRecentReplayUsesWindowCeilingAndTimestampIdPagination() throws SQLException {
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "expired", OperateType.ALTER);
+    forceCreatedAt("expired", 1000);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "recent-a", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "recent-b", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "above-ceiling", OperateType.ALTER);
+    List<EntityChangeRecord> all = entityChangeLogMapper.selectEntityChanges(0, 10);
+    long timestamp = all.get(1).getCreatedAt();
+    forceCreatedAt("recent-b", timestamp);
+    long ceiling = all.get(2).getId();
+    List<EntityChangeRecord> page =
+        entityChangeLogMapper.selectRecentEntityChanges(-1, 0, ceiling, 60000, 1);
+    Assertions.assertEquals(
+        List.of("recent-a"), page.stream().map(EntityChangeRecord::getFullName).toList());
+    EntityChangeRecord first = page.get(0);
+    List<EntityChangeRecord> second =
+        entityChangeLogMapper.selectRecentEntityChanges(
+            first.getCreatedAt(), first.getId(), ceiling, 60000, 10);
+    Assertions.assertEquals(
+        List.of("recent-b"), second.stream().map(EntityChangeRecord::getFullName).toList());
+    EntityChangeRecord last = second.get(0);
+    Assertions.assertTrue(
+        entityChangeLogMapper
+            .selectRecentEntityChanges(last.getCreatedAt(), last.getId(), ceiling, 60000, 10)
+            .isEmpty());
+  }
+
+  @Test
+  void testRecentReplayUsesBackendDatabaseClock() {
+    String mysql =
+        new EntityChangeLogBaseSQLProvider().selectRecentEntityChanges(-1, 0, 10, 60000, 2);
+    String postgres =
+        new EntityChangeLogPostgreSQLProvider().selectRecentEntityChanges(-1, 0, 10, 60000, 2);
+    Assertions.assertTrue(mysql.contains("UNIX_TIMESTAMP"));
+    Assertions.assertTrue(postgres.contains("EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)"));
+    Assertions.assertFalse(postgres.contains("UNIX_TIMESTAMP"));
+    Assertions.assertTrue(mysql.contains("ORDER BY created_at, id LIMIT #{maxRows}"));
+    Assertions.assertTrue(postgres.contains("#{windowMs}"));
+  }
+
+  @Test
   void testEntityChangeLogInsertAndSelect() {
     long jvmBefore = System.currentTimeMillis();
     entityChangeLogMapper.insertEntityChange(

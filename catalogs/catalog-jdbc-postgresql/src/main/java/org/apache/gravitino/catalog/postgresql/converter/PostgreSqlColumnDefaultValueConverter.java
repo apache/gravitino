@@ -22,11 +22,13 @@ import static org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter.VARC
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.google.common.io.BaseEncoding;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -40,7 +42,8 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
   // for example:
   // '2021-10-01 00:00:00'::timestamp without time zone
   // ''something'::character varying'
-  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'(.+?)'::\\s*(.+)");
+  // Possessive repetition avoids recursive backtracking for long default literals.
+  private static final Pattern VALUE_WITH_TYPE = Pattern.compile("'((?:[^']|'')*+)'::\\s*(.+)");
 
   // for example:
   // NULL::character varying
@@ -72,10 +75,38 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
     }
   }
 
+  /** {@inheritDoc} */
+  @Override
+  @Nullable
+  public String fromGravitino(Expression defaultValue) {
+    String sql = super.fromGravitino(defaultValue);
+    if (sql != null && sql.indexOf('\0') >= 0) {
+      throw new IllegalArgumentException("PostgreSQL column default must not contain U+0000 (NUL)");
+    }
+    return sql;
+  }
+
+  /**
+   * Doubles single quotes only. With {@code standard_conforming_strings} on, the default since
+   * PostgreSQL 9.1, a backslash in a string literal is an ordinary character.
+   */
+  @Override
+  protected String quoteStringLiteral(String value) {
+    return "'" + value.replace("'", "''") + "'";
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected String binaryLiteral(byte[] value) {
+    // PostgreSQL's X'...' literal is a bit string, so decode hex explicitly for bytea.
+    return "decode('" + BaseEncoding.base16().lowerCase().encode(value) + "', 'hex')";
+  }
+
   private Expression parseLiteral(JdbcTypeConverter.JdbcTypeBean type, String columnDefaultValue) {
     Matcher matcher = VALUE_WITH_TYPE.matcher(columnDefaultValue);
     if (matcher.find()) {
-      columnDefaultValue = matcher.group(1);
+      // String literals in the catalog are shown with embedded single quotes doubled.
+      columnDefaultValue = matcher.group(1).replace("''", "'");
     }
 
     if (columnDefaultValue.startsWith(NULL_PREFIX)) {
@@ -107,7 +138,10 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.timestampLiteral(
             LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
-        return Literals.varcharLiteral(type.getColumnSize(), columnDefaultValue);
+        Integer length = type.getColumnSize();
+        return length == null || length <= 0 || length == Integer.MAX_VALUE
+            ? Literals.stringLiteral(columnDefaultValue)
+            : Literals.varcharLiteral(length, columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -109,5 +110,86 @@ public class TestJettyServerConfig {
         Sets.newHashSet("1", "2"), jettyServerConfig.getCustomFilters());
     Assertions.assertTrue(jettyServerConfig.getAllWithPrefix("2.").isEmpty());
     Assertions.assertEquals(2, jettyServerConfig.getAllWithPrefix("1.").size());
+  }
+
+  @Test
+  public void testTrustedProxiesDefaultIsEmpty() {
+    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(new Config() {}, "");
+    Assertions.assertTrue(jettyServerConfig.getTrustedProxies().isEmpty());
+    Assertions.assertNotNull(jettyServerConfig.getClientAddressResolver());
+  }
+
+  @Test
+  public void testTrustedProxiesParsedWithPrefix() {
+    Config config = new Config(false) {};
+    config.loadFromMap(
+        ImmutableMap.of(
+            JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX + "trustedProxies",
+            " 10.0.0.1, 172.16.0.0/12 ,, fd00::/8, ::ffff:192.168.0.0/112 "),
+        k -> true);
+
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(config, JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
+
+    Assertions.assertEquals(
+        Arrays.asList("10.0.0.1", "172.16.0.0/12", "fd00::/8", "::ffff:192.168.0.0/112"),
+        jettyServerConfig.getTrustedProxies());
+  }
+
+  @Test
+  public void testInvalidTrustedProxyFailsWithClearMessage() {
+    for (String invalid :
+        Arrays.asList(
+            "proxy.example.com",
+            "10.0.0.0/33",
+            "fd00::/129",
+            "10.0.0.0/abc",
+            "10.0.0",
+            "10.0.0.1/")) {
+      Config config = new Config() {};
+      config.set(JettyServerConfig.TRUSTED_PROXIES, List.of("10.0.0.1", invalid));
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> JettyServerConfig.fromConfig(config, ""),
+              "Expected failure for " + invalid);
+      Assertions.assertTrue(
+          e.getMessage().contains(JettyServerConfig.TRUSTED_PROXIES.getKey()), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains(invalid), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testInvalidTrustedProxyErrorNamesFullKey() {
+    String serverKey = JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX + "trustedProxies";
+    Config serverConfig = new Config(false) {};
+    serverConfig.loadFromMap(ImmutableMap.of(serverKey, "proxy.example.com"), k -> true);
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                JettyServerConfig.fromConfig(
+                    serverConfig, JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX));
+    Assertions.assertTrue(e.getMessage().contains(serverKey), e.getMessage());
+
+    // An auxiliary service configuration has its prefix stripped already.
+    Config serviceConfig = new Config(false) {};
+    serviceConfig.loadFromMap(ImmutableMap.of("trustedProxies", "10.0.0.0/33"), k -> true);
+    e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> JettyServerConfig.fromServiceConfig(serviceConfig, "gravitino.iceberg-rest."));
+    Assertions.assertTrue(
+        e.getMessage().contains("gravitino.iceberg-rest.trustedProxies"), e.getMessage());
+  }
+
+  @Test
+  public void testFromServiceConfigReadsUnprefixedKeys() {
+    Config serviceConfig = new Config(false) {};
+    serviceConfig.loadFromMap(ImmutableMap.of("trustedProxies", "10.0.0.1"), k -> true);
+    Assertions.assertEquals(
+        Arrays.asList("10.0.0.1"),
+        JettyServerConfig.fromServiceConfig(serviceConfig, "gravitino.lance-rest.")
+            .getTrustedProxies());
   }
 }

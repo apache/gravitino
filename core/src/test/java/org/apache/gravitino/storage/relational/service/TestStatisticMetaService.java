@@ -436,24 +436,36 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     // backend
     // collation are rejected before the write, so a duplicate key can only come from a concurrent
     // creator, even if that creator's row is gone again by the time the caller looks.
-    SQLException duplicate = new SQLException("duplicate key", "23505");
-    StatisticMetaService duplicating = failingStatements(new PersistenceException(duplicate));
-    OptimisticLockException writeDuplicate =
-        Assertions.assertThrows(
-            OptimisticLockException.class,
-            () ->
-                duplicating.writeStatisticsWithVersion(
-                    List.of(createNamedStatistic("b", 2L)),
-                    table.nameIdentifier(),
-                    Entity.EntityType.TABLE));
-    Assertions.assertSame(duplicate, writeDuplicate.getCause().getCause());
-    OptimisticLockException dropDuplicate =
-        Assertions.assertThrows(
-            OptimisticLockException.class,
-            () ->
-                duplicating.batchDeleteStatisticPOs(
-                    table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
-    Assertions.assertSame(duplicate, dropDuplicate.getCause().getCause());
+    for (SQLException duplicate :
+        List.of(
+            new SQLException("MySQL duplicate", null, 1062),
+            new SQLException("H2 duplicate", "23505", 23505),
+            new SQLException("PostgreSQL duplicate", "23505"))) {
+      SQLException mixed = new SQLException("batch failed");
+      mixed.setNextException(new SQLException("lock timeout", "55P03"));
+      mixed.setNextException(duplicate);
+      for (SQLException failure : List.of(duplicate, mixed)) {
+        StatisticMetaService duplicating = failingStatements(new PersistenceException(failure));
+        OptimisticLockException writeDuplicate =
+            Assertions.assertThrows(
+                OptimisticLockException.class,
+                () ->
+                    duplicating.writeStatisticsWithVersion(
+                        List.of(createNamedStatistic("b", 2L)),
+                        table.nameIdentifier(),
+                        Entity.EntityType.TABLE));
+        Assertions.assertSame(failure, writeDuplicate.getCause().getCause());
+        OptimisticLockException dropDuplicate =
+            Assertions.assertThrows(
+                OptimisticLockException.class,
+                () ->
+                    duplicating.batchDeleteStatisticPOs(
+                        table.nameIdentifier(), Entity.EntityType.TABLE, List.of("a")));
+        Assertions.assertSame(failure, dropDuplicate.getCause().getCause());
+        Assertions.assertTrue(writeDuplicate.getMessage().contains("were changed concurrently"));
+        Assertions.assertTrue(dropDuplicate.getMessage().contains("were changed concurrently"));
+      }
+    }
 
     PersistenceException connectionFailure =
         new PersistenceException(new SQLException("connection lost", "08006"));
