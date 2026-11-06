@@ -251,47 +251,8 @@ public class TagManager implements TagDispatcher {
       checkValueCharacters(((TagValueSelector) selector).value(), "Selector value");
     }
     checkMetalake(NameIdentifier.of(metalake), entityStore);
-    PolicyEntity policy = null;
-    try {
-      policy = entityStore.get(policyIdentifier, Entity.EntityType.POLICY, PolicyEntity.class);
-    } catch (NoSuchEntityException e) {
-      // The write path reports missing policies; skip the maintenance pre-check here.
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    if (policy != null && policy.policyType().uniqueAtSameLevel()) {
-      List<String> conflicting = new ArrayList<>();
-      IllegalArgumentException first = null;
-      for (MetadataObject object : listMetadataObjectsForTag(metalake, tagName)) {
-        Tag tagOnObject;
-        try {
-          tagOnObject = getTagForMetadataObject(metalake, object, tagName);
-        } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
-          continue;
-        }
-        try {
-          objectPolicyResolver.checkMaintenanceTypeUniqueness(
-              metalake,
-              object,
-              tagOnObject.assignment().orElseGet(TagAssignment::noValue),
-              policy,
-              selector);
-        } catch (IllegalArgumentException e) {
-          conflicting.add(object.toString());
-          if (first == null) {
-            first = e;
-          }
-        }
-      }
-      if (first != null) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Associating the policy with tag %s would create same-type policy conflicts on"
-                    + " metadata objects %s. %s",
-                tagName, conflicting, first.getMessage()),
-            first);
-      }
-    }
+    requireNoConflictBeforeAssociate(metalake, tagName, policyName, selector);
+
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -452,6 +413,45 @@ public class TagManager implements TagDispatcher {
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     return associateTagValuesForMetadataObject(
         metalake, metadataObject, tagsToAdd, tagsToRemove, TagAssociationMode.TAG_VALUES);
+  }
+
+  /**
+   * Rejects associating a maintenance policy when that would create a same-level same-type conflict
+   * on any metadata object that already carries this tag.
+   */
+  private void requireNoConflictBeforeAssociate(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    PolicyEntity policy;
+    try {
+      policy =
+          entityStore.get(
+              NameIdentifierUtil.ofPolicy(metalake, policyName),
+              Entity.EntityType.POLICY,
+              PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      // The write path reports missing policies; skip the maintenance pre-check here.
+      return;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    if (!policy.policyType().uniqueAtSameLevel()) {
+      return;
+    }
+
+    for (MetadataObject object : listMetadataObjectsForTag(metalake, tagName)) {
+      Tag tagOnObject;
+      try {
+        tagOnObject = getTagForMetadataObject(metalake, object, tagName);
+      } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
+        continue;
+      }
+      objectPolicyResolver.checkMaintenanceTypeUniqueness(
+          metalake,
+          object,
+          tagOnObject.assignment().orElseGet(TagAssignment::noValue),
+          policy,
+          selector);
+    }
   }
 
   private enum TagAssociationMode {
