@@ -48,10 +48,12 @@ import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
@@ -69,6 +71,7 @@ public class SemanticModelMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(SemanticModelMetaService.class);
   private static final int METRIC_INSERT_BATCH_SIZE = 1000;
+  private static final int SOURCE_INSERT_BATCH_SIZE = 1000;
   private static final SemanticModelMetaService INSTANCE = new SemanticModelMetaService();
 
   private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops;
@@ -139,7 +142,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Inserts or overwrites a Semantic Model, its snapshot, and its metric identities atomically.
+   * Inserts or overwrites a Semantic Model, its snapshot, metric identities, and supplied source
+   * associations atomically.
    *
    * @param semanticModelEntity The Semantic Model entity.
    * @param overwrite Whether to overwrite rows for the same stable ID or natural key.
@@ -186,6 +190,7 @@ public class SemanticModelMetaService {
                         persistedPO.set(replacementPO);
                       }),
               () -> reconcileMetricIdentities(persistedPO.get(), semanticModelEntity.definition()),
+              () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
                       SemanticModelVersionInfoMapper.class,
@@ -272,6 +277,7 @@ public class SemanticModelMetaService {
               reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
             }
           },
+          () -> replaceSources(newSemanticModelPO, newEntity),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
@@ -295,7 +301,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Soft-deletes a Semantic Model, its metric identities, and all of its version snapshots.
+   * Soft-deletes a Semantic Model, its metric identities, source associations, and version
+   * snapshots.
    *
    * @param identifier The Semantic Model identifier.
    * @return {@code true} when an active identity was deleted.
@@ -312,8 +319,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Permanently deletes retired metric identities and deleted models and snapshots older than a
-   * timeline.
+   * Permanently deletes retired source associations, metric identities, and deleted models and
+   * snapshots older than a timeline.
    *
    * @param legacyTimeline The exclusive deletion timeline in epoch milliseconds.
    * @param limit The maximum rows to delete from each table.
@@ -323,6 +330,10 @@ public class SemanticModelMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSemanticModelMetasByLegacyTimeline")
   public int deleteSemanticModelMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int sourceDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            SemanticModelSourceMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
     int metricDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelMetricMapper.class,
@@ -335,7 +346,7 @@ public class SemanticModelMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelMetaMapper.class,
             mapper -> mapper.deleteSemanticModelMetasByLegacyTimeline(legacyTimeline, limit));
-    return metricDeletedCount + versionDeletedCount + metaDeletedCount;
+    return sourceDeletedCount + metricDeletedCount + versionDeletedCount + metaDeletedCount;
   }
 
   /**
@@ -417,8 +428,31 @@ public class SemanticModelMetaService {
                 SemanticModelMetricMapper.class,
                 mapper -> mapper.softDeleteSemanticModelMetricsBySemanticModelId(semanticModelId)),
         () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelSourceMapper.class,
+                mapper -> mapper.softDeleteByModelId(semanticModelId)),
+        () ->
             EntityChangeLogWriter.append(
                 semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));
+  }
+
+  private void replaceSources(SemanticModelPO po, SemanticModelEntity entity) {
+    if (!entity.sourceUpdate().replacesSources()) {
+      return;
+    }
+    entity.sourceUpdate().validate(entity.definition());
+    SessionUtils.doWithoutCommit(
+        SemanticModelSourceMapper.class,
+        mapper -> {
+          mapper.softDeleteByModelId(po.getSemanticModelId());
+          List<SemanticModelSource> sources = entity.sourceUpdate().sources();
+          for (int start = 0; start < sources.size(); start += SOURCE_INSERT_BATCH_SIZE) {
+            mapper.insertSources(
+                po.getMetalakeId(),
+                po.getSemanticModelId(),
+                sources.subList(start, Math.min(start + SOURCE_INSERT_BATCH_SIZE, sources.size())));
+          }
+        });
   }
 
   private static void reconcileMetricIdentities(

@@ -104,7 +104,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         executeScript(scriptFile);
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
-        assertRoleRelationsIndexedByRoleId("schema " + versionScripts.getKey());
+        assertCleanupIndexes("schema " + versionScripts.getKey());
       }
     }
   }
@@ -137,7 +137,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(sourceSchema);
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
-        assertRoleRelationsIndexedByRoleId(upgradeScript.getName());
+        assertCleanupIndexes(upgradeScript.getName());
       }
     }
   }
@@ -605,12 +605,19 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
-  private void assertRoleRelationsIndexedByRoleId(String source) throws SQLException {
+  private void assertCleanupIndexes(String source) throws SQLException {
+    Map<String, String> leadingColumns =
+        Map.of(
+            "user_role_rel", "role_id",
+            "group_role_rel", "role_id",
+            "semantic_model_source_rel", "deleted_at");
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection()) {
       DatabaseMetaData metaData = connection.getMetaData();
-      for (String table : List.of("user_role_rel", "group_role_rel")) {
+      for (Map.Entry<String, String> entry : leadingColumns.entrySet()) {
+        String table = entry.getKey();
+        String column = entry.getValue();
         String tableName =
             metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
         boolean indexed = false;
@@ -618,14 +625,14 @@ public class TestSQLScripts extends TestJDBCBackend {
             metaData.getIndexInfo(connection.getCatalog(), null, tableName, false, false)) {
           while (indexes.next()) {
             if (indexes.getShort("ORDINAL_POSITION") == 1
-                && "role_id".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+                && column.equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
               indexed = true;
               break;
             }
           }
         }
         Assertions.assertTrue(
-            indexed, "No index leading with role_id on " + table + " after " + source);
+            indexed, "No index leading with " + column + " on " + table + " after " + source);
       }
     }
   }
