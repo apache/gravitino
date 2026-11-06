@@ -111,8 +111,13 @@ public class TestPostgreSqlColumnDefaultValueConverter {
         Literals.varcharLiteral(20, "10"), converter.toGravitino(varchar, "10", false, true));
     Assertions.assertEquals(
         Literals.stringLiteral("1.50"), converter.toGravitino(text, "1.50", false, true));
-    // These constants store different text, such as '1000' for 1e3.
-    for (String sql : new String[] {"1e3", ".5", "10 + 1"}) {
+    // PostgreSQL shows `text DEFAULT true` as true; the stored value is the text 'true'.
+    Assertions.assertEquals(
+        Literals.stringLiteral("true"), converter.toGravitino(text, "true", false, true));
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "false"), converter.toGravitino(varchar, "false", false, true));
+    // Forms whose stored text could differ are not guessed.
+    for (String sql : new String[] {"1e3", ".5", "10 + 1", "TRUE AND false"}) {
       Assertions.assertEquals(
           UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
     }

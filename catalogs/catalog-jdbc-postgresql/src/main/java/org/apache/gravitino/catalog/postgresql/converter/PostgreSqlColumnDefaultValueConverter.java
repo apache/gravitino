@@ -51,10 +51,12 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
   private static final Pattern QUOTED_LITERAL =
       Pattern.compile(
           "([eE]?)'((?:[^']|'')*+)'(?:\\s*::\\s*" + LITERAL_TYPE + ")?", Pattern.CASE_INSENSITIVE);
-  // An unsigned integer or decimal constant, for example from `varchar(20) DEFAULT (10)`. Its text
-  // form is the value that an assignment cast stores. Exponents and leading dots are excluded
-  // because the stored text would differ.
-  private static final Pattern NUMERIC_CONSTANT = Pattern.compile("\\d++(?:\\.\\d++)?");
+  // An unquoted constant on a string column, for example from `varchar(20) DEFAULT (10)` or
+  // `text DEFAULT true`. PostgreSQL shows these as 10 or true, and the assignment cast stores the
+  // same text. PostgreSQL normalizes other numeric forms, such as 1e3, before showing them; this
+  // pattern also excludes them so it never guesses their stored text.
+  private static final Pattern STRING_COLUMN_CONSTANT =
+      Pattern.compile("\\d++(?:\\.\\d++)?|true|false");
   private static final Pattern NULL_LITERAL =
       Pattern.compile("NULL(?:\\s*::\\s*(.+))?", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
@@ -203,7 +205,7 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.timestampLiteral(
             LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
-        if (!quoted && !NUMERIC_CONSTANT.matcher(expression).matches()) {
+        if (!quoted && !STRING_COLUMN_CONSTANT.matcher(expression).matches()) {
           return UnparsedExpression.of(expression);
         }
         Integer length = type.getColumnSize();
@@ -212,7 +214,7 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
             : Literals.varcharLiteral(length, columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:
       case JdbcTypeConverter.TEXT:
-        return quoted || NUMERIC_CONSTANT.matcher(expression).matches()
+        return quoted || STRING_COLUMN_CONSTANT.matcher(expression).matches()
             ? Literals.stringLiteral(columnDefaultValue)
             : UnparsedExpression.of(expression);
       default:
