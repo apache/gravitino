@@ -114,12 +114,7 @@ public class TestPostgreSqlExceptionConverter {
   @ValueSource(strings = {"XX000", "53300", "57014"})
   void testServerSideFailuresRemainGeneric(String state) {
     SQLException failure = new SQLException("server side failure", state);
-    // Preemptive: a regression loops without checking interruption, so the test must not run on
-    // the test thread.
-    Exception error =
-        Assertions.assertTimeoutPreemptively(
-            Duration.ofSeconds(10),
-            () -> new PostgreSqlExceptionConverter().toGravitinoException(failure));
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
     Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
   }
 
@@ -129,8 +124,27 @@ public class TestPostgreSqlExceptionConverter {
     RuntimeException wrapper = new RuntimeException("wrapper");
     failure.initCause(wrapper);
     wrapper.initCause(failure);
-    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Exception error = convertWithinTimeout(failure);
     Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
     Assertions.assertSame(failure, error.getCause());
+  }
+
+  @Test
+  void testCauseCycleStillFindsNestedSqlState() {
+    SQLException failure = new SQLException("pool failure");
+    SQLException driverFailure = new SQLException("permission denied", "42501");
+    failure.initCause(driverFailure);
+    driverFailure.initCause(failure);
+    Exception error = convertWithinTimeout(failure);
+    Assertions.assertInstanceOf(ForbiddenException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+  }
+
+  // A regression loops without checking interruption, so the conversion must not run on the test
+  // thread.
+  private static Exception convertWithinTimeout(SQLException failure) {
+    return Assertions.assertTimeoutPreemptively(
+        Duration.ofSeconds(10),
+        () -> new PostgreSqlExceptionConverter().toGravitinoException(failure));
   }
 }
