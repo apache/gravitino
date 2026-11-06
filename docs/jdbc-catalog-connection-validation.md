@@ -92,7 +92,9 @@ unit:
 - MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs: `connectTimeout`
   and `socketTimeout` in milliseconds.
 - PostgreSQL — also used by the Hologres catalog: `connectTimeout`, `socketTimeout` and
-  `loginTimeout` in seconds (rounded up, minimum 1).
+  `loginTimeout` in seconds (rounded up, minimum 1, maximum `2147483`). The upper cap avoids
+  overflow when the driver converts seconds back to integer milliseconds; near the millisecond
+  upper bound, it shortens the configured timeout by less than one second.
 - ClickHouse: `connect_timeout` and `socket_timeout` in milliseconds (note the underscore names).
 
 It is applied differently to the two kinds of connection:

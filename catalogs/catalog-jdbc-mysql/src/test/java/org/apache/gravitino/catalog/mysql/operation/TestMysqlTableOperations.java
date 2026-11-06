@@ -21,9 +21,13 @@ package org.apache.gravitino.catalog.mysql.operation;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -39,6 +44,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -54,12 +60,102 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
   private static final Type VARCHAR = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
+
+  @ParameterizedTest
+  @CsvSource({
+    "+00:00, 12:34:56.123456", "+08:00, 12:34:56.123456", "-07:00, 12:34:56.123456",
+    "+00:00, 12:34:00", "+08:00, 12:34:00", "-07:00, 12:34:00",
+    "+00:00, 00:00:00", "+08:00, 00:00:00", "-07:00, 00:00:00"
+  })
+  void testZonedTimestampDefaultsPreserveInstantOnCreateAndAlter(String timeZone, String time)
+      throws Exception {
+    for (boolean zoned : new boolean[] {true, false}) {
+      String table = RandomNameUtils.genRandomName("timestamp_defaults");
+      OffsetDateTime value = OffsetDateTime.parse("2026-11-04T" + time + "Z");
+      try (BasicDataSource dataSource =
+          (BasicDataSource) DataSourceUtils.createDataSource(getMySQLCatalogProperties())) {
+        dataSource.setConnectionInitSqls(List.of("SET time_zone = '" + timeZone + "'"));
+        MysqlTableOperations operations = new MysqlTableOperations();
+        operations.initialize(
+            dataSource,
+            JDBC_EXCEPTION_CONVERTER,
+            new MysqlTypeConverter(),
+            new MysqlColumnDefaultValueConverter(),
+            Collections.emptyMap());
+        operations.create(
+            TEST_DB_NAME.toString(),
+            table,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName("ts")
+                  .withType(
+                      zoned
+                          ? Types.TimestampType.withTimeZone(6)
+                          : Types.TimestampType.withoutTimeZone(6))
+                  .withNullable(true)
+                  .withDefaultValue(
+                      zoned
+                          ? Literals.of(value, Types.TimestampType.withTimeZone())
+                          : Literals.timestampLiteral(value.toLocalDateTime()))
+                  .build()
+            },
+            null,
+            Collections.emptyMap(),
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        try (Connection connection = dataSource.getConnection();
+            Statement statement = connection.createStatement()) {
+          String qualified = "`" + TEST_DB_NAME + "`.`" + table + "`";
+          for (int iteration = 0; iteration < 2; iteration++) {
+            if (iteration == 1) {
+              statement.executeUpdate("DELETE FROM " + qualified);
+              value = value.plusDays(1);
+              operations.alterTable(
+                  TEST_DB_NAME.toString(),
+                  table,
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"ts"},
+                      DTOConverters.toFunctionArg(
+                          zoned
+                              ? Literals.of(value, Types.TimestampType.withTimeZone())
+                              : Literals.timestampLiteral(value.toLocalDateTime()))));
+            }
+            statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+            try (ResultSet result =
+                statement.executeQuery(
+                    "SELECT UNIX_TIMESTAMP(ts), @@session.time_zone, DATE_FORMAT(ts, '%Y-%m-%d %H:%i:%s.%f') FROM "
+                        + qualified)) {
+              Assertions.assertTrue(result.next());
+              if (zoned) {
+                Assertions.assertEquals(
+                    0,
+                    BigDecimal.valueOf(value.toEpochSecond())
+                        .add(BigDecimal.valueOf(value.getNano(), 9))
+                        .compareTo(result.getBigDecimal(1)));
+              } else {
+                Assertions.assertEquals(
+                    value
+                        .toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")),
+                    result.getString(3));
+              }
+              Assertions.assertEquals(timeZone, result.getString(2));
+            }
+          }
+        } finally {
+          operations.drop(TEST_DB_NAME.toString(), table);
+        }
+      }
+    }
+  }
 
   @Test
   public void testOperationTable() {

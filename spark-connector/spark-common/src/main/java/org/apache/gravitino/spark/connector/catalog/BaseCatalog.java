@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -47,6 +49,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.JavaImpl;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -246,10 +249,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
             .map(structField -> createGravitinoColumn(structField))
             .toArray(org.apache.gravitino.rel.Column[]::new);
 
+    // Spark stores the table comment in the table properties. Take it out before converting the
+    // properties, because it is passed to Gravitino as the comment, not as a table property, and
+    // a catalog that accepts no table properties would otherwise refuse it.
+    Map<String, String> sparkProperties =
+        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    String comment = sparkProperties.remove(ConnectorConstants.COMMENT);
     Map<String, String> gravitinoProperties =
-        propertiesConverter.toGravitinoTableProperties(properties);
-    // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
-    String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
+        propertiesConverter.toGravitinoTableProperties(sparkProperties);
 
     DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
         sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
@@ -305,11 +312,36 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table alterTable(Identifier ident, TableChange... changes) throws NoSuchTableException {
-    org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        Arrays.stream(changes)
-            .map(sparkTableChangeConverter::toGravitinoTableChange)
-            .toArray(org.apache.gravitino.rel.TableChange[]::new);
+    if (changes == null || changes.length == 0) {
+      // Spark sends no change when every requested change is a no-op, for example DROP COLUMN IF
+      // EXISTS on an absent column. There is nothing to apply.
+      return loadTable(ident);
+    }
     try {
+      Supplier<Column[]> columns =
+          Suppliers.memoize(
+                  () -> {
+                    // A schema-changing batch needs sequential schema evolution before coercion.
+                    // Reject it before any write rather than resolve against stale column types.
+                    Preconditions.checkArgument(
+                        Arrays.stream(changes)
+                            .noneMatch(
+                                change ->
+                                    change instanceof TableChange.AddColumn
+                                        || change instanceof TableChange.DeleteColumn
+                                        || change instanceof TableChange.RenameColumn
+                                        || change instanceof TableChange.UpdateColumnType),
+                        "Timestamp, date, and string defaults cannot be combined with column schema changes");
+                    return gravitinoCatalogClient
+                        .asTableCatalog()
+                        .loadTable(NameIdentifier.of(getDatabase(ident), ident.name()))
+                        .columns();
+                  })
+              ::get;
+      org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
+          Arrays.stream(changes)
+              .map(change -> sparkTableChangeConverter.toGravitinoTableChange(change, columns))
+              .toArray(org.apache.gravitino.rel.TableChange[]::new);
       invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
