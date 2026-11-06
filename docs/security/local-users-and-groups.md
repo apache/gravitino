@@ -163,23 +163,23 @@ writes name the object and operation instead of falling back to `HttpRequestEven
 Object identifiers are instance-scoped and channel-prefixed so they stay distinct from metalake
 users and groups:
 
-| Kind  | Identifier form          | Example            |
-|-------|--------------------------|--------------------|
-| User  | `basic.user.<name>`      | `basic.user.alice` |
-| Group | `basic.group.<name>`     | `basic.group.eng`  |
+| Kind  | Identifier form      | Example            |
+|-------|----------------------|--------------------|
+| User  | `basic.user.<name>`  | `basic.user.alice` |
+| Group | `basic.group.<name>` | `basic.group.eng`  |
 
 The first segment is the authenticator / local-store channel (`basic`), parallel to other
 instance identity channels such as `scim.user.<name>`.
 
-| API                                      | Event family                         | `OperationType`        |
-|------------------------------------------|--------------------------------------|------------------------|
-| `POST /api/idp/users`                    | `IdpAddUser*`                        | `ADD_USER`             |
-| `DELETE /api/idp/users/{user}`           | `IdpRemoveUser*`                     | `REMOVE_USER`          |
-| `PUT /api/idp/users/{user}/password`     | `IdpChangeUserPassword*`             | `ALTER_USER`           |
-| `PUT /api/idp/users/{user}/enabled`      | `IdpUpdateUserEnabled*`              | `ENABLE_USER` / `DISABLE_USER` |
-| `POST /api/idp/groups`                   | `IdpAddGroup*`                       | `ADD_GROUP`            |
-| `DELETE /api/idp/groups/{group}`         | `IdpRemoveGroup*`                    | `REMOVE_GROUP`         |
-| `PUT /api/idp/groups/{group}/users`      | `IdpChangeGroupMembership*`          | `ALTER_GROUP`          |
+| API                                  | Event family                | `OperationType`                |
+|--------------------------------------|-----------------------------|--------------------------------|
+| `POST /api/idp/users`                | `IdpAddUser*`               | `ADD_USER`                     |
+| `DELETE /api/idp/users/{user}`       | `IdpRemoveUser*`            | `REMOVE_USER`                  |
+| `PUT /api/idp/users/{user}/password` | `IdpChangeUserPassword*`    | `ALTER_USER`                   |
+| `PUT /api/idp/users/{user}/enabled`  | `IdpUpdateUserEnabled*`     | `ENABLE_USER` / `DISABLE_USER` |
+| `POST /api/idp/groups`               | `IdpAddGroup*`              | `ADD_GROUP`                    |
+| `DELETE /api/idp/groups/{group}`     | `IdpRemoveGroup*`           | `REMOVE_GROUP`                 |
+| `PUT /api/idp/groups/{group}/users`  | `IdpChangeGroupMembership*` | `ALTER_GROUP`                  |
 
 Each mutation emits a pre-event before the store write, a success event after it commits, or a
 failure event if it throws. Password values are not placed on the event. Membership changes carry
