@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.iceberg.extensions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -41,7 +42,10 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.execution.SparkPlan;
+import org.apache.spark.sql.execution.datasources.v2.AddPartitionFieldExec;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -51,8 +55,8 @@ import scala.collection.JavaConverters;
 import scala.collection.immutable.Seq;
 
 /**
- * Tests {@link IcebergExtendedDataSourceV2Strategy} on an Iceberg catalog that Gravitino does not
- * manage.
+ * Tests that {@link IcebergExtendedDataSourceV2Strategy} plans Iceberg DDL itself for a Gravitino
+ * catalog and falls back to Iceberg's strategy for a catalog that Gravitino does not manage.
  */
 public class TestIcebergExtendedDataSourceV2Strategy {
 
@@ -131,15 +135,21 @@ public class TestIcebergExtendedDataSourceV2Strategy {
   }
 
   @Test
-  void testGravitinoIcebergCatalogTakesGravitinoBranch() {
+  void testGravitinoIcebergCatalogTakesGravitinoBranch() throws Exception {
+    GravitinoIcebergCatalog gravitinoCatalog = mock(GravitinoIcebergCatalog.class);
     Identifier identifier = Identifier.of(new String[] {"db"}, "t");
+    LogicalPlan plan =
+        spark.sessionState().sqlParser().parsePlan("ALTER TABLE cat.db.t ADD PARTITION FIELD id");
     try (MockedStatic<Spark3Util> util = mockStatic(Spark3Util.class)) {
       util.when(() -> Spark3Util.catalogAndIdentifier(any(SparkSession.class), anyList()))
-          .thenReturn(
-              new Spark3Util.CatalogAndIdentifier(mock(GravitinoIcebergCatalog.class), identifier));
+          .thenReturn(new Spark3Util.CatalogAndIdentifier(gravitinoCatalog, identifier));
       assertTrue(
           IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, seq("cat", "db", "t"))
               .isDefined());
+      // Iceberg's own strategy plans nothing for this catalog, so the plan must come from ours.
+      Seq<SparkPlan> plans = new IcebergExtendedDataSourceV2Strategy(spark).apply(plan);
+      assertEquals(1, plans.size());
+      assertSame(gravitinoCatalog, ((AddPartitionFieldExec) plans.head()).catalog());
 
       util.when(() -> Spark3Util.catalogAndIdentifier(any(SparkSession.class), anyList()))
           .thenReturn(new Spark3Util.CatalogAndIdentifier(mock(SparkCatalog.class), identifier));
