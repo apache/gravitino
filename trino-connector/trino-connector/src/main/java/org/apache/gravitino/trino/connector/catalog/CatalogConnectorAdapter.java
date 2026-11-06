@@ -67,6 +67,17 @@ public interface CatalogConnectorAdapter {
   CatalogConnectorMetadataAdapter getMetadataAdapter();
 
   /**
+   * Returns the metadata adapter for the given catalog. Adapters whose behavior depends on catalog
+   * properties override this method.
+   *
+   * @param catalog the Gravitino catalog
+   * @return the metadata adapter of the catalog
+   */
+  default CatalogConnectorMetadataAdapter getMetadataAdapter(GravitinoCatalog catalog) {
+    return getMetadataAdapter();
+  }
+
+  /**
    * @return ColumnProperties list that used to validate column properties.
    */
   default List<PropertyMetadata<?>> getColumnProperties() {

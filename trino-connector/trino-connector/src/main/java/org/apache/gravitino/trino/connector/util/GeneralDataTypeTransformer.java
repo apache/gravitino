@@ -164,7 +164,7 @@ public class GeneralDataTypeTransformer {
       default:
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
-            "Unsupported gravitino datatype: " + type);
+            "Unsupported gravitino datatype: " + type.simpleString());
     }
   }
 

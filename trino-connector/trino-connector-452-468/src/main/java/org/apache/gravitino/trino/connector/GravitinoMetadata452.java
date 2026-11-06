@@ -50,9 +50,60 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
 
   @Override
   public void addColumn(
+<<<<<<< HEAD:trino-connector/trino-connector-452-468/src/main/java/org/apache/gravitino/trino/connector/GravitinoMetadata452.java
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
     GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
+=======
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      ColumnMetadata column,
+      ColumnPosition position) {
+    TableChange.ColumnPosition columnPosition = TableChange.ColumnPosition.defaultPos();
+    if (position instanceof ColumnPosition.First) {
+      columnPosition = TableChange.ColumnPosition.first();
+    }
+    if (position instanceof ColumnPosition.After after) {
+      columnPosition = TableChange.ColumnPosition.after(after.columnName());
+    }
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
+    catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn, columnPosition);
+  }
+
+  @Override
+  public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+      ConnectorSession session,
+      ConnectorAccessControl accessControl,
+      ConnectorTableHandle tableHandle,
+      String procedureName,
+      Map<String, Object> executeProperties,
+      RetryMode retryMode) {
+    return internalMetadata
+        .getTableHandleForExecute(
+            session,
+            accessControl,
+            GravitinoHandle.unWrap(tableHandle),
+            procedureName,
+            executeProperties,
+            retryMode)
+        .map(GravitinoTableExecuteHandle::new);
+  }
+
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  @Override
+  public void executeTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    internalMetadata.executeTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle));
+>>>>>>> 463296cac ([#14587] fix(connector): Fix Glue catalog handling in Trino and Spark connectors (#14588)):trino-connector/trino-connector-473-477/src/main/java/org/apache/gravitino/trino/connector/GravitinoMetadata473.java
   }
 
   @Override

@@ -24,6 +24,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+<<<<<<< HEAD:trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/glue/GlueConnectorAdapter.java
+=======
+import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
+>>>>>>> 463296cac ([#14587] fix(connector): Fix Glue catalog handling in Trino and Spark connectors (#14588)):trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/catalog/glue/GlueConnectorAdapter.java
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
@@ -112,6 +117,14 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return new GlueMetadataAdapter(propertyMetadata.getSchemaPropertyMetadata());
+  }
+
+  @Override
+  public CatalogConnectorMetadataAdapter getMetadataAdapter(GravitinoCatalog catalog) {
+    return new GlueMetadataAdapter(
+        propertyMetadata.getSchemaPropertyMetadata(),
+        catalog.getProperty(
+            GlueConstants.DEFAULT_TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE));
   }
 
   @Override
