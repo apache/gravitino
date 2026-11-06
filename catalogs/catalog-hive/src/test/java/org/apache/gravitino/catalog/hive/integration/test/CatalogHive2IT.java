@@ -561,6 +561,7 @@ public class CatalogHive2IT extends BaseIT {
       return;
     }
 
+    Assertions.assertEquals(expected.strategy(), actual.strategy());
     Assertions.assertEquals(expected.number(), actual.number());
     List<String> expectedFields =
         Arrays.stream(expected.expressions())
@@ -610,7 +611,7 @@ public class CatalogHive2IT extends BaseIT {
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
     Distribution distribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1));
+        Distributions.of(Strategy.HASH, 10, NamedReference.field(HIVE_COL_NAME1));
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
@@ -618,6 +619,23 @@ public class CatalogHive2IT extends BaseIT {
         };
 
     Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    for (Strategy unsupported : new Strategy[] {Strategy.RANGE, Strategy.EVEN}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tableCatalog.createTable(
+                      nameIdentifier,
+                      columns,
+                      TABLE_COMMENT,
+                      properties,
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.of(unsupported, 10, NamedReference.field(HIVE_COL_NAME1)),
+                      sortOrders));
+      Assertions.assertTrue(error.getMessage().contains("HASH"));
+      Assertions.assertFalse(tableCatalog.tableExists(nameIdentifier));
+    }
     Table createdTable =
         catalog
             .asTableCatalog()
@@ -658,8 +676,7 @@ public class CatalogHive2IT extends BaseIT {
     // Test bad request
     // Bad name in distribution
     final Distribution badDistribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
-    TableCatalog tableCatalog = catalog.asTableCatalog();
+        Distributions.of(Strategy.HASH, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
     Assertions.assertThrows(
         Exception.class,
         () -> {
