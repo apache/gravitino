@@ -25,6 +25,32 @@ import org.junit.jupiter.api.Test;
 
 public class TestTagEntity {
 
+  /** The stored visibility flag defaults to false and survives assignment/inheritance copies. */
+  @Test
+  public void testHiddenFlagIsAnEntityField() {
+    TagEntity visible =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    TagEntity hidden =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withHidden(true)
+            .build();
+    Assertions.assertFalse(visible.hidden());
+    Assertions.assertEquals(false, visible.fields().get(TagEntity.HIDDEN));
+    Assertions.assertEquals(true, hidden.fields().get(TagEntity.HIDDEN));
+    Assertions.assertNotEquals(visible, hidden);
+    Assertions.assertTrue(hidden.copyWithAssignment(TagAssignment.noValue()).hidden());
+    Assertions.assertTrue(hidden.copyWithInherited(true).hidden());
+  }
+
   @Test
   public void testTagEntityCarriesAssignmentContextOutsideFields() {
     TagEntity tagEntity =

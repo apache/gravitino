@@ -54,6 +54,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,6 +73,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -96,6 +98,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rel.Column;
@@ -306,7 +309,7 @@ public class TestPolicyManager {
   }
 
   @Test
-  public void testCreateAndGetPolicy() {
+  public void testCreateAndGetPolicy() throws IOException {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
@@ -321,6 +324,26 @@ public class TestPolicyManager {
 
     PolicyEntity policy1 = policyManager.getPolicy(METALAKE, policyName);
     Assertions.assertEquals(policy, policy1);
+    TagEntity hidden =
+        entityStore.get(
+            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    Assertions.assertEquals(policy.auditInfo(), hidden.auditInfo());
+    Assertions.assertTrue(hidden.hidden());
+    Assertions.assertEquals(0, hidden.valueConstraint().allowedValues().length);
+    Assertions.assertEquals(0, tagManager.listTags(METALAKE).length);
+    Assertions.assertEquals(
+        0, policyManager.listTagAssociationsForPolicy(METALAKE, policyName).length);
+    Assertions.assertEquals(
+        1,
+        entityStore
+            .relationOperations()
+            .batchListEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                Collections.singletonList(policy.nameIdentifier()),
+                Entity.EntityType.POLICY)
+            .size());
 
     // Create a policy in non-existent metalake
     Exception e =

@@ -24,6 +24,8 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -71,6 +74,31 @@ public class PolicyManager implements PolicyDispatcher {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
+  }
+
+  /**
+   * Applies a policy to an object through its hidden tag in the caller's metadata transaction.
+   *
+   * <p>This is an internal entry point for migration and server-side callers. It is idempotent and
+   * does not commit, roll back, or close the caller's connection.
+   *
+   * @param connection The caller-owned metadata connection with auto-commit disabled.
+   * @param policyId The policy ID.
+   * @param objectId The metadata object ID.
+   * @param objectType The metadata object type.
+   * @param auditInfo The serialized audit information to preserve on the association.
+   * @return The policy's hidden tag ID.
+   * @throws SQLException If an endpoint or hidden tag is invalid, or persistence fails.
+   */
+  public static long addPolicyToObject(
+      Connection connection,
+      long policyId,
+      long objectId,
+      MetadataObject.Type objectType,
+      String auditInfo)
+      throws SQLException {
+    return new PolicyObjectBindingService(connection)
+        .addPolicyToObject(policyId, objectId, objectType, auditInfo);
   }
 
   @Override
@@ -215,7 +243,9 @@ public class PolicyManager implements PolicyDispatcher {
               SupportsRelationOperations.Type.POLICY_TAG_REL,
               Collections.singletonList(policyIdentifier),
               Entity.EntityType.POLICY)
-          .toArray(new RelationalEntity<?>[0]);
+          .stream()
+          .filter(relation -> !((TagEntity) relation.targetEntity()).hidden())
+          .toArray(RelationalEntity<?>[]::new);
     } catch (IOException e) {
       LOG.error(
           "Failed to list tag associations for policy {} under metalake {}",

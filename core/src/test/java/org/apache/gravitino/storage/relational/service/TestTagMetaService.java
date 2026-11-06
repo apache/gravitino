@@ -1515,6 +1515,7 @@ public class TestTagMetaService extends TestJDBCBackend {
           TagEntity.builder()
               .withId(RandomIdGenerator.INSTANCE.nextId())
               .withName(name)
+              .withHidden("flag".equals(name))
               .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
               .withAuditInfo(AUDIT_INFO)
               .build(),
@@ -1539,6 +1540,14 @@ public class TestTagMetaService extends TestJDBCBackend {
         new TagValue[0]);
     expected.put(
         identifiers.get(0), Map.of("stage", Set.of("common", "value_0"), "flag", Set.of()));
+    service
+        .listTagsForMetadataObjects(identifiers.subList(0, 2), Entity.EntityType.COLUMN)
+        .forEach(
+            relation -> {
+              TagEntity tag = (TagEntity) relation.targetEntity();
+              assertEquals(
+                  "flag".equals(tag.name()), tag.hidden(), "Batch queries must preserve hidden");
+            });
     for (int count : new int[] {0, 1, 499, 500, 501}) {
       List<NameIdentifier> requested = identifiers.subList(0, count);
       assertBatchTagAssignments(

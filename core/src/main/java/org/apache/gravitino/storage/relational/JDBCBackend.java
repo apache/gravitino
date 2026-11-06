@@ -26,6 +26,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +73,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.policy.PolicyBindingMigration;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
@@ -126,6 +129,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public void initialize(Config config) {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
+    try (Connection connection =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .getEnvironment()
+            .getDataSource()
+            .getConnection()) {
+      PolicyBindingMigration.checkMigrationComplete(connection);
+    } catch (SQLException e) {
+      throw new IllegalStateException("Cannot start metadata backend: " + e.getMessage(), e);
+    }
     SQLExceptionConverterFactory.initConverter(config);
   }
 

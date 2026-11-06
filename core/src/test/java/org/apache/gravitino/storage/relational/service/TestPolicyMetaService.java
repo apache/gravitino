@@ -63,6 +63,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -71,8 +72,10 @@ import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -96,6 +99,128 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   private final PolicyContent content =
       PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
 
+  /** A persisted policy receives a real TagEntity and a presence-matching relation atomically. */
+  @TestTemplate
+  public void testCreatePolicyCreatesHiddenTagModel() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "automatic_hidden_tag",
+            AUDIT_INFO);
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+    TagEntity tag =
+        TagMetaService.getInstance()
+            .getTagByIdentifier(
+                NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id())));
+    assertEquals(NamespaceUtil.ofTag(METALAKE_NAME), tag.namespace());
+    assertTrue(tag.hidden());
+    assertEquals(Map.of("gravitino.internal.policy-id", policy.id().toString()), tag.properties());
+    assertEquals(AUDIT_INFO, tag.auditInfo());
+    assertEquals(0, tag.valueConstraint().allowedValues().length);
+    assertFalse(tag.assignment().isPresent());
+    assertEquals(0, countActiveRows("tag_relation_meta", "tag_id = " + tag.id()));
+    PolicyTagRelPO relation =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class,
+            mapper -> mapper.getByPolicyIdAndTagId(policy.id(), tag.id()));
+    Assertions.assertNotNull(relation);
+    Assertions.assertNull(relation.getSelector());
+    assertEquals(1L, relation.getCurrentVersion());
+    assertEquals(1L, relation.getLastVersion());
+  }
+
+  /** An overwrite inserts a hidden tag only when it actually creates a policy identity. */
+  @TestTemplate
+  public void testOverwritePreservesHiddenTagIdentity() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "overwrite_hidden_tag",
+            AUDIT_INFO);
+    service.insertPolicy(policy, true);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdentifier);
+    PolicyEntity incoming =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(), policy.namespace(), policy.name(), AUDIT_INFO);
+    service.insertPolicy(incoming, true);
+    assertEquals(policy.id(), service.getPolicyByIdentifier(policy.nameIdentifier()).id());
+    assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+    assertEquals(1, TagMetaService.getInstance().listTagsByNamespace(tag.namespace()).size());
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TagMetaService.getInstance()
+                .getTagByIdentifier(
+                    NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(incoming.id()))));
+    service.updatePolicy(
+        policy.nameIdentifier(),
+        entity -> copyPolicy((PolicyEntity) entity, "renamed_hidden_tag", "new comment"));
+    assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+  }
+
+  /** A reserved-name collision must not leave a policy or content snapshot committed. */
+  @TestTemplate
+  public void testHiddenTagCreationFailureRollsBackPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hidden_tag_collision",
+            AUDIT_INFO);
+    TagEntity collision =
+        createAndInsertTagEntity(HiddenPolicyTag.name(policy.id()), "existing tag", METALAKE_NAME);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> PolicyMetaService.getInstance().insertPolicy(policy, false));
+    assertFalse(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(0, countActiveRows("policy_version_info", "policy_id = " + policy.id()));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertEquals(
+        collision, TagMetaService.getInstance().getTagByIdentifier(collision.nameIdentifier()));
+  }
+
+  /** Failure after deletion restores the policy, hidden tag and relation together. */
+  @TestTemplate
+  public void testHiddenTagDeletionRollsBackWithPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hidden_tag_delete_rollback",
+            AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdentifier);
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void afterRemove(long policyId) {
+            throw new IllegalStateException("Injected post-delete failure");
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      assertThrows(
+          IllegalStateException.class, () -> service.deletePolicy(policy.nameIdentifier()));
+      assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+      assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+      assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
+
   @TestTemplate
   public void testLifecycleHookFailureRollsBackInsert() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
@@ -103,6 +228,16 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         new PolicyLifecycleHook() {
           @Override
           public void afterPersist(PolicyEntity policy) {
+            TagEntity tag =
+                TagMetaService.getInstance()
+                    .getTagByIdentifier(
+                        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id())));
+            assertTrue(tag.valueConstraint().allowedValues().length == 0);
+            assertTrue(
+                SessionUtils.getWithoutCommit(
+                        PolicyTagRelMapper.class,
+                        mapper -> mapper.getByPolicyIdAndTagId(policy.id(), tag.id()))
+                    != null);
             throw new IllegalArgumentException("bad cron");
           }
         };
@@ -128,6 +263,12 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           () ->
               policyMetaService.getPolicyByIdentifier(
                   NameIdentifierUtil.ofPolicy(metalake.name(), "hook-rollback")));
+      assertEquals(
+          0,
+          countActiveRows(
+              "tag_meta", "tag_name = '" + HiddenPolicyTag.name(policyEntity.id()) + "'"));
+      assertEquals(
+          0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policyEntity.id()));
     } finally {
       PolicyLifecycleHooks.unregister(hook);
     }
@@ -1160,7 +1301,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
 
     String policyAsMetadataObject =
         String.format("metadata_object_id = %d AND metadata_object_type = 'POLICY'", policy.id());
-    assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertEquals(2, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
     assertEquals(1, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
     assertEquals(

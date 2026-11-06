@@ -54,6 +54,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " tag_comment = #{newTagMeta.comment},"
         + " properties = #{newTagMeta.properties},"
         + " allowed_values = #{newTagMeta.allowedValues},"
+        + " hidden = #{newTagMeta.hidden},"
         + " audit_info = #{newTagMeta.auditInfo},"
         + " current_version = #{newTagMeta.currentVersion},"
         + " last_version = #{newTagMeta.lastVersion},"

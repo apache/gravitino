@@ -166,6 +166,12 @@ restarted upgrade skips the steps that already completed. The PostgreSQL and H2
 1.3.0-to-2.0.0 upgrade scripts are retryable as well. Unexpected schema differences, such
 as a missing MySQL index during a rename, require manual schema repair before retrying.
 
+When upgrading from 1.3 to 2.0, keep all servers stopped after applying the SQL scripts.
+Run `bin/migrate-policy-bindings.sh --dry-run`, `bin/migrate-policy-bindings.sh`, and
+`bin/migrate-policy-bindings.sh --verify` from the new distribution before starting the server.
+See [Offline policy binding migration](./migration-guide.md#offline-policy-binding-migration)
+for prerequisites, retry behavior, and rollback. Active legacy bindings prevent server startup.
+
 ### Step 6: Verify the Upgrade
 
 The final step of the upgrade process is validating your freshly

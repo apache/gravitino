@@ -507,6 +507,7 @@ CREATE TABLE IF NOT EXISTS tag_meta (
     tag_comment VARCHAR(256) DEFAULT '',
     properties TEXT DEFAULT NULL,
     allowed_values TEXT DEFAULT NULL,
+    hidden BOOLEAN NOT NULL DEFAULT FALSE,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -523,6 +524,7 @@ COMMENT ON COLUMN tag_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN tag_meta.tag_comment IS 'tag comment';
 COMMENT ON COLUMN tag_meta.properties IS 'tag properties';
 COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
+COMMENT ON COLUMN tag_meta.hidden IS 'whether the tag is server-managed and hidden';
 COMMENT ON COLUMN tag_meta.audit_info IS 'tag audit info';
 
 
