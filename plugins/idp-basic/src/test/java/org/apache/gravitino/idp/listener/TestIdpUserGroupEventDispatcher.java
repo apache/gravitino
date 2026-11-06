@@ -18,24 +18,22 @@
  */
 package org.apache.gravitino.idp.listener;
 
-import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.LinkedList;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.listener.event.IdpAddGroupEvent;
-import org.apache.gravitino.idp.listener.event.IdpAddGroupFailureEvent;
-import org.apache.gravitino.idp.listener.event.IdpAddGroupPreEvent;
 import org.apache.gravitino.idp.listener.event.IdpAddUserEvent;
 import org.apache.gravitino.idp.listener.event.IdpAddUserFailureEvent;
 import org.apache.gravitino.idp.listener.event.IdpAddUserPreEvent;
@@ -58,109 +56,78 @@ import org.junit.jupiter.api.Test;
 
 class TestIdpUserGroupEventDispatcher {
 
-  private RecordingListener listener;
+  private final List<Event> postEvents = new ArrayList<>();
+  private final List<PreEvent> preEvents = new ArrayList<>();
   private IdpUserGroupManager manager;
   private IdpUserGroupEventDispatcher dispatcher;
 
   @BeforeEach
   void setUp() {
-    listener = new RecordingListener();
+    postEvents.clear();
+    preEvents.clear();
     manager = mock(IdpUserGroupManager.class);
+    EventListenerPlugin listener = mock(EventListenerPlugin.class);
+    doAnswer(
+            inv -> {
+              postEvents.add(inv.getArgument(0));
+              return null;
+            })
+        .when(listener)
+        .onPostEvent(any(Event.class));
+    doAnswer(
+            inv -> {
+              preEvents.add(inv.getArgument(0));
+              return null;
+            })
+        .when(listener)
+        .onPreEvent(any(PreEvent.class));
     dispatcher = new IdpUserGroupEventDispatcher(new EventBus(List.of(listener)), manager);
   }
 
   @Test
-  void testAddUserDispatchesTypedEvents() throws Exception {
+  void testUserMutationsDispatchTypedEvents() throws Exception {
     when(manager.addUser("alice", "Passw0rd-For-User", true)).thenReturn(mock(IdpUser.class));
-
-    PrincipalUtils.doAs(
-        new UserPrincipal("admin"),
-        () -> {
-          dispatcher.addUser("alice", "Passw0rd-For-User", true);
-          return null;
-        });
-
-    Assertions.assertEquals(1, listener.preEvents.size());
-    Assertions.assertInstanceOf(IdpAddUserPreEvent.class, listener.preEvents.get(0));
-    Assertions.assertEquals(1, listener.postEvents.size());
-    IdpAddUserEvent event = (IdpAddUserEvent) listener.postEvents.get(0);
-    Assertions.assertEquals(OperationType.ADD_USER, event.operationType());
-    Assertions.assertEquals("basic.user.alice", event.identifier().toString());
-    Assertions.assertEquals("admin", event.user());
-  }
-
-  @Test
-  void testAddUserFailureDispatchesFailureEvent() throws Exception {
-    when(manager.addUser(eq("alice"), anyString(), anyBoolean()))
-        .thenThrow(new AlreadyExistsException("exists"));
-
-    Assertions.assertThrows(
-        AlreadyExistsException.class,
-        () ->
-            PrincipalUtils.doAs(
-                new UserPrincipal("admin"),
-                () -> {
-                  dispatcher.addUser("alice", "Passw0rd-For-User", true);
-                  return null;
-                }));
-
-    Assertions.assertEquals(1, listener.preEvents.size());
-    Assertions.assertEquals(1, listener.postEvents.size());
-    Assertions.assertInstanceOf(IdpAddUserFailureEvent.class, listener.postEvents.get(0));
-    Assertions.assertEquals(OperationType.ADD_USER, listener.postEvents.get(0).operationType());
-  }
-
-  @Test
-  void testUpdateEnabledUsesEnableAndDisableOperationTypes() throws Exception {
+    when(manager.changePassword("alice", "Passw0rd-For-User-2")).thenReturn(true);
     when(manager.updateEnabled("alice", false)).thenReturn(true);
     when(manager.updateEnabled("alice", true)).thenReturn(true);
-
-    PrincipalUtils.doAs(
-        new UserPrincipal("admin"),
-        () -> {
-          dispatcher.updateEnabled("alice", false);
-          dispatcher.updateEnabled("alice", true);
-          return null;
-        });
-
-    Assertions.assertEquals(2, listener.postEvents.size());
-    IdpUpdateUserEnabledEvent disable = (IdpUpdateUserEnabledEvent) listener.postEvents.get(0);
-    IdpUpdateUserEnabledEvent enable = (IdpUpdateUserEnabledEvent) listener.postEvents.get(1);
-    Assertions.assertEquals(OperationType.DISABLE_USER, disable.operationType());
-    Assertions.assertEquals(OperationType.ENABLE_USER, enable.operationType());
-    Assertions.assertEquals("basic.user.alice", disable.identifier().toString());
-  }
-
-  @Test
-  void testChangePasswordAndRemoveUser() throws Exception {
-    when(manager.changePassword("alice", "Passw0rd-For-User-2")).thenReturn(true);
     when(manager.removeUser("alice")).thenReturn(true);
 
-    PrincipalUtils.doAs(
-        new UserPrincipal("admin"),
+    asAdmin(
         () -> {
+          dispatcher.addUser("alice", "Passw0rd-For-User", true);
           dispatcher.changePassword("alice", "Passw0rd-For-User-2");
+          dispatcher.updateEnabled("alice", false);
+          dispatcher.updateEnabled("alice", true);
           dispatcher.removeUser("alice");
           return null;
         });
 
-    Assertions.assertEquals(2, listener.postEvents.size());
-    Assertions.assertInstanceOf(IdpChangeUserPasswordEvent.class, listener.postEvents.get(0));
-    Assertions.assertEquals(OperationType.ALTER_USER, listener.postEvents.get(0).operationType());
-    IdpRemoveUserEvent remove = (IdpRemoveUserEvent) listener.postEvents.get(1);
+    Assertions.assertInstanceOf(IdpAddUserPreEvent.class, preEvents.get(0));
+    Assertions.assertEquals(5, postEvents.size());
+    IdpAddUserEvent add = (IdpAddUserEvent) postEvents.get(0);
+    Assertions.assertEquals(OperationType.ADD_USER, add.operationType());
+    Assertions.assertEquals("basic.user.alice", add.identifier().toString());
+    Assertions.assertEquals("admin", add.user());
+    Assertions.assertInstanceOf(IdpChangeUserPasswordEvent.class, postEvents.get(1));
+    Assertions.assertEquals(OperationType.ALTER_USER, postEvents.get(1).operationType());
+    Assertions.assertEquals(
+        OperationType.DISABLE_USER,
+        ((IdpUpdateUserEnabledEvent) postEvents.get(2)).operationType());
+    Assertions.assertEquals(
+        OperationType.ENABLE_USER, ((IdpUpdateUserEnabledEvent) postEvents.get(3)).operationType());
+    IdpRemoveUserEvent remove = (IdpRemoveUserEvent) postEvents.get(4);
     Assertions.assertEquals(OperationType.REMOVE_USER, remove.operationType());
     Assertions.assertTrue(remove.isExists());
   }
 
   @Test
-  void testGroupMutations() throws Exception {
+  void testGroupMutationsDispatchTypedEvents() throws Exception {
     when(manager.addGroup("g1", "c")).thenReturn(mock(IdpGroup.class));
     when(manager.changeGroupMembership(eq("g1"), anyList(), isNull()))
         .thenReturn(mock(IdpGroup.class));
     when(manager.removeGroup("g1", true)).thenReturn(true);
 
-    PrincipalUtils.doAs(
-        new UserPrincipal("admin"),
+    asAdmin(
         () -> {
           dispatcher.addGroup("g1", "c");
           dispatcher.changeGroupMembership("g1", List.of("alice"), null);
@@ -168,58 +135,36 @@ class TestIdpUserGroupEventDispatcher {
           return null;
         });
 
-    Assertions.assertEquals(3, listener.preEvents.size());
-    Assertions.assertInstanceOf(IdpAddGroupPreEvent.class, listener.preEvents.get(0));
-    Assertions.assertEquals(3, listener.postEvents.size());
-    Assertions.assertInstanceOf(IdpAddGroupEvent.class, listener.postEvents.get(0));
-    IdpChangeGroupMembershipEvent membership =
-        (IdpChangeGroupMembershipEvent) listener.postEvents.get(1);
+    Assertions.assertEquals(3, postEvents.size());
+    Assertions.assertInstanceOf(IdpAddGroupEvent.class, postEvents.get(0));
+    IdpChangeGroupMembershipEvent membership = (IdpChangeGroupMembershipEvent) postEvents.get(1);
     Assertions.assertEquals(OperationType.ALTER_GROUP, membership.operationType());
     Assertions.assertEquals(List.of("alice"), membership.usersToAdd());
     Assertions.assertEquals("basic.group.g1", membership.identifier().toString());
-    IdpRemoveGroupEvent remove = (IdpRemoveGroupEvent) listener.postEvents.get(2);
+    IdpRemoveGroupEvent remove = (IdpRemoveGroupEvent) postEvents.get(2);
     Assertions.assertEquals(OperationType.REMOVE_GROUP, remove.operationType());
     Assertions.assertTrue(remove.force());
   }
 
   @Test
-  void testAddGroupFailure() throws Exception {
-    doThrow(new AlreadyExistsException("exists")).when(manager).addGroup("g1", "");
+  void testFailureDispatchesFailureEvent() throws Exception {
+    when(manager.addUser(eq("alice"), anyString(), eq(true)))
+        .thenThrow(new AlreadyExistsException("exists"));
 
     Assertions.assertThrows(
         AlreadyExistsException.class,
         () ->
-            PrincipalUtils.doAs(
-                new UserPrincipal("admin"),
+            asAdmin(
                 () -> {
-                  dispatcher.addGroup("g1", "");
+                  dispatcher.addUser("alice", "Passw0rd-For-User", true);
                   return null;
                 }));
 
-    Assertions.assertInstanceOf(IdpAddGroupFailureEvent.class, listener.postEvents.get(0));
+    Assertions.assertInstanceOf(IdpAddUserFailureEvent.class, postEvents.get(0));
+    Assertions.assertEquals(OperationType.ADD_USER, postEvents.get(0).operationType());
   }
 
-  private static final class RecordingListener implements EventListenerPlugin {
-    private final LinkedList<Event> postEvents = new LinkedList<>();
-    private final LinkedList<PreEvent> preEvents = new LinkedList<>();
-
-    @Override
-    public void init(Map<String, String> properties) {}
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void stop() {}
-
-    @Override
-    public void onPostEvent(Event event) {
-      postEvents.add(event);
-    }
-
-    @Override
-    public void onPreEvent(PreEvent preEvent) {
-      preEvents.add(preEvent);
-    }
+  private static void asAdmin(PrivilegedExceptionAction<Void> action) throws Exception {
+    PrincipalUtils.doAs(new UserPrincipal("admin"), action);
   }
 }
