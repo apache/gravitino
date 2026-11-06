@@ -27,7 +27,6 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
-import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -105,11 +104,7 @@ public class TestIcebergTableUpdate {
 
   private void createTable(String namespace, String tableName) {
     CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName(tableName)
-            .withSchema(tableSchema)
-            .setProperties(Collections.singletonMap("format-version", "3"))
-            .build();
+        CreateTableRequest.builder().withName(tableName).withSchema(tableSchema).build();
     icebergCatalogWrapper.createTable(Namespace.of(namespace), createTableRequest);
     Assertions.assertTrue(
         icebergCatalogWrapper.tableExists(TableIdentifier.of(namespace, tableName)));
@@ -122,62 +117,6 @@ public class TestIcebergTableUpdate {
     LoadTableResponse loadTableResponse = updateTable(identifier, updateComment);
     String comment = loadTableResponse.tableMetadata().property("comment", "");
     Assertions.assertTrue(comment.equals(comments));
-  }
-
-  @Test
-  public void testAddColumnWithDefaultValue() {
-    String addColumnName = "add_with_default";
-    TableChange addColumn =
-        TableChange.addColumn(
-            new String[] {addColumnName},
-            Types.StringType.get(),
-            "doc",
-            Literals.stringLiteral("seed"));
-    LoadTableResponse response = updateTable(identifier, addColumn);
-    NestedField field = response.tableMetadata().schema().findField(addColumnName);
-    Assertions.assertNotNull(field);
-    Assertions.assertEquals("seed", field.writeDefault());
-    Assertions.assertEquals("seed", field.initialDefault());
-  }
-
-  @Test
-  public void testUpdateColumnDefaultValue() {
-    TableChange updateDefault =
-        TableChange.updateColumnDefaultValue(firstField, Literals.stringLiteral("updated_default"));
-    LoadTableResponse response = updateTable(identifier, updateDefault);
-    NestedField field = response.tableMetadata().schema().findField(firstField[0]);
-    Assertions.assertEquals("updated_default", field.writeDefault());
-  }
-
-  @Test
-  public void testColumnDefaultRequiresFormatVersion3() {
-    String v2TableName = "gravitino_test_table_v2";
-    NameIdentifier v2Identifier = NameIdentifier.of(TEST_NAMESPACE_NAME, v2TableName);
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder()
-            .withName(v2TableName)
-            .withSchema(tableSchema)
-            .setProperties(Collections.singletonMap("format-version", "2"))
-            .build();
-    icebergCatalogWrapper.createTable(Namespace.of(TEST_NAMESPACE_NAME), createTableRequest);
-
-    TableChange addWithDefault =
-        TableChange.addColumn(
-            new String[] {"add_with_default"},
-            Types.StringType.get(),
-            "doc",
-            Literals.stringLiteral("seed"));
-    IllegalArgumentException addEx =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> updateTable(v2Identifier, addWithDefault));
-    Assertions.assertTrue(addEx.getMessage().contains("format-version"));
-
-    TableChange updateDefault =
-        TableChange.updateColumnDefaultValue(firstField, Literals.stringLiteral("updated_default"));
-    IllegalArgumentException updateEx =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> updateTable(v2Identifier, updateDefault));
-    Assertions.assertTrue(updateEx.getMessage().contains("format-version"));
   }
 
   @Test

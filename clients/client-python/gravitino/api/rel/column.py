@@ -257,12 +257,12 @@ class ColumnImpl(Column):
                 self._nullable,
                 self._auto_increment,
                 (
-                    tuple(self._default_value)
+                    None
                     if self._default_value is Column.DEFAULT_VALUE_NOT_SET
                     else self._default_value
                 ),
                 (
-                    tuple(self._initial_default_value)
+                    None
                     if self._initial_default_value is Column.INITIAL_DEFAULT_VALUE_NOT_SET
                     else self._initial_default_value
                 ),

@@ -26,11 +26,9 @@ plugins {
 
 val scalaVersion: String =
   project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-// Match maintenance/jobs and catalog Iceberg 1.11 so IsolatedClassLoader's shared
-// org.apache.iceberg.* types include NestedField default APIs used by lakehouse-iceberg.
-val sparkVersion: String = libs.versions.spark35.get()
+val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark35.get()
+val icebergVersion: String = libs.versions.iceberg4spark33.get()
 
 dependencies {
   implementation(project(":api"))

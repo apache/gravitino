@@ -37,9 +37,9 @@ public class IcebergCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult columnDefaultValue() {
-    // Format-version 3 column defaults: write-default maps to Column.defaultValue() and
-    // initial-default maps to Column.initialDefaultValue().
-    return CapabilityResult.SUPPORTED;
+    // Iceberg column default value is WIP, see
+    // https://github.com/apache/iceberg/pull/4525
+    return CapabilityResult.unsupported("Iceberg does not support column default value.");
   }
 
   @Override

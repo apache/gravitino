@@ -1213,8 +1213,6 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   @Test
   public void testAlterIcebergTable() {
     Column[] columns = createColumns();
-    Map<String, String> alterTableProperties = createProperties();
-    alterTableProperties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
     Table table =
         catalog
             .asTableCatalog()
@@ -1222,7 +1220,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                 NameIdentifier.of(schemaName, tableName),
                 columns,
                 table_comment,
-                alterTableProperties,
+                createProperties(),
                 new Transform[] {Transforms.identity(columns[0].name())});
     Assertions.assertNull(table.auditInfo().lastModifier());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, table.auditInfo().creator());
@@ -1287,25 +1285,22 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         columns[0].name(),
         ((Transform.SingleFieldTransform) table.partitioning()[0]).fieldName()[0]);
 
-    // test add column with default value
+    // test add column with default value exception
     TableChange withDefaultValue =
         TableChange.addColumn(
-            new String[] {"newColumn"},
-            Types.StringType.get(),
-            "comment",
-            Literals.stringLiteral("default_v"));
-    catalog
-        .asTableCatalog()
-        .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue);
-    table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
-    Column addedWithDefault =
-        Arrays.stream(table.columns())
-            .filter(c -> "newColumn".equals(c.name()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("newColumn not found"));
-    Assertions.assertEquals(Literals.stringLiteral("default_v"), addedWithDefault.defaultValue());
-    Assertions.assertEquals(
-        Literals.stringLiteral("default_v"), addedWithDefault.initialDefaultValue());
+            new String[] {"newColumn"}, Types.ByteType.get(), "comment", Literals.NULL);
+    RuntimeException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Iceberg does not support column default value. Illegal column:"),
+        "The exception message is: " + exception.getMessage());
 
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
@@ -1320,7 +1315,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
             tableIdentifier,
             newColumns,
             table_comment,
-            ImmutableMap.of(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3"),
+            ImmutableMap.of(),
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             new SortOrder[0]);
@@ -1337,11 +1332,15 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     TableChange change2 =
         TableChange.updateColumnDefaultValue(
             new String[] {col1.name()}, Literals.of("hello", Types.StringType.get()));
-    Assertions.assertDoesNotThrow(() -> tableCatalog.alterTable(tableIdentifier, change2));
-    Table updatedDefaultTable = tableCatalog.loadTable(tableIdentifier);
-    Assertions.assertEquals(
-        Literals.of("hello", Types.StringType.get()),
-        updatedDefaultTable.columns()[0].defaultValue());
+    illegalArgumentException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(tableIdentifier, change2));
+    Assertions.assertTrue(
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg does not support column default value. Illegal column: name"),
+        "The exception is: " + illegalArgumentException.getMessage());
 
     catalog
         .asTableCatalog()

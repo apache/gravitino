@@ -220,15 +220,29 @@ class DTOConverters:
         Returns:
             Column: The column.
         """
-        if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET:
+        if (
+            dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            and dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+        ):
             return dto
+        default_value = (
+            Column.DEFAULT_VALUE_NOT_SET
+            if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.default_value())
+        )
+        initial_default_value = (
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            if dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.initial_default_value())
+        )
         return Column.of(
             dto.name(),
             dto.data_type(),
             dto.comment(),
             dto.nullable(),
             dto.auto_increment(),
-            DTOConverters.from_function_arg(dto.default_value()),
+            default_value,
+            initial_default_value,
         )
 
     @from_dto.register
@@ -545,6 +559,12 @@ class DTOConverters:
                 if obj.default_value() is None
                 or obj.default_value() is Column.DEFAULT_VALUE_NOT_SET
                 else DTOConverters.to_function_arg(obj.default_value())
+            )
+            .with_initial_default_value(
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                if obj.initial_default_value() is None
+                or obj.initial_default_value() is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                else DTOConverters.to_function_arg(obj.initial_default_value())
             )
             .build()
         )

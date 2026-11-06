@@ -581,8 +581,6 @@ public class IcebergCatalogOperations
                           .withType(column.dataType())
                           .withComment(column.comment())
                           .withNullable(column.nullable())
-                          .withDefaultValue(column.defaultValue())
-                          .withInitialDefaultValue(column.initialDefaultValue())
                           .build())
               .toArray(IcebergColumn[]::new);
 

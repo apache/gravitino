@@ -31,10 +31,8 @@ import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
-import org.apache.gravitino.catalog.lakehouse.iceberg.converter.ToIcebergColumnDefault;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -46,13 +44,10 @@ import org.apache.gravitino.rel.TableChange.RenameColumn;
 import org.apache.gravitino.rel.TableChange.RenameTable;
 import org.apache.gravitino.rel.TableChange.SetProperty;
 import org.apache.gravitino.rel.TableChange.UpdateColumnComment;
-import org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue;
 import org.apache.gravitino.rel.TableChange.UpdateColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnType;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
-import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -61,7 +56,6 @@ import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types.NestedField;
 
@@ -176,10 +170,7 @@ public class IcebergCatalogWrapperHelper {
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
           IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType()),
-          addColumn.getComment(),
-          ToIcebergColumnDefault.fromGravitino(
-              addColumn.getDefaultValue(),
-              IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType())));
+          addColumn.getComment());
     } else {
       // TODO: figure out how to enable users to add required columns
       // icebergUpdateSchema.allowIncompatibleChanges();
@@ -187,29 +178,12 @@ public class IcebergCatalogWrapperHelper {
           getParentName(addColumn.fieldName()),
           getLeafName(addColumn.fieldName()),
           IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType()),
-          addColumn.getComment(),
-          ToIcebergColumnDefault.fromGravitino(
-              addColumn.getDefaultValue(),
-              IcebergDataTypeConverter.CONVERTER.fromGravitino(addColumn.getDataType())));
+          addColumn.getComment());
     }
 
     if (!ColumnPosition.defaultPos().equals(addColumn.getPosition())) {
       doMoveColumn(icebergUpdateSchema, addColumn.fieldName(), addColumn.getPosition());
     }
-  }
-
-  private void doUpdateColumnDefaultValue(
-      UpdateSchema icebergUpdateSchema,
-      UpdateColumnDefaultValue updateColumnDefaultValue,
-      Schema icebergTableSchema) {
-    String fieldName = DOT.join(updateColumnDefaultValue.fieldName());
-    NestedField field = icebergTableSchema.findField(fieldName);
-    Preconditions.checkArgument(field != null, "Cannot update missing column: %s", fieldName);
-    // Iceberg updateColumnDefault updates write-default only; initial-default is fixed at add time.
-    Literal<?> newDefault =
-        ToIcebergColumnDefault.fromGravitino(
-            updateColumnDefaultValue.getNewDefaultValue(), field.type());
-    icebergUpdateSchema.updateColumnDefault(fieldName, newDefault);
   }
 
   private void alterTableProperty(
@@ -249,9 +223,6 @@ public class IcebergCatalogWrapperHelper {
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         doUpdateColumnNullability(
             icebergUpdateSchema, (TableChange.UpdateColumnNullability) change);
-      } else if (change instanceof UpdateColumnDefaultValue) {
-        doUpdateColumnDefaultValue(
-            icebergUpdateSchema, (UpdateColumnDefaultValue) change, icebergTableSchema);
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         throw new IllegalArgumentException("Iceberg doesn't support auto increment column");
       } else {
@@ -300,27 +271,6 @@ public class IcebergCatalogWrapperHelper {
     IcebergTableChange icebergTableChange =
         new IcebergTableChange(icebergTableIdentifier, transaction);
     if (!gravitinoColumnChanges.isEmpty()) {
-      boolean setsColumnDefault =
-          gravitinoColumnChanges.stream()
-              .anyMatch(
-                  change -> {
-                    if (change instanceof UpdateColumnDefaultValue) {
-                      return true;
-                    }
-                    if (change instanceof AddColumn) {
-                      Expression defaultValue = ((AddColumn) change).getDefaultValue();
-                      return defaultValue != null
-                          && !defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET);
-                    }
-                    return false;
-                  });
-      if (setsColumnDefault) {
-        int formatVersion = ((BaseTable) icebergBaseTable).operations().current().formatVersion();
-        Preconditions.checkArgument(
-            formatVersion >= 3,
-            "Column defaults require Iceberg format-version 3+, but table format-version is %s",
-            formatVersion);
-      }
       alterTableColumn(
           transaction.updateSchema(), gravitinoColumnChanges, icebergBaseTable.schema());
     }

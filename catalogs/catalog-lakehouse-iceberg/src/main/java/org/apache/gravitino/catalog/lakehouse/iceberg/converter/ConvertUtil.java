@@ -19,16 +19,22 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.List;
+import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Decimal;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.ByteBuffers;
+import org.apache.iceberg.util.DateTimeUtil;
 
 public class ConvertUtil {
 
@@ -43,8 +49,7 @@ public class ConvertUtil {
         toGravitinoStructType(gravitinoTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
-    return applyColumnDefaults(
-        converted.asNestedType().asStructType().fields(), gravitinoTable.columns());
+    return new Schema(converted.asNestedType().asStructType().fields());
   }
 
   /**
@@ -65,14 +70,15 @@ public class ConvertUtil {
     org.apache.gravitino.rel.types.Types.StructType structType =
         org.apache.gravitino.rel.types.Types.StructType.of(fields);
     Type converted = ToIcebergTypeVisitor.visit(structType, new ToIcebergType(structType));
-    return applyColumnDefaults(converted.asNestedType().asStructType().fields(), columns);
+    return new Schema(converted.asNestedType().asStructType().fields());
   }
 
   /**
    * Convert the nested field of Iceberg to the Iceberg column.
    *
-   * <p>Iceberg {@code write-default} maps to {@link Column#defaultValue()} and {@code
-   * initial-default} maps to {@link Column#initialDefaultValue()}.
+   * <p>For format-version 3 fields, Iceberg {@code write-default} maps to {@link
+   * Column#defaultValue()} and {@code initial-default} maps to {@link
+   * Column#initialDefaultValue()}.
    *
    * @param nestedField Iceberg nested field.
    * @return Gravitino Iceberg column
@@ -83,9 +89,107 @@ public class ConvertUtil {
         .withNullable(nestedField.isOptional())
         .withComment(nestedField.doc())
         .withType(IcebergDataTypeConverter.CONVERTER.toGravitino(nestedField.type()))
-        .withDefaultValue(FromIcebergColumnDefault.writeDefault(nestedField))
-        .withInitialDefaultValue(FromIcebergColumnDefault.initialDefault(nestedField))
+        .withDefaultValue(
+            fromIcebergLiteral(
+                nestedField.writeDefaultLiteral(),
+                nestedField.type(),
+                Column.DEFAULT_VALUE_NOT_SET))
+        .withInitialDefaultValue(
+            fromIcebergLiteral(
+                nestedField.initialDefaultLiteral(),
+                nestedField.type(),
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET))
         .build();
+  }
+
+  private static Expression fromIcebergLiteral(
+      Literal<?> icebergDefault, Type type, Expression unset) {
+    if (icebergDefault == null) {
+      return unset;
+    }
+    return toGravitinoLiteral(icebergDefault, type, unset);
+  }
+
+  private static Expression toGravitinoLiteral(
+      Literal<?> icebergDefault, Type type, Expression unset) {
+    Object value = icebergDefault.value();
+    if (value == null) {
+      return Literals.NULL;
+    }
+
+    switch (type.typeId()) {
+      case BOOLEAN:
+        return Literals.booleanLiteral((Boolean) value);
+      case INTEGER:
+        return Literals.integerLiteral((Integer) value);
+      case LONG:
+        return Literals.longLiteral((Long) value);
+      case FLOAT:
+        return Literals.floatLiteral((Float) value);
+      case DOUBLE:
+        return Literals.doubleLiteral((Double) value);
+      case STRING:
+        return Literals.stringLiteral(value.toString());
+      case DATE:
+        return Literals.dateLiteral(DateTimeUtil.dateFromDays((Integer) value));
+      case TIME:
+        return Literals.timeLiteral(DateTimeUtil.timeFromMicros((Long) value));
+      case TIMESTAMP:
+        {
+          Types.TimestampType timestampType = (Types.TimestampType) type;
+          if (timestampType.shouldAdjustToUTC()) {
+            return Literals.of(
+                DateTimeUtil.timestamptzFromMicros((Long) value).toLocalDateTime(),
+                org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(
+                    FromIcebergType.PRECISION_MICROSECOND));
+          }
+          return Literals.of(
+              DateTimeUtil.timestampFromMicros((Long) value),
+              org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+                  FromIcebergType.PRECISION_MICROSECOND));
+        }
+      case TIMESTAMP_NANO:
+        {
+          Types.TimestampNanoType timestampNanoType = (Types.TimestampNanoType) type;
+          if (timestampNanoType.shouldAdjustToUTC()) {
+            return Literals.of(
+                DateTimeUtil.timestamptzFromNanos((Long) value).toLocalDateTime(),
+                org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(
+                    FromIcebergType.PRECISION_NANOSECOND));
+          }
+          return Literals.of(
+              DateTimeUtil.timestampFromNanos((Long) value),
+              org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+                  FromIcebergType.PRECISION_NANOSECOND));
+        }
+      case DECIMAL:
+        {
+          Types.DecimalType decimalType = (Types.DecimalType) type;
+          return Literals.decimalLiteral(
+              Decimal.of((BigDecimal) value, decimalType.precision(), decimalType.scale()));
+        }
+      case UUID:
+        return Literals.of(
+            ((UUID) value).toString(), org.apache.gravitino.rel.types.Types.UUIDType.get());
+      case FIXED:
+        return Literals.of(
+            toByteArray(value),
+            org.apache.gravitino.rel.types.Types.FixedType.of(((Types.FixedType) type).length()));
+      case BINARY:
+        return Literals.of(
+            toByteArray(value), org.apache.gravitino.rel.types.Types.BinaryType.get());
+      default:
+        // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
+        // rather than failing table load.
+        return unset;
+    }
+  }
+
+  private static byte[] toByteArray(Object value) {
+    if (value instanceof byte[]) {
+      return (byte[]) value;
+    }
+    return ByteBuffers.toByteArray((ByteBuffer) value);
   }
 
   /**
@@ -104,29 +208,6 @@ public class ConvertUtil {
                         column.name(), column.dataType(), column.nullable(), column.comment()))
             .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
     return org.apache.gravitino.rel.types.Types.StructType.of(fields);
-  }
-
-  private static Schema applyColumnDefaults(
-      List<Types.NestedField> icebergFields, Column[] columns) {
-    List<Types.NestedField> withDefaults = new ArrayList<>(icebergFields.size());
-    for (int i = 0; i < icebergFields.size(); i++) {
-      Types.NestedField field = icebergFields.get(i);
-      Literal<?> write =
-          ToIcebergColumnDefault.fromGravitino(columns[i].defaultValue(), field.type());
-      Literal<?> initial =
-          ToIcebergColumnDefault.fromGravitino(columns[i].initialDefaultValue(), field.type());
-      if (write == null && initial == null) {
-        withDefaults.add(field);
-      } else {
-        // Seed both when only one side is set (Iceberg addColumn behavior for new fields).
-        withDefaults.add(
-            Types.NestedField.from(field)
-                .withWriteDefault(write != null ? write : initial)
-                .withInitialDefault(initial != null ? initial : write)
-                .build());
-      }
-    }
-    return new Schema(withDefaults);
   }
 
   private ConvertUtil() {}
