@@ -694,6 +694,7 @@ public class TestGravitinoInterceptionService {
     try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> providers =
             mockStatic(GravitinoAuthorizerProvider.class);
+        // Bypass checkCurrentUser's GravitinoEnv lookup to isolate catalog-name validation.
         MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class)) {
       principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
       principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
