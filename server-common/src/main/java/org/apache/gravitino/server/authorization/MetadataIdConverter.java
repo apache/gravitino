@@ -79,6 +79,7 @@ public class MetadataIdConverter {
 
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataType);
 
+<<<<<<< HEAD
     Entity entity;
     try {
       entity =
@@ -89,6 +90,45 @@ public class MetadataIdConverter {
     } catch (IOException e) {
       throw new RuntimeException(
           "failed to load entity from entity store: " + metadataObject.fullName(), e);
+=======
+  /**
+   * Loads an ID using an object already normalized by {@link #normalizeMetadataObject}.
+   *
+   * <p>The caller must use the same normalized object for the cache key and this lookup. This
+   * method does not resolve catalog capabilities or normalize the name again.
+   *
+   * @param metadataObject the previously normalized metadata object
+   * @param metalake the metalake name
+   * @return the metadata ID, or empty if the entity does not exist
+   * @throws RuntimeException if the entity store cannot load the entity
+   */
+  public static Optional<Long> getIdForNormalizedObject(
+      MetadataObject metadataObject, String metalake) {
+    Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
+    return loadId(metadataObject, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+  }
+
+  /**
+   * Normalizes a metadata object's name using the same catalog rules as ID resolution.
+   *
+   * <p>Types without a catalog capability scope retain their names. The rules come from {@link
+   * CapabilityHelpers#normalizeMetadataIdentifier}, which tag operations also use: Semantic Model
+   * leaves keep their case, tables and column parents resolve to physical names, and a column keeps
+   * a name that exactly matches a stored column.
+   *
+   * @param metadataObject the object whose name will be normalized
+   * @param metalake the metalake name
+   * @return the normalized object, suitable for name-to-ID cache keys
+   * @throws NotFoundException if the containing catalog does not exist
+   * @throws RuntimeException if catalog capabilities cannot be resolved
+   */
+  public static MetadataObject normalizeMetadataObject(
+      MetadataObject metadataObject, String metalake) {
+    Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
+    Capability.Scope scope = METADATA_SCOPE_MAPPING.get(metadataObject.type());
+    if (scope == null) {
+      return metadataObject;
+>>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
     }
 
     return Optional.of(extractIdFromEntity(entity));
@@ -100,9 +140,30 @@ public class MetadataIdConverter {
     if (scope == null) {
       return ident;
     }
+<<<<<<< HEAD
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
     return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+=======
+    // Tag operations use the same helper, so authorization checks the object they change.
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident, scope, catalogManager, () -> GravitinoEnv.getInstance().entityStore());
+  }
+
+  private static Optional<Long> loadId(MetadataObject metadataObject, NameIdentifier ident) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject.type());
+    Entity entity;
+    try {
+      entity = entityStore.get(ident, entityType, EntityClassMapper.getEntityClass(entityType));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "failed to load entity from entity store: " + metadataObject.fullName(), e);
+    }
+    return Optional.of(extractIdFromEntity(entity));
+>>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
   }
 
   private static Long extractIdFromEntity(Entity entity) {

@@ -18,12 +18,23 @@
  */
 package org.apache.gravitino.catalog;
 
+<<<<<<< HEAD
+=======
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Locale;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
+>>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -117,4 +128,121 @@ public class TestCapabilityHelpers {
 
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  void testSemanticModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testSemanticModelUsesManagedStorageByDefault() {
+    Assertions.assertTrue(
+        Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
+  }
+
+  @Test
+  void testNormalizeMetadataIdentifierKeepsExactStoredColumnName() throws IOException {
+    CatalogManager catalogManager = foldingCatalogManager();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "orders");
+    TableEntity tableEntity = Mockito.mock(TableEntity.class);
+    ColumnEntity column = Mockito.mock(ColumnEntity.class);
+    Mockito.when(column.name()).thenReturn("MyCol");
+    Mockito.when(tableEntity.columns()).thenReturn(Collections.singletonList(column));
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class))
+        .thenReturn(tableEntity);
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "MyCol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "MyCol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "othercol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "OtherCol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Mockito.verify(store, Mockito.times(2)).get(table, Entity.EntityType.TABLE, TableEntity.class);
+
+    // A name that folding does not change needs no stored-column read.
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "mycol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "mycol"),
+            Capability.Scope.COLUMN,
+            catalogManager,
+            () -> store));
+    Mockito.verify(store, Mockito.times(2)).get(table, Entity.EntityType.TABLE, TableEntity.class);
+  }
+
+  @Test
+  void testNormalizeMetadataIdentifierHandlesMissingOrFailedStoredTable() throws IOException {
+    CatalogManager catalogManager = foldingCatalogManager();
+    EntityStore store = Mockito.mock(EntityStore.class);
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "orders");
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class))
+        .thenThrow(new NoSuchEntityException("missing"));
+    NameIdentifier column = NameIdentifier.of("metalake", "catalog", "schema", "ORDERS", "MyCol");
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "orders", "mycol"),
+        CapabilityHelpers.normalizeMetadataIdentifier(
+            column, Capability.Scope.COLUMN, catalogManager, () -> store));
+
+    IOException failure = new IOException("store down");
+    Mockito.reset(store);
+    Mockito.when(store.get(table, Entity.EntityType.TABLE, TableEntity.class)).thenThrow(failure);
+    RuntimeException error =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                CapabilityHelpers.normalizeMetadataIdentifier(
+                    column, Capability.Scope.COLUMN, catalogManager, () -> store));
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertTrue(error.getMessage().contains(table.toString()));
+  }
+
+  private static CatalogManager foldingCatalogManager() {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("case insensitive");
+              }
+            });
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    return catalogManager;
+  }
+>>>>>>> 3c63c74ff ([#14681] fix(tag): Normalize metadata object names for tag operations (#14682))
 }
