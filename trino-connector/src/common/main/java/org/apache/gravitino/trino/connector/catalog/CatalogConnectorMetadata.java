@@ -42,7 +42,6 @@ import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
-import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
@@ -311,13 +310,9 @@ public class CatalogConnectorMetadata {
     boolean success;
     try {
       success = schemaCatalog.dropSchema(schemaName, cascade);
-    } catch (NonEmptySchemaException e) {
-      // Keep the server's reason (for example a blocking dependency on a cascade drop) instead of a
-      // fixed text, so the user sees why the drop was refused.
-      String reason =
-          Strings.isNullOrEmpty(e.getMessage()) ? "Schema is not empty" : e.getMessage();
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY, reason, e);
     } catch (RuntimeException e) {
+      // A refused drop (NonEmptySchemaException) keeps its GRAVITINO_SCHEMA_NOT_EMPTY code and the
+      // server's reason, without the server stack trace a REST failure carries after the message.
       throw GravitinoErrorCode.toTrinoException(e);
     }
     if (!success) {

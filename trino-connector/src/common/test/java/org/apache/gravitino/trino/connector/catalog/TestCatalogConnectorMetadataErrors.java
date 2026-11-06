@@ -227,14 +227,28 @@ public class TestCatalogConnectorMetadataErrors {
   }
 
   @Test
-  public void testDropNonEmptySchemaWithoutReasonFallsBack() {
+  public void testDropNonEmptySchemaDropsServerStackTrace() {
+    // The REST client appends the server stack trace to the message of a refusal, on cascade and
+    // non-cascade drops alike. Only the first line is the reason.
+    String reason = "Schema db is not empty";
+    String messageWithStack =
+        reason
+            + "\n"
+            + "org.apache.gravitino.exceptions.NonEmptySchemaException: "
+            + reason
+            + "\n"
+            + "\tat org.apache.gravitino.server.web.rest.SchemaOperations.dropSchema(SchemaOperations.java:1)";
     SupportsSchemas schemas = mock(SupportsSchemas.class);
-    when(schemas.dropSchema(anyString(), anyBoolean())).thenThrow(new NonEmptySchemaException(""));
+    when(schemas.dropSchema(anyString(), anyBoolean()))
+        .thenThrow(new NonEmptySchemaException(messageWithStack));
     CatalogConnectorMetadata metadata = createMetadata(schemas, mock(TableCatalog.class));
 
-    TrinoException e = assertThrows(TrinoException.class, () -> metadata.dropSchema("s", false));
-    assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
-    assertEquals("Schema is not empty", e.getMessage());
+    for (boolean cascade : new boolean[] {false, true}) {
+      TrinoException e =
+          assertThrows(TrinoException.class, () -> metadata.dropSchema("s", cascade));
+      assertEquals(GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EMPTY.toErrorCode(), e.getErrorCode());
+      assertEquals(reason, e.getMessage());
+    }
   }
 
   private static CatalogConnectorMetadata createMetadata(TableCatalog tableCatalog) {
