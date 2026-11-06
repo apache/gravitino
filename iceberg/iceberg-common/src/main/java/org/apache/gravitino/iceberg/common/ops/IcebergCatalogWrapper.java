@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -64,6 +65,7 @@ import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -101,6 +103,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private static final int MIN_FORMAT_VERSION = 1;
 
   private static final int MAX_FORMAT_VERSION = 3;
+
+  // Iceberg JdbcCatalog declares iceberg_namespace_properties.property_value as VARCHAR(1000).
+  private static final int MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH = 1000;
 
   private final Object initializationLock = new Object();
   private volatile Catalog catalog;
@@ -199,6 +204,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public CreateNamespaceResponse createNamespace(CreateNamespaceRequest request) {
     validateNamespace(Optional.of(request.namespace()));
+    validateNamespaceProperties(request.properties());
     return CatalogHandlers.createNamespace(getNamespaceCatalog(), request);
   }
 
@@ -225,6 +231,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public UpdateNamespacePropertiesResponse updateNamespaceProperties(
       Namespace namespace, UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     validateNamespace(Optional.of(namespace));
+    validateNamespaceProperties(updateNamespacePropertiesRequest.updates());
     return CatalogHandlers.updateNamespaceProperties(
         getNamespaceCatalog(), namespace, updateNamespacePropertiesRequest);
   }
@@ -737,6 +744,24 @@ public class IcebergCatalogWrapper implements AutoCloseable {
               "Cannot set default sort order to %s: the table has no sort order with that id", id);
         }
       }
+    }
+  }
+
+  @VisibleForTesting
+  void validateNamespaceProperties(@Nullable Map<String, String> properties) {
+    if (properties == null) {
+      return;
+    }
+    if (getCatalog() instanceof JdbcCatalog) {
+      properties.forEach(
+          (key, value) ->
+              Preconditions.checkArgument(
+                  value == null
+                      || value.codePointCount(0, value.length())
+                          <= MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH,
+                  "Namespace property '%s' exceeds the JDBC catalog limit of %s characters",
+                  key,
+                  MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH));
     }
   }
 }

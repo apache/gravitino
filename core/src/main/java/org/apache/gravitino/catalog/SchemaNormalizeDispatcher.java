@@ -23,7 +23,10 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -73,6 +76,7 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    checkCommentLength(comment);
     return dispatcher.createSchema(normalizeNameIdentifier(ident), comment, properties);
   }
 
@@ -86,6 +90,8 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    // SchemaChange supports property changes only; schema comments cannot be updated.
+    // Comment length is therefore validated on createSchema, the only API that accepts a comment.
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     return dispatcher.alterSchema(normalizeCaseSensitive(ident), changes);
@@ -99,6 +105,11 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private boolean supportsHierarchicalSchema(Namespace namespace) {
     Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
     return capabilities.supportsHierarchicalSchema().supported();
+  }
+
+  private static void checkCommentLength(@Nullable String comment) {
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {

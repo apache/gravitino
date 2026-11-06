@@ -72,6 +72,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestSchemaOperations extends BaseOperationsTest {
@@ -371,6 +373,23 @@ public class TestSchemaOperations extends BaseOperationsTest {
             .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 256, 257})
+  void testAlterSchemaRejectsCommentUpdatesBeforeDispatch(int commentLength) {
+    String json =
+        "{\"updates\":[{\"@type\":\"updateComment\",\"newComment\":\""
+            + "c".repeat(commentLength)
+            + "\"}]}";
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
   }
 
   @Test

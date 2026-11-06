@@ -67,6 +67,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -119,6 +120,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     this.schemaDispatcherSupplier =
         Preconditions.checkNotNull(
             schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");
+  }
+
+  /**
+   * Checks whether a table exists, treating catalogs without table operations as empty.
+   *
+   * @param ident the table identifier
+   * @return whether the table exists
+   */
+  @Override
+  public boolean tableExists(NameIdentifier ident) {
+    boolean supportsTables =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+            RuntimeException.class);
+    return supportsTables && TableDispatcher.super.tableExists(ident);
   }
 
   /**
