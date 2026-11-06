@@ -489,6 +489,323 @@ public class TestMetadataAuthzHelper {
     }
   }
 
+  /** A SELECT_VIEW grant on the schema makes every view visible without per-view checks. */
+  @Test
+  public void testListShortCircuitViewViaSchemaGrant() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.SELECT_VIEW);
+    NameIdentifier[] identifiers = views(2000);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.VIEW,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.VIEW),
+                  any());
+        });
+  }
+
+  /** A possible SELECT_VIEW deny disables the schema-grant path and each view is checked. */
+  @Test
+  public void testListShortCircuitViewFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.SELECT_VIEW);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.VIEW && "v1".equals(object.name());
+            });
+    NameIdentifier[] identifiers = views(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.VIEW,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
+          // The shortcut must gate on exactly the SELECT_VIEW deny; a wrong deny set here
+          // would over-permit by keeping the shortcut alive under a real deny.
+          verify(authorizer)
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.SELECT_VIEW)), any());
+        });
+  }
+
+  /**
+   * An EXECUTE_FUNCTION grant on the schema makes every function visible without per-function
+   * checks.
+   */
+  @Test
+  public void testListShortCircuitFunctionViaSchemaGrant() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.EXECUTE_FUNCTION);
+    NameIdentifier[] identifiers = functions(2000);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.FUNCTION,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.FUNCTION),
+                  any());
+        });
+  }
+
+  /**
+   * A possible MODIFY_FUNCTION deny disables the schema-grant path and each function is checked;
+   * the MODIFY_FUNCTION path is the second parent-scope path of the function entry.
+   */
+  @Test
+  public void testListShortCircuitFunctionFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.MODIFY_FUNCTION);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.FUNCTION && "f1".equals(object.name());
+            });
+    NameIdentifier[] identifiers = functions(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.FUNCTION,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
+          // The granted path gates on exactly the MODIFY_FUNCTION deny.
+          verify(authorizer)
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.MODIFY_FUNCTION)), any());
+        });
+  }
+
+  /** A READ_FILESET grant on the schema makes every fileset visible without per-object checks. */
+  @Test
+  public void testListShortCircuitFilesetViaSchemaGrant() {
+    EntityStore store = mock(EntityStore.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.READ_FILESET);
+    NameIdentifier[] identifiers = filesets(2000);
+    withPreloadEnv(
+        store,
+        schemaDispatcher,
+        () ->
+            withAuthorizer(
+                authorizer,
+                () -> {
+                  NameIdentifier[] filtered =
+                      MetadataAuthzHelper.filterByExpression(
+                          "testMetalake",
+                          AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
+                          Entity.EntityType.FILESET,
+                          identifiers);
+                  Assertions.assertArrayEquals(identifiers, filtered);
+                  verify(authorizer, never())
+                      .isOwner(
+                          any(),
+                          eq("testMetalake"),
+                          argThat(object -> object.type() == MetadataObject.Type.FILESET),
+                          any());
+                  verifyNoInteractions(store, schemaDispatcher);
+                }));
+  }
+
+  /**
+   * A possible WRITE_FILESET deny disables the schema-grant path and each fileset is checked; the
+   * WRITE_FILESET path is the second parent-scope path of the fileset entry.
+   */
+  @Test
+  public void testListShortCircuitFilesetFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.WRITE_FILESET);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.FILESET && "fs1".equals(object.name());
+            });
+    NameIdentifier[] identifiers = filesets(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.FILESET,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
+          // The granted path gates on exactly the WRITE_FILESET deny.
+          verify(authorizer)
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.WRITE_FILESET)), any());
+        });
+  }
+
+  /**
+   * A USE_SEMANTIC_MODEL grant on the schema makes every semantic model visible without per-object
+   * checks.
+   */
+  @Test
+  public void testListShortCircuitSemanticModelViaSchemaGrant() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.USE_SEMANTIC_MODEL);
+    NameIdentifier[] identifiers = semanticModels(2000);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.SEMANTIC_MODEL,
+                  identifiers);
+          Assertions.assertArrayEquals(identifiers, filtered);
+          verify(authorizer, never())
+              .isOwner(
+                  any(),
+                  eq("testMetalake"),
+                  argThat(object -> object.type() == MetadataObject.Type.SEMANTIC_MODEL),
+                  any());
+        });
+  }
+
+  /**
+   * A possible MODIFY_SEMANTIC_MODEL deny disables the schema-grant path and each semantic model is
+   * checked; the MODIFY_SEMANTIC_MODEL path is the second parent-scope path of the entry.
+   */
+  @Test
+  public void testListShortCircuitSemanticModelFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.MODIFY_SEMANTIC_MODEL);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.SEMANTIC_MODEL
+                  && "sm1".equals(object.name());
+            });
+    NameIdentifier[] identifiers = semanticModels(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.SEMANTIC_MODEL,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
+          // The granted path gates on exactly the MODIFY_SEMANTIC_MODEL deny.
+          verify(authorizer)
+              .hasDenyPolicy(
+                  any(),
+                  eq("testMetalake"),
+                  eq(Set.of(Privilege.Name.MODIFY_SEMANTIC_MODEL)),
+                  any());
+        });
+  }
+
+  /** A CONSUME_TOPIC grant on the schema makes every topic visible without per-topic checks. */
+  @Test
+  public void testListShortCircuitTopicViaSchemaGrant() {
+    EntityStore store = mock(EntityStore.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.CONSUME_TOPIC);
+    NameIdentifier[] identifiers = topics(2000);
+    withPreloadEnv(
+        store,
+        schemaDispatcher,
+        () ->
+            withAuthorizer(
+                authorizer,
+                () -> {
+                  NameIdentifier[] filtered =
+                      MetadataAuthzHelper.filterByExpression(
+                          "testMetalake",
+                          AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
+                          Entity.EntityType.TOPIC,
+                          identifiers);
+                  Assertions.assertArrayEquals(identifiers, filtered);
+                  verify(authorizer, never())
+                      .isOwner(
+                          any(),
+                          eq("testMetalake"),
+                          argThat(object -> object.type() == MetadataObject.Type.TOPIC),
+                          any());
+                  verifyNoInteractions(store, schemaDispatcher);
+                }));
+  }
+
+  /**
+   * A possible PRODUCE_TOPIC deny disables the schema-grant path and each topic is checked; the
+   * PRODUCE_TOPIC path is the second parent-scope path of the topic entry.
+   */
+  @Test
+  public void testListShortCircuitTopicFallsBackWhenDenyMayExist() {
+    GravitinoAuthorizer authorizer =
+        mockParentGrantAuthorizer(MetadataObject.Type.SCHEMA, Privilege.Name.PRODUCE_TOPIC);
+    when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any())).thenReturn(true);
+    when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.TOPIC && "t1".equals(object.name());
+            });
+    NameIdentifier[] identifiers = topics(3);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          NameIdentifier[] filtered =
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake",
+                  AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
+                  Entity.EntityType.TOPIC,
+                  identifiers);
+          Assertions.assertArrayEquals(
+              new NameIdentifier[] {identifiers[0], identifiers[2]}, filtered);
+          // The granted path gates on exactly the PRODUCE_TOPIC deny.
+          verify(authorizer)
+              .hasDenyPolicy(
+                  any(), eq("testMetalake"), eq(Set.of(Privilege.Name.PRODUCE_TOPIC)), any());
+        });
+  }
+
   /** A possible USE_MODEL deny disables the schema-grant path and each model is checked. */
   @Test
   public void testListShortCircuitModelFallsBackWhenDenyMayExist() {
@@ -613,6 +930,37 @@ public class TestMetadataAuthzHelper {
   private static NameIdentifier[] models(int count) {
     return IntStream.range(0, count)
         .mapToObj(i -> NameIdentifierUtil.ofModel("testMetalake", "testCatalog", "s1", "m" + i))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static NameIdentifier[] views(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(i -> NameIdentifierUtil.ofView("testMetalake", "testCatalog", "s1", "v" + i))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static NameIdentifier[] functions(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(i -> NameIdentifierUtil.ofFunction("testMetalake", "testCatalog", "s1", "f" + i))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static NameIdentifier[] filesets(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(i -> NameIdentifierUtil.ofFileset("testMetalake", "testCatalog", "s1", "fs" + i))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static NameIdentifier[] topics(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(i -> NameIdentifierUtil.ofTopic("testMetalake", "testCatalog", "s1", "t" + i))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static NameIdentifier[] semanticModels(int count) {
+    return IntStream.range(0, count)
+        .mapToObj(
+            i -> NameIdentifierUtil.ofSemanticModel("testMetalake", "testCatalog", "s1", "sm" + i))
         .toArray(NameIdentifier[]::new);
   }
 
@@ -773,6 +1121,27 @@ public class TestMetadataAuthzHelper {
         .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
         .thenReturn(false);
     return authorizer;
+  }
+
+  /**
+   * Runs {@code body} with the entity cache enabled and the store and schema dispatcher that the
+   * list preload uses replaced by the given mocks.
+   */
+  private void withPreloadEnv(EntityStore store, SchemaDispatcher schemaDispatcher, Runnable body) {
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
+    when(gravitinoEnv.entityStore()).thenReturn(store);
+    when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(gravitinoEnv.internalAccessControlDispatcher())
+        .thenReturn(mock(AccessControlDispatcher.class));
+    when(gravitinoEnv.cacheEnabled()).thenReturn(true);
+    try {
+      body.run();
+    } finally {
+      when(gravitinoEnv.cacheEnabled()).thenReturn(false);
+      when(gravitinoEnv.entityStore()).thenReturn(null);
+      when(gravitinoEnv.internalSchemaDispatcher()).thenReturn(null);
+      when(gravitinoEnv.internalAccessControlDispatcher()).thenReturn(null);
+    }
   }
 
   @Test
