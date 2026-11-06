@@ -935,7 +935,8 @@ public class GravitinoEnv {
     initInternalAuthorizationComponents();
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
-    this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
+    this.internalPolicyDispatcher =
+        new PolicyManager(idGenerator, entityStore, internalTagDispatcher);
 
     return new MetadataOperations(
         filesetOperationDispatcher,

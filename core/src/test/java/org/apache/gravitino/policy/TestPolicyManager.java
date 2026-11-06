@@ -146,8 +146,8 @@ public class TestPolicyManager {
     Config config = mockConfig();
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    policyManager = new PolicyManager(idGenerator, entityStore);
     tagManager = new TagManager(idGenerator, entityStore);
+    policyManager = new PolicyManager(idGenerator, entityStore, tagManager);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
@@ -925,7 +925,11 @@ public class TestPolicyManager {
             Mockito.eq(PolicyEntity.class),
             Mockito.eq(Entity.EntityType.POLICY),
             Mockito.any());
-    PolicyManager racingManager = new PolicyManager(new RandomIdGenerator(), racingStore);
+    PolicyManager racingManager =
+        new PolicyManager(
+            new RandomIdGenerator(),
+            racingStore,
+            new TagManager(new RandomIdGenerator(), racingStore));
 
     NoSuchPolicyException e =
         Assertions.assertThrows(
