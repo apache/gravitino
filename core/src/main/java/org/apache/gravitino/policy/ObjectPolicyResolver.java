@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,14 +57,6 @@ import org.slf4j.LoggerFactory;
 public class ObjectPolicyResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(ObjectPolicyResolver.class);
-
-  /** Maintenance types that allow at most one effective policy per metadata-object level. */
-  public static final Set<Policy.BuiltInType> UNIQUE_MAINTENANCE_TYPES =
-      ImmutableSet.of(
-          Policy.BuiltInType.ICEBERG_COMPACTION,
-          Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL,
-          Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
-          Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION);
 
   private final EntityStore entityStore;
   private final EffectiveTagResolver effectiveTagResolver;
@@ -199,7 +190,7 @@ public class ObjectPolicyResolver {
     Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
     for (Match match : matches) {
       Policy.BuiltInType type = match.policy().policyType();
-      if (UNIQUE_MAINTENANCE_TYPES.contains(type)) {
+      if (type.uniqueAtSameLevel()) {
         byType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(match);
       }
     }
@@ -236,7 +227,7 @@ public class ObjectPolicyResolver {
       TagAssignment assignment,
       PolicyEntity policy,
       PolicyAssociationSelector selector) {
-    if (!UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType()) || !matches(selector, assignment)) {
+    if (!policy.policyType().uniqueAtSameLevel() || !matches(selector, assignment)) {
       return;
     }
     TreeSet<String> names = new TreeSet<>();

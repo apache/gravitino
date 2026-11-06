@@ -19,7 +19,9 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
@@ -40,40 +42,60 @@ public interface Policy extends Auditable {
   enum BuiltInType {
     /** Built-in policy type for Iceberg compaction strategy. */
     ICEBERG_COMPACTION(
-        BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class),
+        BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class, true),
 
     /** Iceberg orphan file cleanup policy. */
     ICEBERG_ORPHAN_FILE_REMOVAL(
         BUILT_IN_TYPE_PREFIX + "iceberg_orphan_file_removal",
-        IcebergOrphanFileRemovalContent.class),
+        IcebergOrphanFileRemovalContent.class,
+        true),
 
     /** Iceberg manifest rewrite policy. */
     ICEBERG_REWRITE_MANIFESTS(
-        BUILT_IN_TYPE_PREFIX + "iceberg_rewrite_manifests", IcebergRewriteManifestsContent.class),
+        BUILT_IN_TYPE_PREFIX + "iceberg_rewrite_manifests",
+        IcebergRewriteManifestsContent.class,
+        true),
 
     /** Iceberg snapshot expiration policy. */
     ICEBERG_SNAPSHOT_EXPIRATION(
         BUILT_IN_TYPE_PREFIX + "iceberg_snapshot_expiration",
-        IcebergSnapshotExpirationContent.class),
+        IcebergSnapshotExpirationContent.class,
+        true),
 
     /** Built-in policy type for filtering rows of tagged tables. */
-    ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class),
+    ROW_FILTER(BUILT_IN_TYPE_PREFIX + "row_filter", RowFilterContent.class, false),
 
     /** Built-in policy type for masking columns of tagged tables or tagged columns. */
-    COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class),
+    COLUMN_MASK(BUILT_IN_TYPE_PREFIX + "column_mask", ColumnMaskContent.class, false),
 
     /** Built-in policy type for access conferred by a tag. */
-    ACCESS_CONTROL(BUILT_IN_TYPE_PREFIX + "access_control", AccessControlContent.class),
+    ACCESS_CONTROL(BUILT_IN_TYPE_PREFIX + "access_control", AccessControlContent.class, false),
 
     /** Non-built-in policies use the fixed wire value {@code custom}. */
-    CUSTOM("custom", PolicyContents.CustomContent.class);
+    CUSTOM("custom", PolicyContents.CustomContent.class, false);
+
+    /**
+     * Maintenance types that allow at most one effective policy per metadata-object level.
+     *
+     * <p>Derived from {@link #uniqueAtSameLevel()}; kept as a set for callers that iterate or
+     * contain-check the group.
+     */
+    public static final Set<BuiltInType> UNIQUE_MAINTENANCE_TYPES =
+        ImmutableSet.of(
+            ICEBERG_COMPACTION,
+            ICEBERG_ORPHAN_FILE_REMOVAL,
+            ICEBERG_REWRITE_MANIFESTS,
+            ICEBERG_SNAPSHOT_EXPIRATION);
 
     private final String policyType;
     private final Class<? extends PolicyContent> contentClass;
+    private final boolean uniqueAtSameLevel;
 
-    BuiltInType(String policyType, Class<? extends PolicyContent> contentClass) {
+    BuiltInType(
+        String policyType, Class<? extends PolicyContent> contentClass, boolean uniqueAtSameLevel) {
       this.policyType = policyType;
       this.contentClass = contentClass;
+      this.uniqueAtSameLevel = uniqueAtSameLevel;
     }
 
     /**
@@ -118,6 +140,16 @@ public interface Policy extends Auditable {
      */
     public Class<? extends PolicyContent> contentClass() {
       return contentClass;
+    }
+
+    /**
+     * Whether at most one enabled policy of this type may be effective at the same metadata-object
+     * level (via tag assignment / policy-tag link / enable).
+     *
+     * @return {@code true} for Iceberg maintenance built-ins that are unique per level
+     */
+    public boolean uniqueAtSameLevel() {
+      return uniqueAtSameLevel;
     }
   }
 

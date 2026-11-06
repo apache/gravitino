@@ -275,7 +275,7 @@ public class PolicyManager implements PolicyDispatcher {
     }
     if (expectedEnabledState) {
       PolicyEntity policy = loadPolicyEntity(metalake, policyName);
-      if (ObjectPolicyResolver.UNIQUE_MAINTENANCE_TYPES.contains(policy.policyType())) {
+      if (policy.policyType().uniqueAtSameLevel()) {
         List<String> conflicting = new ArrayList<>();
         IllegalArgumentException first = null;
         for (RelationalEntity<?> association : listTagAssociationsForPolicy(metalake, policyName)) {
