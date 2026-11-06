@@ -19,14 +19,7 @@
 
 package org.apache.gravitino.dto.util;
 
-<<<<<<< HEAD
-=======
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.io.BaseEncoding;
-import java.time.Instant;
->>>>>>> a93aa73ea ([#14608] fix(spark): convert default SQL literals to typed values (#14609))
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;

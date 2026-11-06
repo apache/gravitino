@@ -42,12 +42,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.dto.util.DTOConverters;
->>>>>>> a93aa73ea ([#14608] fix(spark): convert default SQL literals to typed values (#14609))
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;

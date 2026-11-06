@@ -46,8 +46,6 @@ NamedReference field = NamedReference.field("student");
 ## Literal
 
 Literal is a constant value.
-<<<<<<< HEAD
-=======
 
 Binary literals created from a Java `byte[]` are encoded in REST literal values as `0x` followed by
 hexadecimal byte pairs, for example `"dataType": "binary", "value": "0x4142"` for the bytes `AB`.
@@ -63,7 +61,7 @@ An LTZ literal assigned to an NTZ column keeps the local fields produced by Spar
 an NTZ literal assigned to an LTZ column is interpreted in the Spark session zone before it is sent
 as an instant. DATE defaults assigned to timestamp columns become midnight in the Spark session
 zone for LTZ targets, or local midnight for NTZ targets. String defaults for timestamp columns are
-explicitly rejected in both Spark 3.5 and 4.0; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
+explicitly rejected in Spark 3.4 and 3.5; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
 of relying on implicit database conversion. Date and string defaults for non-timestamp columns
 retain their literal values and types.
 
@@ -80,13 +78,6 @@ MySQL 5.7 and older 8.0 releases cannot use these zoned defaults. Spark `DROP DE
 supported by the current Gravitino update request and is rejected explicitly; `SET DEFAULT NULL`
 and `SET DEFAULT ''` remain distinct supported literal values.
 
-When writing table or function defaults, partition values, partitioning, distribution, or sort
-expressions, each literal must declare a recognized Gravitino type or an explicit
-[external type](./tables-and-views.md#external-type) with a nonblank `catalogString`.
-This applies recursively inside function arguments and nested types, even when the literal value
-is null. `UnparsedType` is retained for reading existing metadata and cannot be used for these writes.
-
->>>>>>> a93aa73ea ([#14608] fix(spark): convert default SQL literals to typed values (#14609))
 The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
 
 <Tabs groupId='language' queryString>

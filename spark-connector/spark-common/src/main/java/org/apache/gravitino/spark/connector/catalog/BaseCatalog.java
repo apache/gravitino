@@ -26,11 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-<<<<<<< HEAD
-=======
-import java.util.Set;
 import java.util.function.Supplier;
->>>>>>> a93aa73ea ([#14608] fix(spark): convert default SQL literals to typed values (#14609))
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;

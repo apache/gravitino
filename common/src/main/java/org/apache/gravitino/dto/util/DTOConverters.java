@@ -20,11 +20,7 @@ package org.apache.gravitino.dto.util;
 
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
-<<<<<<< HEAD
-=======
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.io.BaseEncoding;
->>>>>>> a93aa73ea ([#14608] fix(spark): convert default SQL literals to typed values (#14609))
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
