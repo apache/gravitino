@@ -100,29 +100,16 @@ public class HiveGravitinoOperationOperator {
 
     boolean isNeedAll = names != null && names.length == 0 ? true : false;
 
-    String[] partitionNames =
-        getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER);
-    String[] partitionNamesWithDelimiter =
-        Arrays.stream(partitionNames)
-            .map(name -> name + PARTITION_NAME_DELIMITER)
-            .toArray(String[]::new);
+    List<String> requestedParts =
+        Arrays.asList(
+            getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER));
 
     return Arrays.stream(allPartitions)
-        .map(e -> e + PARTITION_NAME_DELIMITER)
+        // Match whole column=value parts; a substring match lets region=us match subregion=us.
         .filter(
-            e -> {
-              if (isNeedAll) {
-                return true;
-              }
-              for (String name : partitionNamesWithDelimiter) {
-                // exactly match
-                if (!e.contains(name)) {
-                  return false;
-                }
-              }
-              return true;
-            })
-        .map(e -> e.substring(0, e.length() - 1))
+            e ->
+                isNeedAll
+                    || Arrays.asList(e.split(PARTITION_NAME_DELIMITER)).containsAll(requestedParts))
         .map(e -> toSparkPartition(e, partitionSchema))
         .toArray(GenericInternalRow[]::new);
   }

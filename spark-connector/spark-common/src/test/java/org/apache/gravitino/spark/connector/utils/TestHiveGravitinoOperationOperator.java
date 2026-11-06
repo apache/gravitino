@@ -143,6 +143,23 @@ public class TestHiveGravitinoOperationOperator {
         operator.partitionExists(new String[] {"region"}, ident, MULTI_KEY_SCHEMA));
   }
 
+  @Test
+  void testPartialSpecMatchesWholeColumnName() {
+    StructType schema =
+        new StructType()
+            .add("region", DataTypes.StringType, true)
+            .add("subregion", DataTypes.StringType, true);
+    when(partitions.listPartitionNames())
+        .thenReturn(new String[] {"region=eu/subregion=us", "region=us/subregion=eu"});
+
+    InternalRow[] result =
+        operator.listPartitionIdentifiers(new String[] {"region"}, ident("us"), schema);
+
+    Assertions.assertEquals(1, result.length);
+    Assertions.assertEquals("us", result[0].getUTF8String(0).toString());
+    Assertions.assertEquals("eu", result[0].getUTF8String(1).toString());
+  }
+
   private static InternalRow ident(String value) {
     return new GenericInternalRow(new Object[] {UTF8String.fromString(value)});
   }
