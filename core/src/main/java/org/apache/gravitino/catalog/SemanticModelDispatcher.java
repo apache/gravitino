@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -123,8 +124,10 @@ public interface SemanticModelDispatcher {
    *
    * @param namespace The destination schema namespace.
    * @param document The document to import.
-   * @param sourceValidator The required caller-specific source validator.
+   * @param sourceValidator The required caller-specific source validator, which must return a
+   *     non-null source update.
    * @return The imported Semantic Model.
+   * @throws IllegalArgumentException If the source validator returns {@code null}.
    */
   default SemanticModel importOssieDocument(
       Namespace namespace,
@@ -133,6 +136,7 @@ public interface SemanticModelDispatcher {
     Objects.requireNonNull(sourceValidator, "sourceValidator must not be null");
     ParsedSemanticModel model = OssieDocumentConverter.importDocument(document);
     SemanticModelSourceUpdate sourceUpdate = sourceValidator.apply(model.definition());
+    Preconditions.checkArgument(sourceUpdate != null, "sourceValidator must not return null");
     return importSemanticModel(
         NameIdentifier.of(namespace, model.name()),
         model.comment(),

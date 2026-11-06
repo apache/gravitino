@@ -244,7 +244,7 @@ public class SemanticModelSourceValidator {
         }
       }
     }
-    throw new IllegalStateException("Source View has no registered Gravitino identity: " + ident);
+    throw new IllegalStateException("Source view has no registered Gravitino identity: " + ident);
   }
 
   private static class ResolvedSource {

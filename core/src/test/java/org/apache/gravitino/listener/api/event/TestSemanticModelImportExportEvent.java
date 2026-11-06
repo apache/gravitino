@@ -258,6 +258,19 @@ class TestSemanticModelImportExportEvent {
     verifyNoInteractions(operation, owners);
   }
 
+  @Test
+  void testImportRejectsNullSourceUpdateBeforeWriting() {
+    IllegalArgumentException failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> dispatcher.importOssieDocument(NAMESPACE, document(), definition -> null));
+    assertEquals("sourceValidator must not return null", failure.getMessage());
+    ImportSemanticModelFailureEvent event =
+        assertEvents(ImportSemanticModelPreEvent.class, ImportSemanticModelFailureEvent.class);
+    assertSame(failure, event.exception());
+    verifyNoInteractions(operation, owners);
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testPreEventRejectionEmitsFailureWithoutInvokingOperation(boolean importing) {
