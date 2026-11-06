@@ -39,11 +39,14 @@ import org.apache.gravitino.rel.types.Types;
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
   /**
-   * Renders defaults using numeric literals for MySQL BOOLEAN columns, which are stored as BIT.
+   * Renders Boolean literal defaults as numeric 1 or 0. Gravitino maps BOOLEAN to MySQL BIT, which
+   * rejects the quoted 'true' and 'false' strings. The check uses the literal type, so a Boolean
+   * default that is loaded from BIT(1) and then re-rendered by MODIFY COLUMN keeps working after a
+   * type change to a numeric column. Other defaults use the shared JDBC rendering.
    *
    * @param defaultValue the Gravitino default expression
    * @return the SQL expression, or null when no default is set
-   * @throws IllegalArgumentException if a boolean default is not true, false, 1 or 0
+   * @throws IllegalArgumentException if a Boolean default is not true, false, 1 or 0
    */
   @Override
   @Nullable
@@ -57,7 +60,9 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       if ("false".equalsIgnoreCase(value) || "0".equals(value)) {
         return "0";
       }
-      throw new IllegalArgumentException("Invalid boolean column default; use true, false, 1 or 0");
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid boolean column default value: %s; use true, false, 1 or 0", value));
     }
     return super.fromGravitino(defaultValue);
   }

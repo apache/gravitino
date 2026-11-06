@@ -585,6 +585,16 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(Literals.booleanLiteral(false), altered.columns()[0].defaultValue());
     Assertions.assertEquals(Literals.booleanLiteral(true), altered.columns()[1].defaultValue());
     assertBooleanDefaultInsert(ident, false, true);
+
+    // MODIFY COLUMN re-renders the loaded BIT(1) default. Before Boolean reloading, the loaded
+    // b'0' value was an unparsed expression and this comment change failed.
+    catalog
+        .asTableCatalog()
+        .alterTable(ident, TableChange.updateColumnComment(new String[] {"enabled"}, "flag"));
+    Table commented = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals("flag", commented.columns()[0].comment());
+    Assertions.assertEquals(Literals.booleanLiteral(false), commented.columns()[0].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
   }
 
   @Test

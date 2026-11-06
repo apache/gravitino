@@ -53,6 +53,7 @@ class TestMysqlColumnDefaultValueConverter {
             IllegalArgumentException.class,
             () -> converter.fromGravitino(Literals.of(value, Types.BooleanType.get())));
     Assertions.assertTrue(error.getMessage().contains("boolean"));
+    Assertions.assertTrue(error.getMessage().contains("use true, false, 1 or 0"));
   }
 
   @ParameterizedTest
