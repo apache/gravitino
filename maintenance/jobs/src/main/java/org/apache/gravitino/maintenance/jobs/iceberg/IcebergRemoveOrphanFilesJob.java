@@ -21,15 +21,16 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils.normalizeLocation;
 import static org.apache.spark.sql.functions.lit;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -52,7 +53,38 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v4";
+
+  /**
+   * Outcome of one orphan cleanup run: procedure file count plus bytes measured before delete.
+   *
+   * <p>Iceberg's {@code remove_orphan_files} result has only {@code orphan_file_location}. Bytes
+   * are collected with table {@code FileIO} while files still exist (dry-run listing), then a real
+   * delete is issued when requested.
+   */
+  public static final class OrphanCleanupResult {
+    private final long filesRemoved;
+    private final long bytesReclaimed;
+
+    OrphanCleanupResult(long filesRemoved, long bytesReclaimed) {
+      this.filesRemoved = filesRemoved;
+      this.bytesReclaimed = bytesReclaimed;
+    }
+
+    /**
+     * @return orphan files found (dry-run) or removed
+     */
+    public long filesRemoved() {
+      return filesRemoved;
+    }
+
+    /**
+     * @return sum of file sizes measured before delete; {@code 0} when every size lookup failed
+     */
+    public long bytesReclaimed() {
+      return bytesReclaimed;
+    }
+  }
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -89,7 +121,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     return Runner.run(args);
   }
 
-  static long execute(SparkSession spark, Map<String, String> options)
+  static OrphanCleanupResult execute(SparkSession spark, Map<String, String> options)
       throws IOException, AnalysisException {
     String catalog = requireOption(options, "catalog");
     String identifier = requireOption(options, "table");
@@ -109,29 +141,62 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     validateLocation(table.location(), location);
     validateLocalLocation(table.location(), location);
     validateRemoteLocation(spark, table.location(), location);
-    String sql =
-        buildProcedureCall(
-            catalog,
-            identifier,
-            options.get("older-than"),
-            normalizeLocation(location).toString(),
-            dryRun);
-    Iterator<Row> results = spark.sql(sql).toLocalIterator();
-    long count = 0;
-    while (results.hasNext()) {
-      Row row = results.next();
+    String normalizedLocation = normalizeLocation(location).toString();
+    // Always dry-run list first so sizes can be read before Iceberg deletes the objects.
+    List<String> orphanPaths =
+        listOrphanPaths(spark, catalog, identifier, options.get("older-than"), normalizedLocation);
+    long bytes = 0L;
+    for (String orphanPath : orphanPaths) {
       if (dryRun) {
-        LOG.info("Orphan file (dry-run): {}", row.getString(0));
+        LOG.info("Orphan file (dry-run): {}", orphanPath);
       }
-      count++;
+      bytes += sizeOf(table, orphanPath);
+    }
+    if (!dryRun && !orphanPaths.isEmpty()) {
+      String deleteSql =
+          buildProcedureCall(
+              catalog, identifier, options.get("older-than"), normalizedLocation, false);
+      LOG.info("Executing Iceberg remove_orphan_files delete: {}", deleteSql);
+      spark.sql(deleteSql).collect();
     }
     LOG.info(
-        "Orphan file cleanup completed: {} files {}, table {}.{}",
-        count,
+        "Orphan file cleanup completed: {} files {}, {} bytes, table {}.{}",
+        orphanPaths.size(),
         dryRun ? "found (dry-run)" : "removed",
+        bytes,
         catalog,
         identifier);
-    return count;
+    return new OrphanCleanupResult(orphanPaths.size(), bytes);
+  }
+
+  private static List<String> listOrphanPaths(
+      SparkSession spark,
+      String catalog,
+      String identifier,
+      @Nullable String olderThan,
+      String location) {
+    String sql = buildProcedureCall(catalog, identifier, olderThan, location, true);
+    LOG.info("Executing Iceberg remove_orphan_files dry-run listing: {}", sql);
+    List<Row> rows = spark.sql(sql).collectAsList();
+    List<String> paths = new ArrayList<>(rows.size());
+    for (Row row : rows) {
+      paths.add(row.getString(0));
+    }
+    return paths;
+  }
+
+  /**
+   * Best-effort size for one orphan path via the table {@link org.apache.iceberg.io.FileIO}.
+   * Missing or unreadable files contribute {@code 0}.
+   */
+  @VisibleForTesting
+  static long sizeOf(Table table, String location) {
+    try {
+      return table.io().newInputFile(location).getLength();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to measure orphan file size for {}: {}", location, e.toString());
+      return 0L;
+    }
   }
 
   static String buildProcedureCall(

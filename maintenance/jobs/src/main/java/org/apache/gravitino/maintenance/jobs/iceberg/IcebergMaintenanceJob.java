@@ -121,8 +121,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   public static final String ORPHAN_FILES_REMOVED_METRIC = "custom-orphan-files-removed";
 
   /**
-   * Orphan cleanup S1: bytes reclaimed. The remove_orphan_files procedure returns paths only, so
-   * this is reported as {@code 0} until a size-aware collector is added.
+   * Orphan cleanup S1: bytes reclaimed. Measured from orphan paths before delete (procedure returns
+   * locations only).
    */
   public static final String ORPHAN_BYTES_RECLAIMED_METRIC = "custom-orphan-bytes-reclaimed";
 
@@ -526,10 +526,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           putIfPresent(orphanOpts, "older-than", argsByName.get("older-than"));
           putIfPresent(orphanOpts, "location", argsByName.get("location"));
           putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
-          long removed = IcebergRemoveOrphanFilesJob.execute(spark, orphanOpts);
+          IcebergRemoveOrphanFilesJob.OrphanCleanupResult orphan =
+              IcebergRemoveOrphanFilesJob.execute(spark, orphanOpts);
           long afterSnapshotId =
               currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
-          return new AfterSample(afterSnapshotId, toMetricsJson(orphanAfterMetrics(removed, 0L)));
+          return new AfterSample(
+              afterSnapshotId,
+              toMetricsJson(orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed())));
         }
       default:
         throw new IllegalStateException("Unhandled maintenance type: " + type);

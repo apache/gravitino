@@ -163,14 +163,15 @@ public class TestIcebergMaintenanceJob {
 
   @Test
   public void testOrphanAfterSchema() throws Exception {
-    Map<String, Object> after = IcebergMaintenanceJob.orphanAfterMetrics(288400L, 0L);
+    Map<String, Object> after = IcebergMaintenanceJob.orphanAfterMetrics(288400L, 2500000000000L);
     Map<String, Object> parsed = parseJson(IcebergMaintenanceJob.toMetricsJson(after));
     assertEquals(2, parsed.size());
     assertEquals(
         288400L,
         ((Number) parsed.get(IcebergMaintenanceJob.ORPHAN_FILES_REMOVED_METRIC)).longValue());
     assertEquals(
-        0L, ((Number) parsed.get(IcebergMaintenanceJob.ORPHAN_BYTES_RECLAIMED_METRIC)).longValue());
+        2500000000000L,
+        ((Number) parsed.get(IcebergMaintenanceJob.ORPHAN_BYTES_RECLAIMED_METRIC)).longValue());
   }
 
   private static Map<String, Object> parseJson(String json) throws Exception {
