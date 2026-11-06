@@ -408,14 +408,15 @@ class TestGlueIcebergTableHelper {
         Types.TimestampType.withoutTimeZone(9),
         fromIcebergType(org.apache.iceberg.types.Types.TimestampNanoType.withoutZone()));
     assertEquals(
-        Types.VariantType.get(), fromIcebergType(org.apache.iceberg.types.Types.VariantType.get()));
+        Types.ExternalType.of("VARIANT"),
+        fromIcebergType(org.apache.iceberg.types.Types.VariantType.get()));
     assertEquals(
         Types.NullType.get(), fromIcebergType(org.apache.iceberg.types.Types.UnknownType.get()));
     assertEquals(
-        Types.GeometryType.of("srid:3857"),
+        Types.ExternalType.of("GEOMETRY"),
         fromIcebergType(org.apache.iceberg.types.Types.GeometryType.of("srid:3857")));
     assertEquals(
-        Types.GeographyType.of("srid:4269", "karney"),
+        Types.ExternalType.of("GEOGRAPHY"),
         fromIcebergType(
             org.apache.iceberg.types.Types.GeographyType.of(
                 "srid:4269", org.apache.iceberg.types.EdgeAlgorithm.KARNEY)));
@@ -427,15 +428,11 @@ class TestGlueIcebergTableHelper {
         GlueIcebergTableHelper.toIcebergSchema(
             new Column[] {
               column("f", Types.FixedType.of(16)),
-              column("ts_ns", Types.TimestampType.withoutTimeZone(9)),
-              column("v", Types.VariantType.get()),
-              column("g", Types.GeometryType.of("srid:3857"))
+              column("ts_ns", Types.TimestampType.withoutTimeZone(9))
             });
     assertEquals(FixedType.ofLength(16), schema.findType("f"));
     assertEquals(
         org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(), schema.findType("ts_ns"));
-    assertEquals(org.apache.iceberg.types.Types.VariantType.get(), schema.findType("v"));
-    assertEquals(org.apache.iceberg.types.Types.GeometryType.of("srid:3857"), schema.findType("g"));
   }
 
   @Test

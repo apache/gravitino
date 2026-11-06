@@ -28,8 +28,6 @@ import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
-import static org.apache.gravitino.rel.types.Types.GeographyType;
-import static org.apache.gravitino.rel.types.Types.GeometryType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
 import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
@@ -42,7 +40,6 @@ import static org.apache.gravitino.rel.types.Types.TimeType;
 import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
 import static org.apache.gravitino.rel.types.Types.VarCharType;
-import static org.apache.gravitino.rel.types.Types.VariantType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -93,7 +90,6 @@ import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.SortOrderVisitor;
-import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -369,17 +365,9 @@ final class GlueIcebergTableHelper {
         return tsNano.shouldAdjustToUTC()
             ? TimestampType.withTimeZone(NANOSECOND_PRECISION)
             : TimestampType.withoutTimeZone(NANOSECOND_PRECISION);
-      case VARIANT:
-        return VariantType.get();
       case UNKNOWN:
         // Iceberg v3 unknown is the null-only placeholder type.
         return NullType.get();
-      case GEOMETRY:
-        return GeometryType.of(((Types.GeometryType) icebergType).crs());
-      case GEOGRAPHY:
-        Types.GeographyType geography = (Types.GeographyType) icebergType;
-        // EdgeAlgorithm.toString() is the lower-case spec name, which GeographyType requires.
-        return GeographyType.of(geography.crs(), geography.algorithm().toString());
       case DECIMAL:
         Types.DecimalType decimal = (Types.DecimalType) icebergType;
         return DecimalType.of(decimal.precision(), decimal.scale());
@@ -987,16 +975,6 @@ final class GlueIcebergTableHelper {
     }
     if (type instanceof UUIDType) {
       return Types.UUIDType.get();
-    }
-    if (type instanceof VariantType) {
-      return Types.VariantType.get();
-    }
-    if (type instanceof GeometryType) {
-      return Types.GeometryType.of(((GeometryType) type).crs());
-    }
-    if (type instanceof GeographyType) {
-      GeographyType geography = (GeographyType) type;
-      return Types.GeographyType.of(geography.crs(), EdgeAlgorithm.fromName(geography.algorithm()));
     }
     if (type instanceof NullType) {
       return Types.UnknownType.get();

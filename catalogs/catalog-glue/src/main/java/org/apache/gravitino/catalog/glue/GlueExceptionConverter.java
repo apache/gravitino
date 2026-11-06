@@ -341,18 +341,11 @@ final class GlueExceptionConverter {
    * and S3 errors either as its own exception types or wrapped around the AWS SDK exception, so the
    * cause chain is walked from the outside in and the first recognized type decides the result:
    * Iceberg not-found, already-exists, validation and forbidden errors map to the matching
-<<<<<<< HEAD
-   * Gravitino types, a commit conflict maps to a retryable {@link RuntimeException}, and AWS SDK
-   * causes go through {@link #toGenericException}. A commit whose state is unknown is reported as
-   * such, because the change may have been applied. {@link GravitinoRuntimeException}, {@link
-   * IllegalArgumentException} and {@link UnsupportedOperationException} are returned as is.
-=======
-   * Gravitino types, a commit conflict maps to {@link OptimisticLockException}, S3 failures map by
-   * their HTTP status, and other AWS SDK causes go through {@link #toGenericException}. A commit
-   * whose state is unknown is reported as such, because the change may have been applied. {@link
-   * GravitinoRuntimeException}, {@link IllegalArgumentException} and {@link
+   * Gravitino types, a commit conflict maps to a retryable {@link RuntimeException}, S3 failures
+   * map by their HTTP status, and other AWS SDK causes go through {@link #toGenericException}. A
+   * commit whose state is unknown is reported as such, because the change may have been applied.
+   * {@link GravitinoRuntimeException}, {@link IllegalArgumentException} and {@link
    * UnsupportedOperationException} are returned as is.
->>>>>>> bfa88fcbb ([#14564] fix(catalog-glue): Fix Iceberg table handling (#14565))
    *
    * @param e the failure raised by an Iceberg catalog call
    * @param context description of the operation context for error messages
@@ -462,7 +455,7 @@ final class GlueExceptionConverter {
       return new NotFoundException(e, "S3 object or bucket not found for %s: %s", context, detail);
     }
     if (status == 503 || s3Exception.isThrottlingException()) {
-      return new ServiceUnavailableException(
+      return new ConnectionFailedException(
           e, "S3 throttled the request for %s; the request can be retried: %s", context, detail);
     }
     if (status == 301) {

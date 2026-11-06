@@ -508,7 +508,7 @@ public class TestGlueExceptionConverter {
         NotFoundException.class,
         GlueExceptionConverter.toIcebergException(s3Exception(404, "NoSuchBucket"), "table t"));
     assertInstanceOf(
-        ServiceUnavailableException.class,
+        ConnectionFailedException.class,
         GlueExceptionConverter.toIcebergException(s3Exception(503, "SlowDown"), "table t"));
     assertInstanceOf(
         IllegalArgumentException.class,

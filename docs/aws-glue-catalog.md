@@ -271,9 +271,6 @@ Iceberg tables use the Iceberg type system, which differs from Hive types. The f
 | `binary`                    | `binary`                    |                                             |
 | `fixed(n)`                  | `fixed(n)`                  |                                             |
 | `uuid`                      | `uuid`                      |                                             |
-| `variant`                   | `variant`                   | Needs format version 3                      |
-| `geometry(crs)`             | `geometry(crs)`             | Needs format version 3                      |
-| `geography(crs, algorithm)` | `geography(crs, algorithm)` | Needs format version 3                      |
 | `null`                      | `unknown`                   | Needs format version 3                      |
 | `list`                      | `list`                      |                                             |
 | `map`                       | `map`                       |                                             |
