@@ -901,7 +901,7 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(message, e);
       }
       if (e instanceof NonEmptyDomainException) {
-        return Utils.operationConflict(message, e);
+        return Utils.nonEmpty(message, e);
       }
       if (e instanceof ForbiddenException) {
         return Utils.forbidden(message, e);

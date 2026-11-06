@@ -47,6 +47,7 @@ import org.apache.gravitino.dto.requests.DomainBackingTagSetRequest;
 import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
@@ -355,7 +356,11 @@ public class TestDomainOperations extends BaseOperationsTest {
     when(dispatcher.deleteDomain("test", "Finance"))
         .thenThrow(new NonEmptyDomainException("has children"));
     try (Response response = target(ITEM).request().delete()) {
-      assertError(response, 409);
+      assertEquals(409, response.getStatus());
+      assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+      assertEquals(NonEmptyDomainException.class.getSimpleName(), error.getType());
     }
     when(dispatcher.getDomain("test", "Finance")).thenThrow(new NoSuchDomainException("missing"));
     try (Response response = target(ITEM).request().get()) {
