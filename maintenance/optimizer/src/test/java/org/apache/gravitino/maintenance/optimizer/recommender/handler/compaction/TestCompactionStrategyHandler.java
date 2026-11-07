@@ -125,6 +125,31 @@ class TestCompactionStrategyHandler {
   }
 
   @Test
+  void testShouldTriggerFalseWhenPartitionStatisticsAreEmpty() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(
+                List.of(new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(999999L))))
+            .withPartitionStatistics(Map.of())
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    Assertions.assertFalse(
+        handler.shouldTrigger(),
+        "Empty partition statistics must not trigger, even with high table-level metrics");
+  }
+
+  @Test
   void testJobConfig() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);

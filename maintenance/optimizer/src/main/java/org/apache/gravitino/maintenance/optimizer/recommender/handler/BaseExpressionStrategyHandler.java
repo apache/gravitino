@@ -122,12 +122,20 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean isPartitionTable() {
-    return tableMetadata.partitioning().length > 0;
+    // Table-level handlers must also work on partitioned tables without requesting partition
+    // statistics. Only handlers declaring PARTITION_STATISTICS use per-partition evaluation.
+    return dataRequirements().contains(DataRequirement.PARTITION_STATISTICS)
+        && tableMetadata.partitioning().length > 0;
   }
 
   private boolean shouldTriggerForPartitionTable() {
     if (partitionStatistics.isEmpty()) {
-      LOG.info("No partition statistics available for table {}", nameIdentifier);
+      // Partition-aware strategies require partition statistics; table-level stats are not a
+      // fallback (see #14674 / #14677).
+      LOG.info(
+          "Skip strategy {} for partitioned table {}: no partition statistics available",
+          strategy.name(),
+          nameIdentifier);
       return false;
     }
     String triggerExpression = triggerExpression(strategy);
