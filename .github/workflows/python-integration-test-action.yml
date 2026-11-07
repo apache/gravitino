@@ -76,6 +76,21 @@ jobs:
             rm -rf ./distribution/package/data
           done
 
+      - name: Installed core SDK compatibility
+        run: |
+          ./gradlew -PpythonVersion=3.12 -PskipWeb=true :clients:client-python:coreCompatibilityTest
+
+      - name: Upload core compatibility evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: core-compatibility-${{ inputs.java-version }}
+          path: |
+            clients/client-python/build/core-compatibility/**/*.log
+            clients/client-python/build/core-compatibility/results.json
+            clients/client-python/build/core-compatibility/**/resolved-requirements.txt
+            distribution/package/logs/gravitino-server.log
+
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
         if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}

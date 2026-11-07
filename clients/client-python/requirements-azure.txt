@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-adlfs==2026.2.0
+adlfs>=2026.2.0,<=2026.8.0

@@ -16,6 +16,7 @@
 # under the License.
 
 # Shared runtime dependencies for the Gravitino virtual filesystem.
-cachetools==7.1.4
-fsspec==2026.2.0
-readerwriterlock==1.0.9
+cachetools>=7.1.4,<8
+# Include the fsspec baseline required by s3fs/gcsfs 2023.12.1.
+fsspec>=2023.12.1,<=2026.9.0
+readerwriterlock>=1.0.9,<2
