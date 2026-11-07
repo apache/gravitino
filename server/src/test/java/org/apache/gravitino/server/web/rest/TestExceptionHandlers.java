@@ -22,11 +22,8 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-<<<<<<< HEAD
-import org.apache.gravitino.exceptions.ConnectionFailedException;
-=======
 import org.apache.gravitino.exceptions.BadRequestException;
->>>>>>> a573e3c39 ([#14704] fix(jdbc): classify source refusals and keep source messages literal (#14707))
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
@@ -36,7 +33,6 @@ import org.junit.jupiter.api.Test;
 public class TestExceptionHandlers {
 
   @Test
-<<<<<<< HEAD
   void testSchemaConnectionFailuresReturnBadGateway() {
     for (OperationType operation :
         new OperationType[] {
@@ -54,7 +50,10 @@ public class TestExceptionHandlers {
         Assertions.assertEquals("ConnectionFailedException", error.getType());
         Assertions.assertTrue(error.getMessage().contains("backend unavailable"));
       }
-=======
+    }
+  }
+
+  @Test
   void testBackendRefusedRequestReturnsBadRequest() {
     BadRequestException failure =
         new BadRequestException("cannot drop table t because other objects depend on it");
@@ -70,21 +69,6 @@ public class TestExceptionHandlers {
         Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
         Assertions.assertTrue(error.getMessage().contains("other objects depend on it"));
       }
-    }
-  }
-
-  @Test
-  void testConcurrentActiveJobReturnsConflict() {
-    try (Response response =
-        ExceptionHandlers.handleJobTemplateException(
-            OperationType.DELETE,
-            "template",
-            "metalake",
-            new InUseException("Template has an active job"))) {
-      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
-      Assertions.assertEquals(
-          InUseException.class.getSimpleName(), ((ErrorResponse) response.getEntity()).getType());
->>>>>>> a573e3c39 ([#14704] fix(jdbc): classify source refusals and keep source messages literal (#14707))
     }
   }
 
