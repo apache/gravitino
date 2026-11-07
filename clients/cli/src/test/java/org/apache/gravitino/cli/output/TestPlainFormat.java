@@ -40,6 +40,8 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.TestCliUtil;
 import org.apache.gravitino.cli.outputs.PlainFormat;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
@@ -548,5 +550,21 @@ public class TestPlainFormat {
     PlainFormat.output(new Fileset[] {fileset1, fileset2, fileset3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("fileset1,fileset2,fileset3", output);
+  }
+
+  @Test
+  void testListFunctionsWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Function function1 =
+        TestCliUtil.getMockFunction("func1", "func1", FunctionType.SCALAR, false, null);
+    Function function2 =
+        TestCliUtil.getMockFunction("func2", "func2", FunctionType.SCALAR, false, null);
+    Function function3 =
+        TestCliUtil.getMockFunction("func3", "func3", FunctionType.SCALAR, false, null);
+
+    PlainFormat.output(new Function[] {function1, function2, function3}, mockContext);
+    String output = outContent.toString(StandardCharsets.UTF_8).trim();
+
+    Assertions.assertEquals("func1,func2,func3", output);
   }
 }
