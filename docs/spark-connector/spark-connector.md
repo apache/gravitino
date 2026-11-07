@@ -152,3 +152,53 @@ these columns are rejected before JDBC execution, including writes of NULL value
 INSERT OVERWRITE. The error identifies the unsupported column. Spark binds these columns
 as VARCHAR, which does not preserve the PostgreSQL target type. Use a native PostgreSQL
 writer for these tables. Other PostgreSQL column types retain their existing write behavior.
+
+### JDBC query consistency
+
+Spark pushes predicates, aggregates, Top-N, limits, and offsets down to the JDBC source when
+the matching `pushDown*` options allow it. Some expressions stay in Spark, because the source
+could return different results:
+
+- Expressions on string, char, varchar, binary, UUID, or external-type columns, also inside
+  arrays. The source can compare strings with a different collation, and Spark cannot always
+  write binary literals in SQL.
+- Expressions with a string or binary literal or cast, such as `cast(id AS string) > '9'`.
+- Casts to a timestamp type, and casts or date parts such as `hour()` or `year()` of a Spark
+  `TIMESTAMP` column. Examples are MySQL `DATETIME`, or PostgreSQL `timestamp` when
+  `preferTimestampNTZ` is off. Spark uses the session time zone for these, but the source uses
+  its own time zone.
+- Date parts other than year, quarter, month, day, hour, and minute, such as `second()` or
+  `weekofyear()`. The source can compute them differently.
+- Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
+  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
+- Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
+  example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
+
+Other expressions are still pushed down, for example `id = 1`, `count(*)`, `LIMIT 10`, or
+`ORDER BY id LIMIT 3`. They run with the source semantics. For example, a source `avg()` can
+return fewer decimal places than Spark. When a filter stays in Spark, Spark also keeps the
+limit and the aggregate of that query in Spark.
+
+#### PostgreSQL timestamps without time zone
+
+By default, a PostgreSQL timestamp without time zone maps to Spark `TIMESTAMP`, as before.
+Its value can change with the Spark session time zone. To read the stored wall-clock value,
+set `preferTimestampNTZ=true` on the Spark catalog, for example
+`spark.sql.catalog.<name>.preferTimestampNTZ=true`. You can also set the Gravitino catalog
+property `spark.bypass.preferTimestampNTZ=true`. The Spark catalog option wins when both are
+set. The option applies to PostgreSQL catalogs only. Do not set it on other JDBC catalogs:
+Spark would read their timestamps as `TIMESTAMP_NTZ`, but the table schema still shows
+`TIMESTAMP`.
+
+With the option on:
+
+- A timestamp without time zone maps to Spark `TIMESTAMP_NTZ`. A timestamp with time zone still
+  maps to Spark `TIMESTAMP`.
+- Writes store the value from the Spark session time zone instead of the JVM time zone. Jobs
+  whose session and JVM time zones differ write different values than before.
+- A timestamp column cannot be used as `partitionColumn`. Spark only accepts numeric, date, or
+  `TIMESTAMP` partition columns.
+- Reading PostgreSQL `infinity` or `-infinity` fails with a `long overflow` error. With the
+  option off, Spark reads them as 9999-12-31 and 0001-01-01.
+- On Spark 3.5, timestamp array elements still map to `TIMESTAMP`, because the Spark 3.5
+  reader does not support `TIMESTAMP_NTZ` array elements.

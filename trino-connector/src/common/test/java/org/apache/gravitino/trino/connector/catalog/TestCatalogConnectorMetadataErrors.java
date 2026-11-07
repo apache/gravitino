@@ -19,12 +19,15 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import static io.trino.spi.StandardErrorCode.CATALOG_UNAVAILABLE;
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
@@ -50,6 +53,18 @@ public class TestCatalogConnectorMetadataErrors {
 
   private static final String DENIED_MESSAGE =
       "User joel is not authorized to perform operation loadTable on metadata m.c.s.t";
+
+  /** Checks schema rename reports an unsupported operation without source mutation. */
+  @Test
+  public void testSchemaRenameIsExplicitlyUnsupported() {
+    TableCatalog catalog = mock(TableCatalog.class);
+    CatalogConnectorMetadata metadata = createMetadata(catalog);
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> metadata.renameSchema("before", "after"));
+    assertEquals(NOT_SUPPORTED.toErrorCode(), error.getErrorCode());
+    assertTrue(error.getMessage().contains("renaming schemas"));
+    verifyNoInteractions(catalog);
+  }
 
   @Test
   public void testLoadCatalogDeniedIsPermissionDenied() {

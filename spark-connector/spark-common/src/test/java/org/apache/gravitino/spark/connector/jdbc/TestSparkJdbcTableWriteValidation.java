@@ -33,6 +33,7 @@ import org.apache.spark.sql.connector.write.LogicalWriteInfo;
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -42,6 +43,28 @@ import scala.collection.immutable.HashMap;
 
 /** PostgreSQL write validation before Spark creates or executes a JDBC write. */
 public class TestSparkJdbcTableWriteValidation {
+
+  @Test
+  void testTimestampArraysUseTheReaderElementType() {
+    Type timestamps = Types.ListType.nullable(Types.TimestampType.withoutTimeZone());
+    // Spark 3.5 reads timestamp array elements as TIMESTAMP even with preferTimestampNTZ.
+    SparkJdbcTable spark35 = table(timestamps, DataTypes.createArrayType(DataTypes.TimestampType));
+    Assertions.assertEquals(
+        DataTypes.createArrayType(DataTypes.TimestampType),
+        spark35.schema().fields()[0].dataType());
+    SparkJdbcTable spark40 =
+        table(timestamps, DataTypes.createArrayType(DataTypes.TimestampNTZType));
+    Assertions.assertEquals(
+        DataTypes.createArrayType(DataTypes.TimestampNTZType),
+        spark40.schema().fields()[0].dataType());
+    // Top-level columns keep the converter's type.
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType,
+        table(Types.TimestampType.withoutTimeZone(), DataTypes.TimestampType)
+            .schema()
+            .fields()[0]
+            .dataType());
+  }
 
   @Test
   void testUnsupportedPostgreSqlColumnsFailBeforeWrite() {
@@ -74,6 +97,14 @@ public class TestSparkJdbcTableWriteValidation {
   }
 
   private SparkJdbcTable table(Type type, String url) {
+    return table(type, url, new SparkJdbcTypeConverter(true).toSparkType(type));
+  }
+
+  private SparkJdbcTable table(Type type, DataType readerType) {
+    return table(type, "jdbc:postgresql://localhost/test", readerType);
+  }
+
+  private SparkJdbcTable table(Type type, String url, DataType readerType) {
     Table metadata = mock(Table.class);
     when(metadata.columns())
         .thenReturn(new Column[] {Column.of("special_value", type, null, true, false, null)});
@@ -84,7 +115,7 @@ public class TestSparkJdbcTableWriteValidation {
                 .updated("dbtable", "t")
                 .updated("driver", "org.postgresql.Driver"));
     JDBCTable physical = mock(JDBCTable.class);
-    when(physical.schema()).thenReturn(new StructType());
+    when(physical.schema()).thenReturn(new StructType().add("special_value", readerType));
     when(physical.jdbcOptions()).thenReturn(options);
     return new SparkJdbcTable(
         Identifier.of(new String[] {"public"}, "t"),
@@ -93,6 +124,6 @@ public class TestSparkJdbcTableWriteValidation {
         mock(JDBCTableCatalog.class),
         JdbcPropertiesConverter.getInstance(),
         new SparkTransformConverter(false),
-        new SparkJdbcTypeConverter());
+        new SparkJdbcTypeConverter(true));
   }
 }

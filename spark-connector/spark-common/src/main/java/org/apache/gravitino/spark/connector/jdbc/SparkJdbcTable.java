@@ -31,14 +31,23 @@ import org.apache.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.write.LogicalWriteInfo;
 import org.apache.spark.sql.connector.write.WriteBuilder;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.jdbc.JdbcDialects;
+import org.apache.spark.sql.types.ArrayType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 public class SparkJdbcTable extends JDBCTable {
 
   private final GravitinoTableInfoHelper gravitinoTableInfoHelper;
   private final Table gravitinoTable;
+  private final StructType sparkSchema;
+  private final SparkJdbcPushDownPolicy pushDownPolicy;
 
   public SparkJdbcTable(
       Identifier identifier,
@@ -58,6 +67,24 @@ public class SparkJdbcTable extends JDBCTable {
             propertiesConverter,
             sparkTransformConverter,
             sparkTypeConverter);
+    this.sparkSchema = alignTimestampArrays(gravitinoTableInfoHelper.schema(), jdbcTable.schema());
+    this.pushDownPolicy =
+        new SparkJdbcPushDownPolicy(
+            gravitinoTable.columns(),
+            jdbcTable.schema(),
+            sparkSchema,
+            JdbcDialects.get(jdbcTable.jdbcOptions().url()));
+  }
+
+  /**
+   * Creates a scan builder that keeps unsafe expressions in Spark.
+   *
+   * @param options the scan options
+   * @return the JDBC scan builder
+   */
+  @Override
+  public JDBCScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
+    return new SparkJdbcScanBuilder(super.newScanBuilder(options), pushDownPolicy);
   }
 
   /**
@@ -92,11 +119,49 @@ public class SparkJdbcTable extends JDBCTable {
   @Override
   @SuppressWarnings("deprecation")
   public StructType schema() {
-    return gravitinoTableInfoHelper.schema();
+    return sparkSchema;
   }
 
   @Override
   public Map<String, String> properties() {
     return gravitinoTableInfoHelper.properties();
+  }
+
+  /**
+   * Uses the reader's element type for timestamp arrays. Spark 3.5 reads PostgreSQL timestamp array
+   * elements as TIMESTAMP even when top-level columns use TIMESTAMP_NTZ.
+   */
+  private static StructType alignTimestampArrays(StructType sparkSchema, StructType readerSchema) {
+    StructField[] fields = sparkSchema.fields().clone();
+    for (int i = 0; i < fields.length; i++) {
+      DataType sparkType = fields[i].dataType();
+      DataType readerType = readerType(readerSchema, fields[i].name());
+      if (sparkType instanceof ArrayType
+          && readerType instanceof ArrayType
+          && isTimestamp(((ArrayType) sparkType).elementType())
+          && isTimestamp(((ArrayType) readerType).elementType())) {
+        fields[i] =
+            new StructField(
+                fields[i].name(),
+                DataTypes.createArrayType(
+                    ((ArrayType) readerType).elementType(), ((ArrayType) sparkType).containsNull()),
+                fields[i].nullable(),
+                fields[i].metadata());
+      }
+    }
+    return new StructType(fields);
+  }
+
+  private static DataType readerType(StructType readerSchema, String name) {
+    for (StructField field : readerSchema.fields()) {
+      if (field.name().equalsIgnoreCase(name)) {
+        return field.dataType();
+      }
+    }
+    return null;
+  }
+
+  private static boolean isTimestamp(DataType type) {
+    return DataTypes.TimestampType.equals(type) || DataTypes.TimestampNTZType.equals(type);
   }
 }
