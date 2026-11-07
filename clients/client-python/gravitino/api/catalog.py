@@ -21,7 +21,9 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.policy.supports_policies import SupportsPolicies
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -266,3 +268,37 @@ class Catalog(Auditable):
             UnsupportedOperationException: If this catalog does not support role operations.
         """
         raise UnsupportedOperationException("Catalog does not support role operations")
+
+    def supports_credentials(self) -> SupportsCredentials:
+        """Return the {@link SupportsCredentials} if the catalog supports credential operations.
+
+        Raises:
+            UnsupportedOperationException: if the catalog does not support credential operations.
+
+        Returns:
+            SupportsCredentials: the {@link SupportsCredentials} instance
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support credential operations"
+        )
+
+    def support_credentials(self) -> SupportsCredentials:
+        """Deprecated alias for supports_credentials."""
+        return self.supports_credentials()
+
+    def supports_secrets(self) -> SupportsSecrets:
+        """Return the {@link SupportsSecrets} if the catalog supports secret operations.
+
+        Raises:
+            UnsupportedOperationException: if the catalog does not support secret operations.
+
+        Returns:
+            SupportsSecrets: the {@link SupportsSecrets} instance
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support secret operations"
+        )
+
+    def support_secrets(self) -> SupportsSecrets:
+        """Deprecated alias for supports_secrets."""
+        return self.supports_secrets()

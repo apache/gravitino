@@ -410,14 +410,22 @@ class FilesetCatalog(
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(None)
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
-    def support_credentials(self) -> SupportsCredentials:
+    def supports_credentials(self) -> SupportsCredentials:
         return self
+
+    def support_credentials(self) -> SupportsCredentials:
+        """Deprecated alias for supports_credentials."""
+        return self.supports_credentials()
 
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
 
-    def support_secrets(self) -> SupportsSecrets:
+    def supports_secrets(self) -> SupportsSecrets:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        """Deprecated alias for supports_secrets."""
+        return self.supports_secrets()
 
     def get_secrets(self) -> Dict[str, str]:
         return self._object_secret_operations.get_secrets()

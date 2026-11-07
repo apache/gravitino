@@ -19,6 +19,8 @@ from typing import Final, Optional, overload
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
+from gravitino.api.credential.credential import Credential
+from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
@@ -69,7 +71,11 @@ from gravitino.utils import HTTPClient
 
 
 class RelationalCatalog(
-    BaseSchemaCatalog, TableCatalog, ViewCatalog, SupportsSecrets
+    BaseSchemaCatalog,
+    TableCatalog,
+    ViewCatalog,
+    SupportsSecrets,
+    SupportsCredentials,
 ):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
@@ -105,8 +111,22 @@ class RelationalCatalog(
             rest_client, catalog_namespace, name
         )
 
-    def support_secrets(self) -> SupportsSecrets:
+    def supports_credentials(self) -> SupportsCredentials:
         return self
+
+    def support_credentials(self) -> SupportsCredentials:
+        """Deprecated alias for supports_credentials."""
+        return self.supports_credentials()
+
+    def get_credentials(self) -> list[Credential]:
+        return self._object_credential_operations.get_credentials()
+
+    def supports_secrets(self) -> SupportsSecrets:
+        return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        """Deprecated alias for supports_secrets."""
+        return self.supports_secrets()
 
     def as_table_catalog(self) -> TableCatalog:
         """Return this relational catalog as a :class:`TableCatalog`.
