@@ -163,16 +163,17 @@ could return different results:
   arrays. The source can compare strings with a different collation, and Spark cannot always
   write binary literals in SQL.
 - Expressions with a string or binary literal or cast, such as `cast(id AS string) > '9'`.
-- Casts to a timestamp type. Spark converts the value in the session time zone, but the source
-  uses its own time zone.
+- Casts to a timestamp type, and casts or date parts such as `hour()` of a `TIMESTAMP` column.
+  Spark uses the session time zone for these, but the source uses its own time zone.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
   PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
 - Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 
 Other expressions are still pushed down, for example `id = 1`, `count(*)`, `LIMIT 10`, or
-`ORDER BY id LIMIT 3`. When a filter stays in Spark, Spark also keeps the limit and the
-aggregate of that query.
+`ORDER BY id LIMIT 3`. They run with the source semantics. For example, a source `avg()` can
+return fewer decimal places than Spark. When a filter stays in Spark, Spark also keeps the
+limit and the aggregate of that query in Spark.
 
 #### PostgreSQL timestamps without time zone
 

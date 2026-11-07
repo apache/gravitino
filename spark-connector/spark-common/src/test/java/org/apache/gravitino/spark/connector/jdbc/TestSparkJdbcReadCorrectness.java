@@ -274,6 +274,16 @@ public class TestSparkJdbcReadCorrectness {
       Assertions.assertEquals(
           1704153600000000L,
           spark.sql("SELECT unix_micros(max(tz)) FROM safe.public.zoned_only").head().getLong(0));
+      // Date parts and casts of a TIMESTAMP column use the session time zone in Spark.
+      boolean utc = zone.equals("UTC");
+      Assertions.assertEquals(
+          utc ? List.of(1, 2) : List.of(),
+          ids("SELECT id FROM safe.public.zoned_only WHERE hour(tz) = 0 ORDER BY id"));
+      Assertions.assertEquals(
+          zone.equals("America/Los_Angeles") ? List.of(-1, 0) : List.of(0, 1),
+          ids(
+              "SELECT datediff(d, DATE '2024-01-01') FROM (SELECT cast(tz AS date) AS d, count(*)"
+                  + " FROM safe.public.zoned_only GROUP BY 1) ORDER BY 1"));
     }
   }
 

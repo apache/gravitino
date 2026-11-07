@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
@@ -60,7 +61,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     if ("jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider())) {
       // For PostgreSQL, one value drives both the reader and the type converter.
       // Remove every spelling of the key first; otherwise the reader may use any one of them.
-      useTimestampNtz = Boolean.parseBoolean(preferTimestampNtz(options, properties));
+      String value = preferTimestampNtz(options, properties);
+      Preconditions.checkArgument(
+          "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
+          "Invalid value '%s' for %s; use true or false",
+          value,
+          PREFER_TIMESTAMP_NTZ);
+      useTimestampNtz = Boolean.parseBoolean(value);
       setPreferTimestampNtz(all, useTimestampNtz);
     }
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));

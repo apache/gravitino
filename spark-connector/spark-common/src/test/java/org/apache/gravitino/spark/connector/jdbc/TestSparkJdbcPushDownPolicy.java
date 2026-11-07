@@ -32,6 +32,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.expressions.Cast;
 import org.apache.spark.sql.connector.expressions.Expression;
 import org.apache.spark.sql.connector.expressions.Expressions;
+import org.apache.spark.sql.connector.expressions.Extract;
 import org.apache.spark.sql.connector.expressions.LiteralValue;
 import org.apache.spark.sql.connector.expressions.NullOrdering;
 import org.apache.spark.sql.connector.expressions.SortDirection;
@@ -103,6 +104,11 @@ public class TestSparkJdbcPushDownPolicy {
                 })));
     Assertions.assertFalse(policy.canPush(new Cast(col("d"), DataTypes.TimestampType)));
     Assertions.assertTrue(policy.canPush(new Cast(col("id"), DataTypes.LongType)));
+    // Date parts and casts of a TIMESTAMP column depend on the session time zone.
+    Assertions.assertFalse(policy.canPush(new Extract("HOUR", col("tz"))));
+    Assertions.assertFalse(policy.canPush(new Cast(col("tz"), DataTypes.DateType)));
+    Assertions.assertTrue(policy.canPush(new Extract("HOUR", col("ts"))));
+    Assertions.assertTrue(policy.canPush(new Extract("YEAR", col("d"))));
   }
 
   @Test

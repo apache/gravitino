@@ -184,6 +184,22 @@ public class TestGravitinoJdbcCatalog {
   }
 
   @Test
+  void testInvalidNtzValueIsRejected() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> initialize(catalog, Map.of("preferTimestampNTZ", "yes"), Map.of()));
+      Assertions.assertTrue(error.getMessage().contains("'yes'"), error.getMessage());
+      Assertions.assertTrue(error.getMessage().contains("preferTimestampNTZ"), error.getMessage());
+    }
+  }
+
+  @Test
   void testNtzOptionKeepsOnlyOneSpelling() {
     Map<String, String> properties = new HashMap<>();
     properties.put("prefertimestampntz", "false");

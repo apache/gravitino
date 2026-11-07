@@ -28,6 +28,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.connector.expressions.Cast;
 import org.apache.spark.sql.connector.expressions.Expression;
+import org.apache.spark.sql.connector.expressions.Extract;
 import org.apache.spark.sql.connector.expressions.Literal;
 import org.apache.spark.sql.connector.expressions.NamedReference;
 import org.apache.spark.sql.jdbc.JdbcDialect;
@@ -46,16 +47,16 @@ import org.apache.spark.sql.types.VarcharType;
 /**
  * Decides which expressions a JDBC source may evaluate without changing Spark query results.
  *
- * <p>An expression stays in Spark when it involves a value whose source semantics can differ from
- * Spark: a string-like or binary column (also inside arrays, maps, and structs), a string or binary
- * literal or cast, a cast to a timestamp type, or a {@code TIMESTAMP_NTZ} literal the dialect cannot
- * write in SQL. Aggregates also stay in Spark for columns whose reader timestamp type differs from
+ * <p>An expression stays in Spark when it involves one of these known differences from Spark: a string-like or binary column (also inside arrays, maps, and structs), a string or binary
+ * literal or cast, a cast to a timestamp type, a cast or {@code EXTRACT} of a {@code TIMESTAMP}
+ * column, or a {@code TIMESTAMP_NTZ} literal the dialect cannot write in SQL. Aggregates also stay in Spark for columns whose reader timestamp type differs from
  * the type Spark sees, because the pushed aggregate result is typed by the reader.
  */
 class SparkJdbcPushDownPolicy {
 
   private final Set<String> sensitiveColumns;
   private final Set<String> readerTypeMismatchColumns;
+  private final Set<String> zonedTimestampColumns;
   private final boolean ntzLiteralSupported;
 
   SparkJdbcPushDownPolicy(
@@ -67,7 +68,11 @@ class SparkJdbcPushDownPolicy {
       }
     }
     this.readerTypeMismatchColumns = new HashSet<>();
+    this.zonedTimestampColumns = new HashSet<>();
     for (StructField field : sparkSchema.fields()) {
+      if (field.dataType() instanceof TimestampType) {
+        zonedTimestampColumns.add(normalize(field.name()));
+      }
       DataType readerType = fieldType(readerSchema, field.name());
       // Only timestamp differences change pushed aggregate results; Spark widens numeric results
       // safely. catalogString ignores nullability, which does not change pushed results.
@@ -98,11 +103,18 @@ class SparkJdbcPushDownPolicy {
       return !isSensitive(type) && (ntzLiteralSupported || !containsNtz(type));
     }
     if (expression instanceof Cast) {
-      DataType target = ((Cast) expression).dataType();
-      // Spark converts to a timestamp in the session time zone, the source in its own time zone.
-      if (isSensitive(target) || containsTimestamp(target)) {
+      Cast cast = (Cast) expression;
+      // Casts to or from TIMESTAMP depend on the time zone: Spark uses the session time zone, and
+      // the source uses its own. Casts to TIMESTAMP_NTZ also stay in Spark, which is conservative.
+      if (isSensitive(cast.dataType())
+          || containsTimestamp(cast.dataType())
+          || referencesZonedTimestamp(cast.expression())) {
         return false;
       }
+    }
+    // EXTRACT(HOUR FROM ...) and similar fields of a TIMESTAMP also depend on the time zone.
+    if (expression instanceof Extract && referencesZonedTimestamp(((Extract) expression).source())) {
+      return false;
     }
     for (Expression child : expression.children()) {
       if (!canPush(child)) {
@@ -132,6 +144,18 @@ class SparkJdbcPushDownPolicy {
       }
     }
     return true;
+  }
+
+  private boolean referencesZonedTimestamp(Expression expression) {
+    if (expression instanceof NamedReference) {
+      return zonedTimestampColumns.contains(columnName((NamedReference) expression));
+    }
+    for (Expression child : expression.children()) {
+      if (referencesZonedTimestamp(child)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean isSensitive(Type type) {
