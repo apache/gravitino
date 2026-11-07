@@ -21,9 +21,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
 import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
-import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { associatePolicy } from '@/lib/store/policies'
+import { addPolicyForTag, associatePolicy, getPoliciesForTag, removePolicyFromTag } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
 
@@ -36,6 +35,7 @@ const tagInputStyle = {
 
 export default function PolicyTag({ ...props }) {
   const { readOnly, metadataObjectType, metadataObjectFullName } = props
+  const isTag = metadataObjectType === 'tag'
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
   const [optionList, setOptionList] = useState([])
@@ -43,11 +43,17 @@ export default function PolicyTag({ ...props }) {
   const router = useRouter()
   const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
-  const [policiesForEntity, setPoliciesForEntity] = useState([])
+  const [policiesForObject, setPoliciesForObject] = useState([])
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
 
-  const getPoliciesForEntity = async () => {
+  const getPolicies = async () => {
+    if (isTag) {
+      const { payload } = await dispatch(getPoliciesForTag({ metalake: currentMetalake, tag: metadataObjectFullName }))
+
+      return payload || []
+    }
+
     const { payload } = await dispatch(
       getCurrentEntityPolicies({ metalake: currentMetalake, metadataObjectType, metadataObjectFullName, details: true })
     )
@@ -57,24 +63,24 @@ export default function PolicyTag({ ...props }) {
 
   useEffect(() => {
     const initLoad = async () => {
-      const policies = await getPoliciesForEntity()
-      setPoliciesForEntity(policies)
+      const policies = await getPolicies()
+      setPoliciesForObject(policies)
     }
     if (currentMetalake && metadataObjectType && metadataObjectFullName) {
       initLoad()
     }
-  }, [metadataObjectType, metadataObjectFullName])
+  }, [currentMetalake, metadataObjectType, metadataObjectFullName])
 
   useEffect(() => {
     if (inputVisible) {
       const options =
         store.policiesData?.filter(
-          policyOption => !policiesForEntity?.map(policy => policy.name)?.includes(policyOption.name)
+          policyOption => !policiesForObject?.map(policy => policy.name)?.includes(policyOption.name)
         ) || []
       setOptionList(options)
       inputRef.current?.focus()
     }
-  }, [inputVisible, policiesForEntity])
+  }, [inputVisible, policiesForObject, store.policiesData])
 
   const showInput = () => {
     setInputVisible(true)
@@ -102,32 +108,42 @@ export default function PolicyTag({ ...props }) {
   }
 
   const handleChange = async value => {
-    if (value && !policiesForEntity?.map(policy => policy.name)?.includes(value)) {
-      await dispatch(
-        associatePolicy({
-          metalake: currentMetalake,
-          metadataObjectType,
-          metadataObjectFullName,
-          data: { policiesToAdd: [value] }
-        })
-      )
-      const policies = await getPoliciesForEntity()
-      setPoliciesForEntity(policies)
+    if (value && !policiesForObject?.map(policy => policy.name)?.includes(value)) {
+      if (isTag) {
+        await dispatch(addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value }))
+      } else {
+        await dispatch(
+          associatePolicy({
+            metalake: currentMetalake,
+            metadataObjectType,
+            metadataObjectFullName,
+            data: { policiesToAdd: [value] }
+          })
+        )
+      }
+      const policies = await getPolicies()
+      setPoliciesForObject(policies)
     }
     setInputVisible(false)
   }
 
   const handleClose = async removedPolicy => {
-    await dispatch(
-      associatePolicy({
-        metalake: currentMetalake,
-        metadataObjectType,
-        metadataObjectFullName,
-        data: { policiesToRemove: [removedPolicy] }
-      })
-    )
-    const policies = await getPoliciesForEntity()
-    setPoliciesForEntity(policies)
+    if (isTag) {
+      await dispatch(
+        removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
+      )
+    } else {
+      await dispatch(
+        associatePolicy({
+          metalake: currentMetalake,
+          metadataObjectType,
+          metadataObjectFullName,
+          data: { policiesToRemove: [removedPolicy] }
+        })
+      )
+    }
+    const policies = await getPolicies()
+    setPoliciesForObject(policies)
   }
 
   const handleBlur = () => {
@@ -146,7 +162,7 @@ export default function PolicyTag({ ...props }) {
 
   return (
     <Flex gap='4px 0' wrap>
-      {policiesForEntity?.map((policy, index) => {
+      {policiesForObject?.map((policy, index) => {
         const isLongPolicy = policy.name.length > 20
         let color = policy.enabled ? token.colorPrimary : token.colorTextDisabled
 
@@ -173,7 +189,7 @@ export default function PolicyTag({ ...props }) {
           policyElem
         )
       })}
-      {policiesForEntity?.length === 0 && <span>No Policies</span>}
+      {policiesForObject?.length === 0 && <span>No Policies</span>}
       {inputVisible && !readOnly && (
         <Select
           size='small'
