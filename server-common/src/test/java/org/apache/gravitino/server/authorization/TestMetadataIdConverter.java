@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -41,7 +42,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
@@ -56,11 +59,13 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMetadataIdConverter {
@@ -229,6 +234,58 @@ public class TestMetadataIdConverter {
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "entityStore", originalEntityStore, true);
+    }
+  }
+
+  @Test
+  void testColumnAuthorizationKeepsExactStoredColumnName() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("lowercase");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    TableEntity table = mock(TableEntity.class);
+    ColumnEntity column = mock(ColumnEntity.class);
+    when(column.name()).thenReturn("MyCol");
+    when(table.columns()).thenReturn(Collections.singletonList(column));
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "orders"),
+            Entity.EntityType.TABLE,
+            TableEntity.class))
+        .thenReturn(table);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      NameIdentifier exact = NameIdentifier.of("metalake", "catalog", "schema", "orders", "MyCol");
+      NameIdentifier folded =
+          NameIdentifier.of("metalake", "catalog", "schema", "orders", "othercol");
+      Assertions.assertEquals(
+          exact,
+          MetadataIdConverter.normalizeCaseSensitive(
+              NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "MyCol"),
+              Capability.Scope.COLUMN,
+              catalogs));
+      Assertions.assertEquals(
+          folded,
+          MetadataIdConverter.normalizeCaseSensitive(
+              NameIdentifier.of("metalake", "catalog", "SCHEMA", "ORDERS", "OtherCol"),
+              Capability.Scope.COLUMN,
+              catalogs));
     }
   }
 

@@ -101,8 +101,9 @@ public class MetadataIdConverter {
       return ident;
     }
 
-    Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
-    return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+    // Tag operations use the same helper, so authorization looks up the same stored object.
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident, scope, catalogManager, () -> GravitinoEnv.getInstance().entityStore());
   }
 
   private static Long extractIdFromEntity(Entity entity) {

@@ -33,9 +33,12 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -243,10 +246,8 @@ public class TagManager implements TagDispatcher {
 
   public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject)
       throws NoSuchMetadataObjectException {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -274,11 +275,9 @@ public class TagManager implements TagDispatcher {
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
       throws NoSuchMetadataObjectException {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -316,10 +315,8 @@ public class TagManager implements TagDispatcher {
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());
 
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
@@ -375,6 +372,24 @@ public class TagManager implements TagDispatcher {
                     throw new RuntimeException(e);
                   }
                 }));
+  }
+
+  private NameIdentifier checkAndNormalizeMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    // Keep provider existence checks on the original request. The canonical identifier below is
+    // used for both relation access and tree locks, so equivalent names share the same lock.
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    if (!SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type())
+        || metadataObject.type() == MetadataObject.Type.CATALOG) {
+      return ident;
+    }
+
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident,
+        Capability.Scope.valueOf(metadataObject.type().name()),
+        GravitinoEnv.getInstance().catalogManager(),
+        () -> entityStore);
   }
 
   private TagEntity updateTagEntity(TagEntity tagEntity, TagChange... changes) {

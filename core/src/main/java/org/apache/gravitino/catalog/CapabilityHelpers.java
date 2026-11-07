@@ -23,13 +23,20 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ObjectArrays;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Supplier;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -62,6 +69,42 @@ public class CapabilityHelpers {
     } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
+  }
+
+  /**
+   * Normalizes an existing catalog object's identifier using the catalog's case rules. Tag and
+   * authorization lookups share these rules so they address the same stored object.
+   *
+   * <p>Column parents use the schema and table scopes independently. If folding changes a column
+   * name that exactly matches a stored column, the requested spelling is retained.
+   *
+   * @param ident the entity identifier of the object
+   * @param scope the capability scope of the object
+   * @param catalogManager the catalog manager used to load naming capabilities
+   * @param entityStore supplies the store containing table columns; called only if column folding
+   *     changes the requested name
+   * @return the normalized identifier
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws RuntimeException if capabilities or stored columns cannot be loaded
+   */
+  public static NameIdentifier normalizeMetadataIdentifier(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      CatalogManager catalogManager,
+      Supplier<EntityStore> entityStore) {
+    Capability capability = getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.COLUMN) {
+      NameIdentifier table =
+          applyCaseSensitive(
+              NameIdentifier.of(ident.namespace().levels()), Capability.Scope.TABLE, capability);
+      String column = applyCaseSensitiveOnName(scope, ident.name(), capability);
+      if (!column.equals(ident.name()) && hasStoredColumn(table, ident.name(), entityStore.get())) {
+        column = ident.name();
+      }
+      return NameIdentifier.of(
+          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())), column);
+    }
+    return applyCaseSensitive(ident, scope, capability);
   }
 
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {
@@ -584,5 +627,17 @@ public class CapabilityHelpers {
         capabilities.specificationOnName(scope, name).unsupportedMessage()
             + " Illegal name: "
             + name);
+  }
+
+  private static boolean hasStoredColumn(
+      NameIdentifier table, String column, EntityStore entityStore) {
+    try {
+      return entityStore.get(table, Entity.EntityType.TABLE, TableEntity.class).columns().stream()
+          .anyMatch(storedColumn -> storedColumn.name().equals(column));
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load stored columns of table: " + table, e);
+    }
   }
 }
