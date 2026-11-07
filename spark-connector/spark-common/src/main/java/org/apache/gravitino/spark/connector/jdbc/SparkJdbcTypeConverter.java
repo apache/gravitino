@@ -47,6 +47,12 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
       return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.TimestampType) {
       return DataTypes.TimestampType;
+    } else if (gravitinoType instanceof Types.FixedType) {
+      // A fixed-length binary column (for example SQL Server binary(n)) has no bounded Spark type,
+      // so read it as BinaryType, the same type Spark reads a JDBC BINARY column as. The mapping is
+      // one-way: the fixed length is not representable in Spark and is not carried back. Without
+      // this, a table with such a column cannot be described or read through Spark.
+      return DataTypes.BinaryType;
     } else {
       return super.toSparkType(gravitinoType);
     }

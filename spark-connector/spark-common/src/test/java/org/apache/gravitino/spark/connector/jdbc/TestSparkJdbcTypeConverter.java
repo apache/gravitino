@@ -46,6 +46,12 @@ public class TestSparkJdbcTypeConverter {
   }
 
   @Test
+  void testConvertFixedTypeToSparkBinary() {
+    Assertions.assertEquals(
+        DataTypes.BinaryType, sparkJdbcTypeConverter.toSparkType(Types.FixedType.of(16)));
+  }
+
+  @Test
   void testConvertExternalTypeToSparkString() {
     Assertions.assertEquals(
         DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("numeric")));
