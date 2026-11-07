@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import com.google.common.collect.ImmutableSet;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Locale;
@@ -47,12 +48,23 @@ import org.apache.spark.sql.types.VarcharType;
 /**
  * Decides which expressions a JDBC source may evaluate without changing Spark query results.
  *
- * <p>An expression stays in Spark when it involves one of these known differences from Spark: a string-like or binary column (also inside arrays, maps, and structs), a string or binary
- * literal or cast, a cast to a timestamp type, a cast or {@code EXTRACT} of a {@code TIMESTAMP}
- * column, or a {@code TIMESTAMP_NTZ} literal the dialect cannot write in SQL. Aggregates also stay in Spark for columns whose reader timestamp type differs from
- * the type Spark sees, because the pushed aggregate result is typed by the reader.
+ * <p>An expression stays in Spark when it has a known difference from Spark. These are:
+ *
+ * <ul>
+ *   <li>string-like or binary columns, also inside arrays, maps, and structs;
+ *   <li>string or binary literals and casts;
+ *   <li>casts to a timestamp type, and casts or date parts of a Spark {@code TIMESTAMP} column;
+ *   <li>date parts other than year, quarter, month, day, hour, and minute;
+ *   <li>{@code TIMESTAMP_NTZ} literals the dialect cannot write in SQL.
+ * </ul>
+ *
+ * <p>Aggregates also stay in Spark for timestamp columns whose reader type differs from the type
+ * Spark sees, because the reader types the pushed aggregate result.
  */
 class SparkJdbcPushDownPolicy {
+
+  private static final Set<String> PUSHABLE_EXTRACT_FIELDS =
+      ImmutableSet.of("YEAR", "QUARTER", "MONTH", "DAY", "HOUR", "MINUTE");
 
   private final Set<String> sensitiveColumns;
   private final Set<String> readerTypeMismatchColumns;
@@ -112,9 +124,14 @@ class SparkJdbcPushDownPolicy {
         return false;
       }
     }
-    // EXTRACT(HOUR FROM ...) and similar fields of a TIMESTAMP also depend on the time zone.
-    if (expression instanceof Extract && referencesZonedTimestamp(((Extract) expression).source())) {
-      return false;
+    if (expression instanceof Extract) {
+      Extract extract = (Extract) expression;
+      // Date parts of a TIMESTAMP depend on the time zone. Other fields, such as SECOND (fractions
+      // in PostgreSQL) or WEEK (MySQL week mode on Spark 3.5), can differ from Spark at the source.
+      if (!PUSHABLE_EXTRACT_FIELDS.contains(extract.field().toUpperCase(Locale.ROOT))
+          || referencesZonedTimestamp(extract.source())) {
+        return false;
+      }
     }
     for (Expression child : expression.children()) {
       if (!canPush(child)) {

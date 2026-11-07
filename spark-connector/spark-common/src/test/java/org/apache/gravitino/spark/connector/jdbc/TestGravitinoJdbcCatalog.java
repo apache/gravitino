@@ -157,7 +157,8 @@ public class TestGravitinoJdbcCatalog {
       SupportsCredentials credentials = mock(SupportsCredentials.class);
       when(credentials.getCredentials()).thenReturn(new Credential[0]);
       GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
-      // A Spark catalog option wins over a Gravitino catalog property with the "spark.bypass." prefix.
+      // A Spark catalog option wins over a Gravitino catalog property with the "spark.bypass."
+      // prefix.
       JDBCOptions options =
           initialize(
               catalog,
@@ -227,7 +228,8 @@ public class TestGravitinoJdbcCatalog {
     properties.put("jdbc-url", "jdbc:postgresql://localhost/db");
     properties.put("jdbc-driver", "org.postgresql.Driver");
     TableCatalog physical =
-        catalog.createAndInitSparkCatalog("test", new CaseInsensitiveStringMap(options), properties);
+        catalog.createAndInitSparkCatalog(
+            "test", new CaseInsensitiveStringMap(options), properties);
     return (JDBCOptions) FieldUtils.readField(physical, "options", true);
   }
 

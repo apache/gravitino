@@ -163,8 +163,12 @@ could return different results:
   arrays. The source can compare strings with a different collation, and Spark cannot always
   write binary literals in SQL.
 - Expressions with a string or binary literal or cast, such as `cast(id AS string) > '9'`.
-- Casts to a timestamp type, and casts or date parts such as `hour()` of a `TIMESTAMP` column.
-  Spark uses the session time zone for these, but the source uses its own time zone.
+- Casts to a timestamp type, and casts or date parts such as `hour()` or `year()` of a Spark
+  `TIMESTAMP` column. Examples are MySQL `DATETIME`, or PostgreSQL `timestamp` when
+  `preferTimestampNTZ` is off. Spark uses the session time zone for these, but the source uses
+  its own time zone.
+- Date parts other than year, quarter, month, day, hour, and minute, such as `second()` or
+  `weekofyear()`. The source can compute them differently.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
   PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
 - Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An

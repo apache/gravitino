@@ -64,9 +64,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       String value = preferTimestampNtz(options, properties);
       Preconditions.checkArgument(
           "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
-          "Invalid value '%s' for %s; use true or false",
+          "Invalid value '%s' for %s (or %s%s) in catalog %s; use true or false",
           value,
-          PREFER_TIMESTAMP_NTZ);
+          PREFER_TIMESTAMP_NTZ,
+          PropertiesConverter.SPARK_PROPERTY_PREFIX,
+          PREFER_TIMESTAMP_NTZ,
+          name);
       useTimestampNtz = Boolean.parseBoolean(value);
       setPreferTimestampNtz(all, useTimestampNtz);
     }

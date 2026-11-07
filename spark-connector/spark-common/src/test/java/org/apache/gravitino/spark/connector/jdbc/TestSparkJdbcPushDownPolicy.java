@@ -91,7 +91,7 @@ public class TestSparkJdbcPushDownPolicy {
                 eq(col("s"), lit("a", DataTypes.StringType)))));
     Assertions.assertTrue(
         policy.canPush(
-            eq(col("ts"), lit(LocalDateTime.of(2024, 1, 2, 3, 4), DataTypes.TimestampNTZType)))
+                eq(col("ts"), lit(LocalDateTime.of(2024, 1, 2, 3, 4), DataTypes.TimestampNTZType)))
             == (DIALECT.compileValue(LocalDateTime.of(2000, 1, 1, 0, 0)) instanceof String));
     Assertions.assertTrue(policy.canPush(col("ts")));
     // Spark converts to TIMESTAMP in the session time zone; the source uses its own time zone.
@@ -109,6 +109,11 @@ public class TestSparkJdbcPushDownPolicy {
     Assertions.assertFalse(policy.canPush(new Cast(col("tz"), DataTypes.DateType)));
     Assertions.assertTrue(policy.canPush(new Extract("HOUR", col("ts"))));
     Assertions.assertTrue(policy.canPush(new Extract("YEAR", col("d"))));
+    // Fields whose source semantics can differ from Spark stay in Spark.
+    for (String field : new String[] {"SECOND", "WEEK", "DAY_OF_WEEK", "DAY_OF_YEAR"}) {
+      Assertions.assertFalse(policy.canPush(new Extract(field, col("ts"))), field);
+    }
+    Assertions.assertTrue(policy.canPush(new Extract("MINUTE", col("ts"))));
   }
 
   @Test
@@ -137,12 +142,14 @@ public class TestSparkJdbcPushDownPolicy {
                 .updated("pushDownLimit", "true"));
     SparkJdbcScanBuilder builder =
         new SparkJdbcScanBuilder(
-            new JDBCScanBuilder(mock(SparkSession.class, RETURNS_DEEP_STUBS), sparkSchema(), options),
+            new JDBCScanBuilder(
+                mock(SparkSession.class, RETURNS_DEEP_STUBS), sparkSchema(), options),
             policy);
     Predicate safe = eq(col("id"), lit(1, DataTypes.IntegerType));
     Predicate unsafe = eq(col("s"), lit("a", DataTypes.StringType));
 
-    List<Predicate> postScan = Arrays.asList(builder.pushPredicates(new Predicate[] {safe, unsafe}));
+    List<Predicate> postScan =
+        Arrays.asList(builder.pushPredicates(new Predicate[] {safe, unsafe}));
     Assertions.assertEquals(List.of(unsafe), postScan);
     Assertions.assertEquals(List.of(safe), Arrays.asList(builder.pushedPredicates()));
     Assertions.assertFalse(builder.pushTopN(new SortOrder[] {sort(col("s"))}, 1));

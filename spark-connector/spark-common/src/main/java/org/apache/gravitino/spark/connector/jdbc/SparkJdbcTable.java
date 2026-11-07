@@ -67,8 +67,7 @@ public class SparkJdbcTable extends JDBCTable {
             propertiesConverter,
             sparkTransformConverter,
             sparkTypeConverter);
-    this.sparkSchema =
-        alignTimestampArrays(gravitinoTableInfoHelper.schema(), jdbcTable.schema());
+    this.sparkSchema = alignTimestampArrays(gravitinoTableInfoHelper.schema(), jdbcTable.schema());
     this.pushDownPolicy =
         new SparkJdbcPushDownPolicy(
             gravitinoTable.columns(),
@@ -129,8 +128,8 @@ public class SparkJdbcTable extends JDBCTable {
   }
 
   /**
-   * Uses the reader's element type for timestamp arrays. Spark 3.5 reads PostgreSQL timestamp
-   * array elements as TIMESTAMP even when top-level columns use TIMESTAMP_NTZ.
+   * Uses the reader's element type for timestamp arrays. Spark 3.5 reads PostgreSQL timestamp array
+   * elements as TIMESTAMP even when top-level columns use TIMESTAMP_NTZ.
    */
   private static StructType alignTimestampArrays(StructType sparkSchema, StructType readerSchema) {
     StructField[] fields = sparkSchema.fields().clone();
@@ -145,8 +144,7 @@ public class SparkJdbcTable extends JDBCTable {
             new StructField(
                 fields[i].name(),
                 DataTypes.createArrayType(
-                    ((ArrayType) readerType).elementType(),
-                    ((ArrayType) sparkType).containsNull()),
+                    ((ArrayType) readerType).elementType(), ((ArrayType) sparkType).containsNull()),
                 fields[i].nullable(),
                 fields[i].metadata());
       }

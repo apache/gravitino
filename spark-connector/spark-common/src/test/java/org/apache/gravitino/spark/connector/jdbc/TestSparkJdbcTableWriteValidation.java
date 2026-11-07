@@ -48,8 +48,7 @@ public class TestSparkJdbcTableWriteValidation {
   void testTimestampArraysUseTheReaderElementType() {
     Type timestamps = Types.ListType.nullable(Types.TimestampType.withoutTimeZone());
     // Spark 3.5 reads timestamp array elements as TIMESTAMP even with preferTimestampNTZ.
-    SparkJdbcTable spark35 =
-        table(timestamps, DataTypes.createArrayType(DataTypes.TimestampType));
+    SparkJdbcTable spark35 = table(timestamps, DataTypes.createArrayType(DataTypes.TimestampType));
     Assertions.assertEquals(
         DataTypes.createArrayType(DataTypes.TimestampType),
         spark35.schema().fields()[0].dataType());
@@ -116,8 +115,7 @@ public class TestSparkJdbcTableWriteValidation {
                 .updated("dbtable", "t")
                 .updated("driver", "org.postgresql.Driver"));
     JDBCTable physical = mock(JDBCTable.class);
-    when(physical.schema())
-        .thenReturn(new StructType().add("special_value", readerType));
+    when(physical.schema()).thenReturn(new StructType().add("special_value", readerType));
     when(physical.jdbcOptions()).thenReturn(options);
     return new SparkJdbcTable(
         Identifier.of(new String[] {"public"}, "t"),

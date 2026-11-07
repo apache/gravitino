@@ -200,6 +200,9 @@ public class TestSparkJdbcReadCorrectness {
               .sql("SELECT cast(ts as string) FROM safe.public.samples WHERE id=2")
               .head()
               .getString(0));
+      // PostgreSQL EXTRACT(SECOND) keeps fractions, while Spark second() does not.
+      Assertions.assertEquals(
+          List.of(1), ids("SELECT id FROM safe.public.samples WHERE second(ts) = 56"));
       // Spark 3.5 reads timestamp array elements as TIMESTAMP; reading them must not fail.
       Assertions.assertEquals(
           1, spark.sql("SELECT tss FROM safe.public.samples WHERE id=1").head().getList(0).size());
@@ -207,10 +210,10 @@ public class TestSparkJdbcReadCorrectness {
     String stringFilter = pushedFilters("SELECT id FROM safe.public.samples WHERE s = 'a'");
     Assertions.assertFalse(stringFilter.contains("s ="), stringFilter);
     // A filter kept in Spark also keeps the limit and the aggregate of the query in Spark.
-    String limitAfterStringFilter = plan("SELECT id FROM safe.public.samples WHERE s = 'a' LIMIT 1");
+    String limitAfterStringFilter =
+        plan("SELECT id FROM safe.public.samples WHERE s = 'a' LIMIT 1");
     Assertions.assertFalse(limitAfterStringFilter.contains("PushedLimit"), limitAfterStringFilter);
-    String countAfterStringFilter =
-        plan("SELECT count(*) FROM safe.public.samples WHERE s = 'a'");
+    String countAfterStringFilter = plan("SELECT count(*) FROM safe.public.samples WHERE s = 'a'");
     Assertions.assertFalse(
         countAfterStringFilter.contains("PushedAggregates: [COUNT"), countAfterStringFilter);
     Assertions.assertEquals(
