@@ -891,11 +891,10 @@ class DTOConverters:
 
     @staticmethod
     def _decode_binary_hex(value: str, data_type):
-        # Match Java DTOConverters: reject unprefixed values so Binary/Fixed does not become str.
+        # Match Java DTOConverters: decode 0x-prefixed hex; keep unprefixed strings for
+        # provider-specific interpretation (#14609).
         if not value.lower().startswith("0x"):
-            raise IllegalArgumentException(
-                "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs"
-            )
+            return value
         hex_value = value[2:]
         try:
             decoded = bytes.fromhex(hex_value)

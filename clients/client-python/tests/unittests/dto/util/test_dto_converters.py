@@ -609,16 +609,26 @@ class TestDTOConverters(unittest.TestCase):
             decoded,
         )
 
+        # Unprefixed wire values keep provider-specific string interpretation (#14609).
         unprefixed = (
             LiteralDTO.builder()
             .with_data_type(Types.BinaryType.get())
-            .with_value("010203")
+            .with_value("AB")
             .build()
         )
-        with self.assertRaisesRegex(
-            IllegalArgumentException, "0x followed by hexadecimal"
-        ):
-            DTOConverters.from_function_arg(unprefixed)
+        self.assertEqual(
+            Literals.of(value="AB", data_type=Types.BinaryType.get()),
+            DTOConverters.from_function_arg(unprefixed),
+        )
+        self.assertEqual(
+            "legacy",
+            cast(
+                LiteralDTO,
+                DTOConverters.to_function_arg(
+                    Literals.of(value="legacy", data_type=Types.BinaryType.get())
+                ),
+            ).value(),
+        )
 
     def test_to_dto_raise_exception(self):
         with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
