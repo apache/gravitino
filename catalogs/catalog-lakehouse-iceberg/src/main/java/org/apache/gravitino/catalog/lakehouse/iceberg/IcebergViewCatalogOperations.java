@@ -404,14 +404,16 @@ class IcebergViewCatalogOperations {
       newRepresentations.add(toSqlViewRepresentation(representation));
     }
 
+    long timestampMillis = System.currentTimeMillis();
     ViewVersion newVersion =
         ImmutableViewVersion.builder()
             .versionId(newVersionId)
-            .timestampMillis(System.currentTimeMillis())
+            .timestampMillis(timestampMillis)
             .schemaId(schemaId)
             .defaultNamespace(defaultNamespace)
             .representations(newRepresentations)
             .putSummary("operation", "alter")
+            .putSummary("timestamp-ms", Long.toString(timestampMillis))
             .defaultCatalog(replace.getDefaultCatalog())
             .build();
 
