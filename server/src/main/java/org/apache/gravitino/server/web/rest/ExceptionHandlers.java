@@ -23,6 +23,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -1129,6 +1130,14 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+
+      // A request the backend refuses because of the request itself (for example an invalid
+      // definition or a drop blocked by dependent objects) is a client error, not a server error.
+      if (e instanceof BadRequestException) {
+        LOG.warn(errorMsg, e);
+        return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
+      }
+
       // A source catalog connection failure is a downstream failure rather than a server bug.
       if (e instanceof ConnectionFailedException) {
         LOG.warn(errorMsg, e);

@@ -19,8 +19,11 @@
 package org.apache.gravitino.catalog.postgresql.converter;
 
 import java.sql.SQLException;
+import java.time.Duration;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -75,5 +78,73 @@ public class TestPostgreSqlExceptionConverter {
           converter.toGravitinoException(
               new SQLException("connection or protocol failure", state)));
     }
+  }
+
+  @Test
+  void testPoolWrappedConnectionFailureUsesNestedSqlState() {
+    SQLException driverFailure = new SQLException("The connection attempt failed.", "08001");
+    SQLException poolFailure =
+        new SQLException("Cannot create PoolableConnectionFactory (connect failed)", driverFailure);
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(poolFailure);
+    Assertions.assertInstanceOf(ConnectionFailedException.class, error);
+    Assertions.assertSame(poolFailure, error.getCause());
+    Assertions.assertEquals(poolFailure.getMessage(), error.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"28P01", "28000"})
+  void testRejectedLoginIsConnectionFailure(String state) {
+    SQLException failure = new SQLException("password authentication failed for user", state);
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Assertions.assertInstanceOf(ConnectionFailedException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"2BP01", "42601", "42703", "42804", "23502", "23505", "22003", "22P02"})
+  void testRequestsRefusedBySourceAreBadRequests(String state) {
+    SQLException failure = new SQLException("source refused the request", state);
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Assertions.assertInstanceOf(BadRequestException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertEquals(failure.getMessage(), error.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"XX000", "53300", "57014"})
+  void testServerSideFailuresRemainGeneric(String state) {
+    SQLException failure = new SQLException("server side failure", state);
+    Exception error = new PostgreSqlExceptionConverter().toGravitinoException(failure);
+    Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
+  }
+
+  @Test
+  void testCauseCycleWithoutSqlStateEndsTheWalk() {
+    SQLException failure = new SQLException("source failure");
+    RuntimeException wrapper = new RuntimeException("wrapper");
+    failure.initCause(wrapper);
+    wrapper.initCause(failure);
+    Exception error = convertWithinTimeout(failure);
+    Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
+    Assertions.assertSame(failure, error.getCause());
+  }
+
+  @Test
+  void testCauseCycleStillFindsNestedSqlState() {
+    SQLException failure = new SQLException("pool failure");
+    SQLException driverFailure = new SQLException("permission denied", "42501");
+    failure.initCause(driverFailure);
+    driverFailure.initCause(failure);
+    Exception error = convertWithinTimeout(failure);
+    Assertions.assertInstanceOf(ForbiddenException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+  }
+
+  // A regression loops without checking interruption, so the conversion must not run on the test
+  // thread.
+  private static Exception convertWithinTimeout(SQLException failure) {
+    return Assertions.assertTimeoutPreemptively(
+        Duration.ofSeconds(10),
+        () -> new PostgreSqlExceptionConverter().toGravitinoException(failure));
   }
 }
