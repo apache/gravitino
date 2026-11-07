@@ -248,6 +248,13 @@ public class TestSparkJdbcReadCorrectness {
     for (String zone : ZONES) {
       spark.conf().set("spark.sql.session.timeZone", zone);
       Assertions.assertEquals(List.of(2), ids(query));
+      // A TIMESTAMP literal casts the NTZ column in the session time zone; it must stay in Spark.
+      // The literal is 3 hours before row 2, so a pushed cast in another time zone drops it.
+      Assertions.assertEquals(
+          List.of(2),
+          ids(
+              "SELECT id FROM safe.public.timestamp_only"
+                  + " WHERE ts > TIMESTAMP '2024-01-03 00:00:00'"));
       Assertions.assertEquals(
           "2024-01-03 03:04:05",
           spark

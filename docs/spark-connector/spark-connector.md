@@ -163,10 +163,12 @@ could return different results:
   arrays. The source can compare strings with a different collation, and Spark cannot always
   write binary literals in SQL.
 - Expressions with a string or binary literal or cast, such as `cast(id AS string) > '9'`.
+- Casts to a timestamp type. Spark converts the value in the session time zone, but the source
+  uses its own time zone.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
   PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
-- Aggregates on columns whose JDBC reader type differs from the type Spark shows. An example
-  is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
+- Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
+  example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 
 Other expressions are still pushed down, for example `id = 1`, `count(*)`, `LIMIT 10`, or
 `ORDER BY id LIMIT 3`. When a filter stays in Spark, Spark also keeps the limit and the
@@ -178,8 +180,10 @@ By default, a PostgreSQL timestamp without time zone maps to Spark `TIMESTAMP`, 
 Its value can change with the Spark session time zone. To read the stored wall-clock value,
 set `preferTimestampNTZ=true` on the Spark catalog, for example
 `spark.sql.catalog.<name>.preferTimestampNTZ=true`. You can also set the Gravitino catalog
-property `spark.preferTimestampNTZ=true`. The Spark catalog option wins when both are set. The
-option applies to PostgreSQL catalogs only.
+property `spark.bypass.preferTimestampNTZ=true`. The Spark catalog option wins when both are
+set. The option applies to PostgreSQL catalogs only. Do not set it on other JDBC catalogs:
+Spark would read their timestamps as `TIMESTAMP_NTZ`, but the table schema still shows
+`TIMESTAMP`.
 
 With the option on:
 

@@ -40,6 +40,7 @@ import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.types.VarcharType;
 
 /**
@@ -47,9 +48,9 @@ import org.apache.spark.sql.types.VarcharType;
  *
  * <p>An expression stays in Spark when it involves a value whose source semantics can differ from
  * Spark: a string-like or binary column (also inside arrays, maps, and structs), a string or binary
- * literal or cast, or a {@code TIMESTAMP_NTZ} literal the dialect cannot write in SQL. Aggregates
- * also stay in Spark for columns whose reader type differs from the type Spark sees, because the
- * pushed aggregate result is typed by the reader.
+ * literal or cast, a cast to a timestamp type, or a {@code TIMESTAMP_NTZ} literal the dialect cannot
+ * write in SQL. Aggregates also stay in Spark for columns whose reader timestamp type differs from
+ * the type Spark sees, because the pushed aggregate result is typed by the reader.
  */
 class SparkJdbcPushDownPolicy {
 
@@ -68,9 +69,11 @@ class SparkJdbcPushDownPolicy {
     this.readerTypeMismatchColumns = new HashSet<>();
     for (StructField field : sparkSchema.fields()) {
       DataType readerType = fieldType(readerSchema, field.name());
-      // catalogString ignores nullability, which does not change pushed results.
+      // Only timestamp differences change pushed aggregate results; Spark widens numeric results
+      // safely. catalogString ignores nullability, which does not change pushed results.
       if (readerType == null
-          || !readerType.catalogString().equals(field.dataType().catalogString())) {
+          || (!readerType.catalogString().equals(field.dataType().catalogString())
+              && (containsTimestamp(readerType) || containsTimestamp(field.dataType())))) {
         readerTypeMismatchColumns.add(normalize(field.name()));
       }
     }
@@ -94,8 +97,12 @@ class SparkJdbcPushDownPolicy {
       DataType type = ((Literal<?>) expression).dataType();
       return !isSensitive(type) && (ntzLiteralSupported || !containsNtz(type));
     }
-    if (expression instanceof Cast && isSensitive(((Cast) expression).dataType())) {
-      return false;
+    if (expression instanceof Cast) {
+      DataType target = ((Cast) expression).dataType();
+      // Spark converts to a timestamp in the session time zone, the source in its own time zone.
+      if (isSensitive(target) || containsTimestamp(target)) {
+        return false;
+      }
     }
     for (Expression child : expression.children()) {
       if (!canPush(child)) {
@@ -172,22 +179,31 @@ class SparkJdbcPushDownPolicy {
         || type instanceof BinaryType;
   }
 
+  private static boolean containsTimestamp(DataType type) {
+    return containsNtz(type) || contains(type, TimestampType.class);
+  }
+
   private static boolean containsNtz(DataType type) {
+    return contains(type, TimestampNTZType.class);
+  }
+
+  private static boolean contains(DataType type, Class<? extends DataType> leaf) {
     if (type instanceof ArrayType) {
-      return containsNtz(((ArrayType) type).elementType());
+      return contains(((ArrayType) type).elementType(), leaf);
     }
     if (type instanceof MapType) {
-      return containsNtz(((MapType) type).keyType()) || containsNtz(((MapType) type).valueType());
+      return contains(((MapType) type).keyType(), leaf)
+          || contains(((MapType) type).valueType(), leaf);
     }
     if (type instanceof StructType) {
       for (StructField field : ((StructType) type).fields()) {
-        if (containsNtz(field.dataType())) {
+        if (contains(field.dataType(), leaf)) {
           return true;
         }
       }
       return false;
     }
-    return type instanceof TimestampNTZType;
+    return leaf.isInstance(type);
   }
 
   private static DataType fieldType(StructType schema, String name) {

@@ -93,10 +93,20 @@ public class TestSparkJdbcPushDownPolicy {
             eq(col("ts"), lit(LocalDateTime.of(2024, 1, 2, 3, 4), DataTypes.TimestampNTZType)))
             == (DIALECT.compileValue(LocalDateTime.of(2000, 1, 1, 0, 0)) instanceof String));
     Assertions.assertTrue(policy.canPush(col("ts")));
+    // Spark converts to TIMESTAMP in the session time zone; the source uses its own time zone.
+    Assertions.assertFalse(
+        policy.canPush(
+            new Predicate(
+                ">",
+                new Expression[] {
+                  new Cast(col("ts"), DataTypes.TimestampType), lit(0L, DataTypes.TimestampType)
+                })));
+    Assertions.assertFalse(policy.canPush(new Cast(col("d"), DataTypes.TimestampType)));
+    Assertions.assertTrue(policy.canPush(new Cast(col("id"), DataTypes.LongType)));
   }
 
   @Test
-  void testAggregatesStayInSparkWhenReaderTypeDiffers() {
+  void testAggregatesStayInSparkWhenReaderTimestampTypeDiffers() {
     SparkJdbcPushDownPolicy policy = policy();
     // "tz" is NTZ for the reader but TIMESTAMP for Spark, as on Spark 3.5 PostgreSQL.
     Assertions.assertTrue(policy.canPush(col("tz")));
@@ -104,6 +114,8 @@ public class TestSparkJdbcPushDownPolicy {
     Assertions.assertTrue(policy.canPushAggregate(new Max(col("id"))));
     Assertions.assertTrue(policy.canPushAggregate(new CountStar()));
     Assertions.assertFalse(policy.canPushAggregate(new Max(col("s"))));
+    // Numeric differences, such as a MySQL SMALLINT read as INT on Spark 3.5, keep pushdown.
+    Assertions.assertTrue(policy.canPushAggregate(new Max(col("si"))));
   }
 
   @Test
@@ -149,13 +161,20 @@ public class TestSparkJdbcPushDownPolicy {
       column("j", Types.ExternalType.of("jsonb")),
       column("tags", Types.ListType.nullable(Types.StringType.get())),
       column("ts", Types.TimestampType.withoutTimeZone()),
-      column("tz", Types.TimestampType.withTimeZone())
+      column("tz", Types.TimestampType.withTimeZone()),
+      column("d", Types.DateType.get()),
+      column("si", Types.ShortType.get())
     };
     // The reader sees timestamptz as NTZ, as Spark 3.5 does under preferTimestampNTZ.
     StructType reader = new StructType();
     for (StructField field : sparkSchema().fields()) {
-      reader =
-          reader.add(field.name().equals("tz") ? field.copy("tz", DataTypes.TimestampNTZType, true, field.metadata()) : field);
+      if (field.name().equals("tz")) {
+        reader = reader.add(field.copy("tz", DataTypes.TimestampNTZType, true, field.metadata()));
+      } else if (field.name().equals("si")) {
+        reader = reader.add(field.copy("si", DataTypes.IntegerType, true, field.metadata()));
+      } else {
+        reader = reader.add(field);
+      }
     }
     return new SparkJdbcPushDownPolicy(columns, reader, sparkSchema(), DIALECT);
   }
@@ -170,7 +189,9 @@ public class TestSparkJdbcPushDownPolicy {
         .add("j", DataTypes.StringType)
         .add("tags", DataTypes.createArrayType(DataTypes.StringType))
         .add("ts", DataTypes.TimestampNTZType)
-        .add("tz", DataTypes.TimestampType);
+        .add("tz", DataTypes.TimestampType)
+        .add("d", DataTypes.DateType)
+        .add("si", DataTypes.ShortType);
   }
 
   private static Column column(String name, Type type) {

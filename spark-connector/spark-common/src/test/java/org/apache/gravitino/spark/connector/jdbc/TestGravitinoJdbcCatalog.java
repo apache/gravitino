@@ -147,7 +147,8 @@ public class TestGravitinoJdbcCatalog {
     "preferTimestampNTZ, false, true, false",
     "prefertimestampntz, true, false, true",
     "PreferTimestampNtz, true, false, true",
-    "PREFERTIMESTAMPNTZ, false, true, false"
+    "PREFERTIMESTAMPNTZ, false, true, false",
+    "prefertimestampntz, '', true, true"
   })
   void testPostgreSqlNtzOptionDrivesReaderAndConverter(
       String key, String option, String property, boolean expected) throws Exception {
@@ -156,16 +157,29 @@ public class TestGravitinoJdbcCatalog {
       SupportsCredentials credentials = mock(SupportsCredentials.class);
       when(credentials.getCredentials()).thenReturn(new Credential[0]);
       GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
-      // A Spark catalog option wins over a Gravitino catalog property with the "spark." prefix.
+      // A Spark catalog option wins over a Gravitino catalog property with the "spark.bypass." prefix.
       JDBCOptions options =
           initialize(
               catalog,
               option.isEmpty() ? Map.of() : Map.of(key, option),
-              property.isEmpty() ? Map.of() : Map.of("spark." + key, property));
+              property.isEmpty() ? Map.of() : Map.of("spark.bypass." + key, property));
       Assertions.assertEquals(expected, options.preferTimestampNTZ());
       Assertions.assertEquals(
           expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
           catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  @Test
+  void testNtzPropertyNeedsTheBypassPrefix() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
+      Assertions.assertFalse(
+          initialize(catalog, Map.of(), Map.of("spark.preferTimestampNTZ", "true"))
+              .preferTimestampNTZ());
     }
   }
 
