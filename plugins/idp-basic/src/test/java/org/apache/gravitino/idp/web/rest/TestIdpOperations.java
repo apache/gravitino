@@ -52,8 +52,10 @@ import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -70,6 +72,8 @@ class TestIdpOperations extends JerseyTest {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
+  private static final IdpUserGroupEventDispatcher DISPATCHER =
+      new IdpUserGroupEventDispatcher(new EventBus(Collections.emptyList()), MANAGER);
 
   private static Config previousConfig;
 
@@ -113,7 +117,7 @@ class TestIdpOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(MANAGER).to(IdpUserGroupManager.class);
+            bind(DISPATCHER).to(IdpUserGroupEventDispatcher.class);
             bind(request).to(HttpServletRequest.class);
           }
         });

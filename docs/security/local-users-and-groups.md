@@ -146,6 +146,43 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
 
+## Audit and Events
+
+Built-in IdP mutations go through `IdpUserGroupEventDispatcher`, the same PreEvent / Event /
+FailureEvent pattern used for metalake access-control and job operations. When
+[audit logging](../gravitino-server-config.md#audit-logging) or an
+[event listener](../gravitino-server-config.md#event-listeners) is enabled, successful and failed
+writes name the object and operation instead of falling back to `HttpRequestEvent` with
+`UNKNOWN` and a null identifier.
+
+Object identifiers are instance-scoped and channel-prefixed so they stay distinct from metalake
+users and groups:
+
+| Kind  | Identifier form      | Example            |
+|-------|----------------------|--------------------|
+| User  | `basic.user.<name>`  | `basic.user.alice` |
+| Group | `basic.group.<name>` | `basic.group.eng`  |
+
+The first segment is the authenticator / local-store channel (`basic`), parallel to other
+instance identity channels such as `scim.user.<name>`.
+
+| API                                  | Event family                | `OperationType`                |
+|--------------------------------------|-----------------------------|--------------------------------|
+| `POST /api/idp/users`                | `IdpAddUser*`               | `ADD_USER`                     |
+| `DELETE /api/idp/users/{user}`       | `IdpRemoveUser*`            | `REMOVE_USER`                  |
+| `PUT /api/idp/users/{user}/password` | `IdpChangeUserPassword*`    | `ALTER_USER`                   |
+| `POST /api/idp/groups`               | `IdpAddGroup*`              | `ADD_GROUP`                    |
+| `DELETE /api/idp/groups/{group}`     | `IdpRemoveGroup*`           | `REMOVE_GROUP`                 |
+| `PUT /api/idp/groups/{group}/users`  | `IdpChangeGroupMembership*` | `ALTER_GROUP`                  |
+
+Each mutation emits a pre-event before the store write, a success event after it commits, or a
+failure event if it throws. Password values are not placed on the event. Membership changes carry
+`usersToAdd` / `usersToRemove` in `customInfo` (comma-separated). `GET` requests do not dispatch
+these operation events; with audit enabled they still produce the generic HTTP fallback entry.
+
+Event classes live in `org.apache.gravitino.idp.listener.event` inside the `idp-basic` plugin, not
+in the core `org.apache.gravitino.listener.api.event` package.
+
 ## Granting Access to Metadata
 
 A local user can authenticate as soon as it exists, but it can only reach metadata once it is registered in a metalake and granted privileges there. The two are separate steps, and the username must match.
@@ -222,5 +259,6 @@ iceberg.rest-catalog.http-headers=Authorization: Basic {base64_credentials}
 ## Further Reading
 
 - [OpenAPI definition](../open-api/idp/openapi.yaml) for full request and response schemas
+- [Audit Logging](../gravitino-server-config.md#audit-logging) and [Event Listeners](../gravitino-server-config.md#event-listeners) for observing IdP mutations
 - [How to Use HTTPS](how-to-use-https.md) for protecting credentials in transit
 - [Access Control](access-control.md) for what an authenticated user is allowed to do

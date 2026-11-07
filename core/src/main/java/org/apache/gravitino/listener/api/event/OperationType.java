@@ -128,6 +128,7 @@ public enum OperationType {
   // User
   ADD_USER,
   REMOVE_USER,
+  ALTER_USER,
   GET_USER,
   LIST_USERS,
   LIST_USER_NAMES,
@@ -137,6 +138,7 @@ public enum OperationType {
   // Group
   ADD_GROUP,
   REMOVE_GROUP,
+  ALTER_GROUP,
   GET_GROUP,
   LIST_GROUPS,
   LIST_GROUP_NAMES,

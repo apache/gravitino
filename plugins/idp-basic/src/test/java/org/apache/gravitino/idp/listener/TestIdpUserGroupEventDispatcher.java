@@ -1,0 +1,133 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.idp.listener;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.listener.event.IdpAddGroupEvent;
+import org.apache.gravitino.idp.listener.event.IdpAddUserEvent;
+import org.apache.gravitino.idp.listener.event.IdpAddUserFailureEvent;
+import org.apache.gravitino.idp.listener.event.IdpChangeGroupMembershipEvent;
+import org.apache.gravitino.idp.listener.event.IdpChangeUserPasswordEvent;
+import org.apache.gravitino.idp.listener.event.IdpRemoveGroupEvent;
+import org.apache.gravitino.idp.listener.event.IdpRemoveUserEvent;
+import org.apache.gravitino.idp.model.IdpGroup;
+import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class TestIdpUserGroupEventDispatcher {
+
+  private final List<Event> postEvents = new ArrayList<>();
+  private IdpUserGroupManager manager;
+  private IdpUserGroupEventDispatcher dispatcher;
+
+  @BeforeEach
+  void setUp() {
+    postEvents.clear();
+    manager = mock(IdpUserGroupManager.class);
+    EventListenerPlugin listener = mock(EventListenerPlugin.class);
+    doAnswer(
+            inv -> {
+              postEvents.add(inv.getArgument(0));
+              return null;
+            })
+        .when(listener)
+        .onPostEvent(any(Event.class));
+    doAnswer(inv -> null).when(listener).onPreEvent(any(PreEvent.class));
+    dispatcher = new IdpUserGroupEventDispatcher(new EventBus(List.of(listener)), manager);
+  }
+
+  @Test
+  void testMutationsDispatchTypedEvents() throws Exception {
+    when(manager.addUser("alice", "Passw0rd-For-User")).thenReturn(mock(IdpUser.class));
+    when(manager.changePassword("alice", "Passw0rd-For-User-2")).thenReturn(true);
+    when(manager.removeUser("alice")).thenReturn(true);
+    when(manager.addGroup("g1")).thenReturn(mock(IdpGroup.class));
+    when(manager.changeGroupMembership(eq("g1"), anyList(), isNull()))
+        .thenReturn(mock(IdpGroup.class));
+    when(manager.removeGroup("g1", true)).thenReturn(true);
+
+    asAdmin(
+        () -> {
+          dispatcher.addUser("alice", "Passw0rd-For-User");
+          dispatcher.changePassword("alice", "Passw0rd-For-User-2");
+          dispatcher.removeUser("alice");
+          dispatcher.addGroup("g1");
+          dispatcher.changeGroupMembership("g1", List.of("alice"), null);
+          dispatcher.removeGroup("g1", true);
+          return null;
+        });
+
+    Assertions.assertEquals(6, postEvents.size());
+    IdpAddUserEvent addUser = (IdpAddUserEvent) postEvents.get(0);
+    Assertions.assertEquals(OperationType.ADD_USER, addUser.operationType());
+    Assertions.assertEquals("basic.user.alice", addUser.identifier().toString());
+    Assertions.assertEquals("admin", addUser.user());
+    Assertions.assertInstanceOf(IdpChangeUserPasswordEvent.class, postEvents.get(1));
+    Assertions.assertTrue(((IdpRemoveUserEvent) postEvents.get(2)).isExists());
+    Assertions.assertInstanceOf(IdpAddGroupEvent.class, postEvents.get(3));
+    IdpChangeGroupMembershipEvent membership = (IdpChangeGroupMembershipEvent) postEvents.get(4);
+    Assertions.assertEquals(OperationType.ALTER_GROUP, membership.operationType());
+    Assertions.assertEquals(List.of("alice"), membership.usersToAdd());
+    Assertions.assertEquals("basic.group.g1", membership.identifier().toString());
+    Assertions.assertTrue(((IdpRemoveGroupEvent) postEvents.get(5)).force());
+  }
+
+  @Test
+  void testFailureDispatchesFailureEvent() throws Exception {
+    when(manager.addUser(eq("alice"), anyString())).thenThrow(new AlreadyExistsException("exists"));
+
+    Assertions.assertThrows(
+        AlreadyExistsException.class,
+        () ->
+            asAdmin(
+                () -> {
+                  dispatcher.addUser("alice", "Passw0rd-For-User");
+                  return null;
+                }));
+
+    Assertions.assertInstanceOf(IdpAddUserFailureEvent.class, postEvents.get(0));
+    Assertions.assertEquals(OperationType.ADD_USER, postEvents.get(0).operationType());
+  }
+
+  private static void asAdmin(PrivilegedExceptionAction<Void> action) throws Exception {
+    PrincipalUtils.doAs(new UserPrincipal("admin"), action);
+  }
+}
