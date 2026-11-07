@@ -42,6 +42,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
@@ -115,31 +116,17 @@ public class TestGravitinoJdbcCatalog {
         "jdbc-oceanbase",
         "jdbc-oracle"
       })
-  void testTimestampMappingAndReaderOptionStayAligned(String provider) throws Exception {
+  void testTimestampMappingIsUnchangedByDefault(String provider) throws Exception {
     try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
       global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
-      Catalog source = mock(Catalog.class);
       SupportsCredentials credentials = mock(SupportsCredentials.class);
-      when(source.provider()).thenReturn(provider);
-      when(source.supportsCredentials()).thenReturn(credentials);
       when(credentials.getCredentials())
           .thenReturn(new Credential[] {new JdbcCredential("user", "password")});
-      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
-      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
-      TableCatalog physical =
-          catalog.createAndInitSparkCatalog(
-              "test",
-              new CaseInsensitiveStringMap(Map.of()),
-              Map.of(
-                  "jdbc-url",
-                  "jdbc:postgresql://localhost/db",
-                  "jdbc-driver",
-                  "org.postgresql.Driver"));
-      JDBCOptions options = (JDBCOptions) FieldUtils.readField(physical, "options", true);
-      boolean postgres = "jdbc-postgresql".equals(provider);
-      Assertions.assertEquals(postgres, options.preferTimestampNTZ());
+      GravitinoJdbcCatalog catalog = catalog(provider, credentials);
+      JDBCOptions options = initialize(catalog, Map.of(), Map.of());
+      Assertions.assertFalse(options.preferTimestampNTZ());
       Assertions.assertEquals(
-          postgres ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          DataTypes.TimestampType,
           catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
       Assertions.assertEquals(
           DataTypes.TimestampType,
@@ -147,6 +134,71 @@ public class TestGravitinoJdbcCatalog {
       Assertions.assertEquals("password", options.asConnectionProperties().getProperty("password"));
       verify(credentials).getCredentials();
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "preferTimestampNTZ, true, '', true",
+    "prefertimestampntz, true, '', true",
+    "PREFERTIMESTAMPNTZ, false, '', false",
+    "preferTimestampNTZ, '', true, true",
+    "prefertimestampntz, '', true, true",
+    "PreferTimestampNtz, '', false, false",
+    "preferTimestampNTZ, false, true, false",
+    "prefertimestampntz, true, false, true",
+    "PreferTimestampNtz, true, false, true",
+    "PREFERTIMESTAMPNTZ, false, true, false"
+  })
+  void testPostgreSqlNtzOptionDrivesReaderAndConverter(
+      String key, String option, String property, boolean expected) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
+      // A Spark catalog option wins over a Gravitino catalog property with the "spark." prefix.
+      JDBCOptions options =
+          initialize(
+              catalog,
+              option.isEmpty() ? Map.of() : Map.of(key, option),
+              property.isEmpty() ? Map.of() : Map.of("spark." + key, property));
+      Assertions.assertEquals(expected, options.preferTimestampNTZ());
+      Assertions.assertEquals(
+          expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  @Test
+  void testNtzOptionKeepsOnlyOneSpelling() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("prefertimestampntz", "false");
+    properties.put("PreferTimestampNtz", "false");
+    properties.put("url", "jdbc:postgresql://localhost/db");
+    GravitinoJdbcCatalog.setPreferTimestampNtz(properties, true);
+    Assertions.assertEquals(
+        Map.of("preferTimestampNTZ", "true", "url", "jdbc:postgresql://localhost/db"), properties);
+  }
+
+  private static GravitinoJdbcCatalog catalog(String provider, SupportsCredentials credentials)
+      throws IllegalAccessException {
+    Catalog source = mock(Catalog.class);
+    when(source.provider()).thenReturn(provider);
+    when(source.supportsCredentials()).thenReturn(credentials);
+    GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
+    FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+    return catalog;
+  }
+
+  private static JDBCOptions initialize(
+      GravitinoJdbcCatalog catalog, Map<String, String> options, Map<String, String> extra)
+      throws IllegalAccessException {
+    Map<String, String> properties = new HashMap<>(extra);
+    properties.put("jdbc-url", "jdbc:postgresql://localhost/db");
+    properties.put("jdbc-driver", "org.postgresql.Driver");
+    TableCatalog physical =
+        catalog.createAndInitSparkCatalog("test", new CaseInsensitiveStringMap(options), properties);
+    return (JDBCOptions) FieldUtils.readField(physical, "options", true);
   }
 
   @Test

@@ -46,6 +46,10 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
 
+  private static final String PREFER_TIMESTAMP_NTZ = "preferTimestampNTZ";
+
+  private boolean useTimestampNtz;
+
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
@@ -53,8 +57,11 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     applyJdbcCredential(gravitinoCatalogClient, all);
-    if (useTimestampNtz()) {
-      all.put("preferTimestampNTZ", "true");
+    if ("jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider())) {
+      // One value drives both the reader and the type converter, so they cannot disagree.
+      // Remove every spelling of the key first; otherwise the reader may use any one of them.
+      useTimestampNtz = Boolean.parseBoolean(preferTimestampNtz(options, properties));
+      setPreferTimestampNtz(all, useTimestampNtz);
     }
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return jdbcTableCatalog;
@@ -118,7 +125,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkJdbcTypeConverter(useTimestampNtz());
+    return new SparkJdbcTypeConverter(useTimestampNtz);
   }
 
   @Override
@@ -146,8 +153,28 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     super.createNamespace(namespace, properties);
   }
 
-  private boolean useTimestampNtz() {
-    // Keep the reader and metadata mapping aligned; other providers retain their existing mapping.
-    return "jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider());
+  @VisibleForTesting
+  static void setPreferTimestampNtz(Map<String, String> properties, boolean value) {
+    properties.keySet().removeIf(PREFER_TIMESTAMP_NTZ::equalsIgnoreCase);
+    properties.put(PREFER_TIMESTAMP_NTZ, String.valueOf(value));
+  }
+
+  /**
+   * Resolves the opt-in NTZ option. A Spark catalog option wins over a Gravitino catalog property
+   * with the {@code spark.} prefix, as in {@link PropertiesConverter#toSparkCatalogProperties}.
+   */
+  private static String preferTimestampNtz(
+      CaseInsensitiveStringMap options, Map<String, String> properties) {
+    if (options != null && options.containsKey(PREFER_TIMESTAMP_NTZ)) {
+      return options.get(PREFER_TIMESTAMP_NTZ);
+    }
+    if (properties != null) {
+      for (Map.Entry<String, String> entry : properties.entrySet()) {
+        if (("spark." + PREFER_TIMESTAMP_NTZ).equalsIgnoreCase(entry.getKey())) {
+          return entry.getValue();
+        }
+      }
+    }
+    return "false";
   }
 }
