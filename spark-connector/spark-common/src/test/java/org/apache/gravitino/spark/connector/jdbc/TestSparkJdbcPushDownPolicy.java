@@ -110,10 +110,14 @@ public class TestSparkJdbcPushDownPolicy {
     Assertions.assertTrue(policy.canPush(new Extract("HOUR", col("ts"))));
     Assertions.assertTrue(policy.canPush(new Extract("YEAR", col("d"))));
     // Fields whose source semantics can differ from Spark stay in Spark.
-    for (String field : new String[] {"SECOND", "WEEK", "DAY_OF_WEEK", "DAY_OF_YEAR"}) {
+    for (String field :
+        new String[] {"SECOND", "WEEK", "DAY_OF_WEEK", "DAY_OF_YEAR", "YEAR_OF_WEEK"}) {
       Assertions.assertFalse(policy.canPush(new Extract(field, col("ts"))), field);
     }
     Assertions.assertTrue(policy.canPush(new Extract("MINUTE", col("ts"))));
+    for (String field : new String[] {"QUARTER", "MONTH", "DAY"}) {
+      Assertions.assertTrue(policy.canPush(new Extract(field, col("d"))), field);
+    }
   }
 
   @Test

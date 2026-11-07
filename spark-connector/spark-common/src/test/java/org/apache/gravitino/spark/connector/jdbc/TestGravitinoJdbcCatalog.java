@@ -197,6 +197,9 @@ public class TestGravitinoJdbcCatalog {
               () -> initialize(catalog, Map.of("preferTimestampNTZ", "yes"), Map.of()));
       Assertions.assertTrue(error.getMessage().contains("'yes'"), error.getMessage());
       Assertions.assertTrue(error.getMessage().contains("preferTimestampNTZ"), error.getMessage());
+      Assertions.assertTrue(
+          error.getMessage().contains("spark.bypass.preferTimestampNTZ"), error.getMessage());
+      Assertions.assertTrue(error.getMessage().contains("catalog test"), error.getMessage());
     }
   }
 
