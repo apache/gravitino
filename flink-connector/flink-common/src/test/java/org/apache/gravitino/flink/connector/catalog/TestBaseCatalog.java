@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
@@ -46,6 +47,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
@@ -60,6 +62,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /**
@@ -544,6 +547,115 @@ public abstract class TestBaseCatalog {
     catalog.alterTable(new ObjectPath("db", "tbl"), newTable, false);
 
     Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  /**
+   * The Gravitino catalog handle must be fetched once per catalog instance: the client has no
+   * catalog cache and Flink consults catalog() on every table resolution, so a per-call fetch
+   * doubled the REST traffic of each query.
+   */
+  @Test
+  void testCatalogHandleFetchedOncePerInstance() {
+    AtomicInteger loadCalls = new AtomicInteger();
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.doAnswer(
+            inv -> {
+              loadCalls.incrementAndGet();
+              return info;
+            })
+        .when(manager)
+        .getGravitinoCatalogInfo(Mockito.anyString());
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Assertions.assertEquals(1, loadCalls.get(), "catalog handle must be fetched exactly once");
+    }
+  }
+
+  /**
+   * A failed load must not be cached. On Flink 2.x, CREATE CATALOG opens the catalog before the
+   * catalog store creates it in Gravitino, so the first catalog() call in open() fails with
+   * NoSuchCatalogException and later calls must load the catalog again.
+   */
+  @Test
+  void testCatalogHandleLoadFailureIsNotCached() {
+    Catalog info = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager manager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(manager.getGravitinoCatalogInfo(Mockito.anyString()))
+        .thenThrow(new NoSuchCatalogException("catalog test does not exist"))
+        .thenReturn(info);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(manager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+
+      Assertions.assertThrows(NoSuchCatalogException.class, catalog::catalog);
+      Assertions.assertSame(info, catalog.catalog());
+      Assertions.assertSame(info, catalog.catalog());
+
+      Mockito.verify(manager, Mockito.times(2)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
+   * The handle keeps using the REST client of the manager that loaded it, so the catalog must be
+   * loaded again after the shared manager is closed and created again.
+   */
+  @Test
+  void testCatalogHandleReloadedWhenManagerIsReplaced() {
+    Catalog first = Mockito.mock(Catalog.class);
+    Catalog second = Mockito.mock(Catalog.class);
+    GravitinoCatalogManager firstManager = Mockito.mock(GravitinoCatalogManager.class);
+    GravitinoCatalogManager secondManager = Mockito.mock(GravitinoCatalogManager.class);
+    Mockito.when(firstManager.getGravitinoCatalogInfo("test")).thenReturn(first);
+    Mockito.when(secondManager.getGravitinoCatalogInfo("test")).thenReturn(second);
+
+    try (MockedStatic<GravitinoCatalogManager> mocked =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      mocked.when(GravitinoCatalogManager::get).thenReturn(firstManager);
+      BaseCatalog catalog = catalogWithoutCatalogOverride();
+      Assertions.assertSame(first, catalog.catalog());
+      Assertions.assertSame(first, catalog.catalog());
+
+      mocked.when(GravitinoCatalogManager::get).thenReturn(secondManager);
+      Assertions.assertSame(second, catalog.catalog());
+      Assertions.assertSame(second, catalog.catalog());
+
+      Mockito.verify(firstManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+      Mockito.verify(secondManager, Mockito.times(1)).getGravitinoCatalogInfo("test");
+    }
+  }
+
+  /**
+   * Builds a catalog that does not override catalog(), so tests exercise the memoization in
+   * BaseCatalog.catalog() itself.
+   */
+  private BaseCatalog catalogWithoutCatalogOverride() {
+    return new BaseCatalog(
+        "test",
+        Collections.emptyMap(),
+        "default",
+        Mockito.mock(SchemaAndTablePropertiesConverter.class),
+        Mockito.mock(PartitionConverter.class)) {
+      @Override
+      protected AbstractCatalog realCatalog() {
+        return null;
+      }
+
+      @Override
+      protected CatalogCompat catalogCompat() {
+        return TestBaseCatalog.this.catalogCompat();
+      }
+    };
   }
 
   private class TestableBaseCatalog extends BaseCatalog {
