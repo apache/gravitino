@@ -42,10 +42,14 @@ sphinx==7.1.2
 furo==2024.8.6
 banks==2.4.5
 
-# Lance integration deps. Pinned so the default integration test runs against
-# a single, known-good (server-side `lance-namespace-core` 0.7.5+) combination.
-# The multi-version matrix (`:clients:client-python:lanceRayMatrixTest`) keeps
-# its own per-version venvs and does not consume these pins.
+# Lance integration deps. Pinned so the default integration test runs against one
+# known-good combination instead of whatever pip resolves on the day. The pin that
+# matters is `lance-namespace==0.7.5`: to satisfy it pip backtracks `pylance` to
+# 6.1.0, so this lane deliberately drives an older client against the
+# `lance-namespace-core` 0.11.1 the server now embeds - the backward-compatible
+# direction, which is what the lane is here to cover. Current pairings are covered
+# by the multi-version matrix (`:clients:client-python:lanceRayMatrixTest`), which
+# keeps its own per-version venvs and does not consume these pins.
 ray==2.55.1
 lance-ray==0.4.2
 lance-namespace==0.7.5
