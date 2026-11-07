@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
@@ -28,6 +33,7 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PR
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -35,6 +41,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -88,6 +95,8 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -218,22 +227,49 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   static class FileSystemCacheKey {
+    // The settings that decide how an HDFS file system logs in. The authority carries the principal
+    // only without its realm, and a location without a scheme has no authority at all.
+    private static final List<String> AUTHENTICATION_KEYS =
+        ImmutableList.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+            KerberosConfig.PRINCIPAL_KEY,
+            KerberosConfig.KEY_TAB_URI_KEY,
+            HADOOP_SECURITY_AUTHENTICATION,
+            GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION,
+            HADOOP_SECURITY_PRINCIPAL,
+            GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL,
+            HADOOP_SECURITY_KEYTAB,
+            GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB,
+            HADOOP_KRB5_CONF,
+            GRAVITINO_BYPASS + HADOOP_KRB5_CONF,
+            CONFIG_RESOURCES);
+
     /**
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
      *
-     * <p>NOTE: The filesystem cache key includes the schema, authority, and current user. Changes
-     * to the configuration of the fileset will not affect the cached filesystem.
+     * <p>NOTE: The filesystem cache key includes the scheme, authority, current user and the
+     * authentication settings of the configuration. Changes to other configuration of the fileset
+     * will not affect the cached filesystem.
      */
     @Nullable private final String scheme;
 
     @Nullable private final String authority;
     private final String currentUser;
+    private final Map<String, String> authenticationSettings;
 
-    FileSystemCacheKey(String scheme, String authority) {
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> conf) {
       this.scheme = scheme;
       this.authority = authority;
       this.currentUser = PrincipalUtils.getCurrentUserName();
+      Map<String, String> settings = new HashMap<>();
+      for (String key : AUTHENTICATION_KEYS) {
+        if (conf.containsKey(key)) {
+          settings.put(key, conf.get(key));
+        }
+      }
+      this.authenticationSettings = Collections.unmodifiableMap(settings);
     }
 
     @Override
@@ -247,7 +283,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
-          && Objects.equals(currentUser, that.currentUser);
+          && Objects.equals(currentUser, that.currentUser)
+          && authenticationSettings.equals(that.authenticationSettings);
     }
 
     @Override
@@ -255,6 +292,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       int result = 31 * (scheme == null ? 0 : scheme.hashCode());
       result = 31 * result + (authority == null ? 0 : authority.hashCode());
       result = 31 * result + currentUser.hashCode();
+      result = 31 * result + authenticationSettings.hashCode();
       return result;
     }
   }
@@ -1449,7 +1487,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority),
+        new FileSystemCacheKey(scheme, authority, conf),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
