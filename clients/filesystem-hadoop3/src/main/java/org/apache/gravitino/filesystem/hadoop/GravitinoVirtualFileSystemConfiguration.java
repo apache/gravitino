@@ -230,6 +230,14 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
 
   /**
+   * The configuration key for the comma-separated fileset paths to collect delegation tokens for,
+   * e.g. {@code gvfs://fileset/catalog/schema/fileset}. Needed when a job reads filesets outside
+   * {@code fs.defaultFS}, because token requests carry no path for GVFS to resolve.
+   */
+  public static final String FS_GRAVITINO_DELEGATION_TOKEN_FILESETS =
+      "fs.gravitino.delegationToken.filesets";
+
+  /**
    * The prefix for user-defined location configs: {@code
    * fs.path.config.<locationName>.<property_name>=<property_value>}.
    */
