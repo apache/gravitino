@@ -59,9 +59,41 @@ public class TestPaimonSchema {
     try {
       FileUtils.deleteDirectory(
           new File(System.getProperty("java.io.tmpdir") + "/paimon_catalog_warehouse"));
+      FileUtils.deleteDirectory(
+          new File(System.getProperty("java.io.tmpdir") + "/paimon_jdbc_catalog_warehouse"));
     } catch (IOException e) {
       // Ignore
     }
+  }
+
+  @Test
+  public void testLoadSchemaCommentWithJdbcBackend() {
+    PaimonCatalog paimonCatalog = initJdbcPaimonCatalog("testLoadSchemaCommentWithJdbcBackend");
+    PaimonCatalogOperations paimonCatalogOperations = (PaimonCatalogOperations) paimonCatalog.ops();
+
+    NameIdentifier ident =
+        NameIdentifier.of(META_LAKE_NAME, paimonCatalog.name(), "test_paimon_schema_comment");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+
+    paimonCatalogOperations.createSchema(ident, COMMENT_VALUE, properties);
+    Assertions.assertFalse(properties.containsKey(PaimonSchemaPropertiesMetadata.COMMENT));
+
+    Schema loadedSchema = paimonCatalogOperations.loadSchema(ident);
+    Assertions.assertEquals(COMMENT_VALUE, loadedSchema.comment());
+    Assertions.assertEquals("val1", loadedSchema.properties().get("key1"));
+
+    NameIdentifier noCommentIdent =
+        NameIdentifier.of(META_LAKE_NAME, paimonCatalog.name(), "test_paimon_schema_no_comment");
+    paimonCatalogOperations.createSchema(noCommentIdent, null, Maps.newHashMap());
+    Schema noCommentSchema = paimonCatalogOperations.loadSchema(noCommentIdent);
+    Assertions.assertNull(noCommentSchema.comment());
+    Assertions.assertFalse(
+        noCommentSchema.properties().containsKey(PaimonSchemaPropertiesMetadata.COMMENT));
+
+    // clean up
+    cleanUp(paimonCatalogOperations, ident);
+    cleanUp(paimonCatalogOperations, noCommentIdent);
   }
 
   @Test
@@ -189,6 +221,30 @@ public class TestPaimonSchema {
         PaimonCatalogPropertiesMetadata.WAREHOUSE,
         String.join(
             File.separator, System.getProperty("java.io.tmpdir"), "paimon_catalog_warehouse"));
+    return new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+  }
+
+  private PaimonCatalog initJdbcPaimonCatalog(String name) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(name)
+            .withNamespace(Namespace.of(META_LAKE_NAME))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "jdbc");
+    conf.put(PaimonCatalogPropertiesMetadata.URI, "jdbc:h2:mem:" + name + ";DB_CLOSE_DELAY=-1");
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER, "org.h2.Driver");
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, "user");
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, "password");
+    conf.put(
+        PaimonCatalogPropertiesMetadata.WAREHOUSE,
+        String.join(
+            File.separator, System.getProperty("java.io.tmpdir"), "paimon_jdbc_catalog_warehouse"));
     return new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 }
