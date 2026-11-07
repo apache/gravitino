@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -45,6 +46,7 @@ import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -52,6 +54,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyRoleRelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -169,6 +172,7 @@ public class PolicyMetaService {
           () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
           () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
+          () -> updateRoleRelationsWithoutCommit(newPolicyPO.getPolicyId(), updatedPolicyEntity),
           () -> afterUpdate(updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -219,6 +223,9 @@ public class PolicyMetaService {
                   PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
           () ->
               SessionUtils.doWithoutCommit(
+                  PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
                   TagMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
@@ -256,7 +263,12 @@ public class PolicyMetaService {
             PolicyVersionMapper.class,
             mapper -> mapper.deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit));
 
-    return policyDeletedCount + policyVersionDeletedCount;
+    int roleRelationDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyRoleRelMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
+
+    return policyDeletedCount + policyVersionDeletedCount + roleRelationDeletedCount;
   }
 
   @Monitored(
@@ -361,8 +373,17 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot without committing, and fires the matching
-   * lifecycle hooks around the DML.
+   * Writes the policy row, its content snapshot, and the role references derived from that content.
+   */
+  private void insertPolicyWithoutCommit(
+      PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
+    long policyId = writePolicyRowWithoutCommit(policyEntity, initializedPolicyPO, overwritten);
+    updateRoleRelationsWithoutCommit(policyId, policyEntity);
+  }
+
+  /**
+   * Writes the policy row and its content snapshot, returns the ID the row ended up with, and fires
+   * the matching lifecycle hooks around the DML.
    *
    * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
    * replaces an existing row uses update hooks and passes the entity as stored — including the
@@ -378,13 +399,13 @@ public class PolicyMetaService {
    * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
    * which is the honest answer: the snapshots and relations of the deleted policy are gone with it.
    */
-  private void insertPolicyWithoutCommit(
+  private long writePolicyRowWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
       beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
       afterPersist(policyEntity);
-      return;
+      return initializedPolicyPO.getPolicyId();
     }
 
     PolicyPO existingPolicyPO = findAndLockPolicyForOverwrite(initializedPolicyPO);
@@ -400,7 +421,7 @@ public class PolicyMetaService {
       beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
       afterPersist(policyEntity);
-      return;
+      return initializedPolicyPO.getPolicyId();
     }
 
     PolicyPO replacementPolicyPO =
@@ -413,6 +434,66 @@ public class PolicyMetaService {
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
     afterUpdate(storedPolicy);
+    return replacementPolicyPO.getPolicyId();
+  }
+
+  /**
+   * Brings the role references derived from a policy's content in line with that content.
+   *
+   * <p>The references are written only here and never by a caller, so {@code content} stays the one
+   * authority on which roles a policy names.
+   *
+   * <p>Only the difference is written: a reference the content still names keeps its row, so a
+   * policy edit that leaves {@code applicableRoles} alone writes no reference rows at all.
+   *
+   * <p>A reference the content drops is deleted rather than soft-deleted, so no edit leaves a
+   * tombstone behind. Removing a role, naming it again, and removing it once more therefore cannot
+   * collide on the table's uniqueness over (policy, role, deleted_at), which the two removals would
+   * otherwise share whenever they read the same millisecond from the database clock.
+   */
+  private void updateRoleRelationsWithoutCommit(long policyId, PolicyEntity policyEntity) {
+    List<PolicyRoleRelPO> desired = POConverters.initializePolicyRoleRelPOs(policyId, policyEntity);
+    List<PolicyRoleRelPO> current =
+        SessionUtils.getWithoutCommit(
+            PolicyRoleRelMapper.class, mapper -> mapper.listByPolicyId(policyId));
+
+    Set<String> desiredRoles =
+        desired.stream().map(PolicyRoleRelPO::getRoleName).collect(Collectors.toSet());
+    Set<String> currentRoles =
+        current.stream().map(PolicyRoleRelPO::getRoleName).collect(Collectors.toSet());
+
+    for (PolicyRoleRelPO superseded : current) {
+      if (desiredRoles.contains(superseded.getRoleName())) {
+        continue;
+      }
+      // A zero-row delete means the reference is already gone, which is the intended end state.
+      SessionUtils.doWithoutCommit(
+          PolicyRoleRelMapper.class, mapper -> mapper.deleteByIdAndVersion(superseded));
+    }
+
+    for (PolicyRoleRelPO added : desired) {
+      if (currentRoles.contains(added.getRoleName())) {
+        continue;
+      }
+      try {
+        SessionUtils.doWithoutCommit(PolicyRoleRelMapper.class, mapper -> mapper.insert(added));
+      } catch (RuntimeException re) {
+        // This table names roles exactly as the role table does, so a duplicate here is content
+        // naming one role twice under the backend's own equality: MySQL ignores trailing spaces,
+        // PostgreSQL does not, and each matches how that backend identifies a role. Report the
+        // role that collided instead of letting the caller's handler blame the policy name. The
+        // SQL failure is deliberately not chained: the handlers upstream look for a duplicate key
+        // through the cause chain and would rewrite this back into an already-existing policy.
+        if (ExceptionUtils.isDuplicateKey(re)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "The content of policy %s names the role %s more than once; on this backend"
+                      + " those names identify the same role",
+                  policyEntity.name(), added.getRoleName()));
+        }
+        throw re;
+      }
+    }
   }
 
   /**
