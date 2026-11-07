@@ -158,10 +158,7 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
   public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
     SchemaTableName schemaTableName =
         new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
-    ArrayList<ColumnMetadata> columnMetadataList = new ArrayList<>();
-    for (GravitinoColumn column : gravitinoTable.getColumns()) {
-      columnMetadataList.add(getColumnMetadata(column));
-    }
+    List<ColumnMetadata> columnMetadataList = getColumnMetadataList(gravitinoTable);
 
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
 

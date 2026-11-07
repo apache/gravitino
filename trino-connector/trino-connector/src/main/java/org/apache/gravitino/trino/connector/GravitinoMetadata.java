@@ -89,6 +89,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.function.SQLImpl;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.TrinoRoutineSpecification;
@@ -311,6 +312,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public Optional<ConnectorTableLayout> getNewTableLayout(
       ConnectorSession session, ConnectorTableMetadata tableMetadata) {
+    if (metadataAdapter.skipsInternalNewTableLayout()) {
+      return Optional.empty();
+    }
     try {
       return internalMetadata
           .getNewTableLayout(session, tableMetadata)
@@ -428,10 +432,11 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   public void setColumnType(
       ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Type type) {
     String columnName = getColumnName(column);
+    GravitinoColumn gravitinoColumn =
+        createColumn(
+            tableHandle, ColumnMetadata.builder().setName(columnName).setType(type).build());
     catalogConnectorMetadata.setColumnType(
-        getTableName(tableHandle),
-        columnName,
-        metadataAdapter.getDataTypeTransformer().getGravitinoType(type));
+        getTableName(tableHandle), columnName, gravitinoColumn.getType());
   }
 
   @Override
@@ -838,6 +843,23 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       List<Object> tableExecuteState) {
     internalMetadata.finishTableExecute(
         session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  /**
+   * Converts a column being added to or changed in a table, and checks that the table can hold it.
+   *
+   * @param tableHandle the handle of the table
+   * @param column the Trino column
+   * @return the Gravitino column
+   */
+  protected GravitinoColumn createColumn(ConnectorTableHandle tableHandle, ColumnMetadata column) {
+    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    SchemaTableName tableName = getTableName(tableHandle);
+    metadataAdapter.checkColumnType(
+        gravitinoColumn,
+        () ->
+            catalogConnectorMetadata.getTable(tableName.getSchemaName(), tableName.getTableName()));
+    return gravitinoColumn;
   }
 
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
