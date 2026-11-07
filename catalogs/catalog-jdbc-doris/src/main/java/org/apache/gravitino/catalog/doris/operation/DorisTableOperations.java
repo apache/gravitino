@@ -167,12 +167,13 @@ public class DorisTableOperations extends JdbcTableOperations {
       LOG.debug("generateCreateTableSql: tableName={}, indexCount={}", tableName, indexes.length);
     }
 
-    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
-    validateAutoIncrementVersion(columns);
-    boolean useDoubleQuotedStringDefaults = useDoubleQuotedCreateTableStringDefaults(columns);
-
     validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
+
+    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
+    Optional<String> createTableDorisVersion = validateAutoIncrementVersion(columns);
+    boolean useDoubleQuotedStringDefaults =
+        useDoubleQuotedCreateTableStringDefaults(columns, createTableDorisVersion);
 
     StringBuilder sqlBuilder = new StringBuilder();
 
@@ -322,16 +323,17 @@ public class DorisTableOperations extends JdbcTableOperations {
    * introduced in Doris 2.1.0. On older versions, the SQL parser does not recognize the
    * AUTO_INCREMENT keyword and returns a syntax error.
    */
-  private void validateAutoIncrementVersion(JdbcColumn[] columns) {
+  private Optional<String> validateAutoIncrementVersion(JdbcColumn[] columns) {
     boolean hasAutoIncrement = Arrays.stream(columns).anyMatch(Column::autoIncrement);
     if (!hasAutoIncrement) {
-      return;
+      return Optional.empty();
     }
     String version = getDorisVersion("AUTO_INCREMENT compatibility check");
     if (!isVersionAtLeast(version, 2, 1, 0)) {
       throw new UnsupportedOperationException(
           "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
     }
+    return Optional.of(version);
   }
 
   /**
@@ -339,7 +341,8 @@ public class DorisTableOperations extends JdbcTableOperations {
    * version is looked up only when a string default contains a quote or backslash, since plain
    * strings render the same in both forms.
    */
-  private boolean useDoubleQuotedCreateTableStringDefaults(JdbcColumn[] columns) {
+  private boolean useDoubleQuotedCreateTableStringDefaults(
+      JdbcColumn[] columns, Optional<String> dorisVersion) {
     boolean needsVersion =
         Arrays.stream(columns)
             .map(Column::defaultValue)
@@ -352,7 +355,11 @@ public class DorisTableOperations extends JdbcTableOperations {
                         || value.indexOf('\\') >= 0);
     return needsVersion
         && isVersionAtLeast(
-            getDorisVersion("CREATE TABLE default literal compatibility check"), 2, 1, 0);
+            dorisVersion.orElseGet(
+                () -> getDorisVersion("CREATE TABLE default literal compatibility check")),
+            2,
+            1,
+            0);
   }
 
   private String getDorisVersion(String purpose) {
@@ -920,12 +927,12 @@ public class DorisTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnNullability updateColumnNullability =
             (TableChange.UpdateColumnNullability) change;
-        alterColumnDorisVersion =
-            resolveModifyColumnVersion(
-                updateColumnNullability, lazyLoadTable, alterColumnDorisVersion);
+        JdbcColumn column =
+            validateDorisUpdateColumnNullability(updateColumnNullability, lazyLoadTable);
+        alterColumnDorisVersion = resolveModifyColumnVersion(column, alterColumnDorisVersion);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                updateColumnNullability, lazyLoadTable, alterColumnDorisVersion));
+                updateColumnNullability, column, alterColumnDorisVersion));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
@@ -997,14 +1004,22 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (dorisVersion.isPresent() || change.fieldName().length != 1) {
       return dorisVersion;
     }
-    JdbcColumn column = getJdbcColumnFromTable(table, change.fieldName()[0]);
+    return resolveModifyColumnVersion(
+        getJdbcColumnFromTable(table, change.fieldName()[0]), dorisVersion);
+  }
+
+  private Optional<String> resolveModifyColumnVersion(
+      JdbcColumn column, Optional<String> dorisVersion) {
+    if (dorisVersion.isPresent()) {
+      return dorisVersion;
+    }
     return requiresVersionAwareModifyEscaping(column)
         ? Optional.of(getDorisVersion("MODIFY COLUMN default literal compatibility check"))
         : dorisVersion;
   }
 
-  private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table, Optional<String> dorisVersion) {
+  private JdbcColumn validateDorisUpdateColumnNullability(
+      TableChange.UpdateColumnNullability change, JdbcTable table) {
     JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
     // Doris schema change does not allow converting a nullable column to non-nullable.
@@ -1012,6 +1027,14 @@ public class DorisTableOperations extends JdbcTableOperations {
         change.nullable() || !column.nullable(),
         "Doris does not support changing nullable column %s to not null",
         col);
+    return column;
+  }
+
+  private String updateColumnNullabilityDefinition(
+      TableChange.UpdateColumnNullability change,
+      JdbcColumn column,
+      Optional<String> dorisVersion) {
+    String col = change.fieldName()[0];
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)
