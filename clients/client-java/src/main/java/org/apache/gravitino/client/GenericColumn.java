@@ -126,6 +126,11 @@ public class GenericColumn implements Column, SupportsTags {
   }
 
   @Override
+  public Expression initialDefaultValue() {
+    return internalColumn.initialDefaultValue();
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (this == obj) {
       return true;

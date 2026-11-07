@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -657,7 +658,8 @@ public class CapabilityHelpers {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        column.defaultValue());
+        column.defaultValue(),
+        column.initialDefaultValue());
   }
 
   static String applyCapabilitiesOnName(
@@ -705,6 +707,7 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue());
   }
 
   private static void applyColumnDefaultValue(
@@ -712,6 +715,19 @@ public class CapabilityHelpers {
     Preconditions.checkArgument(
         capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+  }
+
+  /**
+   * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
+   * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
+   * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
+   * catalog can write initial defaults, require the unset sentinel.
+   */
+  private static void applyColumnInitialDefaultValue(
+      String columnName, Expression initialDefaultValue) {
+    Preconditions.checkArgument(
+        INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        "Setting column initial default value is not supported. Illegal column: " + columnName);
   }
 
   private static void applyNameSpecification(
