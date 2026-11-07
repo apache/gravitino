@@ -76,12 +76,12 @@ class TestGlueCatalogOperationsForIceberg {
 
   private GlueClient mockClient;
   private GlueCatalogOperations ops;
-  private Catalog mockIcebergCatalog;
+  private GravitinoGlueCatalog mockIcebergCatalog;
 
   @BeforeEach
   void setup() {
     mockClient = mock(GlueClient.class);
-    mockIcebergCatalog = mock(Catalog.class);
+    mockIcebergCatalog = mock(GravitinoGlueCatalog.class);
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
     ops.catalogId = null;
@@ -198,7 +198,8 @@ class TestGlueCatalogOperationsForIceberg {
     ops.alterTable(
         ident, TableChange.addColumn(new String[] {"score"}, Types.DoubleType.get(), true));
 
-    verify(mockIcebergCatalog, Mockito.times(2)).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog).loadStaticTable(any(TableIdentifier.class), any());
     verify(mockUpdateSchema)
         .addColumn("score", org.apache.iceberg.types.Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
@@ -235,7 +236,7 @@ class TestGlueCatalogOperationsForIceberg {
     String metadataLocation = LOCATION + "/metadata/00001.metadata.json";
     stubGlueTable(
         Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE, METADATA_LOCATION, metadataLocation));
-    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any()))
         .thenThrow(
             new org.apache.iceberg.exceptions.NotFoundException(
                 "Location does not exist: %s", metadataLocation));
@@ -255,19 +256,19 @@ class TestGlueCatalogOperationsForIceberg {
             ICEBERG_TABLE_TYPE_VALUE,
             METADATA_LOCATION,
             LOCATION + "/metadata/00001.metadata.json"));
-    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any()))
         .thenThrow(new org.apache.iceberg.exceptions.NotFoundException("Location does not exist"));
 
     assertTrue(ops.dropTable(NameIdentifier.of("cat", "ns", DB, TABLE)));
 
     verify(mockClient).deleteTable(any(DeleteTableRequest.class));
-    verify(mockIcebergCatalog, never()).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog, never()).loadStaticTable(any(TableIdentifier.class), any());
   }
 
   @Test
   void testLoadTableFailsWhenS3DeniesIcebergMetadata() {
     stubGlueTable(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE));
-    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any()))
         .thenThrow(
             S3Exception.builder()
                 .statusCode(403)
@@ -305,6 +306,8 @@ class TestGlueCatalogOperationsForIceberg {
     when(mockIcebergCatalog.registerTable(TableIdentifier.of(DB, TABLE), metadataLocation))
         .thenReturn(registered);
     when(mockIcebergCatalog.loadTable(any(TableIdentifier.class))).thenReturn(registered);
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any()))
+        .thenReturn(registered);
     stubGlueTable(
         Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE, METADATA_LOCATION, metadataLocation));
 
@@ -393,7 +396,8 @@ class TestGlueCatalogOperationsForIceberg {
     assertEquals("v1", captor.getValue().tableInput().parameters().get("k1"));
     assertEquals("3", captor.getValue().versionId());
     verify(mockIcebergCatalog, never()).renameTable(any(), any());
-    verify(mockIcebergCatalog, Mockito.times(2)).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog).loadTable(any(TableIdentifier.class));
+    verify(mockIcebergCatalog).loadStaticTable(any(TableIdentifier.class), any());
   }
 
   @Test
@@ -495,7 +499,8 @@ class TestGlueCatalogOperationsForIceberg {
     Table icebergTable = mockIcebergTable();
     when(icebergTable.properties())
         .thenReturn(Map.of(TABLE_TYPE_PARAM, "HIVE", GlueConstants.TABLE_FORMAT, "HIVE", "k", "v"));
-    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class))).thenReturn(icebergTable);
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any()))
+        .thenReturn(icebergTable);
 
     GlueTable table = ops.loadTable(NameIdentifier.of("cat", "ns", DB, TABLE));
 
@@ -546,6 +551,7 @@ class TestGlueCatalogOperationsForIceberg {
   private Table stubIcebergTable() {
     Table table = mockIcebergTable();
     when(mockIcebergCatalog.loadTable(any(TableIdentifier.class))).thenReturn(table);
+    when(mockIcebergCatalog.loadStaticTable(any(TableIdentifier.class), any())).thenReturn(table);
     return table;
   }
 
