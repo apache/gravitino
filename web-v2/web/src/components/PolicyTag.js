@@ -69,12 +69,14 @@ export default function PolicyTag({ ...props }) {
     if (inputVisible) {
       const options =
         store.policiesData?.filter(
-          policyOption => !policiesForEntity?.map(policy => policy.name)?.includes(policyOption.name)
+          policyOption =>
+            !policiesForEntity?.map(policy => policy.name)?.includes(policyOption.name) &&
+            policyOption.policyType !== 'system_access_control'
         ) || []
       setOptionList(options)
       inputRef.current?.focus()
     }
-  }, [inputVisible, policiesForEntity])
+  }, [inputVisible, policiesForEntity, store.policiesData])
 
   const showInput = () => {
     setInputVisible(true)

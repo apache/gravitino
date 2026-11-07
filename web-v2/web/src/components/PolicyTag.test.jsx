@@ -24,7 +24,7 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
 import metalakes from '@/lib/store/metalakes'
-import policies from '@/lib/store/policies'
+import policies, { fetchPolicies } from '@/lib/store/policies'
 import PolicyTag from './PolicyTag'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
@@ -90,4 +90,45 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   await act(async () => policyLink.click())
   expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/metadataObjectsForPolicy?policy=inherited&metalake=demo')
   if (readOnly) expect(defHttp.post).not.toHaveBeenCalled()
+})
+
+it.each(['table', 'schema', 'catalog'])('offers only directly assignable policies on %s', async metadataObjectType => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  )
+
+  const options = [
+    { name: 'access', enabled: true, policyType: 'system_access_control' },
+    { name: 'retention', enabled: true, policyType: 'custom' },
+    { name: 'compaction', enabled: true, policyType: 'system_iceberg_compaction' }
+  ]
+  defHttp.get.mockResolvedValue({ policies: [] })
+  defHttp.post.mockResolvedValue({ code: 0 })
+  const store = configureStore({ reducer: { metalakes, policies } })
+  store.dispatch(fetchPolicies.fulfilled({ policies: options }, 'load', { metalake: 'demo' }))
+  await act(async () =>
+    root.render(
+      <Provider store={store}>
+        <PolicyTag metadataObjectType={metadataObjectType} metadataObjectFullName='sales.mart.orders' />
+      </Provider>
+    )
+  )
+  await act(async () =>
+    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent.includes('Associate Policy')).click()
+  )
+  await act(async () =>
+    container.querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  )
+  const choices = [...document.querySelectorAll('.ant-select-item-option')]
+  expect(choices.map(option => option.textContent)).toEqual(['retention', 'compaction'])
+  await act(async () => choices.find(option => option.textContent === 'retention').click())
+  expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
+    url: `/api/metalakes/demo/objects/${metadataObjectType}/sales.mart.orders/policies`,
+    data: { policiesToAdd: ['retention'] }
+  })
 })
