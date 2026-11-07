@@ -23,6 +23,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -1129,7 +1130,29 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+<<<<<<< HEAD
       // A source catalog connection failure is a downstream failure rather than a server bug.
+=======
+
+      // A request the backend refuses because of the request itself (for example an invalid
+      // definition or a drop blocked by dependent objects) is a client error, not a server error.
+      if (e instanceof BadRequestException) {
+        LOG.warn(errorMsg, e);
+        return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
+      }
+
+      // A configured dependency that is temporarily unavailable is not an internal Gravitino error:
+      // surface it as 503 Service Unavailable so callers can tell an outage from a server bug.
+      if (e instanceof ServiceUnavailableException) {
+        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
+        LOG.warn(errorMsg, e);
+        return Utils.serviceUnavailable(errorMsg, e);
+      }
+
+      // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
+      // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
+      // outage from a server bug.
+>>>>>>> a573e3c39 ([#14704] fix(jdbc): classify source refusals and keep source messages literal (#14707))
       if (e instanceof ConnectionFailedException) {
         LOG.warn(errorMsg, e);
         return Utils.connectionFailed(errorMsg, e);
