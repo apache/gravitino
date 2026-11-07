@@ -112,7 +112,13 @@ dependencies {
   testImplementation(project(":spark-connector:spark-3.5"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common", "testArtifacts"))
-  testImplementation(libs.lance)
+  testImplementation(libs.lance) {
+    // lance-core declares newer lance-namespace-* transitives than the pinned
+    // lance-namespace the REST server serves; exclude them so the test
+    // classpath stays on the same namespace API as the server.
+    exclude(group = "org.lance", module = "lance-namespace-core")
+    exclude(group = "org.lance", module = "lance-namespace-apache-client")
+  }
   testImplementation(libs.lance.namespace.apache.client)
 
   lanceSparkBundleVersions.forEach { version ->

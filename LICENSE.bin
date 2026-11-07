@@ -414,6 +414,7 @@
    db-scheduler
    cron-utils (shaded into db-scheduler)
    JSpecify
+   OpenTelemetry API
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
