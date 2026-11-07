@@ -749,24 +749,27 @@ class TestDTOConverters(unittest.TestCase):
 
     def test_to_dtos_indexes(self):
         field_names = [[f"field_{i}"] for i in range(2)]
+        cases = list(product(Index.IndexType, ({}, {"key": "value"})))
 
         indexes: list[Index] = [
-            Indexes.of(index_type, index_type.value, field_names, {})
-            for index_type in Index.IndexType
+            Indexes.of(index_type, index_type.value, field_names, properties)
+            for index_type, properties in cases
         ]
         expected_dtos: list[IndexDTO] = [
             IndexDTO(
                 index_type=index_type,
                 name=index_type.value,
                 field_names=field_names,
+                properties=properties,
             )
-            for index_type in Index.IndexType
+            for index_type, properties in cases
         ]
         converted_dtos = DTOConverters.to_dtos(indexes)
-        for converted, expected in zip(converted_dtos, expected_dtos):
-            self.assertEqual(converted.type(), expected.type())
-            self.assertEqual(converted.name(), expected.name())
-            self.assertListEqual(converted.field_names(), expected.field_names())
+        self.assertListEqual(converted_dtos, expected_dtos)
+        self.assertListEqual(
+            DTOConverters.to_dtos(DTOConverters.from_dtos(converted_dtos)),
+            expected_dtos,
+        )
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
