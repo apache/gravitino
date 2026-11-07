@@ -42,7 +42,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
+import org.mockserver.model.Parameter;
+import org.mockserver.model.ParameterBody;
 
 @SuppressWarnings("JavaUtilDate")
 public class TestOAuth2TokenProvider {
@@ -152,6 +155,64 @@ public class TestOAuth2TokenProvider {
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
         new String(provider.getTokenData(), StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testAuthenticationPasswordGrant() throws Exception {
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    String accessToken = "access-token";
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
+    HttpResponse mockResponse =
+        HttpResponse.response()
+            .withStatusCode(HttpStatus.SC_OK)
+            .withBody(objectMapper.writeValueAsString(response));
+
+    // The password itself may contain ':' because the credential is split into at most 4 parts.
+    mockServer
+        .when(
+            HttpRequest.request()
+                .withPath("/oauth/token")
+                .withBody(
+                    ParameterBody.params(
+                        Parameter.param("grant_type", "password"),
+                        Parameter.param("client_id", "client-id"),
+                        Parameter.param("client_secret", "client-secret"),
+                        Parameter.param("username", "usera"),
+                        Parameter.param("password", "pass:word"),
+                        Parameter.param("scope", "test"))),
+            // build() requests the token once, and getAccessToken() requests it again because
+            // "access-token" is not a JWT and therefore has no expiry.
+            Times.exactly(2))
+        .respond(mockResponse);
+
+    OAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("client-id:client-secret:usera:pass:word")
+            .withPath("oauth/token")
+            .withScope("test")
+            .build();
+
+    Assertions.assertEquals(accessToken, provider.getAccessToken());
+  }
+
+  @Test
+  public void testInvalidCredential() {
+    DefaultOAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withPath("oauth/token")
+            .withScope("test");
+
+    // 3 parts are ambiguous and must be rejected.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("client-id:client-secret:username").build());
+    // The username and password are mandatory for the password grant.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withCredential("client-id:client-secret::password").build());
   }
 
   @Test
