@@ -108,8 +108,10 @@ class Literals:
 
     @staticmethod
     def decimal_literal(value: decimal.Decimal) -> LiteralImpl[decimal.Decimal]:
-        precision: int = len(value.as_tuple().digits)
-        scale: int = -value.as_tuple().exponent
+        decimal_tuple = value.as_tuple()
+        # Positive exponents add integer digits, not a negative fractional scale.
+        precision: int = len(decimal_tuple.digits) + max(decimal_tuple.exponent, 0)
+        scale: int = max(-decimal_tuple.exponent, 0)
         return LiteralImpl(value, Types.DecimalType.of(max(precision, scale), scale))
 
     @staticmethod
