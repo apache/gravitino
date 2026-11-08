@@ -124,6 +124,48 @@ public class TestIcebergScanPlanning {
   }
 
   @Test
+  public void testTimestamptzFilterWithoutZoneIsClientError() {
+    // #14421: binding a zone-less timestamp literal to timestamptz throws DateTimeParseException
+    // only while files are planned (empty tables return 200).
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tstz");
+    Table tstz =
+        wrapper
+            .getCatalog()
+            .createTable(
+                ident,
+                new Schema(
+                    Types.NestedField.required(1, "id", Types.LongType.get()),
+                    Types.NestedField.optional(2, "c_tstz", Types.TimestampType.withZone())),
+                PartitionSpec.unpartitioned());
+    tstz.newFastAppend()
+        .appendFile(
+            DataFiles.builder(PartitionSpec.unpartitioned())
+                .withPath("/data/tstz.parquet")
+                .withFileSizeInBytes(10)
+                .withRecordCount(1)
+                .build())
+        .commit();
+
+    IllegalArgumentException withoutZone =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                planFiles(
+                    ident,
+                    PlanTableScanRequest.builder()
+                        .withFilter(Expressions.equal("c_tstz", "2024-06-01T12:00:00"))));
+    Assertions.assertTrue(
+        withoutZone.getMessage().contains("Invalid scan parameters"), withoutZone.getMessage());
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            planFiles(
+                ident,
+                PlanTableScanRequest.builder()
+                    .withFilter(Expressions.equal("c_tstz", "2024-06-01T12:00:00+00:00"))));
+  }
+
+  @Test
   public void testConstantFiltersInTheSpecFormAreAccepted() throws Exception {
     PlanTableScanRequest request =
         IcebergObjectMapper.getInstance()
