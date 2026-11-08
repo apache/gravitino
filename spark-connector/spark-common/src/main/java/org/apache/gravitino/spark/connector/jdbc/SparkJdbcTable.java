@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.rel.Column;
@@ -73,7 +74,8 @@ public class SparkJdbcTable extends JDBCTable {
             gravitinoTable.columns(),
             jdbcTable.schema(),
             sparkSchema,
-            JdbcDialects.get(jdbcTable.jdbcOptions().url()));
+            JdbcDialects.get(jdbcTable.jdbcOptions().url()),
+            jdbcTable.jdbcOptions().url());
   }
 
   /**
@@ -84,7 +86,11 @@ public class SparkJdbcTable extends JDBCTable {
    */
   @Override
   public JDBCScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
-    return new SparkJdbcScanBuilder(super.newScanBuilder(options), pushDownPolicy);
+    // Schema and aggregate typing are fixed by the catalog options, not by individual reads.
+    Map<String, String> scanOptions = new HashMap<>(options.asCaseSensitiveMap());
+    scanOptions.keySet().removeIf("preferTimestampNTZ"::equalsIgnoreCase);
+    return new SparkJdbcScanBuilder(
+        super.newScanBuilder(new CaseInsensitiveStringMap(scanOptions)), pushDownPolicy);
   }
 
   /**

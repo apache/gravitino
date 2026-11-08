@@ -32,11 +32,13 @@ import org.apache.spark.sql.connector.expressions.Expression;
 import org.apache.spark.sql.connector.expressions.Extract;
 import org.apache.spark.sql.connector.expressions.Literal;
 import org.apache.spark.sql.connector.expressions.NamedReference;
+import org.apache.spark.sql.connector.expressions.filter.Predicate;
 import org.apache.spark.sql.jdbc.JdbcDialect;
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.MapType;
 import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructField;
@@ -58,6 +60,9 @@ import org.apache.spark.sql.types.VarcharType;
  *   <li>{@code TIMESTAMP_NTZ} literals the dialect cannot write in SQL.
  * </ul>
  *
+ * <p>Null checks on a column itself are exact. Simple positive PostgreSQL/MySQL string predicates
+ * can prefilter rows while Spark rechecks them; see {@link #canPrefilter(Predicate)}.
+ *
  * <p>Aggregates also stay in Spark for timestamp columns whose reader type differs from the type
  * Spark sees, because the reader types the pushed aggregate result.
  */
@@ -67,14 +72,36 @@ class SparkJdbcPushDownPolicy {
       ImmutableSet.of("YEAR", "QUARTER", "MONTH", "DAY", "HOUR", "MINUTE");
 
   private final Set<String> sensitiveColumns;
+  private final Set<String> columns;
+  private final Set<String> stringColumns;
+  private final boolean stringPrefilterSupported;
   private final Set<String> readerTypeMismatchColumns;
   private final Set<String> zonedTimestampColumns;
   private final boolean ntzLiteralSupported;
 
   SparkJdbcPushDownPolicy(
-      Column[] columns, StructType readerSchema, StructType sparkSchema, JdbcDialect dialect) {
+      Column[] columns,
+      StructType readerSchema,
+      StructType sparkSchema,
+      JdbcDialect dialect,
+      String jdbcUrl) {
     this.sensitiveColumns = new HashSet<>();
+    this.columns = new HashSet<>();
+    this.stringColumns = new HashSet<>();
+    String url = jdbcUrl.toLowerCase(Locale.ROOT);
+    // These sources can return extra collation matches, which Spark removes with a residual.
+    // Other JDBC sources retain their existing conservative policy until validated separately.
+    this.stringPrefilterSupported =
+        url.startsWith("jdbc:postgresql:") || url.startsWith("jdbc:mysql:");
     for (Column column : columns) {
+      this.columns.add(normalize(column.name()));
+      Type type = column.dataType();
+      if ((type instanceof Types.StringType
+              || type instanceof Types.VarCharType
+              || type instanceof Types.FixedCharType)
+          && DataTypes.StringType.equals(fieldType(sparkSchema, column.name()))) {
+        stringColumns.add(normalize(column.name()));
+      }
       if (isSensitive(column.dataType())) {
         sensitiveColumns.add(normalize(column.name()));
       }
@@ -107,6 +134,16 @@ class SparkJdbcPushDownPolicy {
    * @return true if pushing it keeps Spark results
    */
   boolean canPush(Expression expression) {
+    if (expression instanceof Predicate) {
+      Predicate predicate = (Predicate) expression;
+      Expression[] children = predicate.children();
+      if (("IS_NULL".equals(predicate.name()) || "IS_NOT_NULL".equals(predicate.name()))
+          && children.length == 1
+          && isColumn(children[0], columns)) {
+        // Nullness of the column itself is unchanged by string collation or literal compilation.
+        return true;
+      }
+    }
     if (expression instanceof NamedReference) {
       return !sensitiveColumns.contains(columnName((NamedReference) expression));
     }
@@ -161,6 +198,47 @@ class SparkJdbcPushDownPolicy {
       }
     }
     return true;
+  }
+
+  /**
+   * Returns whether a positive string predicate can reduce source rows while Spark rechecks it.
+   * Negation and compound expressions are deliberately excluded: a source must not remove a row
+   * that Spark would accept. This is a prefilter, never proof that the source result is exact.
+   */
+  boolean canPrefilter(Predicate predicate) {
+    if (!stringPrefilterSupported) {
+      return false;
+    }
+    Expression[] children = predicate.children();
+    boolean equality = "=".equals(predicate.name()) && children.length == 2;
+    boolean in = "IN".equals(predicate.name()) && children.length >= 2;
+    if ((!equality && !in) || !isColumn(children[0], stringColumns)) {
+      return false;
+    }
+    // A non-binary Spark collation could accept rows a stricter source would remove.
+    for (int i = 1; i < children.length; i++) {
+      if (!(children[i] instanceof Literal)) {
+        return false;
+      }
+      Literal<?> literal = (Literal<?>) children[i];
+      if (!DataTypes.StringType.equals(literal.dataType()) || literal.value() == null) {
+        return false;
+      }
+      String value = literal.value().toString();
+      // MySQL's dialect does not escape backslashes. PostgreSQL rejects NUL in text literals.
+      if (value.indexOf('\\') >= 0 || value.indexOf('\0') >= 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isColumn(Expression expression, Set<String> names) {
+    if (!(expression instanceof NamedReference)) {
+      return false;
+    }
+    NamedReference reference = (NamedReference) expression;
+    return reference.fieldNames().length == 1 && names.contains(columnName(reference));
   }
 
   private boolean referencesZonedTimestamp(Expression expression) {

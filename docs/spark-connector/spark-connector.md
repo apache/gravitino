@@ -174,6 +174,14 @@ could return different results:
 - Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 
+NULL checks (`IS NULL` and `IS NOT NULL`) on the column itself are pushed down normally.
+For PostgreSQL and MySQL, a simple positive string equality or `IN` filter can also be sent
+to the source as a prefilter, while Spark rechecks it. This reduces rows transferred to Spark
+without trusting the source collation to produce an exact match. These prefilters require
+Spark's default binary string comparison. Negated comparisons, casts, compound expressions,
+and literals containing a backslash or NUL remain in Spark. Other JDBC sources retain the
+conservative string policy.
+
 Other expressions are still pushed down, for example `id = 1`, `count(*)`, `LIMIT 10`, or
 `ORDER BY id LIMIT 3`. They run with the source semantics. For example, a source `avg()` can
 return fewer decimal places than Spark. When a filter stays in Spark, Spark also keeps the
@@ -186,7 +194,8 @@ Its value can change with the Spark session time zone. To read the stored wall-c
 set `preferTimestampNTZ=true` on the Spark catalog, for example
 `spark.sql.catalog.<name>.preferTimestampNTZ=true`. You can also set the Gravitino catalog
 property `spark.bypass.preferTimestampNTZ=true`. The Spark catalog option wins when both are
-set. The option applies to PostgreSQL catalogs only. Do not set it on other JDBC catalogs:
+set. This is a catalog-level option: a per-read `spark.read.option("preferTimestampNTZ", ...)`
+is ignored so that the reader and the fixed table schema cannot diverge. The option applies to PostgreSQL catalogs only. Do not set it on other JDBC catalogs:
 Spark would read their timestamps as `TIMESTAMP_NTZ`, but the table schema still shows
 `TIMESTAMP`.
 

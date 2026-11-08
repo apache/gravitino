@@ -51,6 +51,7 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.unsafe.types.UTF8String;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import scala.collection.immutable.HashMap;
@@ -155,7 +156,7 @@ public class TestSparkJdbcPushDownPolicy {
     List<Predicate> postScan =
         Arrays.asList(builder.pushPredicates(new Predicate[] {safe, unsafe}));
     Assertions.assertEquals(List.of(unsafe), postScan);
-    Assertions.assertEquals(List.of(safe), Arrays.asList(builder.pushedPredicates()));
+    Assertions.assertEquals(List.of(safe, unsafe), Arrays.asList(builder.pushedPredicates()));
     Assertions.assertFalse(builder.pushTopN(new SortOrder[] {sort(col("s"))}, 1));
     Assertions.assertTrue(builder.pushTopN(new SortOrder[] {sort(col("id"))}, 1));
     Assertions.assertTrue(builder.pushLimit(10));
@@ -168,7 +169,81 @@ public class TestSparkJdbcPushDownPolicy {
     Assertions.assertFalse(builder.pushAggregation(groupByString));
   }
 
+  @Test
+  @SuppressWarnings("deprecation")
+  void testNullChecksAndPositiveStringPrefilters() {
+    for (String url : new String[] {URL, "jdbc:mysql://localhost/test"}) {
+      SparkJdbcPushDownPolicy policy = policy(url);
+      Assertions.assertTrue(policy.canPush(predicate("IS_NULL", col("s"))));
+      Assertions.assertTrue(policy.canPush(predicate("IS_NOT_NULL", col("b"))));
+      Assertions.assertFalse(
+          policy.canPush(predicate("IS_NULL", new Cast(col("id"), DataTypes.StringType))));
+      for (String value : new String[] {"a", "A", "a ", "", "é", "O'Reilly"}) {
+        Assertions.assertTrue(policy.canPrefilter(eq(col("s"), lit(value, DataTypes.StringType))));
+      }
+      Assertions.assertTrue(
+          policy.canPrefilter(
+              predicate(
+                  "IN", col("v"), lit("a", DataTypes.StringType), lit("B", DataTypes.StringType))));
+      for (String operation : new String[] {"<>", "<=>", "NOT IN", ">", "<"}) {
+        Assertions.assertFalse(
+            policy.canPrefilter(predicate(operation, col("s"), lit("a", DataTypes.StringType))));
+      }
+      Assertions.assertFalse(
+          policy.canPrefilter(predicate("NOT", eq(col("s"), lit("a", DataTypes.StringType)))));
+      Assertions.assertFalse(
+          policy.canPrefilter(
+              predicate(
+                  "OR",
+                  eq(col("s"), lit("a", DataTypes.StringType)),
+                  eq(col("s"), lit("b", DataTypes.StringType)))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("tags"), lit("a", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("u"), lit("a", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("j"), lit("a", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("id"), lit("1", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("s"), lit(1, DataTypes.IntegerType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("s"), lit(null, DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("s"), lit("abc\\", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(eq(col("s"), lit("a\0b", DataTypes.StringType))));
+      Assertions.assertFalse(policy.canPrefilter(predicate("IN", col("s"))));
+      Assertions.assertFalse(
+          policy.canPrefilter(
+              eq(new Cast(col("id"), DataTypes.StringType), lit("1", DataTypes.StringType))));
+    }
+    Assertions.assertFalse(
+        policy("jdbc:h2:mem:test").canPrefilter(eq(col("s"), lit("a", DataTypes.StringType))));
+  }
+
+  @Test
+  void testDisabledPredicatePushdownKeepsEachResidualOnce() {
+    JDBCOptions options =
+        new JDBCOptions(
+            new HashMap<String, String>()
+                .updated("url", URL)
+                .updated("dbtable", "t")
+                .updated("driver", "org.postgresql.Driver")
+                .updated("pushDownPredicate", "false"));
+    SparkJdbcScanBuilder builder =
+        new SparkJdbcScanBuilder(
+            new JDBCScanBuilder(
+                mock(SparkSession.class, RETURNS_DEEP_STUBS), sparkSchema(), options),
+            policy());
+    Predicate prefilter = eq(col("s"), lit("a", DataTypes.StringType));
+    Predicate numeric = eq(col("id"), lit(1, DataTypes.IntegerType));
+    Predicate[] residual = builder.pushPredicates(new Predicate[] {prefilter, numeric});
+    Assertions.assertEquals(List.of(prefilter, numeric), Arrays.asList(residual));
+    Assertions.assertEquals(0, builder.pushedPredicates().length);
+  }
+
+  private static Predicate predicate(String name, Expression... children) {
+    return new Predicate(name, children);
+  }
+
   private static SparkJdbcPushDownPolicy policy() {
+    return policy(URL);
+  }
+
+  private static SparkJdbcPushDownPolicy policy(String url) {
     Column[] columns = {
       column("id", Types.IntegerType.get()),
       column("s", Types.StringType.get()),
@@ -193,7 +268,7 @@ public class TestSparkJdbcPushDownPolicy {
         reader = reader.add(field);
       }
     }
-    return new SparkJdbcPushDownPolicy(columns, reader, sparkSchema(), DIALECT);
+    return new SparkJdbcPushDownPolicy(columns, reader, sparkSchema(), JdbcDialects.get(url), url);
   }
 
   private static StructType sparkSchema() {
@@ -219,8 +294,12 @@ public class TestSparkJdbcPushDownPolicy {
     return Expressions.column(name);
   }
 
-  private static <T> LiteralValue<T> lit(T value, DataType type) {
-    return new LiteralValue<>(value, type);
+  private static <T> LiteralValue<?> lit(T value, DataType type) {
+    Object internal =
+        value instanceof String && DataTypes.StringType.equals(type)
+            ? UTF8String.fromString((String) value)
+            : value;
+    return new LiteralValue<>(internal, type);
   }
 
   private static Predicate eq(Expression left, Expression right) {

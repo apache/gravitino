@@ -27,6 +27,8 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.rel.Column;
@@ -37,14 +39,19 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.functions;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
@@ -64,6 +71,15 @@ public class TestSparkJdbcReadCorrectness {
   /** Minimal catalog that installs the production JDBC table wrapper. */
   @SuppressWarnings("overrides")
   public static class SafeCatalog extends JDBCTableCatalog {
+    private boolean useTimestampNtz;
+
+    /** {@inheritDoc} */
+    @Override
+    public void initialize(String name, CaseInsensitiveStringMap options) {
+      super.initialize(name, options);
+      useTimestampNtz = Boolean.parseBoolean(options.get("preferTimestampNTZ"));
+    }
+
     /** {@inheritDoc} */
     @Override
     public JDBCTable loadTable(Identifier identifier) {
@@ -77,7 +93,7 @@ public class TestSparkJdbcReadCorrectness {
           this,
           JdbcPropertiesConverter.getInstance(),
           new SparkTransformConverter(false),
-          new SparkJdbcTypeConverter(true));
+          new SparkJdbcTypeConverter(useTimestampNtz));
     }
 
     private static Column[] columns(String table) {
@@ -141,6 +157,12 @@ public class TestSparkJdbcReadCorrectness {
             .master("local[1]")
             .appName("jdbc-read-regression")
             .config("spark.ui.enabled", "false")
+            .config("spark.sql.catalog.legacy", SafeCatalog.class.getName())
+            .config("spark.sql.catalog.legacy.url", url)
+            .config("spark.sql.catalog.legacy.user", "postgres")
+            .config("spark.sql.catalog.legacy.password", "test")
+            .config("spark.sql.catalog.legacy.driver", "org.postgresql.Driver")
+            .config("spark.sql.catalog.legacy.preferTimestampNTZ", "false")
             .config("spark.sql.catalog.safe", SafeCatalog.class.getName())
             .config("spark.sql.catalog.safe.url", url)
             .config("spark.sql.catalog.safe.user", "postgres")
@@ -208,7 +230,9 @@ public class TestSparkJdbcReadCorrectness {
           1, spark.sql("SELECT tss FROM safe.public.samples WHERE id=1").head().getList(0).size());
     }
     String stringFilter = pushedFilters("SELECT id FROM safe.public.samples WHERE s = 'a'");
-    Assertions.assertFalse(stringFilter.contains("s ="), stringFilter);
+    Assertions.assertTrue(stringFilter.contains("s ="), stringFilter);
+    String stringFilterPlan = plan("SELECT id FROM safe.public.samples WHERE s = 'a'");
+    Assertions.assertTrue(stringFilterPlan.contains("Filter "), stringFilterPlan);
     // A filter kept in Spark also keeps the limit and the aggregate of the query in Spark.
     String limitAfterStringFilter =
         plan("SELECT id FROM safe.public.samples WHERE s = 'a' LIMIT 1");
@@ -287,6 +311,45 @@ public class TestSparkJdbcReadCorrectness {
           ids(
               "SELECT datediff(d, DATE '2024-01-01') FROM (SELECT cast(tz AS date) AS d, count(*)"
                   + " FROM safe.public.zoned_only GROUP BY 1) ORDER BY 1"));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"safe", "legacy"})
+  void testPerReadTimestampOptionCannotOverrideCatalog(String name) {
+    TimeZone original = TimeZone.getDefault();
+    String originalSessionZone = spark.conf().get("spark.sql.session.timeZone");
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+      spark.conf().set("spark.sql.session.timeZone", "UTC");
+      boolean ntz = name.equals("safe");
+      for (String key :
+          new String[] {"preferTimestampNTZ", "prefertimestampntz", "PrEfErTiMeStAmPnTz"}) {
+        CaseInsensitiveStringMap options =
+            new CaseInsensitiveStringMap(
+                Map.of(key, Boolean.toString(!ntz), "pushDownLimit", "false"));
+        Map<String, String> originalOptions = Map.copyOf(options.asCaseSensitiveMap());
+        JDBCTableCatalog catalog =
+            (JDBCTableCatalog) spark.sessionState().catalogManager().catalog(name);
+        SparkJdbcTable table =
+            (SparkJdbcTable)
+                catalog.loadTable(Identifier.of(new String[] {"public"}, "timestamp_only"));
+        JDBCScanBuilder builder = table.newScanBuilder(options);
+        Assertions.assertEquals(ntz, builder.jdbcOptions().preferTimestampNTZ());
+        Assertions.assertFalse(builder.jdbcOptions().pushDownLimit());
+        Assertions.assertEquals(originalOptions, options.asCaseSensitiveMap());
+        Dataset<Row> read =
+            spark.read().option(key, Boolean.toString(!ntz)).table(name + ".public.timestamp_only");
+        String expected =
+            read.select("ts").collectAsList().stream()
+                .map(row -> row.get(0).toString())
+                .max(String::compareTo)
+                .get();
+        Assertions.assertEquals(expected, read.agg(functions.max("ts")).head().get(0).toString());
+      }
+    } finally {
+      spark.conf().set("spark.sql.session.timeZone", originalSessionZone);
+      TimeZone.setDefault(original);
     }
   }
 

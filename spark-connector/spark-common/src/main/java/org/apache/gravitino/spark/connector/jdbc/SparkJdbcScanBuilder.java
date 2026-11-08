@@ -21,7 +21,9 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.spark.sql.connector.expressions.Expression;
 import org.apache.spark.sql.connector.expressions.SortOrder;
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation;
@@ -43,17 +45,24 @@ public class SparkJdbcScanBuilder extends JDBCScanBuilder {
   }
 
   /**
-   * Pushes only predicates whose results cannot change at the source.
+   * Pushes exact predicates and candidate-row prefilters that Spark still evaluates.
    *
    * @param predicates the predicates Spark offers to the source
    * @return the predicates Spark must still evaluate after the scan
    */
   @Override
   public Predicate[] pushPredicates(Predicate[] predicates) {
-    List<Predicate> kept = new ArrayList<>();
+    Set<Predicate> kept = new LinkedHashSet<>();
     List<Predicate> candidates = new ArrayList<>();
     for (Predicate predicate : predicates) {
-      (policy.canPush(predicate) ? candidates : kept).add(predicate);
+      if (policy.canPush(predicate)) {
+        candidates.add(predicate);
+      } else {
+        kept.add(predicate);
+        if (policy.canPrefilter(predicate)) {
+          candidates.add(predicate);
+        }
+      }
     }
     kept.addAll(Arrays.asList(super.pushPredicates(candidates.toArray(new Predicate[0]))));
     return kept.toArray(new Predicate[0]);
