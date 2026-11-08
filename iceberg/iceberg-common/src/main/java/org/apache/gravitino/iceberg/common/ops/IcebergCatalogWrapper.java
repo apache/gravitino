@@ -61,6 +61,7 @@ import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -343,7 +344,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
-   * @throws BadRequestException if no metadata file exists at the location
+   * @throws BadRequestException if the location cannot be read as a metadata file
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     validateTableLocation(metadataLocation);
@@ -353,6 +354,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // The location comes from the request, so a missing file is a client error. 404 is reserved
       // by the REST spec for a namespace or table that does not exist.
       throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
+    } catch (IllegalArgumentException e) {
+      // TableMetadataParser throws this when the path is a directory or otherwise not a metadata
+      // file. Keep it as a BadRequestException so authz can propagate it as HTTP 400 instead of
+      // wrapping the plain IllegalArgumentException as an authorization system error.
+      throw new BadRequestException(
+          "Metadata location %s is not a valid metadata file: %s",
+          metadataLocation, e.getMessage());
+    } catch (RuntimeIOException e) {
+      // Unreadable scheme (for example s3:// on a local catalog) is also a client-supplied path
+      // problem, not a server failure.
+      throw new BadRequestException(
+          "Cannot read metadata location %s: %s", metadataLocation, e.getMessage());
     }
   }
 

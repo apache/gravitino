@@ -75,7 +75,11 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(TokenExpiredException.class, 419)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          // javax.ws.rs.NotFoundException (JAX-RS, imported above) for an unknown REST path.
           .put(NotFoundException.class, 404)
+          // Iceberg NotFoundException shares a simple name with javax.ws.rs.NotFoundException;
+          // map it explicitly so uncaught Iceberg not-found failures are 404, not 500.
+          .put(org.apache.iceberg.exceptions.NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)

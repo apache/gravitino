@@ -253,17 +253,46 @@ class TestRegisterTableAuthzHandler {
     verify(invocation, never()).proceed();
   }
 
+  @Test
+  void testMissingRequestBodyIsBadRequest() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    MethodInvocation invocation = registerInvocationWithRequest(null);
+    Object result = interceptor.invoke(invocation);
+    assertBadRequest(result);
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
+  void testUnreadableMetadataLocationIsBadRequestNotAuthzInternalError() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    when(catalogWrapper.loadTableMetadataFromLocation(any()))
+        .thenThrow(
+            new org.apache.iceberg.exceptions.BadRequestException(
+                "Metadata location %s is not a valid metadata file: directory", META_LOC));
+
+    MethodInvocation invocation = registerInvocation(false, TABLE, META_LOC);
+    Object result = interceptor.invoke(invocation);
+    assertBadRequest(result);
+    verify(invocation, never()).proceed();
+  }
+
   private MethodInvocation registerInvocation(
       boolean overwrite, String tableName, String metadataLocation) throws Throwable {
-    Method method =
-        IcebergNamespaceOperations.class.getMethod(
-            "registerTable", String.class, String.class, RegisterTableRequest.class, String.class);
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder()
             .name(tableName)
             .metadataLocation(metadataLocation)
             .overwrite(overwrite)
             .build();
+    return registerInvocationWithRequest(request);
+  }
+
+  private MethodInvocation registerInvocationWithRequest(RegisterTableRequest request)
+      throws Throwable {
+    Method method =
+        IcebergNamespaceOperations.class.getMethod(
+            "registerTable", String.class, String.class, RegisterTableRequest.class, String.class);
     MethodInvocation invocation = mock(MethodInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
     when(invocation.getArguments()).thenReturn(new Object[] {CATALOG + "/", SCHEMA, request, null});
@@ -334,6 +363,12 @@ class TestRegisterTableAuthzHandler {
   private static void assertForbidden(Object result) {
     Response response = assertInstanceOf(Response.class, result);
     assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+    assertInstanceOf(ErrorResponse.class, response.getEntity());
+  }
+
+  private static void assertBadRequest(Object result) {
+    Response response = assertInstanceOf(Response.class, result);
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     assertInstanceOf(ErrorResponse.class, response.getEntity());
   }
 }

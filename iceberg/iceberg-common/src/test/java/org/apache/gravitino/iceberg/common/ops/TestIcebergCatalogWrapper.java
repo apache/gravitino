@@ -454,6 +454,36 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  @Test
+  public void testLoadTableMetadataFromDirectoryIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path directory = Files.createDirectories(warehouseDir.resolve("not-a-metadata-file"));
+      String location = directory.toUri().toString();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("is not a valid metadata file"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromUnreadableSchemeIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      // Local JDBC catalogs have no S3 FileIO; the client-supplied scheme is unreadable.
+      String location = "s3://bucket/path/v1.metadata.json";
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("Cannot read metadata location"), e.getMessage());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testPurgeDeletesWhatCanBeReadWhenAManifestListIsMissing(

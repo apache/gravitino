@@ -43,6 +43,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /**
@@ -85,11 +86,17 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     this.parameters = parameters;
     this.args = args;
     RegisterTableRequest request = registerTableRequest();
-    this.accessEntityType = request.overwrite() ? EntityType.TABLE : EntityType.SCHEMA;
+    // A missing body is validated in process(); default to SCHEMA so entityType() is defined.
+    this.accessEntityType =
+        request != null && request.overwrite() ? EntityType.TABLE : EntityType.SCHEMA;
     NameIdentifier metalakeIdent = nameIdentifierMap.get(EntityType.METALAKE);
     NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
     NameIdentifier schemaIdent = nameIdentifierMap.get(EntityType.SCHEMA);
-    if (metalakeIdent != null && catalogIdent != null && schemaIdent != null) {
+    if (request != null
+        && request.name() != null
+        && metalakeIdent != null
+        && catalogIdent != null
+        && schemaIdent != null) {
       nameIdentifierMap.put(
           EntityType.TABLE,
           NameIdentifierUtil.ofTable(
@@ -100,6 +107,9 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     RegisterTableRequest request = registerTableRequest();
+    if (request == null) {
+      throw new BadRequestException("Invalid request: a RegisterTableRequest body is required");
+    }
 
     NameIdentifier metalakeIdent = nameIdentifierMap.get(EntityType.METALAKE);
     NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
