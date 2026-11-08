@@ -378,6 +378,8 @@ public interface AuditLog {
 
     REMOVE_USER,
 
+    ALTER_USER,
+
     GET_USER,
 
     LIST_USERS,
@@ -391,6 +393,8 @@ public interface AuditLog {
     ADD_GROUP,
 
     REMOVE_GROUP,
+
+    ALTER_GROUP,
 
     GET_GROUP,
 
