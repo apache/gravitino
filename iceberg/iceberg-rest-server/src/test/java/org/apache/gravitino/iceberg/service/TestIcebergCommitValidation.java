@@ -318,6 +318,97 @@ public class TestIcebergCommitValidation {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testOptionalFieldCannotBecomeRequired() {
+    // Add optional s (id 2) and make it current; the table already has data without it.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+
+    commitFails(
+        ValidationException.class,
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":true,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertTrue(catalog.loadTable(IDENT).schema().findField(2).isOptional());
+
+    // Allowed: required to optional.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":false,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertTrue(catalog.loadTable(IDENT).schema().findField(1).isOptional());
+  }
+
+  @Test
+  public void testDecimalChangesFollowPromotionRules() {
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\"decimal(10, 2)\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+
+    for (String type : new String[] {"decimal(10, 3)", "decimal(9, 2)"}) {
+      commitFails(
+          ValidationException.class,
+          addSchema(
+              "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                  + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\""
+                  + type
+                  + "\"}"),
+          new MetadataUpdate.SetCurrentSchema(-1));
+    }
+
+    // Allowed: widening precision at the same scale.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\"decimal(12, 2)\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertEquals(
+        Types.DecimalType.of(12, 2), catalog.loadTable(IDENT).schema().findType("d"));
+  }
+
+  @Test
+  public void testDatePromotionsAreAllowedOnlyFromV3() {
+    // The v3 table spec allows date to timestamp and timestamp_ns; v2 does not.
+    datePromotion("3", "timestamp", true);
+    datePromotion("3", "timestamp_ns", true);
+    datePromotion("2", "timestamp", false);
+    // A promotion to a type with a time zone is never allowed.
+    datePromotion("3", "timestamptz", false);
+  }
+
+  private void datePromotion(String version, String type, boolean allowed) {
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "d_v" + version + "_" + type);
+    append(
+        catalog.createTable(
+            ident,
+            new Schema(Types.NestedField.optional(1, "d", Types.DateType.get())),
+            PartitionSpec.unpartitioned(),
+            ImmutableMap.of("format-version", version)),
+        "/data/" + ident.name() + ".parquet");
+    UpdateTableRequest request =
+        request(
+            addSchema("{\"id\":1,\"name\":\"d\",\"required\":false,\"type\":\"" + type + "\"}"));
+    if (allowed) {
+      CatalogHandlers.updateTable(catalog, ident, request);
+      Assertions.assertEquals(2, catalog.loadTable(ident).schemas().size(), type);
+    } else {
+      Assertions.assertThrows(
+          ValidationException.class,
+          () -> CatalogHandlers.updateTable(catalog, ident, request),
+          version + " " + type);
+    }
+  }
+
+  @Test
+>>>>>>> 426f8908e ([#14429] fix(iceberg-rest): refuse optional-to-required column changes on tables with data (#14748))
   public void testReusingADroppedFieldIdIsRefused() {
     // Schema 1 adds b (id 2); schema 2 drops it; a later schema may not give id 2 to another field.
     commit(
