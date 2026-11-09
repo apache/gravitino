@@ -380,15 +380,18 @@ public class ModelMetaService {
 
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
-<<<<<<< HEAD
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      ModelMetaMapper.class,
-                      mapper ->
-                          mapper.updateModelMeta(
-                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
+          () -> {
+            if (isRenamed) {
+              failIfModelNameTaken(oldModelPO, newEntity);
+            }
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    ModelMetaMapper.class,
+                    mapper ->
+                        mapper.updateModelMeta(
+                            POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO)));
+          },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -401,38 +404,6 @@ public class ModelMetaService {
                           OperateType.ALTER));
             }
           });
-=======
-      SchemaMetaService.getInstance()
-          .doWithSchemaWriteLock(
-              identifier,
-              oldModelPO.getSchemaId(),
-              oldModelPO.getCatalogId(),
-              oldModelPO.getMetalakeId(),
-              () -> {
-                if (isRenamed) {
-                  failIfModelNameTaken(oldModelPO, newEntity);
-                }
-                // The model CAS is the first child write. It succeeds only if the concurrency
-                // version
-                // still matches, so an older request cannot overwrite a newer model or add an
-                // incorrect change-log entry.
-                int updated =
-                    SessionUtils.getWithoutCommit(
-                        ModelMetaMapper.class,
-                        mapper ->
-                            mapper.updateModelMeta(
-                                POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
-                if (updated == 0) {
-                  throw modelWriteFailure(identifier, oldModelPO);
-                }
-              },
-              () -> {
-                if (isRenamed) {
-                  EntityChangeLogWriter.append(
-                      oldModelIdent, Entity.EntityType.MODEL, OperateType.ALTER);
-                }
-              });
->>>>>>> 9cf8ebb0b ([#14752] fix(core): Avoid deadlock when concurrent model renames swap names (#14789))
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());
