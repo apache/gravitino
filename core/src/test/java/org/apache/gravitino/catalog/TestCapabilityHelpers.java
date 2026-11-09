@@ -298,8 +298,8 @@ public class TestCapabilityHelpers {
                 CapabilityHelpers.applyCapabilities(
                     new Column[] {withInitialOnly}, Capability.DEFAULT));
     Assertions.assertTrue(
-        thrown.getMessage().contains("initial default value is not supported"),
-        thrown.getMessage());
+        thrown.getMessage().contains("initial default value is read-only"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("catalog capability"), thrown.getMessage());
     Assertions.assertTrue(thrown.getMessage().contains("country"), thrown.getMessage());
 
     Column unsetInitial =
@@ -342,8 +342,8 @@ public class TestCapabilityHelpers {
                 CapabilityHelpers.applyCapabilities(
                     new Column[] {loadedLikeIcebergV3}, Capability.DEFAULT));
     Assertions.assertTrue(
-        thrown.getMessage().contains("initial default value is not supported"),
-        thrown.getMessage());
+        thrown.getMessage().contains("initial default value is read-only"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("catalog capability"), thrown.getMessage());
     Assertions.assertTrue(thrown.getMessage().contains("region"), thrown.getMessage());
   }
 

@@ -747,6 +747,46 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testFromNestedFieldTimestamptzDefaultsRoundTripThroughDtoJson() throws Exception {
+    // UTC LocalDateTime + TimestampType.withTimeZone must survive ColumnDTO JSON: clients that
+    // only see the wire form still get a with-time-zone type and the UTC wall-clock value.
+    long micros = 1_700_000_000_123_456L;
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("event_ts")
+            .asOptional()
+            .ofType(Types.TimestampType.withZone())
+            .withWriteDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .withInitialDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    LocalDateTime expectedUtc = DateTimeUtil.timestamptzFromMicros(micros).toLocalDateTime();
+
+    org.apache.gravitino.dto.rel.ColumnDTO dto =
+        org.apache.gravitino.dto.util.DTOConverters.toDTO(column);
+    String json = org.apache.gravitino.json.JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains(expectedUtc.toString()), json);
+    Assertions.assertTrue(json.contains("timestamp_tz"), json);
+
+    org.apache.gravitino.dto.rel.ColumnDTO deser =
+        org.apache.gravitino.json.JsonUtils.objectMapper()
+            .readValue(json, org.apache.gravitino.dto.rel.ColumnDTO.class);
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.TimestampType.class, deser.dataType());
+    Assertions.assertTrue(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) deser.dataType()).hasTimeZone());
+    Assertions.assertEquals(
+        expectedUtc.toString(),
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals(
+        expectedUtc.toString(),
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.initialDefaultValue())
+            .value());
+  }
+
+  @Test
   public void testFromNestedFieldBinaryDefaultsRoundTripThroughDtoJson() throws Exception {
     byte[] bytes = new byte[] {1, 2, 3};
     Types.NestedField field =

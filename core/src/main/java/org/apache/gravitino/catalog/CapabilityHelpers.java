@@ -727,7 +727,10 @@ public class CapabilityHelpers {
       String columnName, Expression initialDefaultValue) {
     Preconditions.checkArgument(
         INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
-        "Setting column initial default value is not supported. Illegal column: " + columnName);
+        "Column initial default value is read-only for now: catalogs may return it on load "
+            + "(e.g. Iceberg v3), but setting it on create/add-column is not supported by any "
+            + "catalog capability yet. Illegal column: "
+            + columnName);
   }
 
   private static void applyNameSpecification(
