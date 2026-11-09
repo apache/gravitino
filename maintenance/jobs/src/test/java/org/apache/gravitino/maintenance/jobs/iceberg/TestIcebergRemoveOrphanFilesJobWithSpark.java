@@ -29,10 +29,10 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,16 +84,13 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     Path old = Files.write(data.resolve("old-orphan.parquet"), new byte[] {1});
     Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS)));
     Path recent = Files.write(data.resolve("recent-orphan.parquet"), new byte[] {1});
-    Map<String, String> args = args("cleanup");
-    args.put("dry-run", "true");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, args));
+    assertEquals(1, execute("cleanup", null, null, true).size());
     assertTrue(Files.exists(old));
-    args.put("dry-run", "false");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, args));
+    assertEquals(1, execute("cleanup", null, null, false).size());
     assertFalse(Files.exists(old));
     assertTrue(Files.exists(recent));
     assertEquals(2, spark.table("test_catalog.db.cleanup").count());
-    assertEquals(0, IcebergRemoveOrphanFilesJob.execute(spark, args));
+    assertEquals(0, execute("cleanup", null, null, false).size());
   }
 
   /** Verifies TMS executeWithMetrics measures removed file size; CLI execute does not. */
@@ -104,17 +101,14 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     byte[] payload = new byte[] {1, 2, 3, 4, 5, 6, 7};
     Path old = Files.write(root.resolve("old-orphan.bin"), payload);
     Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS)));
-    Map<String, String> options = args("bytes");
-    options.put("dry-run", "true");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    assertEquals(1, execute("bytes", null, null, true).size());
     IcebergRemoveOrphanFilesJob.OrphanCleanupResult dry =
-        IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, options);
+        executeWithMetrics("bytes", null, null, true);
     assertEquals(1, dry.filesRemoved());
     assertEquals(payload.length, dry.bytesReclaimed());
     assertTrue(Files.exists(old));
-    options.put("dry-run", "false");
     IcebergRemoveOrphanFilesJob.OrphanCleanupResult deleted =
-        IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, options);
+        executeWithMetrics("bytes", null, null, false);
     assertEquals(1, deleted.filesRemoved());
     assertEquals(payload.length, deleted.bytesReclaimed());
     assertFalse(Files.exists(old));
@@ -127,16 +121,11 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     Path root = tempDir.resolve("db/blank_location");
     Path old = Files.write(root.resolve("old-orphan"), new byte[] {1});
     Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS)));
-    Map<String, String> options = args("blank_location");
-    options.put("dry-run", "true");
     for (String location : new String[] {"", " ", "\t", "\u2003"}) {
-      options.put("location", location);
-      assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertEquals(1, execute("blank_location", null, location, true).size());
       assertTrue(Files.exists(old));
     }
-    options.put("location", "");
-    options.put("dry-run", "false");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    assertEquals(1, execute("blank_location", null, "", false).size());
     assertFalse(Files.exists(old));
   }
 
@@ -151,20 +140,16 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     FileTime old = FileTime.from(Instant.now().minus(5, ChronoUnit.DAYS));
     Files.setLastModifiedTime(inside, old);
     Files.setLastModifiedTime(outside, old);
-    Map<String, String> args = args("scoped");
-    args.put("location", sub.toString());
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, args));
+    assertEquals(1, execute("scoped", null, sub.toString(), false).size());
     assertFalse(Files.exists(inside));
     assertTrue(Files.exists(outside));
-    args.put("location", tempDir.toString());
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, args));
+        IllegalArgumentException.class, () -> execute("scoped", null, tempDir.toString(), false));
     assertTrue(Files.exists(outside));
     Path link = root.resolve("escape");
     Files.createSymbolicLink(link, tempDir);
-    args.put("location", link.toString());
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, args));
+        IllegalArgumentException.class, () -> execute("scoped", null, link.toString(), false));
   }
 
   /** Verifies UTC cutoffs from the policy adapter retain their meaning in other session zones. */
@@ -177,12 +162,11 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     Path newer = Files.write(root.resolve("newer"), new byte[] {1});
     Files.setLastModifiedTime(older, FileTime.from(cutoff.minusSeconds(60)));
     Files.setLastModifiedTime(newer, FileTime.from(cutoff.plusSeconds(60)));
-    Map<String, String> options = args("utc_cutoff");
-    options.put("older-than", cutoff.toString().replace("T", " "));
+    String olderThan = cutoff.toString().replace("T", " ");
     String timezone = spark.conf().get("spark.sql.session.timeZone");
     spark.conf().set("spark.sql.session.timeZone", "America/Los_Angeles");
     try {
-      assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertEquals(1, execute("utc_cutoff", olderThan, null, false).size());
       assertFalse(Files.exists(older));
       assertTrue(Files.exists(newer));
     } finally {
@@ -194,23 +178,17 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
   @Test
   public void testInvalidInputsFailBeforeDeletion() throws Exception {
     spark.sql("CREATE TABLE test_catalog.db.invalid (id INT) USING iceberg");
-    Map<String, String> options = args("invalid");
-    options.put("dry-run", "yes");
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, options));
-    options.remove("dry-run");
-    options.put("location", tempDir.resolve("db/invalid/missing").toString());
-    assertThrows(IOException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, options));
-    options.remove("location");
-    options.put("older-than", "2999-01-01 00:00:00");
+        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.parseDryRun("yes"));
     assertThrows(
-        IllegalArgumentException.class, () -> IcebergRemoveOrphanFilesJob.execute(spark, options));
-    options.remove("older-than");
+        IOException.class,
+        () -> execute("invalid", null, tempDir.resolve("db/invalid/missing").toString(), false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> execute("invalid", "2999-01-01 00:00:00", null, false));
     spark.conf().set("spark.sql.parser.escapedStringLiterals", "true");
     try {
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> IcebergRemoveOrphanFilesJob.execute(spark, options));
+      assertThrows(IllegalArgumentException.class, () -> execute("invalid", null, null, false));
     } finally {
       spark.conf().set("spark.sql.parser.escapedStringLiterals", "false");
     }
@@ -239,21 +217,31 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     Path newer = Files.write(location.resolve("newer"), new byte[] {1});
     Files.setLastModifiedTime(old, FileTime.from(Instant.parse("2023-01-01T00:00:00Z")));
     Files.setLastModifiedTime(newer, FileTime.from(Instant.parse("2025-01-01T00:00:00Z")));
-    Map<String, String> options = args("`quo'te`");
-    options.put("older-than", "2024-01-01 00:00:00");
-    options.put("dry-run", "true");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    String table = "db.`quo'te`";
+    assertEquals(
+        1,
+        IcebergRemoveOrphanFilesJob.execute(
+                spark, "test_catalog", table, "2024-01-01 00:00:00", null, true)
+            .size());
     assertTrue(Files.exists(old));
-    options.put("dry-run", "false");
-    assertEquals(1, IcebergRemoveOrphanFilesJob.execute(spark, options));
+    assertEquals(
+        1,
+        IcebergRemoveOrphanFilesJob.execute(
+                spark, "test_catalog", table, "2024-01-01 00:00:00", null, false)
+            .size());
     assertFalse(Files.exists(old));
     assertTrue(Files.exists(newer));
   }
 
-  private static Map<String, String> args(String table) {
-    Map<String, String> args = new HashMap<>();
-    args.put("catalog", "test_catalog");
-    args.put("table", "db." + table);
-    return args;
+  private static List<Row> execute(String table, String olderThan, String location, boolean dryRun)
+      throws IOException {
+    return IcebergRemoveOrphanFilesJob.execute(
+        spark, "test_catalog", "db." + table, olderThan, location, dryRun);
+  }
+
+  private static IcebergRemoveOrphanFilesJob.OrphanCleanupResult executeWithMetrics(
+      String table, String olderThan, String location, boolean dryRun) throws IOException {
+    return IcebergRemoveOrphanFilesJob.executeWithMetrics(
+        spark, "test_catalog", "db." + table, olderThan, location, dryRun);
   }
 }

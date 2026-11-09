@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -43,22 +44,24 @@ import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfig
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.spark.Spark3Util;
-import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Removes unreferenced Iceberg files after validating the requested scan location. */
+/**
+ * Built-in job for removing unreferenced Iceberg files after validating the requested scan
+ * location.
+ */
 public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenanceAction {
+
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
   private static final String VERSION = "v1";
 
   /**
-   * Outcome of a TMS orphan cleanup with byte measurement.
+   * Outcome of orphan cleanup with byte measurement.
    *
    * <p>Only produced by {@link #executeWithMetrics}; CLI {@link #execute} does not collect bytes.
    */
@@ -105,8 +108,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
    *
    * <p>Required: {@code --catalog name --table db.table}. Optional: {@code --older-than 'yyyy-MM-dd
    * HH:mm:ss'}, {@code --location path}, {@code --dry-run true|false}, and {@code --spark-conf
-   * json}. The cutoff defaults to three days ago and dry-run defaults to false. Iceberg's minimum
-   * retention interval is preserved. A custom location must be within the table.
+   * json}.
    *
    * @param args named command-line arguments
    */
@@ -118,56 +120,120 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
   }
 
   static int run(String[] args) {
-    return Runner.run(args);
-  }
+    try {
+      Map<String, String> argMap =
+          IcebergJobUtils.parseArguments(
+              args,
+              new HashSet<>(
+                  Arrays.asList(
+                      "catalog", "table", "older-than", "location", "dry-run", "spark-conf")),
+              new HashSet<>(Arrays.asList("catalog", "table")));
+      boolean dryRun = parseDryRun(argMap.get("dry-run"));
+      Map<String, String> configs =
+          IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
+      SparkSession.Builder builder =
+          SparkSession.builder().appName("Gravitino Built-in Iceberg Remove Orphan Files");
+      configs.forEach(builder::config);
 
-  /**
-   * CLI / standalone path: run {@code remove_orphan_files} once and return the row count. Does
-   * <b>not</b> measure bytes or double-list for metrics.
-   */
-  static long execute(SparkSession spark, Map<String, String> options)
-      throws IOException, AnalysisException {
-    PreparedOrphanCall prepared = prepare(spark, options);
-    boolean dryRun = parseDryRun(options.get("dry-run"));
-    String sql =
-        buildProcedureCall(
-            prepared.catalog,
-            prepared.identifier,
-            options.get("older-than"),
-            prepared.normalizedLocation,
-            dryRun);
-    java.util.Iterator<Row> results = spark.sql(sql).toLocalIterator();
-    long count = 0;
-    while (results.hasNext()) {
-      Row row = results.next();
-      if (dryRun) {
-        LOG.info("Orphan file (dry-run): {}", row.getString(0));
+      try (SparkSession spark = builder.getOrCreate()) {
+        IcebergJobUtils.requireIcebergSparkRuntime();
+        List<Row> results =
+            execute(
+                spark,
+                argMap.get("catalog"),
+                argMap.get("table"),
+                IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("older-than")),
+                IcebergJobUtils.nullIfUnresolvedPlaceholder(argMap.get("location")),
+                dryRun);
+        LOG.info(
+            "Orphan file cleanup completed: {} files {}, table {}.{}",
+            results.size(),
+            dryRun ? "found (dry-run)" : "removed",
+            argMap.get("catalog"),
+            argMap.get("table"));
       }
-      count++;
+      return 0;
+    } catch (Exception e) {
+      LOG.error("Error executing remove orphan files job", e);
+      printUsage();
+      return 1;
     }
-    LOG.info(
-        "Orphan file cleanup completed: {} files {}, table {}.{}",
-        count,
-        dryRun ? "found (dry-run)" : "removed",
-        prepared.catalog,
-        prepared.identifier);
-    return count;
   }
 
   /**
-   * TMS path: builds options from job args then runs {@link #executeWithMetrics(SparkSession,
-   * Map)}.
+   * Runs {@code remove_orphan_files} on an existing Spark session. Shared by CLI {@link #main} and
+   * tests. Does not measure reclaimed bytes.
+   *
+   * @return procedure result rows (one path per row)
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String olderThan,
+      @Nullable String location,
+      boolean dryRun)
+      throws IOException {
+    requireEscapedStringLiteralsDisabled(spark);
+    String normalizedLocation =
+        resolveAndValidateLocation(spark, catalogName, tableIdentifier, location);
+    return callRemoveOrphanFiles(
+        spark, catalogName, tableIdentifier, olderThan, normalizedLocation, dryRun);
+  }
+
+  /**
+   * TMS path: dry-run list → FileIO sizes → optional real delete. CLI uses {@link #execute} instead
+   * (single procedure call, no byte measurement).
    */
   static OrphanCleanupResult executeWithMetrics(
-      SparkSession spark, String catalogName, String tableIdentifier, Map<String, String> jobArgs)
-      throws IOException, AnalysisException {
-    Map<String, String> options = new HashMap<>();
-    options.put("catalog", catalogName);
-    options.put("table", tableIdentifier);
-    putIfPresent(options, "older-than", jobArgs.get("older-than"));
-    putIfPresent(options, "location", jobArgs.get("location"));
-    putIfPresent(options, "dry-run", jobArgs.get("dry-run"));
-    return executeWithMetrics(spark, options);
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String olderThan,
+      @Nullable String location,
+      boolean dryRun)
+      throws IOException {
+    requireEscapedStringLiteralsDisabled(spark);
+    Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    String normalizedLocation = resolveAndValidateLocation(spark, table, location);
+    List<Row> listed =
+        callRemoveOrphanFiles(
+            spark, catalogName, tableIdentifier, olderThan, normalizedLocation, true);
+    List<String> orphanPaths = new ArrayList<>(listed.size());
+    long bytes = 0L;
+    for (Row row : listed) {
+      String orphanPath = row.getString(0);
+      orphanPaths.add(orphanPath);
+      if (dryRun) {
+        LOG.info("Orphan file (dry-run): {}", orphanPath);
+      }
+      bytes += sizeOf(table, orphanPath);
+    }
+    if (!dryRun && !orphanPaths.isEmpty()) {
+      callRemoveOrphanFiles(
+          spark, catalogName, tableIdentifier, olderThan, normalizedLocation, false);
+    }
+    LOG.info(
+        "Orphan file cleanup completed: {} files {}, {} bytes, table {}.{}",
+        orphanPaths.size(),
+        dryRun ? "found (dry-run)" : "removed",
+        bytes,
+        catalogName,
+        tableIdentifier);
+    return new OrphanCleanupResult(orphanPaths.size(), bytes);
+  }
+
+  private static List<Row> callRemoveOrphanFiles(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String olderThan,
+      String normalizedLocation,
+      boolean dryRun) {
+    String sql =
+        buildProcedureCall(catalogName, tableIdentifier, olderThan, normalizedLocation, dryRun);
+    LOG.info("Executing Iceberg remove_orphan_files: {}", sql);
+    return spark.sql(sql).collectAsList();
   }
 
   @Override
@@ -195,53 +261,16 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       @Nullable TableSnapshotMetrics before)
       throws Exception {
     OrphanCleanupResult orphan =
-        executeWithMetrics(spark, catalogName, tableIdentifier, argsByName);
+        executeWithMetrics(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("location")),
+            parseDryRun(IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("dry-run"))));
     return TableSnapshotMetrics.of(
         IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
         orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed()));
-  }
-
-  /**
-   * TMS-only path: dry-run list → FileIO sizes → optional real delete. CLI {@link #main} uses
-   * {@link #execute(SparkSession, Map)} instead (single procedure call, no byte measurement).
-   */
-  static OrphanCleanupResult executeWithMetrics(SparkSession spark, Map<String, String> options)
-      throws IOException, AnalysisException {
-    PreparedOrphanCall prepared = prepare(spark, options);
-    boolean dryRun = parseDryRun(options.get("dry-run"));
-    List<String> orphanPaths =
-        listOrphanPaths(
-            spark,
-            prepared.catalog,
-            prepared.identifier,
-            options.get("older-than"),
-            prepared.normalizedLocation);
-    long bytes = 0L;
-    for (String orphanPath : orphanPaths) {
-      if (dryRun) {
-        LOG.info("Orphan file (dry-run): {}", orphanPath);
-      }
-      bytes += sizeOf(prepared.table, orphanPath);
-    }
-    if (!dryRun && !orphanPaths.isEmpty()) {
-      String deleteSql =
-          buildProcedureCall(
-              prepared.catalog,
-              prepared.identifier,
-              options.get("older-than"),
-              prepared.normalizedLocation,
-              false);
-      LOG.info("Executing Iceberg remove_orphan_files delete: {}", deleteSql);
-      spark.sql(deleteSql).collect();
-    }
-    LOG.info(
-        "Orphan file cleanup completed: {} files {}, {} bytes, table {}.{}",
-        orphanPaths.size(),
-        dryRun ? "found (dry-run)" : "removed",
-        bytes,
-        prepared.catalog,
-        prepared.identifier);
-    return new OrphanCleanupResult(orphanPaths.size(), bytes);
   }
 
   @VisibleForTesting
@@ -250,74 +279,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
     metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, removedFileNumber);
     metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, removedFileSize);
     return metrics;
-  }
-
-  private static PreparedOrphanCall prepare(SparkSession spark, Map<String, String> options)
-      throws IOException, AnalysisException {
-    String catalog = requireOption(options, "catalog");
-    String identifier = requireOption(options, "table");
-    // Backslash escapes in string literals must retain Spark's default interpretation.
-    Preconditions.checkArgument(
-        !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
-        "spark.sql.parser.escapedStringLiterals must be false");
-    Table table =
-        Spark3Util.loadIcebergTable(
-            spark, IcebergJobUtils.escapeSqlIdentifier(catalog) + "." + identifier);
-    String location = options.get("location");
-    // Direct callers may pass an empty template value without CLI argument parsing.
-    if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
-      location = table.location();
-    }
-    OrphanFileLocationUtils.validateLocation(table.location(), location);
-    validateLocalLocation(table.location(), location);
-    validateRemoteLocation(spark, table.location(), location);
-    return new PreparedOrphanCall(
-        catalog, identifier, table, normalizeLocation(location).toString());
-  }
-
-  private static List<String> listOrphanPaths(
-      SparkSession spark,
-      String catalog,
-      String identifier,
-      @Nullable String olderThan,
-      String location) {
-    String sql = buildProcedureCall(catalog, identifier, olderThan, location, true);
-    LOG.info("Executing Iceberg remove_orphan_files dry-run listing: {}", sql);
-    List<Row> rows = spark.sql(sql).collectAsList();
-    List<String> paths = new ArrayList<>(rows.size());
-    for (Row row : rows) {
-      paths.add(row.getString(0));
-    }
-    return paths;
-  }
-
-  /**
-   * Best-effort size for one orphan path via the table {@link org.apache.iceberg.io.FileIO}.
-   * Missing or unreadable files contribute {@code 0}.
-   */
-  @VisibleForTesting
-  static long sizeOf(Table table, String location) {
-    try {
-      return table.io().newInputFile(location).getLength();
-    } catch (RuntimeException e) {
-      LOG.warn("Failed to measure orphan file size for {}: {}", location, e.toString());
-      return 0L;
-    }
-  }
-
-  private static final class PreparedOrphanCall {
-    private final String catalog;
-    private final String identifier;
-    private final Table table;
-    private final String normalizedLocation;
-
-    private PreparedOrphanCall(
-        String catalog, String identifier, Table table, String normalizedLocation) {
-      this.catalog = catalog;
-      this.identifier = identifier;
-      this.table = table;
-      this.normalizedLocation = normalizedLocation;
-    }
   }
 
   static String buildProcedureCall(
@@ -348,31 +309,44 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
     return "true".equals(value);
   }
 
-  private static List<String> buildArguments() {
-    return Arrays.asList(
-        "--catalog",
-        "{{catalog_name}}",
-        "--table",
-        "{{table_identifier}}",
-        "--older-than",
-        "{{older_than:-}}",
-        "--location",
-        "{{location:-}}",
-        "--dry-run",
-        "{{dry_run:-false}}",
-        "--spark-conf",
-        "{{spark_conf:-}}");
+  /**
+   * Best-effort size for one orphan path via the table {@link org.apache.iceberg.io.FileIO}.
+   * Missing or unreadable files contribute {@code 0}.
+   */
+  @VisibleForTesting
+  static long sizeOf(Table table, String location) {
+    try {
+      return table.io().newInputFile(location).getLength();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to measure orphan file size for {}: {}", location, e.toString());
+      return 0L;
+    }
   }
 
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  private static void requireEscapedStringLiteralsDisabled(SparkSession spark) {
+    // Backslash escapes in string literals must retain Spark's default interpretation.
+    Preconditions.checkArgument(
+        !Boolean.parseBoolean(spark.conf().get("spark.sql.parser.escapedStringLiterals", "false")),
+        "spark.sql.parser.escapedStringLiterals must be false");
   }
 
-  private static void printUsage() {
-    LOG.error(
-        "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
-            + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
-            + "[--dry-run true|false] [--spark-conf <json>]");
+  private static String resolveAndValidateLocation(
+      SparkSession spark, String catalogName, String tableIdentifier, @Nullable String location)
+      throws IOException {
+    Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    return resolveAndValidateLocation(spark, table, location);
+  }
+
+  private static String resolveAndValidateLocation(
+      SparkSession spark, Table table, @Nullable String location) throws IOException {
+    // Direct callers may pass an empty template value without CLI argument parsing.
+    if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
+      location = table.location();
+    }
+    OrphanFileLocationUtils.validateLocation(table.location(), location);
+    validateLocalLocation(table.location(), location);
+    validateRemoteLocation(spark, table.location(), location);
+    return normalizeLocation(location).toString();
   }
 
   private static void validateLocalLocation(String tableLocation, String location)
@@ -409,51 +383,30 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         spark.sparkContext().hadoopConfiguration(), tableLocation, location);
   }
 
-  private static void putIfPresent(Map<String, String> target, String key, @Nullable String raw) {
-    String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(raw);
-    if (value != null && !value.isEmpty()) {
-      target.put(key, value);
-    }
+  private static List<String> buildArguments() {
+    return Arrays.asList(
+        "--catalog",
+        "{{catalog_name}}",
+        "--table",
+        "{{table_identifier}}",
+        "--older-than",
+        "{{older_than:-}}",
+        "--location",
+        "{{location:-}}",
+        "--dry-run",
+        "{{dry_run:-false}}",
+        "--spark-conf",
+        "{{spark_conf:-}}");
   }
 
-  private static String requireOption(Map<String, String> options, String key) {
-    String value = options.get(key);
-    Preconditions.checkArgument(value != null && !value.trim().isEmpty(), "--%s is required", key);
-    return value;
+  private static Map<String, String> buildSparkConfigs() {
+    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 
-  // Defer verification of Spark-specific exception handlers until job execution. The server
-  // loads this job's template without Spark or Iceberg on its classpath.
-  private static final class Runner {
-    private static int run(String[] args) {
-      Map<String, String> options = IcebergJobUtils.parseArguments(args);
-      SparkSession.Builder builder =
-          SparkSession.builder().appName("Gravitino Built-in Iceberg Remove Orphan Files");
-      try {
-        requireOption(options, "catalog");
-        requireOption(options, "table");
-        parseDryRun(options.get("dry-run"));
-        IcebergJobUtils.parseCustomSparkConfigs(options.get("spark-conf")).forEach(builder::config);
-      } catch (IllegalArgumentException e) {
-        LOG.error("Invalid remove orphan files job arguments: {}", e.getMessage());
-        printUsage();
-        return 1;
-      }
-
-      SparkSession spark = null;
-      try {
-        spark = builder.getOrCreate();
-        IcebergJobUtils.requireIcebergSparkRuntime();
-        execute(spark, options);
-        return 0;
-      } catch (IOException | AnalysisException | RuntimeException e) {
-        LOG.error("Error executing remove orphan files job", e);
-        return 1;
-      } finally {
-        if (spark != null) {
-          spark.stop();
-        }
-      }
-    }
+  private static void printUsage() {
+    LOG.error(
+        "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
+            + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
+            + "[--dry-run true|false] [--spark-conf <json>]");
   }
 }
