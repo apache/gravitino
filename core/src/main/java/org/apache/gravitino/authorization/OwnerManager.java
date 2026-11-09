@@ -111,8 +111,9 @@ public class OwnerManager implements OwnerDispatcher {
               authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
       notifyOwnerChange(originOwner.orElse(null), metalake, metadataObject);
     } catch (NoSuchEntityException nse) {
-      // The object existed when getOwner ran, so it can have been dropped since then. Only a
-      // live owner proves that; otherwise keep reporting that either side may be missing.
+      // The object existed when getOwner ran, so it can have been dropped since then. This
+      // owner-exists check is a heuristic: if the owner is also removed between the failure and
+      // this check, keep the generic NotFoundException; table creation can still fail in that race.
       if (ownerExists(metalake, ownerName, ownerType)) {
         throw new NoSuchMetadataObjectException(
             nse, "The metadata object of %s isn't found", metadataObject.fullName());
