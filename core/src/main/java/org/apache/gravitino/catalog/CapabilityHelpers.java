@@ -483,6 +483,7 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       TableChange.UpdateColumnPosition updateColumnPosition =
           (TableChange.UpdateColumnPosition) change;
+<<<<<<< HEAD
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
         String afterFieldName =
@@ -493,6 +494,12 @@ public class CapabilityHelpers {
             fieldName, TableChange.ColumnPosition.after(afterFieldName));
       }
       return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
+=======
+      return TableChange.updateColumnPosition(
+          fieldName,
+          normalizeColumnPosition(
+              updateColumnPosition.getPosition(), capabilities, fieldName.length == 1));
+>>>>>>> 85a0501f2 ([#14762] fix(jdbc): Safely quote existing native table and column names (#14764))
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return TableChange.updateColumnType(
@@ -505,28 +512,45 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.AddColumn addColumn, Capability capabilities) {
-    Column appliedColumn =
-        applyCapabilities(
-            Column.of(
-                addColumn.fieldName()[0],
-                addColumn.getDataType(),
-                addColumn.getComment(),
-                addColumn.isNullable(),
-                addColumn.isAutoIncrement(),
-                addColumn.getDefaultValue()),
-            capabilities);
+    Column column =
+        Column.of(
+            addColumn.fieldName()[0],
+            addColumn.getDataType(),
+            addColumn.getComment(),
+            addColumn.isNullable(),
+            addColumn.isAutoIncrement(),
+            addColumn.getDefaultValue());
+    applyColumnNotNull(column, capabilities);
+    applyColumnDefaultValue(column, capabilities);
 
-    String[] standardizeFieldName =
-        Arrays.copyOf(addColumn.fieldName(), addColumn.fieldName().length);
-    standardizeFieldName[0] = appliedColumn.name();
+    boolean topLevel = addColumn.fieldName().length == 1;
+    if (topLevel) {
+      applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
+    } else {
+      // For a nested addition the first component names an existing parent column.
+      applyExistingColumnName(addColumn.fieldName()[0], capabilities);
+    }
     return TableChange.addColumn(
-        standardizeFieldName,
-        appliedColumn.dataType(),
-        appliedColumn.comment(),
-        addColumn.getPosition(),
-        appliedColumn.nullable(),
-        appliedColumn.autoIncrement(),
-        appliedColumn.defaultValue());
+        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        column.dataType(),
+        column.comment(),
+        normalizeColumnPosition(addColumn.getPosition(), capabilities, topLevel),
+        column.nullable(),
+        column.autoIncrement(),
+        column.defaultValue());
+  }
+
+  private static TableChange.ColumnPosition normalizeColumnPosition(
+      TableChange.ColumnPosition position, Capability capabilities, boolean topLevel) {
+    // Nested siblings follow the connector's own field rules rather than top-level name rules.
+    if (position instanceof TableChange.After && topLevel) {
+      // AFTER identifies an existing sibling; it does not introduce a new column name.
+      String afterColumn = ((TableChange.After) position).getColumn();
+      applyExistingColumnName(afterColumn, capabilities);
+      return TableChange.ColumnPosition.after(
+          applyCaseSensitiveOnName(Capability.Scope.COLUMN, afterColumn, capabilities));
+    }
+    return position;
   }
 
   private static TableChange applyCapabilities(
