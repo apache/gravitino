@@ -789,8 +789,23 @@ public class DorisTableOperations extends JdbcTableOperations {
         columns.populate(metadata);
       }
 
-      // Doris 1.2 can expose LARGEINT as INT through MySQL JDBC metadata. Restore its native
-      // type before converting both the column type and its default value.
+      // Doris 1.2 can expose LARGEINT as INT through MySQL JDBC metadata. Only query native
+      // types when the target table has an INT column that may need correction.
+      boolean hasIntColumn = false;
+      while (columns.next()) {
+        // JDBC treats underscores and percent signs in table names as wildcard patterns.
+        if (tableName.equals(columns.getString("TABLE_NAME"))
+            && "INT".equalsIgnoreCase(columns.getString("TYPE_NAME"))) {
+          hasIntColumn = true;
+          break;
+        }
+      }
+      columns.beforeFirst();
+      if (!hasIntColumn) {
+        return columns;
+      }
+
+      // Restore the native type before converting both the column type and its default value.
       Set<String> largeIntColumns = new HashSet<>();
       String sql =
           "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS"

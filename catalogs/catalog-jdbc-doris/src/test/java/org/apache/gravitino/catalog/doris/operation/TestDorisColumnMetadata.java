@@ -20,11 +20,13 @@ package org.apache.gravitino.catalog.doris.operation;
 
 import static java.sql.Types.VARCHAR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,17 +47,24 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestDorisColumnMetadata {
-  @Test
-  void testNativeLargeIntTypeBeforeDefaultConversion() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"INT", "int"})
+  void testNativeLargeIntTypeBeforeDefaultConversion(String jdbcIntType) throws Exception {
     Connection connection = mock(Connection.class);
     DatabaseMetaData metadata = mock(DatabaseMetaData.class);
     when(connection.getMetaData()).thenReturn(metadata);
     CachedRowSet jdbcColumns = columns();
     addColumn(
-        jdbcColumns, "target_table", "large", "INT", "170141183460469231731687303715884105727");
-    addColumn(jdbcColumns, "target_table", "regular_int", "INT", "7");
+        jdbcColumns,
+        "target_table",
+        "large",
+        jdbcIntType,
+        "170141183460469231731687303715884105727");
+    addColumn(jdbcColumns, "target_table", "regular_int", jdbcIntType, "7");
     addColumn(jdbcColumns, "target_table", "regular_long", "BIGINT", "8");
     addColumn(jdbcColumns, "target_table", "unsigned_long", "BIGINT UNSIGNED", null);
     addColumn(jdbcColumns, "targetXtable", "large", "INT", "9");
@@ -102,12 +111,55 @@ class TestDorisColumnMetadata {
     verify(statement).close();
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"BIGINT", "LARGEINT", "INT UNSIGNED", "SMALLINT", "VARCHAR"})
+  void testNativeMetadataLookupSkippedWithoutIntColumns(String type) throws Exception {
+    Connection connection = mock(Connection.class);
+    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+    when(connection.getMetaData()).thenReturn(metadata);
+    CachedRowSet jdbcColumns = columns();
+    addColumn(jdbcColumns, "target_table", "value", type, "7");
+    // A table matched only by the JDBC wildcard must not trigger a native metadata lookup.
+    addColumn(jdbcColumns, "targetXtable", "other_value", "INT", "9");
+    jdbcColumns.beforeFirst();
+    when(metadata.getColumns(null, null, "target_table", null)).thenReturn(jdbcColumns);
+
+    try (ResultSet result =
+        new TestableOperations().readMetadata(connection, "db", "target_table")) {
+      Map<String, String> loaded = new HashMap<>();
+      while (result.next()) {
+        loaded.put(result.getString("COLUMN_NAME"), result.getString("TYPE_NAME"));
+        if ("target_table".equals(result.getString("TABLE_NAME"))) {
+          assertEquals("7", result.getString("COLUMN_DEF"));
+          assertEquals("column comment", result.getString("REMARKS"));
+        }
+      }
+      assertEquals(Map.of("value", type, "other_value", "INT"), loaded);
+    }
+    verify(connection, never()).prepareStatement(anyString());
+  }
+
+  @Test
+  void testNativeMetadataLookupSkippedForEmptyColumns() throws Exception {
+    Connection connection = mock(Connection.class);
+    DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+    when(connection.getMetaData()).thenReturn(metadata);
+    when(metadata.getColumns(null, null, "t", null)).thenReturn(columns());
+
+    try (ResultSet result = new TestableOperations().readMetadata(connection, "db", "t")) {
+      assertFalse(result.next());
+    }
+    verify(connection, never()).prepareStatement(anyString());
+  }
+
   @Test
   void testNativeMetadataFailurePropagates() throws Exception {
     Connection connection = mock(Connection.class);
     DatabaseMetaData metadata = mock(DatabaseMetaData.class);
     when(connection.getMetaData()).thenReturn(metadata);
     CachedRowSet jdbcColumns = columns();
+    addColumn(jdbcColumns, "t", "value", "INT", "7");
+    jdbcColumns.beforeFirst();
     when(metadata.getColumns(null, null, "t", null)).thenReturn(jdbcColumns);
     SQLException failure = new SQLException("metadata unavailable");
     when(connection.prepareStatement(anyString())).thenThrow(failure);
