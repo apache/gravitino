@@ -1093,6 +1093,37 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  void testIndexSqlEscapesEmbeddedBackticks() {
+    TestableDorisTableOperations ops = Mockito.spy(new TestableDorisTableOperations());
+    Mockito.doAnswer(invocation -> invocation.getArgument(0))
+        .when(ops)
+        .appendNecessaryProperties(Mockito.anyMap());
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col`name")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .build();
+    for (Index.IndexType type :
+        new Index.IndexType[] {Index.IndexType.INVERTED, Index.IndexType.BITMAP}) {
+      String usingClause = type == Index.IndexType.INVERTED ? " USING INVERTED" : "";
+      Index index = Indexes.of(type, "idx`name", new String[][] {{"col`name"}});
+      String createSql =
+          ops.createTableSqlWithIndexes(
+              "tab`name", new JdbcColumn[] {column}, Distributions.even(1), new Index[] {index});
+      Assertions.assertTrue(createSql.startsWith("CREATE TABLE `tab``name`"), createSql);
+      Assertions.assertTrue(
+          createSql.contains("INDEX `idx``name` (`col``name`)" + usingClause), createSql);
+      TableChange.AddIndex addIndex =
+          (TableChange.AddIndex)
+              TableChange.addIndex(type, "idx`name", new String[][] {{"col`name"}});
+      Assertions.assertEquals(
+          "ADD INDEX `idx``name` (`col``name`)" + usingClause,
+          DorisTableOperations.addIndexDefinition(addIndex));
+    }
+  }
+
+  @Test
   public void testAddIndexDefinitionRejectsUnsupportedFieldShapes() {
     assertInvalidAddIndex(
         new String[][] {{"col1"}, {"col2"}},
