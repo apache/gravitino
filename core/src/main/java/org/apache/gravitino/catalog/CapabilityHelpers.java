@@ -732,12 +732,13 @@ public class CapabilityHelpers {
    * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
    * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
    * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
-   * catalog can write initial defaults, require the unset sentinel.
+   * catalog can write initial defaults, require unset ({@code null} or {@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
    */
   private static void applyColumnInitialDefaultValue(
       String columnName, Expression initialDefaultValue) {
     Preconditions.checkArgument(
-        INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        initialDefaultValue == null || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
         "Column initial default value is read-only for now: catalogs may return it on load "
             + "(e.g. Iceberg v3), but setting it on create/add-column is not supported by any "
             + "catalog capability yet. Illegal column: "

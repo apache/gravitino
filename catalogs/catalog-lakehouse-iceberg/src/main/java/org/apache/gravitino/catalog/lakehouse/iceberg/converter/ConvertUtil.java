@@ -35,8 +35,12 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.ByteBuffers;
 import org.apache.iceberg.util.DateTimeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConvertUtil {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ConvertUtil.class);
 
   /**
    * Convert an Apache Iceberg Table to the corresponding schema information in the Iceberg.
@@ -184,6 +188,7 @@ public class ConvertUtil {
       default:
         // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
         // rather than failing table load.
+        LOG.warn("Dropping Iceberg column default of unsupported type {} as unset", type.typeId());
         return unset;
     }
   }

@@ -319,6 +319,24 @@ public class TestCapabilityHelpers {
   }
 
   @Test
+  void testApplyCapabilitiesTreatsNullInitialDefaultAsUnset() {
+    // Third-party Column implementations may return null instead of the unset sentinel.
+    Column nullInitial = Mockito.mock(Column.class);
+    Mockito.when(nullInitial.name()).thenReturn("country");
+    Mockito.when(nullInitial.dataType()).thenReturn(Types.StringType.get());
+    Mockito.when(nullInitial.comment()).thenReturn(null);
+    Mockito.when(nullInitial.nullable()).thenReturn(true);
+    Mockito.when(nullInitial.autoIncrement()).thenReturn(false);
+    Mockito.when(nullInitial.defaultValue()).thenReturn(Column.DEFAULT_VALUE_NOT_SET);
+    Mockito.when(nullInitial.initialDefaultValue()).thenReturn(null);
+
+    Column[] applied =
+        CapabilityHelpers.applyCapabilities(new Column[] {nullInitial}, Capability.DEFAULT);
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertEquals(Column.INITIAL_DEFAULT_VALUE_NOT_SET, applied[0].initialDefaultValue());
+  }
+
+  @Test
   void testLoadThenCreateRejectsColumnsCarryingInitialDefault() {
     // Iceberg v3 load exposes write-default and initial-default on columns. Feeding those columns
     // straight into create/add-column (copy-table / load-then-create) must fail: Gravitino create
