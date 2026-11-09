@@ -85,6 +85,17 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
   }
 
   @Test
+  public void testToJdbcCatalogPropertiesWithBypassBaseUrl() {
+    String bypassBaseUrl = "jdbc:mysql://127.0.0.1:13306/";
+    Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+    catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", bypassBaseUrl);
+    Map<String, String> properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+  }
+
+  @Test
   public void testToJdbcCatalogPropertiesUsingDomainUrl() {
     Map<String, String> catalogPropertiesWithDomainUrl = new HashMap<>(catalogProperties);
     catalogPropertiesWithDomainUrl.put(

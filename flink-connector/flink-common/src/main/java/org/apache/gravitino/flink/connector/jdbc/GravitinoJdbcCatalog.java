@@ -53,7 +53,8 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
   @Nullable private final String configuredDefaultDatabase;
   private AbstractCatalog jdbcCatalog;
   // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
-  // visible to toFlinkTable() and to the inner JdbcCatalogFactory context.
+  // visible to toFlinkTable(). The inner JdbcCatalogFactory context gets a filtered copy taken
+  // after the injection.
   private final Map<String, String> mutableOptions;
 
   protected GravitinoJdbcCatalog(
@@ -113,6 +114,15 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
     if (configuredDefaultDatabase == null) {
       return;
     }
+    // The inner Flink JDBC catalog connects to its 'default-database' and rejects unknown options,
+    // so pass it the connection database instead when the converter tracks one separately.
+    Map<String, String> innerCatalogOptions = new HashMap<>(mutableOptions);
+    String connectionDatabase =
+        innerCatalogOptions.remove(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE);
+    if (connectionDatabase != null) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
+    }
     CatalogFactory.Context contextWithCredentials =
         new CatalogFactory.Context() {
           @Override
@@ -122,7 +132,7 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
           @Override
           public Map<String, String> getOptions() {
-            return mutableOptions;
+            return innerCatalogOptions;
           }
 
           @Override

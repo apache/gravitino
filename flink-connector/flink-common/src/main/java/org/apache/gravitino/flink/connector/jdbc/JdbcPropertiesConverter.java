@@ -66,16 +66,14 @@ public abstract class JdbcPropertiesConverter
             + JdbcPropertiesConstants.GRAVITINO_JDBC_URL
             + "'.");
 
-    // The URL in FlinkJdbcCatalog does not support database and other parameters.
-    flinkCatalogProperties.put(
+    // The URL in FlinkJdbcCatalog does not support database and other parameters. An explicit
+    // flink.bypass.base-url takes precedence, so Flink clients can reach the database through a
+    // different address than the Gravitino server.
+    flinkCatalogProperties.putIfAbsent(
         JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
 
     // Default the Flink catalog's 'default-database' option from the Gravitino jdbc-database
-    // property when it was not already supplied (e.g. via flink.bypass.default-database). This
-    // makes the value available when building per-table scan properties, since only the Flink
-    // catalog properties (not the Gravitino table properties) reach toFlinkTableProperties, and
-    // 'default-database' -- unlike 'jdbc-database' -- is an option Flink's JdbcCatalogFactory
-    // already recognizes, so it survives that factory's strict option validation.
+    // property when it was not already supplied (e.g. via flink.bypass.default-database).
     String gravitinoJdbcDatabase =
         gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE);
     if (StringUtils.isNotBlank(gravitinoJdbcDatabase)) {
@@ -121,6 +119,10 @@ public abstract class JdbcPropertiesConverter
         jdbcPassword != null, JdbcPropertiesConstants.FLINK_JDBC_PASSWORD + " should not be null.");
     Preconditions.checkArgument(
         jdbcBaseUrl != null, JdbcPropertiesConstants.FLINK_JDBC_URL + " should not be null.");
+    // Same as FlinkJdbcCatalog, accept a base-url with or without the trailing slash.
+    if (!jdbcBaseUrl.endsWith("/")) {
+      jdbcBaseUrl = jdbcBaseUrl + "/";
+    }
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,

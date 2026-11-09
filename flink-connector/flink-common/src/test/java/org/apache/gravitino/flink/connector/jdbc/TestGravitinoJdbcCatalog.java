@@ -90,9 +90,30 @@ public abstract class TestGravitinoJdbcCatalog {
     Assertions.assertTrue(exception.getMessage().contains("No default database is configured"));
   }
 
+  @Test
+  void testInnerCatalogUsesConnectionDatabase() {
+    Map<String, String> options = new HashMap<>();
+    options.put(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, "public");
+    options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
+    TestableGravitinoJdbcCatalog catalog =
+        new TestableGravitinoJdbcCatalog(catalogCompat(), "public", options);
+
+    Assertions.assertThrows(UnsupportedOperationException.class, catalog::open);
+
+    Map<String, String> innerOptions = catalog.getInnerCatalogOptions();
+    Assertions.assertEquals(
+        "gravitino", innerOptions.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+    Assertions.assertFalse(
+        innerOptions.containsKey(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
+    Assertions.assertEquals("public", catalog.getDefaultDatabase());
+    Assertions.assertEquals(
+        "gravitino", options.get(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
+  }
+
   private static class TestableGravitinoJdbcCatalog extends GravitinoJdbcCatalog {
     private final CatalogCompat catalogCompat;
     private boolean innerCatalogCreated;
+    private Map<String, String> innerCatalogOptions;
 
     TestableGravitinoJdbcCatalog(
         CatalogCompat catalogCompat, String defaultDatabase, Map<String, String> options) {
@@ -112,7 +133,12 @@ public abstract class TestGravitinoJdbcCatalog {
     @Override
     protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
       innerCatalogCreated = true;
+      innerCatalogOptions = context.getOptions();
       throw new UnsupportedOperationException("The inner catalog must not be created");
+    }
+
+    Map<String, String> getInnerCatalogOptions() {
+      return innerCatalogOptions;
     }
 
     @Override

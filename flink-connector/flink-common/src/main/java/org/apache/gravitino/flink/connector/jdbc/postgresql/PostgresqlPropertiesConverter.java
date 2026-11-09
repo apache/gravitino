@@ -21,6 +21,9 @@ package org.apache.gravitino.flink.connector.jdbc.postgresql;
 
 import com.google.common.base.Strings;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
@@ -28,6 +31,9 @@ import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConverter;
 
 public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
+
+  private static final Pattern JDBC_URL_DATABASE_PATTERN =
+      Pattern.compile("jdbc:\\w+://[^/]+/([^/?;]+)");
 
   private PostgresqlPropertiesConverter() {}
 
@@ -43,23 +49,58 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
     return GravitinoJdbcCatalogFactoryOptions.POSTGRESQL_IDENTIFIER;
   }
 
+  /**
+   * For PostgreSQL, a Flink "database" is a Gravitino schema, so 'default-database' names the
+   * schema Flink starts in, while JDBC connections always target the catalog's PostgreSQL database.
+   * That database is resolved from jdbc-database, or from jdbc-url when jdbc-database is not set,
+   * and also serves as 'default-database' when that is not set.
+   */
+  @Override
+  public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
+    Map<String, String> flinkCatalogProperties =
+        super.toFlinkCatalogProperties(gravitinoProperties);
+    String connectionDatabase =
+        gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE);
+    if (StringUtils.isBlank(connectionDatabase)) {
+      connectionDatabase =
+          getDatabaseFromJdbcUrl(
+              gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
+    }
+    if (StringUtils.isNotBlank(connectionDatabase)) {
+      flinkCatalogProperties.put(
+          JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, connectionDatabase);
+      flinkCatalogProperties.putIfAbsent(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
+    }
+    return flinkCatalogProperties;
+  }
+
   @Override
   protected String getConnectionDatabase(
       Map<String, String> flinkCatalogProperties, ObjectPath tablePath) {
-    // For PostgreSQL, the Flink "database" is a Gravitino schema, not the PostgreSQL database
-    // that the JDBC connection must target. The connection must use the catalog's configured
-    // jdbc-database instead, which JdbcPropertiesConverter#toFlinkCatalogProperties defaults into
-    // the 'default-database' option.
+    // Fall back to 'default-database' when no connection database can be resolved, which is
+    // also what the inner Flink JDBC catalog connects to in that case.
     String database =
-        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE);
+        flinkCatalogProperties.getOrDefault(
+            JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE,
+            flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
     Preconditions.checkArgument(
         !Strings.isNullOrEmpty(database),
-        JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE + " should not be null or empty.");
+        "Cannot resolve the PostgreSQL database: set '"
+            + JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE
+            + "' or include the database in '"
+            + JdbcPropertiesConstants.GRAVITINO_JDBC_URL
+            + "'.");
     return database;
   }
 
   @Override
   protected String getTableName(ObjectPath tablePath) {
     return tablePath.getDatabaseName() + "." + tablePath.getObjectName();
+  }
+
+  private static String getDatabaseFromJdbcUrl(String jdbcUrl) {
+    Matcher matcher = JDBC_URL_DATABASE_PATTERN.matcher(jdbcUrl);
+    return matcher.find() ? matcher.group(1) : null;
   }
 }
