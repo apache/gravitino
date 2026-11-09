@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
 
   @Test
+<<<<<<< HEAD
   void testQuotedSchemaNamesLoadWithoutExecutingSql() throws SQLException {
     for (String schema : new String[] {"quoted';CREATE SCHEMA injected_marker;--"}) {
       DATABASE_OPERATIONS.create(schema, "safe comment", Map.of());
@@ -54,6 +55,33 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
         Assertions.assertFalse(DATABASE_OPERATIONS.listDatabases().contains("injected_marker"));
       } finally {
         DATABASE_OPERATIONS.delete(schema, true);
+=======
+  void testRefusedDropNamesTheBlockerOnTheFirstLine() throws SQLException {
+    String schema = RandomNameUtils.genRandomName("blocked_source");
+    String other = RandomNameUtils.genRandomName("blocked_other");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + schema);
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + other);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + schema + ".parent (id int PRIMARY KEY)");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE VIEW " + other + ".v AS SELECT * FROM " + schema + ".parent");
+
+        NonEmptySchemaException error =
+            Assertions.assertThrows(
+                NonEmptySchemaException.class, () -> DATABASE_OPERATIONS.delete(schema, true));
+
+        // Clients keep only the first line of a message and treat the rest as the server stack
+        // trace, so the object in the other schema that blocks the drop must be on that line.
+        Assertions.assertFalse(error.getMessage().contains("\n"), error.getMessage());
+        Assertions.assertTrue(error.getMessage().contains(other + ".v"), error.getMessage());
+        Assertions.assertEquals("2BP01", ((SQLException) error.getCause()).getSQLState());
+      } finally {
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA IF EXISTS " + other + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+>>>>>>> eca38776f ([#14660] fix(trino,spark): keep the server reason when a cascade drop schema is refused (#14663))
       }
     }
   }
