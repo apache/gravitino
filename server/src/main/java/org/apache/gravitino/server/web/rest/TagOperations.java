@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -62,6 +63,8 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -73,6 +76,7 @@ import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -415,13 +419,27 @@ public class TagOperations {
             PolicyTagAddRequest effectiveRequest =
                 request == null ? new PolicyTagAddRequest() : request;
             effectiveRequest.validate();
-            tagDispatcher.addPolicyForTag(
-                metalake, tagName, policyName, effectiveRequest.selector());
+            PolicyAssociationSelector selector = effectiveRequest.selector();
+            if (selector instanceof TagValueSelector) {
+              TagValueConstraint constraint =
+                  tagDispatcher.getTag(metalake, tagName).valueConstraint();
+              String value = ((TagValueSelector) selector).value();
+              Preconditions.checkArgument(
+                  constraint.type() != TagValueConstraint.Type.NO_VALUE,
+                  "Tag %s does not allow assignment values",
+                  tagName);
+              Preconditions.checkArgument(
+                  constraint.type() != TagValueConstraint.Type.ALLOWED_VALUES
+                      || Arrays.asList(constraint.allowedValues()).contains(value),
+                  "Tag %s value %s is not in allowed values %s",
+                  tagName,
+                  value,
+                  Arrays.toString(constraint.allowedValues()));
+            }
+            tagDispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
             return Utils.ok(
                 new PolicyTagAssociationResponse(
-                    policyName,
-                    tagName,
-                    PolicyAssociationSelectorDTO.fromSelector(effectiveRequest.selector())));
+                    policyName, tagName, PolicyAssociationSelectorDTO.fromSelector(selector)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, tagName, metalake, e);
