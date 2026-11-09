@@ -197,7 +197,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
     OrphanCleanupResult orphan =
         executeWithMetrics(spark, catalogName, tableIdentifier, argsByName);
     return TableSnapshotMetrics.of(
-        IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
         orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed()));
   }
 
@@ -268,7 +268,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
     if (location == null || location.codePoints().allMatch(Character::isWhitespace)) {
       location = table.location();
     }
-    validateLocation(table.location(), location);
+    OrphanFileLocationUtils.validateLocation(table.location(), location);
     validateLocalLocation(table.location(), location);
     validateRemoteLocation(spark, table.location(), location);
     return new PreparedOrphanCall(
@@ -346,10 +346,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         value == null || "false".equals(value) || "true".equals(value),
         "--dry-run must be true or false");
     return "true".equals(value);
-  }
-
-  static void validateLocation(String tableLocation, String location) {
-    OrphanFileLocationUtils.validateLocation(tableLocation, location);
   }
 
   private static List<String> buildArguments() {

@@ -171,7 +171,30 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
           execute(
               spark, catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
       if (!results.isEmpty()) {
-        printRewriteResults(results.get(0));
+        Row result = results.get(0);
+        // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
+        if (result.size() >= 5) {
+          System.out.printf(
+              "Rewrite Data Files Results:%n"
+                  + "  Rewritten data files: %d%n"
+                  + "  Added data files: %d%n"
+                  + "  Rewritten bytes: %d%n"
+                  + "  Failed data files: %d%n"
+                  + "  Removed delete files: %d%n",
+              result.getInt(0),
+              result.getInt(1),
+              result.getLong(2),
+              result.getInt(3),
+              result.getInt(4));
+        } else {
+          System.out.printf(
+              "Rewrite Data Files Results:%n"
+                  + "  Rewritten data files: %d%n"
+                  + "  Added data files: %d%n"
+                  + "  Rewritten bytes: %d%n"
+                  + "  Failed data files: %d%n",
+              result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
+        }
       }
       System.out.println("Rewrite data files job completed successfully");
     } catch (Exception e) {
@@ -180,32 +203,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
       System.exit(1);
     } finally {
       spark.stop();
-    }
-  }
-
-  private static void printRewriteResults(Row result) {
-    // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
-    if (result.size() >= 5) {
-      System.out.printf(
-          "Rewrite Data Files Results:%n"
-              + "  Rewritten data files: %d%n"
-              + "  Added data files: %d%n"
-              + "  Rewritten bytes: %d%n"
-              + "  Failed data files: %d%n"
-              + "  Removed delete files: %d%n",
-          result.getInt(0),
-          result.getInt(1),
-          result.getLong(2),
-          result.getInt(3),
-          result.getInt(4));
-    } else {
-      System.out.printf(
-          "Rewrite Data Files Results:%n"
-              + "  Rewritten data files: %d%n"
-              + "  Added data files: %d%n"
-              + "  Rewritten bytes: %d%n"
-              + "  Failed data files: %d%n",
-          result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
     }
   }
 
@@ -273,21 +270,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     return sql.toString();
   }
 
-  /** Delegates to {@link IcebergJobUtils#escapeSqlString(String)}. */
-  static String escapeSqlString(String value) {
-    return IcebergJobUtils.escapeSqlString(value);
-  }
-
-  /** Delegates to {@link IcebergJobUtils#escapeSqlIdentifier(String)}. */
-  static String escapeSqlIdentifier(String identifier) {
-    return IcebergJobUtils.escapeSqlIdentifier(identifier);
-  }
-
-  /** Delegates to {@link IcebergJobUtils#parseArguments(String[])}. */
-  static Map<String, String> parseArguments(String[] args) {
-    return IcebergJobUtils.parseArguments(args);
-  }
-
   /**
    * Validate the strategy parameter value.
    *
@@ -309,11 +291,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
               + STRATEGY_SORT
               + "'");
     }
-  }
-
-  /** Delegates to {@link IcebergJobUtils#parseCustomSparkConfigs(String)}. */
-  static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
   /** Print usage information. */
@@ -431,8 +408,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
-    long snapshotId =
-        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
+    long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
     return TableSnapshotMetrics.of(snapshotId, payload);
   }
@@ -458,7 +434,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
     return TableSnapshotMetrics.of(
-        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier),
+        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier),
         collectCompactionMetrics(spark, catalogName, tableIdentifier));
   }
 

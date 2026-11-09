@@ -273,8 +273,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         return;
       }
       long headSnapshotId =
-          IcebergMaintenanceSnapshots.requireCurrentId(
-              spark, table.catalogName, table.tableIdentifier);
+          IcebergJobUtils.requireCurrentSnapshotId(spark, table.catalogName, table.tableIdentifier);
       if (action.shouldCheckSnapshotDrift() && before.snapshotId() != headSnapshotId) {
         LOG.info(
             "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"

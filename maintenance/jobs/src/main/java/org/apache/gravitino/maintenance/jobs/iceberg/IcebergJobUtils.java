@@ -29,6 +29,9 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -37,8 +40,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Shared utility methods for Iceberg maintenance jobs.
  *
- * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, and classpath checks
- * used by built-in Iceberg Spark jobs.
+ * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, table/snapshot
+ * helpers, and classpath checks used by built-in Iceberg Spark jobs.
  */
 public final class IcebergJobUtils {
 
@@ -290,6 +293,61 @@ public final class IcebergJobUtils {
       System.exit(1);
       return;
     }
+  }
+
+  /**
+   * Loads an Iceberg table via Spark.
+   *
+   * <p>Catches checked {@link Exception} (not only Spark {@code NoSuchTableException}) so the
+   * Gravitino server can load callers without Spark catalyst on the classpath.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return loaded Iceberg table
+   */
+  public static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    try {
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
+    }
+  }
+
+  /**
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id
+   * @throws IllegalStateException when the table has no current snapshot
+   */
+  public static long requireCurrentSnapshotId(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    if (snapshot == null) {
+      throw new IllegalStateException(
+          "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
+    }
+    return snapshot.snapshotId();
+  }
+
+  /**
+   * After expiry/orphan, HEAD may briefly be empty; report {@code -1} in that case.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id, or {@code -1} when HEAD is empty
+   */
+  public static long currentSnapshotIdOrEmpty(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    return snapshot == null ? -1L : snapshot.snapshotId();
   }
 
   /** Visible for unit tests that assert the missing-class error message. */

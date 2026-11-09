@@ -33,8 +33,6 @@ import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -216,8 +214,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
   @Override
   public TableSnapshotMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
-    long snapshotId =
-        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
+    long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = expireBeforeMetrics(preExpireData.snapshotCount());
     return TableSnapshotMetrics.of(snapshotId, payload);
@@ -255,8 +252,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     PreExpireData beforeData = preExpireData == null ? after : preExpireData;
     preExpireData = null;
     return TableSnapshotMetrics.of(
-        IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
-        expireAfterMetrics(beforeData, after));
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
+        expireAfterMetrics(
+            snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()),
+            bytesReclaimed(beforeData.fileSizesByPath(), after.fileSizesByPath())));
   }
 
   /**
@@ -454,13 +453,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(PreExpireData before, PreExpireData after) {
-    return expireAfterMetrics(
-        snapshotsCleared(before.snapshotIds(), after.snapshotIds()),
-        bytesReclaimed(before.fileSizesByPath(), after.fileSizesByPath()));
-  }
-
-  @VisibleForTesting
   static Map<String, Object> expireAfterMetrics(long expiredSnapshotNumber, long expiredFileSize) {
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(
@@ -502,7 +494,8 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
   static PreExpireData collectTableData(
       SparkSession spark, String catalogName, String tableIdentifier) {
     Set<Long> snapshotIds = new HashSet<>();
-    for (Snapshot snapshot : loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
+    for (Snapshot snapshot :
+        IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
       snapshotIds.add(snapshot.snapshotId());
     }
     String sql = buildReachableContentFilesSql(catalogName, tableIdentifier);
@@ -525,38 +518,21 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
    */
   @VisibleForTesting
   static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
-    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
-        + buildMetadataTableIdentifier(catalogName, tableIdentifier, "all_files")
-        + " GROUP BY file_path";
-  }
-
-  @VisibleForTesting
-  static String buildMetadataTableIdentifier(
-      String catalogName, String tableIdentifier, String metadataTable) {
     String[] levels = tableIdentifier.split("\\.");
     if (levels.length != 2) {
       throw new IllegalArgumentException(
           "table_identifier must use schema.table format, but got: " + tableIdentifier);
     }
-    return IcebergJobUtils.escapeSqlIdentifier(catalogName)
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(levels[0])
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(levels[1])
-        + "."
-        + IcebergJobUtils.escapeSqlIdentifier(metadataTable);
-  }
-
-  private static Table loadIcebergTable(
-      SparkSession spark, String catalogName, String tableIdentifier) {
-    try {
-      return Spark3Util.loadIcebergTable(
-          spark, String.format("%s.%s", catalogName, tableIdentifier));
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
-    }
+    String metadataTable =
+        IcebergJobUtils.escapeSqlIdentifier(catalogName)
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier(levels[0])
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier(levels[1])
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier("all_files");
+    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
+        + metadataTable
+        + " GROUP BY file_path";
   }
 }
