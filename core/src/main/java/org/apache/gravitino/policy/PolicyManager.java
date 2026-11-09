@@ -50,7 +50,7 @@ import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagAssignment;
-import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -64,11 +64,10 @@ public class PolicyManager implements PolicyDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(PolicyManager.class);
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
-  private final TagDispatcher tagDispatcher;
+  private final TagManager tagManager;
   private final ObjectPolicyResolver objectPolicyResolver;
 
-  public PolicyManager(
-      IdGenerator idGenerator, EntityStore entityStore, TagDispatcher tagDispatcher) {
+  public PolicyManager(IdGenerator idGenerator, EntityStore entityStore, TagManager tagManager) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
       String errorMsg =
           "PolicyManager cannot run with entity store that does not support policy operations, "
@@ -79,7 +78,7 @@ public class PolicyManager implements PolicyDispatcher {
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
-    this.tagDispatcher = Preconditions.checkNotNull(tagDispatcher, "tagDispatcher");
+    this.tagManager = Preconditions.checkNotNull(tagManager, "tagManager");
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
@@ -320,10 +319,10 @@ public class PolicyManager implements PolicyDispatcher {
               .relationValue()
               .map(PolicyAssociationSelectorSerde::deserialize)
               .orElseGet(AllValuesSelector::get);
-      for (MetadataObject object : tagDispatcher.listMetadataObjectsForTag(metalake, tag.name())) {
+      for (MetadataObject object : tagManager.listMetadataObjectsForTag(metalake, tag.name())) {
         Tag tagOnObject;
         try {
-          tagOnObject = tagDispatcher.getTagForMetadataObject(metalake, object, tag.name());
+          tagOnObject = tagManager.getTagForMetadataObject(metalake, object, tag.name());
         } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
           continue;
         }

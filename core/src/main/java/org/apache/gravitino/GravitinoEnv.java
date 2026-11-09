@@ -934,9 +934,9 @@ public class GravitinoEnv {
     this.internalStatisticDispatcher = new StatisticManager(entityStore, idGenerator, config);
     initInternalAuthorizationComponents();
 
-    this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
-    this.internalPolicyDispatcher =
-        new PolicyManager(idGenerator, entityStore, internalTagDispatcher);
+    TagManager tagManager = new TagManager(idGenerator, entityStore);
+    this.internalTagDispatcher = tagManager;
+    this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore, tagManager);
 
     return new MetadataOperations(
         filesetOperationDispatcher,
