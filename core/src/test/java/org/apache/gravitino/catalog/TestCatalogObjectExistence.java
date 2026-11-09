@@ -47,7 +47,6 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
-import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -92,10 +91,9 @@ class TestCatalogObjectExistence {
         .doWithCatalogWrapper(any(), any());
     EntityStore store = mock(EntityStore.class);
     IdGenerator ids = mock(IdGenerator.class);
-    SecretManager secrets = mock(SecretManager.class);
-    filesets = spy(new FilesetOperationDispatcher(manager, store, ids, secrets));
-    models = spy(new ModelOperationDispatcher(manager, store, ids, secrets));
-    topics = spy(new TopicOperationDispatcher(manager, store, ids, secrets));
+    filesets = spy(new FilesetOperationDispatcher(manager, store, ids));
+    models = spy(new ModelOperationDispatcher(manager, store, ids));
+    topics = spy(new TopicOperationDispatcher(manager, store, ids));
   }
 
   @Test
