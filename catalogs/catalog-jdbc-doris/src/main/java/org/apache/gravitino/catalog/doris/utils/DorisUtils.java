@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -150,16 +151,16 @@ public final class DorisUtils {
    * @return The partition sql fragment.
    */
   public static String generatePartitionSqlFragment(Partition partition) {
-    String partitionSqlFragment = "PARTITION `%s` VALUES %s";
+    String partitionSqlFragment = "PARTITION %s VALUES %s";
     if (partition instanceof RangePartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          JdbcConnectorUtils.quoteIdentifier(partition.name(), '`'),
           generateRangePartitionValues((RangePartition) partition));
     } else if (partition instanceof ListPartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          JdbcConnectorUtils.quoteIdentifier(partition.name(), '`'),
           generateListPartitionSqlValues((ListPartition) partition));
     } else {
       throw new IllegalArgumentException("Unsupported partition type of Doris");

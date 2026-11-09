@@ -147,10 +147,43 @@ public class TestTagOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Verifies that REST tag operations reject internal names before dispatch. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
+  public void testInternalTagEndpointsAreHidden(String name) throws Exception {
+    TagOperations operations = new TagOperations(tagManager);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    TagUpdatesRequest update =
+        new TagUpdatesRequest(
+            Collections.singletonList(new TagUpdateRequest.RenameTagRequest("ordinary")));
+    for (Response response :
+        new Response[] {
+          operations.getTag(metalake, name),
+          operations.alterTag(metalake, name, update),
+          operations.deleteTag(metalake, name),
+          operations.listMetadataObjectsForTag(metalake, name, null),
+          operations.listPoliciesForTag(metalake, name, false),
+          operations.addPolicyForTag(metalake, name, "policy", new PolicyTagAddRequest()),
+          operations.addPolicyForTag(
+              metalake,
+              name,
+              "policy",
+              new PolicyTagAddRequest(
+                  PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance")))),
+          operations.removePolicyFromTag(metalake, name, "policy")
+        }) {
+      try (Response result = response) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), result.getStatus());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
+  }
+
   @Test
   public void testListTags() {
     String[] tags = new String[] {"tag1", "tag2"};
-    when(tagManager.listTags(metalake)).thenReturn(tags);
+    when(tagManager.listTags(metalake))
+        .thenReturn(new String[] {"tag1", "GRAVITINO_HIDDEN_123", "tag2"});
 
     Response response =
         target(tagPath(metalake))
@@ -401,7 +434,17 @@ public class TestTagOperations extends BaseOperationsTest {
             .build();
 
     Tag[] tags = new Tag[] {tag1, tag2};
-    when(tagManager.listTagsInfo(metalake)).thenReturn(tags);
+    when(tagManager.listTagsInfo(metalake))
+        .thenReturn(
+            new Tag[] {
+              tags[0],
+              TagEntity.builder()
+                  .withName("gravitino_hidden_123")
+                  .withId(123L)
+                  .withAuditInfo(testAuditInfo1)
+                  .build(),
+              tags[1]
+            });
 
     Response resp =
         target(tagPath(metalake))
@@ -482,6 +525,38 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertTrue(error.getMessage().contains("a.b"));
     }
     Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any(), any());
+  }
+
+  /** REST rejects internal names on creation and rename before invoking the dispatcher. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_internal"})
+  public void testRejectsInternalTagNames(String name) {
+    TagUpdatesRequest rename =
+        new TagUpdatesRequest(
+            Lists.newArrayList(
+                new TagUpdateRequest.RenameTagRequest(name),
+                new TagUpdateRequest.RenameTagRequest("ordinary")));
+    try (Response created =
+            target(tagPath(metalake))
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .post(
+                    Entity.entity(
+                        new TagCreateRequest(name, null, null), MediaType.APPLICATION_JSON_TYPE));
+        Response renamed =
+            target(tagPath(metalake))
+                .path("tag1")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.entity(rename, MediaType.APPLICATION_JSON_TYPE))) {
+      for (Response response : Arrays.asList(created, renamed)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            response.readEntity(ErrorResponse.class).getCode());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
   }
 
   @Test
