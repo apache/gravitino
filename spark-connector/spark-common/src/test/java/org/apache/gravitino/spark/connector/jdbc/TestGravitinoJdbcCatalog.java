@@ -19,16 +19,24 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 /** Unit tests for {@link GravitinoJdbcCatalog#applyJdbcCredential}. */
 public class TestGravitinoJdbcCatalog {
@@ -87,6 +95,33 @@ public class TestGravitinoJdbcCatalog {
     @Override
     public SupportsCredentials supportsCredentials() {
       return this;
+    }
+  }
+
+  @Test
+  void testSpark33RejectsUnsupportedTimestampNtzBeforeOpeningReader() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> managers =
+        mockStatic(GravitinoCatalogManager.class)) {
+      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-postgresql");
+      when(source.supportsCredentials()).thenReturn(new CredentialCatalogStub());
+      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalog.createAndInitSparkCatalog(
+                      "pg33",
+                      new CaseInsensitiveStringMap(Map.of("preferTimestampNTZ", "true")),
+                      Map.of(
+                          "jdbc-url",
+                          "jdbc:postgresql://localhost/db",
+                          "jdbc-driver",
+                          "org.postgresql.Driver")));
+      Assertions.assertTrue(error.getMessage().contains("pg33"));
+      Assertions.assertTrue(error.getMessage().contains("Spark 3.5"));
+      Assertions.assertTrue(error.getMessage().contains("use false"));
     }
   }
 

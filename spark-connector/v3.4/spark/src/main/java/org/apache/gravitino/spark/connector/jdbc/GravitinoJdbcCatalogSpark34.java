@@ -19,15 +19,41 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
+import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
+import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 
 public class GravitinoJdbcCatalogSpark34 extends GravitinoJdbcCatalog {
 
   @Override
+  protected Table createSparkTable(
+      Identifier identifier,
+      org.apache.gravitino.rel.Table gravitinoTable,
+      Table sparkTable,
+      TableCatalog sparkCatalog,
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter transformConverter,
+      SparkTypeConverter typeConverter) {
+    return new SparkJdbcTable34(
+        identifier,
+        gravitinoTable,
+        (JDBCTable) sparkTable,
+        (JDBCTableCatalog) sparkCatalog,
+        propertiesConverter,
+        transformConverter,
+        typeConverter);
+  }
+
+  @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkJdbcTypeConverter34();
+    return new SparkJdbcTypeConverter34(useTimestampNtz());
   }
 
   @Override

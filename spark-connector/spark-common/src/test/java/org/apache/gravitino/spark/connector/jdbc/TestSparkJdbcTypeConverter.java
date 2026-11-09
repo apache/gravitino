@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.TimestampNTZType$;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +29,15 @@ import org.junit.jupiter.api.Test;
 public class TestSparkJdbcTypeConverter {
 
   private final SparkJdbcTypeConverter sparkJdbcTypeConverter = new SparkJdbcTypeConverter();
+
+  @Test
+  void testOptInUsesWallClockTimestamps() {
+    SparkJdbcTypeConverter converter = new SparkJdbcTypeConverter(true);
+    Assertions.assertEquals(
+        TimestampNTZType$.MODULE$, converter.toSparkType(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType, converter.toSparkType(Types.TimestampType.withTimeZone()));
+  }
 
   @Test
   void testConvertTimestampTypesToSparkTimestamp() {

@@ -20,26 +20,30 @@
 package org.apache.gravitino.spark.connector.jdbc;
 
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DataTypes;
 
+/** JDBC type conversion for Spark versions with public TIMESTAMP_NTZ support. */
 public class SparkJdbcTypeConverter34 extends SparkTypeConverter34 {
+
+  private final SparkJdbcTypeConverter jdbcTypeConverter;
+
+  /** Creates a converter retaining the existing JDBC timestamp mapping. */
+  public SparkJdbcTypeConverter34() {
+    this(false);
+  }
+
+  /**
+   * Creates a converter using the same timestamp mode as its JDBC catalog.
+   *
+   * @param useTimestampNtz whether zone-free timestamps use TIMESTAMP_NTZ
+   */
+  public SparkJdbcTypeConverter34(boolean useTimestampNtz) {
+    this.jdbcTypeConverter = new SparkJdbcTypeConverter(useTimestampNtz);
+  }
+
   @Override
   public DataType toSparkType(Type gravitinoType) {
-    // if spark version lower than 3.4.4, using VarCharType will throw an exception: Unsupported
-    // type varchar.
-    if (gravitinoType instanceof Types.VarCharType) {
-      return DataTypes.StringType;
-    } else if (gravitinoType instanceof Types.TimestampType
-        && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
-      // MySQL datetime (no timezone) must map to TimestampType, not TimestampNTZType, for JDBC
-      // filter pushdown compatibility. The MySQL JDBC dialect only handles TimestampType literals
-      // correctly; TimestampNTZType produces invalid SQL syntax errors during filter pushdown.
-      return DataTypes.TimestampType;
-    } else {
-      return super.toSparkType(gravitinoType);
-    }
+    return jdbcTypeConverter.toSparkType(gravitinoType);
   }
 }
