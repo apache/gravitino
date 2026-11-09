@@ -461,9 +461,9 @@ public class TestIcebergCommitValidation {
   }
 
   /**
-   * Staged create-transaction (AssertTableDoesNotExist) committing a required column is correct
-   * per Iceberg create (not Table Spec schema evolution), so removing {@code hasData} must not
-   * reject it.
+   * Staged create-transaction (AssertTableDoesNotExist) committing a required column is correct per
+   * Iceberg create (not Table Spec schema evolution), so removing {@code hasData} must not reject
+   * it.
    */
   @Test
   public void testStagedCreateTransactionStillSucceeds() {

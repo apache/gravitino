@@ -361,9 +361,9 @@ public final class IcebergCommitValidation implements UpdateRequirement {
    * (https://iceberg.apache.org/spec/#schema-evolution): a field id that exists in the current
    * schema keeps its kind, may only change type by an allowed promotion, and cannot go from
    * optional to required; a field id not in the current schema must be new (above last-column-id)
-   * or identical to the field that had the id before; and a new required field needs a default.
-   * The same rules are what Iceberg's {@code UpdateSchema} / {@code SchemaUpdate} enforce, and
-   * what the Gravitino API path applies.
+   * or identical to the field that had the id before; and a new required field needs a default. The
+   * same rules are what Iceberg's {@code UpdateSchema} / {@code SchemaUpdate} enforce, and what the
+   * Gravitino API path applies.
    *
    * <p>Per that Table Spec section (and {@code SchemaUpdate}), these rules do <em>not</em> depend
    * on whether the table has snapshots: incompatible evolution is rejected on empty tables unless
@@ -373,8 +373,8 @@ public final class IcebergCommitValidation implements UpdateRequirement {
    * evolutions may now get 4xx.
    *
    * <p>A replace that removes {@code main} is not schema evolution under the Table Spec: it starts
-   * from no retained data, so only the field-id reuse rule applies and create-then-replace /
-   * staged create still succeed.
+   * from no retained data, so only the field-id reuse rule applies and create-then-replace / staged
+   * create still succeed.
    */
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
