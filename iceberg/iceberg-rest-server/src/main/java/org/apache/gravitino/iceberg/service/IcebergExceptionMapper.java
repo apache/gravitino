@@ -77,9 +77,11 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(ForbiddenException.class, 403)
           // javax.ws.rs.NotFoundException (JAX-RS, imported above) for an unknown REST path.
           .put(NotFoundException.class, 404)
-          // Iceberg NotFoundException shares a simple name with javax.ws.rs.NotFoundException;
-          // map it explicitly so uncaught Iceberg not-found failures are 404, not 500.
-          .put(org.apache.iceberg.exceptions.NotFoundException.class, 404)
+          // Iceberg NotFoundException means a file/location could not be read (e.g. missing
+          // metadata.json), not that a table/namespace is absent. Iceberg REST OpenAPI uses 404 for
+          // NoSuch* entities and 400 for bad client input; map file-not-found to 400. Table absence
+          // remains NoSuchTableException → 404 below.
+          .put(org.apache.iceberg.exceptions.NotFoundException.class, 400)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)

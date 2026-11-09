@@ -77,9 +77,8 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new CommitStateUnknownException("", new RuntimeException()), 500);
     checkExceptionStatus(new ServiceUnavailableException(""), 503);
     checkExceptionStatus(new RuntimeException(), 500);
-    // Iceberg NotFoundException shares its simple name with javax.ws.rs.NotFoundException; map it
-    // by fully qualified class so uncaught Iceberg not-found failures are 404, not 500.
-    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 404);
+    // Iceberg NotFoundException is file/location missing (not NoSuchTable); map to 400.
+    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 400);
   }
 
   @Test
