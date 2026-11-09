@@ -314,6 +314,28 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testAddPolicyForTagInvalidValue() {
+    String message = "Tag tag1 value zzz is not in allowed values [a, b]";
+    doThrow(new IllegalArgumentException(message))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("zzz"));
+
+    Response response =
+        target(tagPath(metalake) + "/tag1/policies/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(
+                Entity.entity(
+                    new PolicyTagAddRequest(
+                        PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("zzz"))),
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+    Assertions.assertTrue(error.getMessage().contains(message));
+  }
+
+  @Test
   public void testListTagsInfo() {
     TagEntity tag1 =
         TagEntity.builder()

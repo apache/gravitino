@@ -1709,13 +1709,61 @@ public class TestTagManager {
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
       Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
 
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
+      for (String invalidValue : new String[] {"engineering", "Finance"}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tagManager.addPolicyForTag(
+                        METALAKE, tagName, policyName, TagValueSelector.of(invalidValue)));
+        Assertions.assertEquals(
+            String.format(
+                "Tag %s value %s is not in allowed values [finance, risk]", tagName, invalidValue),
+            error.getMessage());
+        Assertions.assertEquals(
+            0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
+      }
+
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("finance"));
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
+      Assertions.assertEquals(
+          TagValueSelector.of("finance"),
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
+      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
+
+      String noValueTag = "no_value_policy_tag";
+      tagManager.createTag(METALAKE, noValueTag, null, null, TagValueConstraint.noValue());
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tagManager.addPolicyForTag(
+                      METALAKE, noValueTag, policyName, TagValueSelector.of("finance")));
+      Assertions.assertEquals(
+          "Tag " + noValueTag + " does not allow assignment values", error.getMessage());
+      Assertions.assertEquals(
+          0, tagManager.listPolicyAssociationsForTag(METALAKE, noValueTag).length);
+      tagManager.addPolicyForTag(METALAKE, noValueTag, policyName, AllValuesSelector.get());
+      Assertions.assertEquals(
+          1, tagManager.listPolicyAssociationsForTag(METALAKE, noValueTag).length);
+
+      String anyValueTag = "any_value_policy_tag";
+      tagManager.createTag(METALAKE, anyValueTag, null, null);
+      tagManager.addPolicyForTag(
+          METALAKE, anyValueTag, policyName, TagValueSelector.of("engineering"));
+      associations = tagManager.listPolicyAssociationsForTag(METALAKE, anyValueTag);
+      Assertions.assertEquals(1, associations.length);
       Assertions.assertEquals(
           TagValueSelector.of("engineering"),
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
-      tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
+
+      Assertions.assertThrows(
+          NoSuchTagException.class,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, "missing_tag", policyName, TagValueSelector.of("finance")));
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);

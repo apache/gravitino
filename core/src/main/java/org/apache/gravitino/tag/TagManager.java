@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -239,6 +240,22 @@ public class TagManager implements TagDispatcher {
     NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
+    if (selector instanceof TagValueSelector) {
+      TagEntity tag = loadTagEntity(metalake, tagName);
+      TagValueConstraint constraint = tag.valueConstraint();
+      String value = ((TagValueSelector) selector).value();
+      Preconditions.checkArgument(
+          constraint.type() != TagValueConstraint.Type.NO_VALUE,
+          "Tag %s does not allow assignment values",
+          tagName);
+      Preconditions.checkArgument(
+          constraint.type() != TagValueConstraint.Type.ALLOWED_VALUES
+              || Arrays.asList(constraint.allowedValues()).contains(value),
+          "Tag %s value %s is not in allowed values %s",
+          tagName,
+          value,
+          Arrays.toString(constraint.allowedValues()));
+    }
     RelationUpdate update =
         RelationUpdate.of(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
