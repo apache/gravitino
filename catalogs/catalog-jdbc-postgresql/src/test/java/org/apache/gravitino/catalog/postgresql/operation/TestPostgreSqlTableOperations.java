@@ -1538,6 +1538,48 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
   }
 
   @Test
+  void testNativeQuotedTableAndColumnLifecycle() {
+    String schema = TEST_DB_NAME;
+    String tableName = "native\"table ; --";
+    String columnName = "native\"column\\name' ; --";
+    String renamed = "native_renamed_table";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName(columnName)
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          schema,
+          tableName,
+          new JdbcColumn[] {column},
+          null,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      Assertions.assertEquals(
+          columnName, TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.updateColumnComment(new String[] {columnName}, "changed"));
+      Assertions.assertEquals(
+          "changed", TABLE_OPERATIONS.load(schema, tableName).columns()[0].comment());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.renameColumn(new String[] {columnName}, "renamed_column"));
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.rename(schema, tableName, renamed);
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, renamed).columns()[0].name());
+      Assertions.assertTrue(TABLE_OPERATIONS.drop(schema, renamed));
+    } finally {
+      TABLE_OPERATIONS.drop(schema, tableName);
+      TABLE_OPERATIONS.drop(schema, renamed);
+    }
+  }
+
+  @Test
   public void testOperationTable() {
     String tableName = RandomNameUtils.genRandomName("op_table_");
     String tableComment = "test_comment";
