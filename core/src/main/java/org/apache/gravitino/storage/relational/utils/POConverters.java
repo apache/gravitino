@@ -1178,7 +1178,8 @@ public class POConverters {
                 .withUserId(userEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(userEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1283,7 +1284,8 @@ public class POConverters {
                 .withGroupId(groupEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(groupEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1791,6 +1793,103 @@ public class POConverters {
         .collect(Collectors.toList());
   }
 
+<<<<<<< HEAD
+=======
+  private static PolicyPO buildNextPolicyPOVersion(
+      PolicyPO oldPolicyPO,
+      String policyName,
+      String policyType,
+      String auditInfo,
+      String policyComment,
+      boolean enabled,
+      String content) {
+    // Every successful policy alter advances the OCC token, which is the value the CAS compares.
+    Long occVersion = oldPolicyPO.getOccVersion() + 1;
+
+    // The current version is the join key reads use to find the policy content, so it may only
+    // point at a version that has a stored snapshot. An alter that leaves comment, enabled and
+    // content untouched keeps it where it is and writes no snapshot, so the row keeps pointing at
+    // the one it already has.
+    PolicyVersionPO storedVersionPO = oldPolicyPO.getPolicyVersionPO();
+    if (storedVersionPO != null
+        && Objects.equals(storedVersionPO.getPolicyComment(), policyComment)
+        && storedVersionPO.isEnabled() == enabled
+        && Objects.equals(oldPolicyPO.getPolicyType(), policyType)
+        && policyContentUnchanged(storedVersionPO.getContent(), content, policyType)) {
+      return PolicyPO.builder()
+          .withPolicyId(oldPolicyPO.getPolicyId())
+          .withPolicyName(policyName)
+          .withPolicyType(policyType)
+          .withMetalakeId(oldPolicyPO.getMetalakeId())
+          .withAuditInfo(auditInfo)
+          .withCurrentVersion(oldPolicyPO.getCurrentVersion())
+          .withLastVersion(oldPolicyPO.getLastVersion())
+          .withOccVersion(occVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(storedVersionPO)
+          .build();
+    }
+
+    Long nextVersion = Math.max(oldPolicyPO.getCurrentVersion(), oldPolicyPO.getLastVersion()) + 1;
+    PolicyVersionPO newPolicyVersionPO =
+        PolicyVersionPO.builder()
+            .withMetalakeId(oldPolicyPO.getMetalakeId())
+            .withPolicyId(oldPolicyPO.getPolicyId())
+            .withVersion(nextVersion)
+            .withPolicyComment(policyComment)
+            .withEnabled(enabled)
+            .withContent(content)
+            .withDeletedAt(DEFAULT_DELETED_AT)
+            .build();
+    return PolicyPO.builder()
+        .withPolicyId(oldPolicyPO.getPolicyId())
+        .withPolicyName(policyName)
+        .withPolicyType(policyType)
+        .withMetalakeId(oldPolicyPO.getMetalakeId())
+        .withAuditInfo(auditInfo)
+        .withCurrentVersion(nextVersion)
+        .withLastVersion(nextVersion)
+        .withOccVersion(occVersion)
+        .withDeletedAt(DEFAULT_DELETED_AT)
+        .withPolicyVersionPO(newPolicyVersionPO)
+        .build();
+  }
+
+  private static AuditInfo roleAssignmentAudit(AuditInfo principalAudit) {
+    // New relations are created by the principal mutation, rather than its original creation.
+    // Initial assignments on principal creation have no modification audit yet.
+    return AuditInfo.builder()
+        .withCreator(
+            principalAudit.lastModifier() != null
+                ? principalAudit.lastModifier()
+                : principalAudit.creator())
+        .withCreateTime(
+            principalAudit.lastModifiedTime() != null
+                ? principalAudit.lastModifiedTime()
+                : principalAudit.createTime())
+        .build();
+  }
+
+  private static boolean policyContentUnchanged(
+      String storedContent, String newContent, String policyType) {
+    if (Objects.equals(storedContent, newContent)) {
+      return true;
+    }
+
+    // Sets in policy content can serialize in a different order after a read/write round trip.
+    // Compare the content objects so an audit-only update does not allocate a redundant snapshot.
+    try {
+      Class<? extends PolicyContent> contentClass =
+          Policy.BuiltInType.fromPolicyType(policyType).contentClass();
+      return Objects.equals(
+          JsonUtils.anyFieldMapper().readValue(storedContent, contentClass),
+          JsonUtils.anyFieldMapper().readValue(newContent, contentClass));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize policy content:", e);
+    }
+  }
+
+>>>>>>> cd678ef91 ([#14723] fix(authz): Correct role grants, assignment audits and metadata validation (#14728))
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {
     return ModelVersionAliasRelPO.builder()
         .withModelVersion(version)

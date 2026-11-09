@@ -45,6 +45,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -336,6 +337,184 @@ public class TestAccessControlManagerForPermissions {
         () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
   }
 
+<<<<<<< HEAD
+=======
+  @ParameterizedTest
+  @ValueSource(strings = {"METALAKE", "CATALOG", "SCHEMA"})
+  void testSemanticModelPrivilegeUpdatesStayLocal(String scope) throws IOException {
+    MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
+    String fullName =
+        type == MetadataObject.Type.METALAKE
+            ? METALAKE
+            : type == MetadataObject.Type.CATALOG ? CATALOG : CATALOG + "." + SCHEMA;
+    MetadataObject object = MetadataObjects.parse(fullName, type);
+    String name = "semantic_updates_" + scope;
+    entityStore.put(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(List.of())
+            .build(),
+        false);
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    Privilege semantic = Privileges.UseSemanticModel.allow();
+    Privilege table = Privileges.SelectTable.allow();
+    SecurableObject tableObject = SecurableObjects.parse(fullName, type, List.of(table));
+    SecurableObject semanticObject = SecurableObjects.parse(fullName, type, List.of(semantic));
+    SecurableObject mixed = SecurableObjects.parse(fullName, type, List.of(semantic, table));
+    reset(authorizationPlugin);
+    Role semanticRole =
+        manager.grantPrivilegesToRole(
+            METALAKE, name, object, Set.of(semantic, Privileges.CreateSemanticModel.allow()));
+    Assertions.assertEquals(
+        Set.of(semantic, Privileges.CreateSemanticModel.allow()),
+        Set.copyOf(semanticRole.securableObjects().get(0).privileges()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.grantPrivilegesToRole(
+        METALAKE, name, object, Set.of(Privileges.ModifySemanticModel.allow()));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(mixed));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    SecurableObject modifiedTable =
+        SecurableObjects.parse(fullName, type, List.of(Privileges.ModifyTable.allow()));
+    manager.overridePrivilegesInRole(
+        METALAKE,
+        name,
+        List.of(
+            SecurableObjects.parse(
+                fullName, type, List.of(semantic, Privileges.ModifyTable.allow()))));
+    assertConnectorChange(RoleChange.updateSecurableObject(name, tableObject, modifiedTable));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, modifiedTable));
+    manager.overridePrivilegesInRole(METALAKE, name, List.of());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.overridePrivilegesInRole(METALAKE, name, List.of(semanticObject));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+    manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.addSecurableObject(name, tableObject));
+    manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(semantic, table));
+    assertConnectorChange(RoleChange.removeSecurableObject(name, tableObject));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "CREATE_MODEL,REGISTER_MODEL,ALLOW",
+    "REGISTER_MODEL,CREATE_MODEL,ALLOW",
+    "CREATE_MODEL_VERSION,LINK_MODEL_VERSION,ALLOW",
+    "LINK_MODEL_VERSION,CREATE_MODEL_VERSION,ALLOW",
+    "CREATE_MODEL,REGISTER_MODEL,DENY",
+    "REGISTER_MODEL,CREATE_MODEL,DENY",
+    "CREATE_MODEL_VERSION,LINK_MODEL_VERSION,DENY",
+    "LINK_MODEL_VERSION,CREATE_MODEL_VERSION,DENY"
+  })
+  void testGrantEquivalentPrivilegeIsIdempotent(
+      Privilege.Name heldName, Privilege.Name grantedName, Privilege.Condition condition)
+      throws IOException {
+    String name = "alias_" + heldName + "_" + condition;
+    Privilege held =
+        condition == Privilege.Condition.ALLOW
+            ? Privileges.allow(heldName)
+            : Privileges.deny(heldName);
+    Privilege granted =
+        condition == Privilege.Condition.ALLOW
+            ? Privileges.allow(grantedName)
+            : Privileges.deny(grantedName);
+    MetadataObject object = MetadataObjects.parse(METALAKE, MetadataObject.Type.METALAKE);
+    entityStore.put(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(
+                List.of(SecurableObjects.parse(METALAKE, object.type(), List.of(held))))
+            .build(),
+        false);
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    reset(authorizationPlugin);
+    Role role = manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(granted));
+    Assertions.assertEquals(List.of(held), role.securableObjects().get(0).privileges());
+    Mockito.verifyNoInteractions(authorizationPlugin);
+
+    role =
+        manager.grantPrivilegesToRole(
+            METALAKE, name, object, Set.of(granted, Privileges.CreateTable.allow()));
+    Set<Privilege> expected = Set.of(held, Privileges.CreateTable.allow());
+    Assertions.assertEquals(expected, Set.copyOf(role.securableObjects().get(0).privileges()));
+    Privilege conflicting =
+        condition == Privilege.Condition.ALLOW
+            ? Privileges.deny(grantedName)
+            : Privileges.allow(grantedName);
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () -> manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(conflicting)));
+    Assertions.assertEquals(
+        expected,
+        Set.copyOf(
+            accessControlManager.getRole(METALAKE, name).securableObjects().get(0).privileges()));
+    role = manager.revokePrivilegesFromRole(METALAKE, name, object, Set.of(granted));
+    Assertions.assertEquals(
+        List.of(Privileges.CreateTable.allow()), role.securableObjects().get(0).privileges());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "CREATE_MODEL,REGISTER_MODEL",
+    "REGISTER_MODEL,CREATE_MODEL",
+    "CREATE_MODEL_VERSION,LINK_MODEL_VERSION",
+    "LINK_MODEL_VERSION,CREATE_MODEL_VERSION"
+  })
+  void testEquivalentGrantPreservesStoredDuplicatePrivileges(
+      Privilege.Name heldName, Privilege.Name grantedName)
+      throws IOException, IllegalAccessException {
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    MetadataObject object = MetadataObjects.parse(METALAKE, MetadataObject.Type.METALAKE);
+    for (Privilege.Condition condition : Privilege.Condition.values()) {
+      Privilege held =
+          condition == Privilege.Condition.ALLOW
+              ? Privileges.allow(heldName)
+              : Privileges.deny(heldName);
+      Privilege granted =
+          condition == Privilege.Condition.ALLOW
+              ? Privileges.allow(grantedName)
+              : Privileges.deny(grantedName);
+      for (boolean aliasDuplicate : new boolean[] {false, true}) {
+        String name = "duplicates_" + heldName + "_" + condition + "_" + aliasDuplicate;
+        List<Privilege> stored = List.of(held, aliasDuplicate ? granted : held);
+        SecurableObject storedObject = SecurableObjects.parse(METALAKE, object.type(), stored);
+        // Simulate stored duplicates without the constructor's automatic deduplication.
+        FieldUtils.writeField(storedObject, "privileges", stored, true);
+        entityStore.put(
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName(name)
+                .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(List.of(storedObject))
+                .build(),
+            false);
+        reset(authorizationPlugin);
+        Role role = manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(granted));
+        Assertions.assertEquals(stored, role.securableObjects().get(0).privileges());
+        Assertions.assertEquals(
+            stored,
+            accessControlManager.getRole(METALAKE, name).securableObjects().get(0).privileges());
+        Mockito.verifyNoInteractions(authorizationPlugin);
+      }
+    }
+  }
+
+>>>>>>> cd678ef91 ([#14723] fix(authz): Correct role grants, assignment audits and metadata validation (#14728))
   @Test
   public void testGrantPrivilegeToRole() {
     reset(authorizationPlugin);

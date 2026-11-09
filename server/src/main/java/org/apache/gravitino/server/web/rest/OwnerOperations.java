@@ -116,8 +116,8 @@ public class OwnerOperations {
   public Response setOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("metadataObjectType") String metadataObjectType,
-      @PathParam("fullName") String fullName,
+      @PathParam("metadataObjectType") @AuthorizationObjectType String metadataObjectType,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       OwnerSetRequest request) {
     if (request == null) {
       return ExceptionHandlers.handleOwnerException(
