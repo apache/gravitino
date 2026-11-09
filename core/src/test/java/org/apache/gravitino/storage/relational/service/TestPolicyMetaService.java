@@ -22,13 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -379,6 +382,46 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     } finally {
       PolicyLifecycleHooks.unregister(hook);
     }
+  }
+
+  /** A checked tag-insert failure propagates unchanged after both inserted entities roll back. */
+  @TestTemplate
+  public void testHiddenTagIOExceptionRollsBackPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hidden_tag_io_failure",
+            AUDIT_INFO);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    IOException failure = new IOException("Hidden tag insertion failed");
+    TagMetaService tags = spy(TagMetaService.getInstance());
+    doAnswer(
+            invocation -> {
+              invocation.callRealMethod();
+              assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+              assertTrue(backend.exists(tagIdentifier, Entity.EntityType.TAG));
+              throw failure;
+            })
+        .when(tags)
+        .insertTag(any(TagEntity.class), eq(false));
+
+    try (MockedStatic<TagMetaService> tagService =
+        mockStatic(TagMetaService.class, CALLS_REAL_METHODS)) {
+      tagService.when(TagMetaService::getInstance).thenReturn(tags);
+      assertSame(
+          failure,
+          assertThrows(
+              IOException.class,
+              () -> PolicyMetaService.getInstance().insertPolicy(policy, false)));
+    }
+
+    assertFalse(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(0, countActiveRows("policy_version_info", "policy_id = " + policy.id()));
+    assertEquals(0, countActiveRows("tag_meta", "tag_name = '" + tagIdentifier.name() + "'"));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
   }
 
   @TestTemplate
