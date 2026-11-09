@@ -72,6 +72,53 @@ import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
 
+  @ParameterizedTest
+  @ValueSource(strings = {"file:///tmp/table", "gs://bucket/table", "/tmp/table", "s3:///table"})
+  void testS3CatalogRejectsInvalidLocationBeforeCreatingTable(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    for (boolean staged : new boolean[] {false, true}) {
+      CreateTableRequest.Builder builder =
+          CreateTableRequest.builder()
+              .withName("invalid_location")
+              .withSchema(new Schema(Types.NestedField.optional(1, "id", Types.LongType.get())))
+              .withLocation(location);
+      if (staged) {
+        builder.stageCreate();
+      }
+      CreateTableRequest request = builder.build();
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.createTable(Namespace.of("s"), request));
+      Assertions.assertTrue(failure.getMessage().contains(location));
+    }
+    Mockito.verify(wrapper, Mockito.never()).getCatalog();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3://bucket/table", "s3a://bucket/table", "s3n://bucket/table"})
+  void testS3CatalogAcceptsSupportedLocationSchemes(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.doReturn(catalog).when(wrapper).getCatalog();
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("valid_location")
+            .withSchema(new Schema(Types.NestedField.optional(1, "id", Types.LongType.get())))
+            .withLocation(location)
+            .build();
+    // Stop after validation, before the mocked backend creates anything.
+    Mockito.when(catalog.buildTable(Mockito.any(), Mockito.any()))
+        .thenThrow(new IllegalStateException("backend reached"));
+    IllegalStateException failure =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> wrapper.createTable(Namespace.of("s"), request));
+    Assertions.assertEquals("backend reached", failure.getMessage());
+  }
+
   @Test
   void testLoadViewReportsMissingAfterNativeRename(@TempDir Path warehouseDir) throws Exception {
     Namespace namespace = Namespace.of("views");

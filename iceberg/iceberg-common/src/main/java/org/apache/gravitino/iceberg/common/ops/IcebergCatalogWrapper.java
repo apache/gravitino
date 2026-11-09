@@ -51,6 +51,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -265,6 +266,16 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     validateTableDefinition(request);
+    if (request.location() != null && S3FileIO.class.getName().equals(fileIOImpl())) {
+      String[] parts = request.location().split("://", 2);
+      if (parts.length != 2
+          || !Set.of("s3", "s3a", "s3n").contains(parts[0])
+          || parts[1].split("/", 2)[0].isBlank()) {
+        throw new BadRequestException(
+            "Invalid table location '%s': this catalog requires an S3 location",
+            request.location());
+      }
+    }
     Catalog loadedCatalog = getCatalog();
     LoadTableResponse loadTableResponse;
     try {

@@ -45,6 +45,8 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.RESTUtil;
 
 /**
@@ -89,8 +91,15 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       Parameter parameter = parameters[i];
       AuthorizationMetadata authorizeResource =
           parameter.getAnnotation(AuthorizationMetadata.class);
-      if (authorizeResource != null) {
-        Entity.EntityType type = authorizeResource.type();
+      IcebergAuthorizationMetadata icebergResource =
+          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
+      EntityType type =
+          authorizeResource != null
+              ? authorizeResource.type()
+              : icebergResource != null && icebergResource.type() == RequestType.LOAD_TABLE
+                  ? EntityType.TABLE
+                  : null;
+      if (type != null) {
         String value = String.valueOf(args[i]);
         switch (type) {
           case CATALOG:
@@ -99,6 +108,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
                 StringUtils.isBlank(value) || value.endsWith("/")
                     ? IcebergRESTUtils.getCatalogName(value)
                     : value;
+            if (catalog.contains(".")) {
+              throw new BadRequestException(
+                  "Invalid catalog prefix '%s': use a catalog name without '.'", catalog);
+            }
             nameIdentifierMap.put(
                 Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
             break;
@@ -190,6 +203,11 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception exception) {
     return exception.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  }
+
+  @Override
+  protected boolean isAuthorizationDenial(Exception exception) {
+    return super.isAuthorizationDenial(exception) || exception instanceof ForbiddenException;
   }
 
   /**
