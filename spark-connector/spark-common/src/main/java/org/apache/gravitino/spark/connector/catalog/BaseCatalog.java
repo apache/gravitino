@@ -530,6 +530,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     try {
       return gravitinoCatalogClient.asSchemas().dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
+      // Without cascade, Spark expects NonEmptyNamespaceException so the user knows to retry with
+      // cascade. With cascade the user already asked to drop the contents, so a refusal means a
+      // hard dependency blocks it; keep the server's reason instead of the misleading "namespace
+      // is not empty".
+      if (cascade) {
+        throw e;
+      }
       throw new NonEmptyNamespaceException(namespace);
     }
   }

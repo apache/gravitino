@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -44,6 +46,8 @@ import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
@@ -184,10 +188,38 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
                 + "guaranteed. Remove its objects explicitly, then retry dropping the empty schema. "
                 + "PostgreSQL reason: %s",
             schema,
-            e.getMessage());
+            singleLineReason(e));
       }
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  // pgjdbc renders a server error over several lines, and the DETAIL line that names the dependent
+  // object comes after the first one. A client keeps only the first line of a message, because the
+  // rest of what it receives is the server stack trace, so fold the reason and its detail into one
+  // line to keep the blocking object visible.
+  private static String singleLineReason(SQLException e) {
+    if (e instanceof PSQLException) {
+      ServerErrorMessage server = ((PSQLException) e).getServerErrorMessage();
+      if (server != null) {
+        String reason = singleLine(server.getMessage());
+        String detail = singleLine(server.getDetail());
+        if (!reason.isEmpty()) {
+          return detail.isEmpty() ? reason : reason + " (" + detail + ")";
+        }
+      }
+    }
+    return singleLine(e.getMessage());
+  }
+
+  private static String singleLine(@Nullable String text) {
+    if (text == null) {
+      return "";
+    }
+    return text.lines()
+        .map(String::strip)
+        .filter(StringUtils::isNotEmpty)
+        .collect(Collectors.joining("; "));
   }
 
   private static String quoteName(String name) {
