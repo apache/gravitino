@@ -38,7 +38,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -294,12 +293,15 @@ public class DomainOperations {
         metalake,
         domain,
         () -> {
-          boolean deleted =
-              DomainAuthzHelper.managed(domainDispatcher, metalake).deleteDomain(metalake, domain);
-          if (!deleted
-              && !DomainAuthzHelper.allowed(metalake, null, Privilege.Name.MANAGE_DOMAIN)) {
-            throw new NoSuchDomainException(
-                "Domain %s under metalake %s does not exist", domain, metalake);
+          boolean deleted;
+          try {
+            deleted =
+                DomainAuthzHelper.managed(domainDispatcher, metalake)
+                    .deleteDomain(metalake, domain);
+          } catch (NoSuchDomainException e) {
+            // Hidden drafts have the same delete response as absent domains. The failed check
+            // aborts the store transaction before any domain is deleted.
+            deleted = false;
           }
           return Utils.ok(new DropResponse(deleted));
         });

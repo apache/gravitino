@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -262,6 +261,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   void publishedUsageDenyAndOwnerException() {
     current.set(current.get().toBuilder().withStatus(Domain.Status.PUBLISHED).build());
     expect("GET", BASE + "/Trading", null, 403);
+    expect("DELETE", BASE + "/Trading", null, 403);
     allows.add("Finance:USE_DOMAIN");
     expect("GET", BASE + "/Trading", null, 200);
     expect("PATCH", BASE + "/Trading", "{\"status\":\"draft\"}", 403);
@@ -286,17 +286,22 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   }
 
   @Test
-  void missingAndHiddenDraftDeletesHaveTheSameNotFoundResponse() throws Exception {
+  void missingAndHiddenDraftDeletesReturnNotDropped() throws Exception {
     doReturn(false)
         .when(transactions)
         .deleteDomain(eq(NameIdentifierUtil.ofDomain("lake", "missing")), any());
-    expect("DELETE", BASE + "/missing", null, 404);
-    expect("DELETE", BASE + "/Trading", null, 404);
+    expectDrop("missing", false);
+    expectDrop("Trading", false);
+    allows.add("Finance:USE_DOMAIN");
+    expectDrop("missing", false);
+    expectDrop("Trading", false);
+    allows.add("Finance:MANAGE_DOMAIN");
+    expectDrop("Trading", true);
+    expectDrop("missing", false);
+    allows.clear();
     allows.add("lake:MANAGE_DOMAIN");
-    try (Response response = target(BASE + "/missing").request().delete()) {
-      assertEquals(200, response.getStatus());
-      assertFalse(response.readEntity(DropResponse.class).dropped());
-    }
+    expectDrop("missing", false);
+    expectDrop("Trading", true);
   }
 
   @Test
@@ -304,7 +309,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
     allows.add("Finance:MANAGE_DOMAIN");
     expect("DELETE", BASE + "/Trading/parent", null, 200);
     expect("GET", BASE + "/Trading", null, 404);
-    expect("DELETE", BASE + "/Trading", null, 404);
+    expectDrop("Trading", false);
   }
 
   @Test
@@ -353,6 +358,13 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
         child,
         child.parent().map(name -> domain(name, null, Domain.Status.PUBLISHED)).orElse(null),
         Collections.emptyList());
+  }
+
+  private void expectDrop(String name, boolean dropped) {
+    try (Response response = target(BASE + "/" + name).request().delete()) {
+      assertEquals(200, response.getStatus());
+      assertEquals(dropped, response.readEntity(DropResponse.class).dropped());
+    }
   }
 
   private void expect(String method, String path, String body, int status) {
