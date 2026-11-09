@@ -25,7 +25,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -64,7 +63,6 @@ import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
-import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -485,68 +483,14 @@ public class TagManager implements TagDispatcher {
     TagValue[] tagValuesToAdd = tagsToAddSet.toArray(new TagValue[0]);
     TagValue[] tagValuesToRemove = tagsToRemoveSet.toArray(new TagValue[0]);
 
-    if (tagValuesToAdd.length > 0) {
-      Map<String, LinkedHashSet<String>> valuesByTag = new LinkedHashMap<>();
-      Set<String> noValueTags = new LinkedHashSet<>();
-      for (Tag tag : listTagsInfoForMetadataObject(metalake, metadataObject)) {
-        TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
-        if (assignment.hasValues()) {
-          valuesByTag
-              .computeIfAbsent(tag.name(), ignored -> new LinkedHashSet<>())
-              .addAll(Arrays.asList(assignment.values()));
-        } else {
-          noValueTags.add(tag.name());
-        }
-      }
-      for (TagValue toRemove : tagValuesToRemove) {
-        if (mode == TagAssociationMode.TAG_NAMES || !toRemove.value().isPresent()) {
-          valuesByTag.remove(toRemove.name());
-          noValueTags.remove(toRemove.name());
-          continue;
-        }
-        LinkedHashSet<String> values = valuesByTag.get(toRemove.name());
-        if (values != null) {
-          values.remove(toRemove.value().get());
-          if (values.isEmpty()) {
-            valuesByTag.remove(toRemove.name());
-          }
-        }
-      }
-      for (TagValue toAdd : tagValuesToAdd) {
-        if (!toAdd.value().isPresent()) {
-          if (!valuesByTag.containsKey(toAdd.name())) {
-            noValueTags.add(toAdd.name());
-          }
-          continue;
-        }
-        noValueTags.remove(toAdd.name());
-        valuesByTag
-            .computeIfAbsent(toAdd.name(), ignored -> new LinkedHashSet<>())
-            .add(toAdd.value().get());
-      }
-      List<ResolvedTag> projected = new ArrayList<>();
-      Set<String> names = new LinkedHashSet<>();
-      names.addAll(noValueTags);
-      names.addAll(valuesByTag.keySet());
-      for (String projectedTagName : names) {
-        TagEntity tagEntity;
-        try {
-          tagEntity = loadTagEntity(metalake, projectedTagName);
-        } catch (NoSuchTagException e) {
-          // Matching the store: unknown tag names in an association request are ignored.
-          continue;
-        }
-        TagAssignment assignment =
-            valuesByTag.containsKey(projectedTagName)
-                ? TagAssignment.ofValues(valuesByTag.get(projectedTagName).toArray(new String[0]))
-                : TagAssignment.noValue();
-        projected.add(new ResolvedTag(tagEntity.copyWithAssignment(assignment), metadataObject));
-      }
-      objectPolicyResolver.checkDirectTagsUnique(
-          metalake, metadataObject, projected.toArray(new ResolvedTag[0]));
-    }
-
     try {
+      if (tagValuesToAdd.length > 0) {
+        objectPolicyResolver.checkDirectTagsUnique(
+            metalake,
+            metadataObject,
+            projectDirectAssignmentsAfterChange(
+                entityIdent, entityType, tagValuesToAdd, tagValuesToRemove, mode));
+      }
       List<TagEntity> tags;
       if (mode == TagAssociationMode.TAG_VALUES) {
         tags =
@@ -605,6 +549,76 @@ public class TagManager implements TagDispatcher {
         Capability.Scope.valueOf(metadataObject.type().name()),
         GravitinoEnv.getInstance().catalogManager(),
         () -> entityStore);
+  }
+
+  /**
+   * Projects the direct tag assignments that would remain after applying {@code tagValuesToAdd} /
+   * {@code tagValuesToRemove}. Uses the same relation read as the write path so a missing metadata
+   * object surfaces as {@link NoSuchEntityException}.
+   */
+  private Map<String, TagAssignment> projectDirectAssignmentsAfterChange(
+      NameIdentifier entityIdent,
+      Entity.EntityType entityType,
+      TagValue[] tagValuesToAdd,
+      TagValue[] tagValuesToRemove,
+      TagAssociationMode mode)
+      throws IOException {
+    Map<String, LinkedHashSet<String>> valuesByTag = new LinkedHashMap<>();
+    Set<String> noValueTags = new LinkedHashSet<>();
+    List<TagEntity> currentTags =
+        entityStore
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL, entityIdent, entityType);
+    for (TagEntity tag : currentTags) {
+      TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
+      if (assignment.hasValues()) {
+        valuesByTag
+            .computeIfAbsent(tag.name(), ignored -> new LinkedHashSet<>())
+            .addAll(Arrays.asList(assignment.values()));
+      } else {
+        noValueTags.add(tag.name());
+      }
+    }
+    for (TagValue toRemove : tagValuesToRemove) {
+      if (mode == TagAssociationMode.TAG_NAMES || !toRemove.value().isPresent()) {
+        valuesByTag.remove(toRemove.name());
+        noValueTags.remove(toRemove.name());
+        continue;
+      }
+      LinkedHashSet<String> values = valuesByTag.get(toRemove.name());
+      if (values != null) {
+        values.remove(toRemove.value().get());
+        if (values.isEmpty()) {
+          valuesByTag.remove(toRemove.name());
+        }
+      }
+    }
+    for (TagValue toAdd : tagValuesToAdd) {
+      if (!toAdd.value().isPresent()) {
+        if (!valuesByTag.containsKey(toAdd.name())) {
+          noValueTags.add(toAdd.name());
+        }
+        continue;
+      }
+      noValueTags.remove(toAdd.name());
+      valuesByTag
+          .computeIfAbsent(toAdd.name(), ignored -> new LinkedHashSet<>())
+          .add(toAdd.value().get());
+    }
+
+    Map<String, TagAssignment> projected = new LinkedHashMap<>();
+    Set<String> names = new LinkedHashSet<>();
+    names.addAll(noValueTags);
+    names.addAll(valuesByTag.keySet());
+    for (String tagName : names) {
+      projected.put(
+          tagName,
+          valuesByTag.containsKey(tagName)
+              ? TagAssignment.ofValues(valuesByTag.get(tagName).toArray(new String[0]))
+              : TagAssignment.noValue());
+    }
+    return projected;
   }
 
   private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {

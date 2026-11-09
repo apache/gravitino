@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -167,26 +168,43 @@ public class ObjectPolicyResolver {
   }
 
   /**
-   * Ensures projected direct tags on {@code metadataObject} would not yield two Iceberg maintenance
-   * policies of the same type at that object level.
+   * Ensures projected direct tag assignments on {@code metadataObject} would not yield two Iceberg
+   * maintenance policies of the same type at that object level.
+   *
+   * <p>Unknown tag names are ignored, matching the tag-association store path.
    *
    * @param metalake metalake name
    * @param metadataObject object the tags would be assigned to
-   * @param directTags projected direct tags with {@code source == metadataObject}
+   * @param projectedAssignments tag name to the assignment that would be direct on the object
    * @throws IllegalArgumentException when a same-level same-type conflict would exist
    */
   public void checkDirectTagsUnique(
-      String metalake, MetadataObject metadataObject, ResolvedTag[] directTags) {
-    if (directTags.length == 0) {
+      String metalake,
+      MetadataObject metadataObject,
+      Map<String, TagAssignment> projectedAssignments) {
+    if (projectedAssignments == null || projectedAssignments.isEmpty()) {
       return;
     }
-    List<NameIdentifier> tagIdentifiers =
-        Arrays.stream(directTags)
-            .map(resolvedTag -> resolvedTag.tag().name())
-            .distinct()
-            .map(tagName -> NameIdentifierUtil.ofTag(metalake, tagName))
-            .collect(Collectors.toList());
-    Match[] matches = selectMatches(directTags, loadRelations(tagIdentifiers, metadataObject));
+    List<ResolvedTag> directTags = new ArrayList<>(projectedAssignments.size());
+    List<NameIdentifier> tagIdentifiers = new ArrayList<>(projectedAssignments.size());
+    for (Map.Entry<String, TagAssignment> entry : projectedAssignments.entrySet()) {
+      NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, entry.getKey());
+      try {
+        TagEntity tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+        directTags.add(new ResolvedTag(tag.copyWithAssignment(entry.getValue()), metadataObject));
+        tagIdentifiers.add(tagIdent);
+      } catch (NoSuchEntityException e) {
+        // Matching the store: unknown tag names in an association request are ignored.
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    if (directTags.isEmpty()) {
+      return;
+    }
+    Match[] matches =
+        selectMatches(
+            directTags.toArray(new ResolvedTag[0]), loadRelations(tagIdentifiers, metadataObject));
     Map<Policy.BuiltInType, List<Match>> byType = new LinkedHashMap<>();
     for (Match match : matches) {
       Policy.BuiltInType type = match.policy().policyType();
