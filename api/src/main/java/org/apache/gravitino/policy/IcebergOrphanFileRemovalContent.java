@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.net.URI;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -148,7 +147,7 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   /**
    * When {@link #location()} is non-null, the policy may only bind through tags on {@link
    * MetadataObject.Type#TABLE}. {@code null} location means "use the table root" and remains valid
-   * on catalog/schema/table. Path containment is enforced at job time, not here.
+   * on catalog/schema/table.
    */
   @Override
   public void requireCompatibleBinding(
@@ -160,44 +159,6 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
         objectType == MetadataObject.Type.TABLE,
         "orphan-file-removal policy with location can only be assigned to TABLE, got %s",
         objectType);
-  }
-
-  /**
-   * Validates that a scan location is within the table storage root. Same lexical containment rule
-   * used at job submission; filesystem symlink checks remain a job concern.
-   *
-   * @param tableLocation table storage root
-   * @param location requested scan location
-   * @throws IllegalArgumentException if {@code location} is outside {@code tableLocation}
-   */
-  public static void validateLocationWithinTable(String tableLocation, String location) {
-    URI root = normalizeLocation(tableLocation);
-    URI requested = normalizeLocation(location);
-    String rootPath = root.getPath().replaceAll("/+$", "");
-    String childPath = requested.getPath().replaceAll("/+$", "");
-    boolean sameStorage =
-        Objects.equals(root.getScheme(), requested.getScheme())
-            && Objects.equals(root.getAuthority(), requested.getAuthority());
-    Preconditions.checkArgument(
-        sameStorage
-            && (childPath.equals(rootPath)
-                || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
-        "location must be within the table's storage location: %s",
-        tableLocation);
-  }
-
-  /**
-   * Normalizes an absolute location after {@link #parseAndValidateLocation(String)}.
-   *
-   * @param value input location
-   * @return normalized URI
-   */
-  public static URI normalizeLocation(String value) {
-    URI uri = parseAndValidateLocation(value);
-    if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
-      return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
-    }
-    return uri.normalize();
   }
 
   /**

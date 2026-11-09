@@ -117,17 +117,6 @@ class TestIcebergOrphanFileRemovalContent {
   }
 
   @Test
-  void validatesLocationWithinTable() {
-    IcebergOrphanFileRemovalContent.validateLocationWithinTable(
-        "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t2/data");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            IcebergOrphanFileRemovalContent.validateLocationWithinTable(
-                "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t1/data"));
-  }
-
-  @Test
   void requireCompatibleBindingRequiresTableWhenLocationSet() {
     IcebergOrphanFileRemovalContent withLocation =
         (IcebergOrphanFileRemovalContent)

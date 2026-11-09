@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import com.google.common.base.Preconditions;
 import java.net.URI;
+import java.nio.file.Paths;
+import java.util.Objects;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 
 /** Lexical containment checks shared by orphan cleanup submission and execution. */
@@ -33,7 +36,19 @@ public final class OrphanFileLocationUtils {
    * @param location requested scan location
    */
   public static void validateLocation(String tableLocation, String location) {
-    IcebergOrphanFileRemovalContent.validateLocationWithinTable(tableLocation, location);
+    URI root = normalizeLocation(tableLocation);
+    URI requested = normalizeLocation(location);
+    String rootPath = root.getPath().replaceAll("/+$", "");
+    String childPath = requested.getPath().replaceAll("/+$", "");
+    boolean sameStorage =
+        Objects.equals(root.getScheme(), requested.getScheme())
+            && Objects.equals(root.getAuthority(), requested.getAuthority());
+    Preconditions.checkArgument(
+        sameStorage
+            && (childPath.equals(rootPath)
+                || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
+        "location must be within the table's storage location: %s",
+        tableLocation);
   }
 
   /**
@@ -43,6 +58,12 @@ public final class OrphanFileLocationUtils {
    * @return normalized URI
    */
   public static URI normalizeLocation(String value) {
-    return IcebergOrphanFileRemovalContent.normalizeLocation(value);
+    // Reuse policy write-time syntax checks so create/update and job submission reject the same
+    // illegal characters (spaces, control chars, query/fragment, encodings).
+    URI uri = IcebergOrphanFileRemovalContent.parseAndValidateLocation(value);
+    if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
+      return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
+    }
+    return uri.normalize();
   }
 }
