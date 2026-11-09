@@ -50,6 +50,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.RowSetProvider;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -774,6 +776,64 @@ public class DorisTableOperations extends JdbcTableOperations {
       Optional<Transform> transform =
           DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
       return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  protected ResultSet getColumns(Connection connection, String databaseName, String tableName)
+      throws SQLException {
+    CachedRowSet columns = RowSetProvider.newFactory().createCachedRowSet();
+    try {
+      try (ResultSet metadata = super.getColumns(connection, databaseName, tableName)) {
+        columns.populate(metadata);
+      }
+
+      // Doris 1.2 can expose LARGEINT as INT through MySQL JDBC metadata. Only query native
+      // types when the target table has an INT column that may need correction.
+      boolean hasIntColumn = false;
+      while (columns.next()) {
+        // JDBC treats underscores and percent signs in table names as wildcard patterns.
+        if (tableName.equals(columns.getString("TABLE_NAME"))
+            && "INT".equalsIgnoreCase(columns.getString("TYPE_NAME"))) {
+          hasIntColumn = true;
+          break;
+        }
+      }
+      columns.beforeFirst();
+      if (!hasIntColumn) {
+        return columns;
+      }
+
+      // Restore the native type before converting both the column type and its default value.
+      Set<String> largeIntColumns = new HashSet<>();
+      String sql =
+          "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS"
+              + " WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setString(1, databaseName);
+        statement.setString(2, tableName);
+        try (ResultSet result = statement.executeQuery()) {
+          while (result.next()) {
+            if ("largeint".equalsIgnoreCase(result.getString("COLUMN_TYPE"))) {
+              largeIntColumns.add(result.getString("COLUMN_NAME"));
+            }
+          }
+        }
+      }
+      while (columns.next()) {
+        // JDBC treats underscores and percent signs in table names as wildcard patterns.
+        if (tableName.equals(columns.getString("TABLE_NAME"))
+            && largeIntColumns.contains(columns.getString("COLUMN_NAME"))) {
+          columns.updateString("TYPE_NAME", "largeint");
+          columns.updateRow();
+        }
+      }
+      columns.beforeFirst();
+      return columns;
+    } catch (SQLException | RuntimeException e) {
+      columns.close();
+      throw e;
     }
   }
 

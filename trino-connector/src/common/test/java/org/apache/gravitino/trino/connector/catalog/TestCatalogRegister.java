@@ -649,4 +649,66 @@ public class TestCatalogRegister {
     field.setAccessible(true);
     field.set(target, value);
   }
+
+  @Test
+  public void testRegisterCatalogFindsTrinoCatalogRegardlessOfQuotesAndCase() throws Exception {
+    Statement statement = mock(Statement.class);
+    when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(statement.getResultSet()).thenReturn(resultSet);
+    when(resultSet.next()).thenReturn(true);
+    when(resultSet.getString(1)).thenReturn("\"ml.glue_mx\"");
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister =
+        catalogRegister(connection, Files.createTempDirectory(tempDir, "catalogs"));
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () -> catalogRegister.registerCatalog("\"ml.Glue_MX\"", glueCatalog()));
+    assertEquals("Catalog already exists with unknown reason", e.getCause().getMessage());
+  }
+
+  @Test
+  public void testRegisterCatalogFindsCatalogFileByTrinoCatalogName() throws Exception {
+    Path catalogDirectory = Files.createTempDirectory(tempDir, "catalogs");
+    Files.writeString(catalogDirectory.resolve("ml.glue_mx.properties"), "connector.name=hive");
+
+    CatalogRegister catalogRegister = catalogRegister(mock(Connection.class), catalogDirectory);
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () -> catalogRegister.registerCatalog("\"ml.Glue_MX\"", glueCatalog()));
+    assertEquals(
+        "Catalog already exists, the catalog is not created by Gravitino",
+        e.getCause().getMessage());
+  }
+
+  private static CatalogRegister catalogRegister(Connection connection, Path catalogDirectory)
+      throws Exception {
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test")));
+    setPrivateField(catalogRegister, "connection", connection);
+    setPrivateField(catalogRegister, "catalogStoreDirectory", catalogDirectory.toString());
+    return catalogRegister;
+  }
+
+  private static GravitinoCatalog glueCatalog() throws Exception {
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "Glue_MX", "glue", "test catalog", Catalog.Type.RELATIONAL, Map.of());
+    return new GravitinoCatalog("ml", mockCatalog);
+  }
+
+  @Test
+  public void testTrinoCatalogNameIsUnquotedLowerCase() {
+    assertEquals("gglue_a8_mx", CatalogRegister.trinoCatalogName("gglue_a8_MX"));
+    assertEquals("ml.glue_mx", CatalogRegister.trinoCatalogName("\"ml.Glue_MX\""));
+  }
 }

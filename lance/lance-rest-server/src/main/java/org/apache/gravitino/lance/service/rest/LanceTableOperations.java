@@ -328,14 +328,13 @@ public class LanceTableOperations {
     }
   }
 
-  private void validateDeclareTableRequest(
-      @SuppressWarnings("unused") DeclareTableRequest request) {
-    // No specific fields to validate for now
+  private void validateDeclareTableRequest(DeclareTableRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
   }
 
-  private void validateRegisterTableRequest(
-      @SuppressWarnings("unused") RegisterTableRequest request) {
-    // No specific fields to validate for now
+  private void validateRegisterTableRequest(RegisterTableRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    Preconditions.checkArgument(request.getLocation() != null, "location must not be null");
   }
 
   private void validateDeregisterTableRequest(
@@ -361,6 +360,8 @@ public class LanceTableOperations {
   }
 
   private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    Preconditions.checkArgument(request.getColumns() != null, "columns must not be null");
     Preconditions.checkArgument(
         !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
     Preconditions.checkArgument(
@@ -369,10 +370,14 @@ public class LanceTableOperations {
   }
 
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
+    Preconditions.checkArgument(request != null, "Request body must not be null");
+    Preconditions.checkArgument(request.getAlterations() != null, "alterations must not be null");
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
 
-    for (AlterColumnsEntry alteration : request.getAlterations()) {
+    for (int i = 0; i < request.getAlterations().size(); i++) {
+      AlterColumnsEntry alteration = request.getAlterations().get(i);
+      Preconditions.checkArgument(alteration != null, "alterations[%s] must not be null", i);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(alteration.getPath()), "Column path to alter cannot be empty.");
       Preconditions.checkArgument(

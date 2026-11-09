@@ -23,14 +23,22 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ObjectArrays;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Supplier;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -105,6 +113,63 @@ public class CapabilityHelpers {
     } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
+  }
+
+  /**
+   * Normalizes the identifier of an existing catalog object to the identifier stored by Gravitino.
+   * Tag and authorization lookups use it, so they find the same stored object.
+   *
+   * <ul>
+   *   <li>Names follow the catalog's case rules for each scope.
+   *   <li>A table, or the parent table of a column, is resolved to its physical name by {@link
+   *       #resolvePhysicalTableName}.
+   *   <li>A column keeps the requested name when its table has a stored column with exactly that
+   *       name. A custom {@link Capability#normalizeName} can fold a name that the source stored
+   *       with another case, and an exact name must still find that column.
+   *   <li>A Semantic Model name is owned by Gravitino, so only its schema is normalized.
+   * </ul>
+   *
+   * @param ident the entity identifier of the object
+   * @param scope the capability scope of the object
+   * @param catalogManager the catalog manager used to load capabilities and resolve table names
+   * @param entityStore supplies the entity store that holds the stored columns of a table. It is
+   *     called only for a column whose name the catalog rules change.
+   * @return the normalized identifier
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws RuntimeException if capabilities, the physical table name or the stored table cannot be
+   *     loaded
+   */
+  public static NameIdentifier normalizeMetadataIdentifier(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      CatalogManager catalogManager,
+      Supplier<EntityStore> entityStore) {
+    Capability capability = getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.COLUMN) {
+      NameIdentifier table =
+          resolvePhysicalTableName(
+              applyCaseSensitive(
+                  NameIdentifier.of(ident.namespace().levels()),
+                  Capability.Scope.TABLE,
+                  capability),
+              catalogManager);
+      String column = applyCaseSensitiveOnName(scope, ident.name(), capability);
+      if (!column.equals(ident.name()) && hasStoredColumn(table, ident.name(), entityStore.get())) {
+        column = ident.name();
+      }
+      return NameIdentifier.of(
+          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())), column);
+    }
+
+    if (scope == Capability.Scope.SEMANTIC_MODEL) {
+      return NameIdentifier.of(
+          applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+    }
+
+    NameIdentifier normalized = applyCaseSensitive(ident, scope, capability);
+    return scope == Capability.Scope.TABLE
+        ? resolvePhysicalTableName(normalized, catalogManager)
+        : normalized;
   }
 
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {
@@ -288,6 +353,18 @@ public class CapabilityHelpers {
     return namespace;
   }
 
+  private static boolean hasStoredColumn(
+      NameIdentifier table, String column, EntityStore entityStore) {
+    try {
+      return entityStore.get(table, Entity.EntityType.TABLE, TableEntity.class).columns().stream()
+          .anyMatch(storedColumn -> storedColumn.name().equals(column));
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load stored columns of table: " + table, e);
+    }
+  }
+
   private static boolean hasSchemaParent(Capability.Scope resourceScope) {
     switch (resourceScope) {
       case TABLE:
@@ -450,15 +527,23 @@ public class CapabilityHelpers {
     return TableChange.rename(newName, newSchemaName);
   }
 
+  private static void applyExistingColumnName(String name, Capability capabilities) {
+    CapabilityResult result =
+        capabilities.specificationOnExistingName(Capability.Scope.COLUMN, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-    applyNameSpecification(Capability.Scope.COLUMN, change.fieldName()[0], capabilities);
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
 
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    applyExistingColumnName(change.fieldName()[0], capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
@@ -483,7 +568,7 @@ public class CapabilityHelpers {
           (TableChange.UpdateColumnPosition) change;
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyNameSpecification(Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
+        applyExistingColumnName(afterPosition.getColumn(), capabilities);
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
@@ -554,7 +639,7 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
       newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);

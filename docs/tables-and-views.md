@@ -146,6 +146,18 @@ A column default can be a [literal](./expression.md#literal) or an
 [expression](./expression.md). The underlying catalog applies it to new rows, and support depends
 on the catalog provider.
 
+PostgreSQL, MySQL, Doris, StarRocks, OceanBase, and Hologres share function-default write
+validation: function names must be unquoted identifiers (optionally qualified), and arguments
+must be literals or nested functions. Column references such as `abs(a)` and raw SQL expression
+arguments are rejected before DDL. `CURRENT_TIMESTAMP` accepts no arguments. The source database
+may impose additional restrictions on which functions can be used as defaults.
+
+ClickHouse uses its own function conversion and is outside this shared validation. Hologres also
+retains its separate `UnparsedExpression` write path. The PostgreSQL native-type validation and
+default-reading rules are PostgreSQL-specific; they do not change the other catalogs' native-type
+handling. MySQL, Doris, OceanBase, Hologres, and ClickHouse continue to pass `ExternalType`
+declarations to the source, while StarRocks does not support `ExternalType` writes.
+
 #### Table Column Auto-increment
 
 An auto-increment column asks the underlying catalog to generate values for new rows. Support and

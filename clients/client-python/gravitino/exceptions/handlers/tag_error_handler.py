@@ -20,7 +20,9 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     MetalakeNotInUseException,
     NoSuchMetalakeException,
+    NoSuchPolicyException,
     NoSuchTagException,
+    PolicyAlreadyAssociatedException,
     TagAlreadyAssociatedException,
     TagAlreadyExistsException,
 )
@@ -28,17 +30,26 @@ from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHan
 
 
 class TagErrorHandler(CodeMappingErrorHandler):
-    """Error handler specific to Tag operations."""
+    """Error handler specific to Tag operations.
+
+    The policy mappings cover the tag-side policy association calls in
+    ``GravitinoMetalake``, which share this handler; the tag endpoints
+    themselves never return the policy exception types.
+    """
 
     _code_exception_map = {
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE: IllegalArgumentException,
         ErrorConstants.NOT_FOUND_CODE: {
             NoSuchMetalakeException.__name__: NoSuchMetalakeException,
             NoSuchTagException.__name__: NoSuchTagException,
+            NoSuchPolicyException.__name__: NoSuchPolicyException,
         },
         ErrorConstants.ALREADY_EXISTS_CODE: {
             TagAlreadyExistsException.__name__: TagAlreadyExistsException,
             TagAlreadyAssociatedException.__name__: TagAlreadyAssociatedException,
+            PolicyAlreadyAssociatedException.__name__: (
+                PolicyAlreadyAssociatedException
+            ),
         },
         ErrorConstants.NOT_IN_USE_CODE: MetalakeNotInUseException,
         ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,

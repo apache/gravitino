@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -36,6 +37,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -108,6 +110,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
             : dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     if (isStagedCreateCommit) {
       importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+    } else if (changesSchema(updateTableRequest)) {
+      // Bring the stored columns up to date now, while the request runs as the committing user, so
+      // the change is recorded as theirs. Left to the next load, it is recorded as whoever loads
+      // the table first, or as anonymous when that is a background listener.
+      importTableEntity(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
     }
     return response;
   }
@@ -236,11 +243,28 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
+  @VisibleForTesting
+  static boolean changesSchema(UpdateTableRequest updateTableRequest) {
+    return updateTableRequest.updates().stream()
+        .anyMatch(
+            update ->
+                update instanceof MetadataUpdate.AddSchema
+                    || update instanceof MetadataUpdate.SetCurrentSchema);
+  }
+
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
     // Validate request metadata before the backend operation. An unexpected import failure must
     // propagate without deleting a table that another client may already have updated or recreated.
     importTableEntity(context.catalogName(), namespace, tableName);
+    IcebergEntityAuditUtils.recordCreator(
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            context.catalogName(),
+            TableIdentifier.of(namespace, tableName),
+            HierarchicalSchemaUtil.schemaSeparator()),
+        Entity.EntityType.TABLE,
+        context.userName());
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),

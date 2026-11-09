@@ -269,6 +269,22 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testSetMetalakeRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/test")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+      }
+    }
+    Mockito.verify(metalakeManager, Mockito.never()).enableMetalake(any());
+    Mockito.verify(metalakeManager, Mockito.never()).disableMetalake(any());
+  }
+
+  @Test
   public void testSetMetalake() {
     Mockito.doNothing().when(metalakeManager).enableMetalake(any());
     Mockito.doNothing().when(metalakeManager).disableMetalake(any());

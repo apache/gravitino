@@ -35,6 +35,16 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaBaseSQLProvider {
+  private static final String SELECT_SCHEMA_BY_ID =
+      "SELECT schema_id as schemaId, schema_name as schemaName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId,"
+          + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE schema_id = #{schemaId}";
+
   public String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return "SELECT schema_id as schemaId, schema_name as schemaName,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
@@ -180,14 +190,17 @@ public class SchemaMetaBaseSQLProvider {
   }
 
   public String selectSchemaMetaById(@Param("schemaId") Long schemaId) {
-    return "SELECT schema_id as schemaId, schema_name as schemaName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    return SELECT_SCHEMA_BY_ID + " AND deleted_at = 0";
+  }
+
+  /**
+   * Returns SQL that locks a schema identity, including a retired row that can be revived.
+   *
+   * @param schemaId the schema ID bound by MyBatis
+   * @return a select-for-update statement without a deleted-at filter
+   */
+  public String selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId) {
+    return SELECT_SCHEMA_BY_ID + " FOR UPDATE";
   }
 
   /** Returns SQL that checks whether an active child exists in the schema. */
