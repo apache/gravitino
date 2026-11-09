@@ -50,8 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TMS Spark job: sample before-metrics → gate → run Iceberg procedure → after-metrics → close soft
- * slot.
+ * TMS Spark job: collect before-metrics → gate → execute procedure → report after-metrics → release
+ * soft slot.
  *
  * <p>Started only from the built-in template (cron or commit-chain). {@code maintenance_types} is
  * one type or a comma-separated chain; {@code policy_ids} / {@code action_ids} align 1:1 with those
@@ -132,7 +132,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return SparkJobTemplate.builder()
         .withName(NAME)
         .withComment(
-            "TMS Iceberg maintenance (before-metrics, gate, procedure, after-metrics, finish)")
+            "TMS Iceberg maintenance (before metrics, gate, procedure, after metrics, finish)")
         .withExecutable(resolveExecutable(IcebergMaintenanceJob.class))
         .withClassName(IcebergMaintenanceJob.class.getName())
         .withArguments(templateArguments())
@@ -205,9 +205,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               long actionId = actionIds.get(i);
               String slot = table.tableId + ":" + policyId;
               try {
-                maintainOneType(spark, client, type, table, policyId, actionId, argsByName);
+                runMaintenanceForType(spark, client, type, table, policyId, actionId, argsByName);
               } finally {
-                closeSoftSlot(client, actionId, table.tableId, policyId);
+                releaseSoftSlot(client, actionId, table.tableId, policyId);
                 closedSlots.add(slot);
               }
             }
@@ -222,7 +222,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               long policyId = policyIds.get(i);
               long actionId = actionIds.get(i);
               if (!closedSlots.contains(table.tableId + ":" + policyId)) {
-                closeSoftSlot(client, actionId, table.tableId, policyId);
+                releaseSoftSlot(client, actionId, table.tableId, policyId);
               }
             }
           }
@@ -231,7 +231,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static void maintainOneType(
+  private static void runMaintenanceForType(
       SparkSession spark,
       MaintenanceActionHttpClient client,
       MaintenanceType type,
@@ -242,14 +242,16 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       throws Exception {
     // Orphan cleanup: no S0 row (dashboard uses procedure outcomes only).
     if (type == MaintenanceType.REMOVE_ORPHAN_FILES) {
-      AfterSample after =
-          runProcedure(spark, type, table.catalogName, table.tableIdentifier, argsByName, null);
-      tryReportAfterMetrics(client, actionId, table.tableId, policyId, after);
+      AfterMetrics after =
+          executeMaintenanceProcedure(
+              spark, type, table.catalogName, table.tableIdentifier, argsByName, null);
+      reportAfterMetrics(client, actionId, table.tableId, policyId, after);
       return;
     }
 
-    BeforeSample before = sampleBefore(spark, table.catalogName, table.tableIdentifier, type);
-    if (!tryReportBeforeMetrics(client, actionId, table.tableId, policyId, before)) {
+    BeforeMetrics before =
+        collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier, type);
+    if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
       LOG.info(
           "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
               + " (abandoned or unbound)",
@@ -259,7 +261,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           policyId);
       return;
     }
-    if (usesSnapshotDriftGate(type) && before.snapshotId != before.headSnapshotId) {
+    if (requiresSnapshotDriftCheck(type) && before.snapshotId != before.headSnapshotId) {
       LOG.info(
           "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
               + " (sampled={} head={})",
@@ -280,9 +282,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           policyId);
       return;
     }
-    AfterSample after =
-        runProcedure(spark, type, table.catalogName, table.tableIdentifier, argsByName, before);
-    tryReportAfterMetrics(client, actionId, table.tableId, policyId, after);
+    AfterMetrics after =
+        executeMaintenanceProcedure(
+            spark, type, table.catalogName, table.tableIdentifier, argsByName, before);
+    reportAfterMetrics(client, actionId, table.tableId, policyId, after);
   }
 
   /**
@@ -290,7 +293,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * Expiry and orphan cleanup always proceed past HEAD drift.
    */
   @VisibleForTesting
-  static boolean usesSnapshotDriftGate(MaintenanceType type) {
+  static boolean requiresSnapshotDriftCheck(MaintenanceType type) {
     return type == MaintenanceType.REWRITE_DATA_FILES || type == MaintenanceType.REWRITE_MANIFESTS;
   }
 
@@ -388,13 +391,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     return ids;
   }
 
-  private static AfterSample runProcedure(
+  private static AfterMetrics executeMaintenanceProcedure(
       SparkSession spark,
       MaintenanceType type,
       String catalogName,
       String tableIdentifier,
       Map<String, String> argsByName,
-      @Nullable BeforeSample before)
+      @Nullable BeforeMetrics before)
       throws Exception {
     switch (type) {
       case REWRITE_DATA_FILES:
@@ -417,7 +420,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
               IcebergRewriteDataFilesJob.collectCompactionMetrics(
                   spark, catalogName, tableIdentifier);
           long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-          return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
+          return new AfterMetrics(afterSnapshotId, metricsToJson(afterMetrics));
         }
       case REWRITE_MANIFESTS:
         {
@@ -441,9 +444,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
             LOG.info("Rewrite manifests results: rewritten={}, added={}", rewritten, added);
           }
           long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-          return new AfterSample(
+          return new AfterMetrics(
               afterSnapshotId,
-              toMetricsJson(IcebergRewriteManifestsJob.manifestAfterMetrics(rewritten)));
+              metricsToJson(IcebergRewriteManifestsJob.manifestAfterMetrics(rewritten)));
         }
       case EXPIRE_SNAPSHOTS:
         {
@@ -477,9 +480,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                   : before.expireInventory;
           Map<String, Object> afterMetrics =
               IcebergExpireSnapshotsJob.expireAfterMetrics(beforeInventory, afterInventory);
-          long afterSnapshotId =
-              currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
-          return new AfterSample(afterSnapshotId, toMetricsJson(afterMetrics));
+          long afterSnapshotId = currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier);
+          return new AfterMetrics(afterSnapshotId, metricsToJson(afterMetrics));
         }
       case REMOVE_ORPHAN_FILES:
         {
@@ -491,11 +493,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
           IcebergRemoveOrphanFilesJob.OrphanCleanupResult orphan =
               IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, orphanOpts);
-          long afterSnapshotId =
-              currentSnapshotIdAllowingEmpty(spark, catalogName, tableIdentifier);
-          return new AfterSample(
+          long afterSnapshotId = currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier);
+          return new AfterMetrics(
               afterSnapshotId,
-              toMetricsJson(
+              metricsToJson(
                   IcebergRemoveOrphanFilesJob.orphanAfterMetrics(
                       orphan.filesRemoved(), orphan.bytesReclaimed())));
         }
@@ -508,7 +509,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * Samples snapshot + metrics for the before-metrics gate. Re-reads HEAD after metrics so drift
    * can be detected for compaction / manifest rewrite.
    */
-  private static BeforeSample sampleBefore(
+  private static BeforeMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
     long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload;
@@ -535,7 +536,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
         throw new IllegalStateException("Unhandled maintenance type: " + type);
     }
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    return new BeforeSample(snapshotId, headSnapshotId, toMetricsJson(payload), expireInventory);
+    return new BeforeMetrics(snapshotId, headSnapshotId, metricsToJson(payload), expireInventory);
   }
 
   private static long currentSnapshotId(
@@ -549,7 +550,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /** After expiry/orphan, HEAD may briefly be empty; report {@code -1} in that case. */
-  private static long currentSnapshotIdAllowingEmpty(
+  private static long currentSnapshotIdOrEmpty(
       SparkSession spark, String catalogName, String tableIdentifier) {
     Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
     return snapshot == null ? -1L : snapshot.snapshotId();
@@ -570,7 +571,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static void closeSoftSlot(
+  private static void releaseSoftSlot(
       MaintenanceActionHttpClient client, long actionId, long tableId, long policyId) {
     try {
       client.finish(actionId, new MaintenanceActionFinishRequest(tableId, policyId));
@@ -588,12 +589,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    * Reports before-metrics. Failure means the soft slot is abandoned/unbound — do not run the
    * procedure.
    */
-  private static boolean tryReportBeforeMetrics(
+  private static boolean reportBeforeMetricsOrStop(
       MaintenanceActionHttpClient client,
       long actionId,
       long tableId,
       long policyId,
-      BeforeSample sample) {
+      BeforeMetrics sample) {
     if (sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
       return false;
     }
@@ -615,12 +616,12 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static void tryReportAfterMetrics(
+  private static void reportAfterMetrics(
       MaintenanceActionHttpClient client,
       long actionId,
       long tableId,
       long policyId,
-      AfterSample sample) {
+      AfterMetrics sample) {
     if (sample.metricsJson == null || sample.metricsJson.trim().isEmpty()) {
       LOG.warn(
           "TMS after metrics skipped for action_id {} table {} policy {}: empty metrics JSON",
@@ -646,7 +647,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static String toMetricsJson(Map<String, Object> metrics) {
+  static String metricsToJson(Map<String, Object> metrics) {
     try {
       return JsonUtils.anyFieldMapper().writeValueAsString(metrics);
     } catch (JsonProcessingException e) {
@@ -728,13 +729,13 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /** Before-metrics sample: snapshot at sample time, HEAD after metrics, and metrics JSON. */
-  private static final class BeforeSample {
+  private static final class BeforeMetrics {
     private final long snapshotId;
     private final long headSnapshotId;
     private final String metricsJson;
     @Nullable private final IcebergExpireSnapshotsJob.ExpireInventory expireInventory;
 
-    private BeforeSample(
+    private BeforeMetrics(
         long snapshotId,
         long headSnapshotId,
         String metricsJson,
@@ -747,11 +748,11 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /** After-metrics sample for S1 reporting. */
-  private static final class AfterSample {
+  private static final class AfterMetrics {
     private final long snapshotId;
     private final String metricsJson;
 
-    private AfterSample(long snapshotId, String metricsJson) {
+    private AfterMetrics(long snapshotId, String metricsJson) {
       this.snapshotId = snapshotId;
       this.metricsJson = metricsJson;
     }

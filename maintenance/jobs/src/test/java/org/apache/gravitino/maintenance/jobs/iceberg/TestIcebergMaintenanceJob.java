@@ -83,9 +83,11 @@ public class TestIcebergMaintenanceJob {
 
   @Test
   public void testSnapshotDriftGateOnlyForCompactionAndManifest() {
-    assertTrue(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REWRITE_DATA_FILES));
-    assertTrue(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REWRITE_MANIFESTS));
-    assertFalse(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.EXPIRE_SNAPSHOTS));
-    assertFalse(IcebergMaintenanceJob.usesSnapshotDriftGate(MaintenanceType.REMOVE_ORPHAN_FILES));
+    assertTrue(
+        IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REWRITE_DATA_FILES));
+    assertTrue(IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REWRITE_MANIFESTS));
+    assertFalse(IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.EXPIRE_SNAPSHOTS));
+    assertFalse(
+        IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REMOVE_ORPHAN_FILES));
   }
 }
