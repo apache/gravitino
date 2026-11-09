@@ -38,28 +38,32 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
 @IdpManagement
 @Path("/idp/users")
 public class IdpUserOperations {
 
-  private final IdpUserGroupManager userGroupManager;
+  private static final Logger LOG = LoggerFactory.getLogger(IdpUserOperations.class);
+
+  private final IdpUserGroupEventDispatcher userGroupDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IdpUserOperations(IdpUserGroupManager userGroupManager) {
-    this.userGroupManager = userGroupManager;
+  public IdpUserOperations(IdpUserGroupEventDispatcher userGroupDispatcher) {
+    this.userGroupDispatcher = userGroupDispatcher;
   }
 
   @GET
@@ -70,7 +74,7 @@ public class IdpUserOperations {
   public Response getUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO())),
+        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO())),
         "user",
         IdpOperationType.GET,
         user);
@@ -81,9 +85,11 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -91,7 +97,7 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
-                  userGroupManager.addUser(request.getUser(), request.getPassword()).toDTO()));
+                  userGroupDispatcher.addUser(request.getUser(), request.getPassword()).toDTO()));
         },
         "user",
         IdpOperationType.ADD,
@@ -112,9 +118,11 @@ public class IdpUserOperations {
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
-    Response rejection = IdpRESTUtils.rejectNullRequestBody(request);
-    if (rejection != null) {
-      return rejection;
+    if (request == null) {
+      LOG.warn("Received IdP request with null request body");
+      return IdpRESTUtils.illegalArguments(
+          "Request body cannot be null",
+          new IllegalArgumentException("Request body cannot be null"));
     }
     return IdpRESTUtils.doAs(
         httpRequest,
@@ -132,15 +140,15 @@ public class IdpUserOperations {
             Preconditions.checkArgument(
                 StringUtils.isNotBlank(request.getOldPassword()),
                 "\"oldPassword\" is required when changing your own password");
-            userGroupManager.changePassword(
+            userGroupDispatcher.changePassword(
                 user, request.getNewPassword(), request.getOldPassword());
           } else {
             Preconditions.checkArgument(
                 request.getOldPassword() == null,
                 "\"oldPassword\" is only allowed when changing your own password");
-            userGroupManager.changePassword(user, request.getNewPassword());
+            userGroupDispatcher.changePassword(user, request.getNewPassword());
           }
-          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupDispatcher.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,
@@ -155,7 +163,7 @@ public class IdpUserOperations {
   public Response removeUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupDispatcher.removeUser(user))),
         "user",
         IdpOperationType.REMOVE,
         user);
