@@ -97,6 +97,65 @@ public class TestIcebergCatalogWrapper {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"file:///tmp/table", "gs://bucket/table", "/tmp/table", "s3:///table"})
+  void testS3CatalogRejectsInvalidRegisterAndUpdateLocations(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    RegisterTableRequest register =
+        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(location).build();
+    UpdateTableRequest update =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Collections.singletonList(new MetadataUpdate.SetLocation(location)));
+
+    BadRequestException registerFailure =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.registerTable(Namespace.of("s"), register));
+    Assertions.assertTrue(registerFailure.getMessage().contains(location));
+    BadRequestException metadataFailure =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+    Assertions.assertTrue(metadataFailure.getMessage().contains(location));
+    BadRequestException updateFailure =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> wrapper.updateTable(TableIdentifier.of("s", "t"), update));
+    Assertions.assertTrue(updateFailure.getMessage().contains(location));
+    Mockito.verify(wrapper, Mockito.never()).getCatalog();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3://bucket/table", "s3a://bucket/table", "s3n://bucket/table"})
+  void testS3CatalogAcceptsRegisterAndUpdateLocationSchemes(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.doReturn(catalog).when(wrapper).getCatalog();
+    Mockito.when(catalog.registerTable(Mockito.any(), Mockito.eq(location), Mockito.anyBoolean()))
+        .thenThrow(new IllegalStateException("register backend reached"));
+    Mockito.when(catalog.loadTable(Mockito.any()))
+        .thenThrow(new IllegalStateException("update backend reached"));
+    RegisterTableRequest register =
+        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(location).build();
+    UpdateTableRequest update =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Collections.singletonList(new MetadataUpdate.SetLocation(location)));
+
+    IllegalStateException registerFailure =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> wrapper.registerTable(Namespace.of("s"), register));
+    Assertions.assertEquals("register backend reached", registerFailure.getMessage());
+    IllegalStateException updateFailure =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () -> wrapper.updateTable(TableIdentifier.of("s", "t"), update));
+    Assertions.assertEquals("update backend reached", updateFailure.getMessage());
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"s3://bucket/table", "s3a://bucket/table", "s3n://bucket/table"})
   void testS3CatalogAcceptsSupportedLocationSchemes(String location) {
     IcebergCatalogWrapper wrapper =

@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -28,8 +30,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
@@ -49,6 +53,9 @@ import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailure
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,6 +143,38 @@ class TestIcebergLoadAuthorizationAudit {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"loadTable", "loadView"})
+  void testBackendForbiddenDuringAuthorizationDoesNotRecordDenial(String operation)
+      throws Throwable {
+    when(wrapperManager.getCatalogWrapper("cat"))
+        .thenThrow(new ForbiddenException("Backend credentials rejected"));
+    MethodInvocation invocation = loadInvocation(operation, "cat/");
+    try (Response response = (Response) interceptor.invoke(invocation)) {
+      assertEquals(403, response.getStatus());
+      assertEquals(
+          "Backend credentials rejected", ((ErrorResponse) response.getEntity()).message());
+    }
+    verify(eventBus, never()).dispatchEvent(any());
+    verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"loadTable", "loadView"})
+  void testBackendForbiddenAfterAuthorizationDoesNotRecordDenial(String operation)
+      throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    MethodInvocation invocation = loadInvocation(operation, "cat/");
+    when(invocation.proceed()).thenThrow(new ForbiddenException("Backend credentials rejected"));
+    try (Response response = (Response) interceptor.invoke(invocation)) {
+      assertEquals(403, response.getStatus());
+      assertEquals(
+          "Backend credentials rejected", ((ErrorResponse) response.getEntity()).message());
+    }
+    verify(eventBus, never()).dispatchEvent(any());
+    verify(invocation).proceed();
+  }
+
+  @ParameterizedTest
   @CsvSource({
     "loadTable,false,403",
     "loadView,false,403",
@@ -169,8 +208,43 @@ class TestIcebergLoadAuthorizationAudit {
     MethodInvocation invocation = loadInvocation(operation, "cat/");
     try (Response response = (Response) interceptor.invoke(invocation)) {
       assertEquals(status, response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      assertEquals(owner ? "NoSuchNamespaceException" : "ForbiddenException", error.type());
+      assertEquals(
+          owner
+              ? "No Iceberg configuration for catalog 'cat'"
+              : "Not authorized to access catalog 'cat'",
+          error.message());
     }
     verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCatalogLookupFailurePreservesCause(boolean missing) {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    RuntimeException cause =
+        missing
+            ? new NoSuchCatalogException("Catalog cat does not exist")
+            : new IllegalArgumentException("Catalog cat is not an Iceberg catalog");
+    when(wrapperManager.getCatalogWrapper("cat")).thenThrow(cause);
+    Class<? extends RuntimeException> expectedType =
+        missing ? NoSuchNamespaceException.class : BadRequestException.class;
+
+    RuntimeException failure =
+        assertThrows(
+            expectedType,
+            () ->
+                IcebergLoadAuthzHandlerHelper.getCatalogWrapper(
+                    "cat",
+                    Map.of(
+                        EntityType.METALAKE, NameIdentifier.of("ml"),
+                        EntityType.CATALOG, NameIdentifier.of("ml", "cat"))));
+
+    assertSame(cause, failure.getCause());
+    assertEquals(
+        missing ? "No Iceberg configuration for catalog 'cat'" : cause.getMessage(),
+        failure.getMessage());
   }
 
   @ParameterizedTest

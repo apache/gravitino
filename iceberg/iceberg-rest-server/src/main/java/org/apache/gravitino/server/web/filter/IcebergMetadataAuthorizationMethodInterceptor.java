@@ -46,7 +46,6 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.RESTUtil;
 
 /**
@@ -109,6 +108,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
                     ? IcebergRESTUtils.getCatalogName(value)
                     : value;
             if (catalog.contains(".")) {
+              // CatalogNormalizeDispatcher rejects dots when creating or renaming catalogs.
               throw new BadRequestException(
                   "Invalid catalog prefix '%s': use a catalog name without '.'", catalog);
             }
@@ -203,11 +203,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception exception) {
     return exception.getClass().getName().startsWith("org.apache.iceberg.exceptions");
-  }
-
-  @Override
-  protected boolean isAuthorizationDenial(Exception exception) {
-    return super.isAuthorizationDenial(exception) || exception instanceof ForbiddenException;
   }
 
   /**

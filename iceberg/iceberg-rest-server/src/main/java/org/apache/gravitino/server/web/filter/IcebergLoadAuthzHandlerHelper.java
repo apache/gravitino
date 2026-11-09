@@ -28,6 +28,7 @@ import java.util.function.Supplier;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -41,7 +42,6 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.RESTUtil;
 
@@ -103,9 +103,9 @@ final class IcebergLoadAuthzHandlerHelper {
         throw new ForbiddenException("Not authorized to access catalog '%s'", catalog);
       }
       if (e instanceof NoSuchCatalogException) {
-        throw new NoSuchNamespaceException("No Iceberg configuration for catalog '%s'", catalog);
+        throw new NoSuchNamespaceException(e, "No Iceberg configuration for catalog '%s'", catalog);
       }
-      throw new BadRequestException("%s", e.getMessage());
+      throw new BadRequestException(e, "%s", e.getMessage());
     }
   }
 
