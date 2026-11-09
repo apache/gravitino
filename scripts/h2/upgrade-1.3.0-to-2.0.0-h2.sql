@@ -24,7 +24,7 @@
 -- The 2.0 server no longer reads direct object-policy assignments from this table.
 
 ALTER TABLE `table_column_version_info`
-    ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
+    ALTER COLUMN `column_comment` CLOB DEFAULT '';
 
 -- Support external column names up to 300 characters (including BigQuery).
 ALTER TABLE `table_column_version_info` ALTER COLUMN `column_name` VARCHAR(300) NOT NULL;
