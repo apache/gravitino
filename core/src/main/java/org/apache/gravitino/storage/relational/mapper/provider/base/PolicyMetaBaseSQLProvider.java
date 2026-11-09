@@ -334,7 +334,28 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE pm.policy_type = #{policyType} AND pvi.enabled = TRUE"
         + " AND (ptr.selector IS NULL"
         + " OR ptr.selector = '{\"type\":\"ALL_VALUES\"}'"
-        + " OR ptr.selector = CONCAT('{\"type\":\"TAG_VALUE\",\"value\":\"', a.tag_value, '\"}'))";
+        + " OR "
+        + tagValueSelectorMatches("ptr.selector", "a.tag_value")
+        + ")";
+  }
+
+  /**
+   * Matches a {@code TAG_VALUE} selector against an assignment value using dialect JSON extraction,
+   * so values with quotes, backslashes, or control characters compare correctly.
+   *
+   * @param selectorExpr SQL expression for the stored selector JSON
+   * @param tagValueExpr SQL expression for the assignment value
+   * @return SQL boolean expression
+   */
+  protected String tagValueSelectorMatches(String selectorExpr, String tagValueExpr) {
+    return "(JSON_UNQUOTE(JSON_EXTRACT("
+        + selectorExpr
+        + ", '$.type')) = 'TAG_VALUE'"
+        + " AND JSON_UNQUOTE(JSON_EXTRACT("
+        + selectorExpr
+        + ", '$.value')) = "
+        + tagValueExpr
+        + ")";
   }
 
   /** Tag assignments on each table and its ancestors: table_id, distance, tag_id, tag_value. */

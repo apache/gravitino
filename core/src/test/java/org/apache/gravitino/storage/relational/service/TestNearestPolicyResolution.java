@@ -213,6 +213,55 @@ public class TestNearestPolicyResolution extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testTagValueSelectorWithEscapedCharacters() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createAndInsertCatalog(METALAKE, "cat");
+    createAndInsertSchema(METALAKE, "cat", "schema");
+    TableEntity table =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(METALAKE, "cat", "schema"), "t1");
+
+    PolicyEntity quoted = insertCompaction("quoted_policy");
+    PolicyEntity backslash = insertCompaction("backslash_policy");
+    PolicyEntity newline = insertCompaction("newline_policy");
+    TagEntity domain = insertTag("escaped_domain");
+    linkPolicy(domain, quoted, "{\"type\":\"TAG_VALUE\",\"value\":\"a\\\"b\"}");
+    linkPolicy(domain, backslash, "{\"type\":\"TAG_VALUE\",\"value\":\"a\\\\b\"}");
+    linkPolicy(domain, newline, "{\"type\":\"TAG_VALUE\",\"value\":\"a\\nb\"}");
+
+    assignTag(
+        table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("escaped_domain", "a\"b"));
+    Assertions.assertEquals(
+        List.of(quoted.id()),
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
+
+    TagMetaService.getInstance()
+        .associateTagValuesWithMetadataObject(
+            table.nameIdentifier(),
+            Entity.EntityType.TABLE,
+            new TagValue[] {TagValue.of("escaped_domain", "a\\b")},
+            new TagValue[] {TagValue.of("escaped_domain", "a\"b")});
+    Assertions.assertEquals(
+        List.of(backslash.id()),
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
+
+    TagMetaService.getInstance()
+        .associateTagValuesWithMetadataObject(
+            table.nameIdentifier(),
+            Entity.EntityType.TABLE,
+            new TagValue[] {TagValue.of("escaped_domain", "a\nb")},
+            new TagValue[] {TagValue.of("escaped_domain", "a\\b")});
+    Assertions.assertEquals(
+        List.of(newline.id()),
+        PolicyMetaService.getInstance()
+            .resolveNearestPolicyIds(List.of(table.id()), Policy.BuiltInType.ICEBERG_COMPACTION)
+            .get(table.id()));
+  }
+
+  @TestTemplate
   public void testSelectorAndDisabledPolicy() throws IOException {
     createAndInsertMakeLake(METALAKE);
     createAndInsertCatalog(METALAKE, "cat");

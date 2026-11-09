@@ -139,5 +139,18 @@ public class PolicyMetaSQLProviderFactory {
     }
   }
 
-  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {}
+  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {
+    @Override
+    protected String tagValueSelectorMatches(String selectorExpr, String tagValueExpr) {
+      // H2 has no JSON_EXTRACT; compare JSON-encoded string values so escapes round-trip.
+      return "(CAST(("
+          + selectorExpr
+          + " FORMAT JSON).\"type\" AS VARCHAR) = '\"TAG_VALUE\"'"
+          + " AND CAST(("
+          + selectorExpr
+          + " FORMAT JSON).\"value\" AS VARCHAR) = CAST(JSON_OBJECT('v': "
+          + tagValueExpr
+          + ").\"v\" AS VARCHAR))";
+    }
+  }
 }

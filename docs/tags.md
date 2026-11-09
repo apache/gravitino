@@ -96,11 +96,10 @@ When you create a tag, you can choose one of three value constraints:
 | No value       | The tag can only be assigned without a value                                   |
 | Allowed values | The tag accepts only values from the configured list                           |
 
-Values are case-sensitive strings of up to 256 characters. They cannot contain double quotes (`"`),
-backslashes (`\`), or control characters such as line breaks. The constraint cannot be changed after
-the tag is created. Tag properties and assignment values are separate: changing a property affects
-the tag everywhere, while changing an assignment value affects only that object. Assignment values
-are currently managed through the REST API or the Java and Python clients.
+Values are case-sensitive strings of up to 256 characters. The constraint cannot be changed after the
+tag is created. Tag properties and assignment values are separate: changing a property affects the
+tag everywhere, while changing an assignment value affects only that object. Assignment values are
+currently managed through the REST API or the Java and Python clients.
 
 ### Inheritance
 

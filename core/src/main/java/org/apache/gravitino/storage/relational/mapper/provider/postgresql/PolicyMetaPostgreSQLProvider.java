@@ -50,6 +50,18 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   }
 
   @Override
+  protected String tagValueSelectorMatches(String selectorExpr, String tagValueExpr) {
+    return "(("
+        + selectorExpr
+        + ")::jsonb->>'type' = 'TAG_VALUE'"
+        + " AND ("
+        + selectorExpr
+        + ")::jsonb->>'value' = "
+        + tagValueExpr
+        + ")";
+  }
+
+  @Override
   public String deletePolicyMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return "DELETE FROM "
         + POLICY_META_TABLE_NAME

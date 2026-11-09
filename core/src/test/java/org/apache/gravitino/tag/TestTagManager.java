@@ -1661,39 +1661,61 @@ public class TestTagManager {
   }
 
   @Test
-  public void testRejectValuesThatSelectorJsonEscapes() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tagManager.createTag(
-                METALAKE,
-                "quoted_allowed",
-                null,
-                null,
-                TagValueConstraint.ofAllowedValues("a\"b")));
+  public void testEscapedCharactersAllowedInTagValuesAndSelectors() throws IOException {
+    tagManager.createTag(
+        METALAKE, "quoted_allowed", null, null, TagValueConstraint.ofAllowedValues("a\"b", "a\\b"));
+    Tag created = tagManager.getTag(METALAKE, "quoted_allowed");
+    Assertions.assertArrayEquals(
+        new String[] {"a\"b", "a\\b"}, created.valueConstraint().allowedValues());
 
     tagManager.createTag(METALAKE, "escaped_value", null, null);
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-    for (String value : new String[] {"a\"b", "a\\b", "a\nb"}) {
-      IllegalArgumentException thrown =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  tagManager.associateTagValuesForMetadataObject(
-                      METALAKE,
-                      tableObject,
-                      new TagValue[] {TagValue.of("escaped_value", value)},
-                      null));
-      Assertions.assertTrue(thrown.getMessage().contains("double quotes"));
-    }
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE,
+        tableObject,
+        new TagValue[] {
+          TagValue.of("escaped_value", "a\"b"),
+          TagValue.of("escaped_value", "a\\b"),
+          TagValue.of("escaped_value", "a\nb")
+        },
+        null);
+    Tag[] tagInfos = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
+    Assertions.assertEquals(
+        ImmutableSet.of("a\"b", "a\\b", "a\nb"),
+        ImmutableSet.copyOf(tagInfos[0].assignment().orElseThrow().values()));
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tagManager.addPolicyForTag(
-                METALAKE, "escaped_value", "any_policy", TagValueSelector.of("a\\b")));
+    String policyName = "escaped_policy";
+    entityStore.put(
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(policyName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.custom(
+                    ImmutableMap.of("rule", "value"),
+                    ImmutableSet.of(MetadataObject.Type.TABLE),
+                    null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build(),
+        false);
+    try {
+      tagManager.addPolicyForTag(
+          METALAKE, "escaped_value", policyName, TagValueSelector.of("a\\b"));
+      RelationalEntity<?>[] associations =
+          tagManager.listPolicyAssociationsForTag(METALAKE, "escaped_value");
+      Assertions.assertEquals(
+          TagValueSelector.of("a\\b"),
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
+    } finally {
+      entityStore.delete(
+          NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
+    }
   }
 
   @Test
