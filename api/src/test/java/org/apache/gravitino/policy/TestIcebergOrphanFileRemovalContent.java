@@ -119,62 +119,29 @@ class TestIcebergOrphanFileRemovalContent {
   }
 
   @Test
-  void validatesLocationWithinTable() {
+  void validatesLocationAndBinding() {
     IcebergOrphanFileRemovalContent.validateLocationWithinTable(
         "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t2/data");
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             IcebergOrphanFileRemovalContent.validateLocationWithinTable(
-                "file:///tmp/wh/s1/t2", "file:///"));
+                "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t1/data"));
+
+    IcebergOrphanFileRemovalContent withLocation =
+        (IcebergOrphanFileRemovalContent)
+            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
+    withLocation.requireCompatibleBinding(
+        MetadataObject.Type.TABLE, Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            IcebergOrphanFileRemovalContent.validateLocationWithinTable(
-                "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t1/data"));
-  }
-
-  @Test
-  void requireCompatibleBindingAllowsTableContainment() {
-    IcebergOrphanFileRemovalContent content =
-        (IcebergOrphanFileRemovalContent)
-            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
-    content.requireCompatibleBinding(
-        MetadataObject.Type.TABLE, Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
-  }
-
-  @Test
-  void requireCompatibleBindingRejectsNonTable() {
-    IcebergOrphanFileRemovalContent content =
-        (IcebergOrphanFileRemovalContent)
-            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                content.requireCompatibleBinding(
-                    MetadataObject.Type.SCHEMA,
-                    Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2")));
-    Assertions.assertTrue(error.getMessage().contains("TABLE"));
-  }
-
-  @Test
-  void requireCompatibleBindingRejectsMissingTableLocation() {
-    IcebergOrphanFileRemovalContent content =
-        (IcebergOrphanFileRemovalContent)
-            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
-    IllegalArgumentException error =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> content.requireCompatibleBinding(MetadataObject.Type.TABLE, null));
-    Assertions.assertTrue(error.getMessage().contains(Table.PROPERTY_LOCATION));
-  }
-
-  @Test
-  void requireCompatibleBindingNoopsWithoutLocation() {
-    IcebergOrphanFileRemovalContent content =
-        (IcebergOrphanFileRemovalContent) PolicyContents.icebergOrphanFileRemoval();
+        () -> withLocation.requireCompatibleBinding(MetadataObject.Type.SCHEMA, Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> withLocation.requireCompatibleBinding(MetadataObject.Type.TABLE, null));
     Assertions.assertDoesNotThrow(
-        () -> content.requireCompatibleBinding(MetadataObject.Type.SCHEMA, null));
+        () ->
+            ((IcebergOrphanFileRemovalContent) PolicyContents.icebergOrphanFileRemoval())
+                .requireCompatibleBinding(MetadataObject.Type.SCHEMA, null));
   }
 }

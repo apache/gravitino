@@ -35,6 +35,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,8 +60,11 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
@@ -76,6 +80,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -84,6 +89,8 @@ import org.junit.jupiter.api.TestTemplate;
 
 public class TestPolicyMetaService extends TestJDBCBackend {
   private static final String METALAKE_NAME = "metalake_for_policy_test";
+  private static final String NEAREST_METALAKE = "metalake_for_nearest_policy_test";
+  private static final Policy.BuiltInType COMPACTION = Policy.BuiltInType.ICEBERG_COMPACTION;
 
   private final Set<MetadataObject.Type> supportedObjectTypes =
       ImmutableSet.of(
@@ -1264,6 +1271,177 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         () ->
             policyMetaService.getPolicyByIdentifier(
                 NameIdentifierUtil.ofPolicy(METALAKE_NAME + "1", "policy2")));
+  }
+
+  @TestTemplate
+  public void testResolveNearestPolicyIds() throws IOException {
+    createAndInsertMakeLake(NEAREST_METALAKE);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+
+    // Table placement beats catalog; batch keeps per-table winners; other types stay empty.
+    CatalogEntity catalog = createAndInsertCatalog(NEAREST_METALAKE, "level");
+    createAndInsertSchema(NEAREST_METALAKE, "level", "schema");
+    TableEntity table =
+        createAndInsertTableEntity(
+            NamespaceUtil.ofTable(NEAREST_METALAKE, "level", "schema"), "t1");
+    TableEntity inherited =
+        createAndInsertTableEntity(
+            NamespaceUtil.ofTable(NEAREST_METALAKE, "level", "schema"), "t2");
+    PolicyEntity tablePolicy = insertNearestCompaction("table_compact");
+    PolicyEntity catalogPolicy = insertNearestCompaction("catalog_compact");
+    linkNearest(tablePolicy, null, table.nameIdentifier(), Entity.EntityType.TABLE);
+    linkNearest(catalogPolicy, null, catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertEquals(
+        Map.of(table.id(), List.of(tablePolicy.id()), inherited.id(), List.of(catalogPolicy.id())),
+        service.resolveNearestPolicyIds(List.of(table.id(), inherited.id()), COMPACTION));
+    Assertions.assertNull(
+        service
+            .resolveNearestPolicyIds(
+                List.of(table.id()), Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
+            .get(table.id()));
+
+    // Nearer schema wins; name-prefix without separator is not an ancestor.
+    SchemaEntity outer = createAndInsertSchema(NEAREST_METALAKE, "level", "a");
+    SchemaEntity middle = createAndInsertSchema(NEAREST_METALAKE, "level", "a:b");
+    createAndInsertSchema(NEAREST_METALAKE, "level", "a:b:c");
+    TableEntity nested =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(NEAREST_METALAKE, "level", "a:b:c"), "n1");
+    PolicyEntity outerPolicy = insertNearestCompaction("outer_compact");
+    linkNearest(outerPolicy, null, outer.nameIdentifier(), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(
+        List.of(outerPolicy.id()),
+        service.resolveNearestPolicyIds(List.of(nested.id()), COMPACTION).get(nested.id()));
+    PolicyEntity middlePolicy = insertNearestCompaction("middle_compact");
+    linkNearest(middlePolicy, null, middle.nameIdentifier(), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(
+        List.of(middlePolicy.id()),
+        service.resolveNearestPolicyIds(List.of(nested.id()), COMPACTION).get(nested.id()));
+
+    createAndInsertCatalog(NEAREST_METALAKE, "pfx");
+    SchemaEntity prefixA = createAndInsertSchema(NEAREST_METALAKE, "pfx", "a");
+    createAndInsertSchema(NEAREST_METALAKE, "pfx", "ab");
+    createAndInsertSchema(NEAREST_METALAKE, "pfx", "ab:c");
+    TableEntity prefixTable =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(NEAREST_METALAKE, "pfx", "ab:c"), "t1");
+    linkNearest(
+        insertNearestCompaction("prefix_compact"),
+        null,
+        prefixA.nameIdentifier(),
+        Entity.EntityType.SCHEMA);
+    Assertions.assertNull(
+        service
+            .resolveNearestPolicyIds(List.of(prefixTable.id()), COMPACTION)
+            .get(prefixTable.id()));
+  }
+
+  @TestTemplate
+  public void testResolveNearestPolicySelectors() throws IOException {
+    createAndInsertMakeLake(NEAREST_METALAKE);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    CatalogEntity catalog = createAndInsertCatalog(NEAREST_METALAKE, "sel");
+    createAndInsertSchema(NEAREST_METALAKE, "sel", "schema");
+    TableEntity table =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(NEAREST_METALAKE, "sel", "schema"), "t1");
+
+    PolicyEntity finance = insertNearestCompaction("finance_policy");
+    PolicyEntity disabled = insertNearestCompaction("disabled_policy");
+    service.insertPolicy(
+        PolicyEntity.builder()
+            .withId(disabled.id())
+            .withName(disabled.name())
+            .withNamespace(disabled.namespace())
+            .withComment(disabled.comment())
+            .withPolicyType(disabled.policyType())
+            .withEnabled(false)
+            .withContent(disabled.content())
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        true);
+    TagEntity domain = createAndInsertTagEntity("domain", null, NEAREST_METALAKE);
+    linkNearestPolicy(domain, finance, "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}");
+    linkNearestPolicy(domain, disabled, null);
+    assignNearestTag(
+        table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("domain", "finance"));
+    Assertions.assertEquals(
+        List.of(finance.id()),
+        service.resolveNearestPolicyIds(List.of(table.id()), COMPACTION).get(table.id()));
+
+    assignNearestTag(
+        catalog.nameIdentifier(), Entity.EntityType.CATALOG, TagValue.of("domain", "finance"));
+    TagMetaService.getInstance()
+        .associateTagValuesWithMetadataObject(
+            table.nameIdentifier(),
+            Entity.EntityType.TABLE,
+            new TagValue[] {TagValue.of("domain", "risk")},
+            new TagValue[] {TagValue.of("domain", "finance")});
+    Assertions.assertNull(
+        service.resolveNearestPolicyIds(List.of(table.id()), COMPACTION).get(table.id()));
+
+    TableEntity ambiguous =
+        createAndInsertTableEntity(NamespaceUtil.ofTable(NEAREST_METALAKE, "sel", "schema"), "amb");
+    PolicyEntity a = insertNearestCompaction("a");
+    PolicyEntity b = insertNearestCompaction("b");
+    linkNearest(a, null, ambiguous.nameIdentifier(), Entity.EntityType.TABLE);
+    linkNearest(b, null, ambiguous.nameIdentifier(), Entity.EntityType.TABLE);
+    Assertions.assertEquals(
+        Set.of(a.id(), b.id()),
+        new HashSet<>(
+            service
+                .resolveNearestPolicyIds(List.of(ambiguous.id()), COMPACTION)
+                .get(ambiguous.id())));
+
+    // Escaped quote in TAG_VALUE must survive dialect JSON matching.
+    PolicyEntity quoted = insertNearestCompaction("quoted_policy");
+    TagEntity escaped = createAndInsertTagEntity("escaped", null, NEAREST_METALAKE);
+    linkNearestPolicy(escaped, quoted, "{\"type\":\"TAG_VALUE\",\"value\":\"a\\\"b\"}");
+    assignNearestTag(
+        table.nameIdentifier(), Entity.EntityType.TABLE, TagValue.of("escaped", "a\"b"));
+    Assertions.assertEquals(
+        List.of(quoted.id()),
+        service.resolveNearestPolicyIds(List.of(table.id()), COMPACTION).get(table.id()));
+  }
+
+  private PolicyEntity insertNearestCompaction(String name) throws IOException {
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(NamespaceUtil.ofPolicy(NEAREST_METALAKE))
+            .withPolicyType(COMPACTION)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergDataCompaction())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+    return policy;
+  }
+
+  private void linkNearest(
+      PolicyEntity policy, String selector, NameIdentifier objectIdent, Entity.EntityType type)
+      throws IOException {
+    TagEntity tag = createAndInsertTagEntity(policy.name() + "_tag", null, NEAREST_METALAKE);
+    linkNearestPolicy(tag, policy, selector);
+    assignNearestTag(objectIdent, type, TagValue.noValue(tag.name()));
+  }
+
+  private void linkNearestPolicy(TagEntity tag, PolicyEntity policy, String selector)
+      throws IOException {
+    backend.updateEntityRelations(
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new RelationEdgeTarget[] {
+              RelationEdgeTarget.of(policy.nameIdentifier(), Entity.EntityType.POLICY, selector)
+            },
+            new RelationEdgeTarget[0]));
+  }
+
+  private void assignNearestTag(
+      NameIdentifier objectIdent, Entity.EntityType type, TagValue tagValue) throws IOException {
+    TagMetaService.getInstance()
+        .associateTagValuesWithMetadataObject(
+            objectIdent, type, new TagValue[] {tagValue}, new TagValue[0]);
   }
 
   private int countActiveRows(String table, String whereClause) {

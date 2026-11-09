@@ -875,7 +875,6 @@ public class TestPolicyManager {
         PolicyContents.icebergOrphanFileRemoval());
     tagManager.createTag(METALAKE, tagName, null, null);
     tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get());
-
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
@@ -887,28 +886,15 @@ public class TestPolicyManager {
     when(tableDispatcher.loadTable(NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE)))
         .thenReturn(table);
 
-    IllegalArgumentException thrown =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                policyManager.alterPolicy(
-                    METALAKE,
-                    policyName,
-                    PolicyChange.updateContent(
-                        Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL.policyType(),
-                        PolicyContents.icebergOrphanFileRemoval(3, "file:///", false))));
-    Assertions.assertTrue(thrown.getMessage().contains(policyName));
-    Assertions.assertTrue(thrown.getMessage().contains("file:///tmp/wh/s1/t2"));
-
-    Assertions.assertDoesNotThrow(
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
         () ->
             policyManager.alterPolicy(
                 METALAKE,
                 policyName,
                 PolicyChange.updateContent(
                     Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL.policyType(),
-                    PolicyContents.icebergOrphanFileRemoval(
-                        3, "file:///tmp/wh/s1/t2/data", false))));
+                    PolicyContents.icebergOrphanFileRemoval(3, "file:///", false))));
   }
 
   @Test

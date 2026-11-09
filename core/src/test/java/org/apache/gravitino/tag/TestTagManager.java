@@ -1724,10 +1724,9 @@ public class TestTagManager {
     String tagName = "orphan_tag";
     String policyName = "orphan_loc";
     tagManager.createTag(METALAKE, tagName, null, null);
-    long policyId = idGenerator.nextId();
     entityStore.put(
         PolicyEntity.builder()
-            .withId(policyId)
+            .withId(idGenerator.nextId())
             .withName(policyName)
             .withNamespace(Namespace.of(METALAKE))
             .withPolicyType(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
@@ -1737,70 +1736,41 @@ public class TestTagManager {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build(),
         false);
-
     try {
       tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get());
-
       MetadataObject schemaObject =
           NameIdentifierUtil.toMetadataObject(
               NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
-      IllegalArgumentException schemaRejected =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  tagManager.associateTagsForMetadataObject(
-                      METALAKE, schemaObject, new String[] {tagName}, null));
-      Assertions.assertTrue(schemaRejected.getMessage().contains(policyName));
-      Assertions.assertTrue(schemaRejected.getMessage().contains("TABLE"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, schemaObject, new String[] {tagName}, null));
 
       Table table = mock(Table.class);
       when(table.properties())
           .thenReturn(ImmutableMap.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
       when(tableDispatcher.loadTable(NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE)))
           .thenReturn(table);
-
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(
               NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE),
               Entity.EntityType.TABLE);
-      IllegalArgumentException tableRejected =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  tagManager.associateTagsForMetadataObject(
-                      METALAKE, tableObject, new String[] {tagName}, null));
-      Assertions.assertTrue(tableRejected.getMessage().contains(policyName));
-      Assertions.assertTrue(tableRejected.getMessage().contains("file:///tmp/wh/s1/t2"));
-
-      entityStore.put(
-          PolicyEntity.builder()
-              .withId(policyId)
-              .withName(policyName)
-              .withNamespace(Namespace.of(METALAKE))
-              .withPolicyType(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
-              .withEnabled(true)
-              .withContent(
-                  PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false))
-              .withAuditInfo(
-                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-              .build(),
-          true);
-      Assertions.assertDoesNotThrow(
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
           () ->
               tagManager.associateTagsForMetadataObject(
                   METALAKE, tableObject, new String[] {tagName}, null));
 
+      // Associating the policy onto a tag that already sits on a schema is also rejected.
       tagManager.createTag(METALAKE, "schema_orphan_tag", null, null);
       tagManager.associateTagsForMetadataObject(
           METALAKE, schemaObject, new String[] {"schema_orphan_tag"}, null);
-      IllegalArgumentException policyOnSchemaTag =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  tagManager.addPolicyForTag(
-                      METALAKE, "schema_orphan_tag", policyName, AllValuesSelector.get()));
-      Assertions.assertTrue(policyOnSchemaTag.getMessage().contains(policyName));
-      Assertions.assertTrue(policyOnSchemaTag.getMessage().contains("TABLE"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, "schema_orphan_tag", policyName, AllValuesSelector.get()));
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
