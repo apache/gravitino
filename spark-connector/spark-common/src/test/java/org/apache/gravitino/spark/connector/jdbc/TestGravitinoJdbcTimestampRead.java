@@ -20,7 +20,6 @@
 package org.apache.gravitino.spark.connector.jdbc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -110,7 +109,6 @@ public class TestGravitinoJdbcTimestampRead {
           Catalog catalog = mock(Catalog.class);
           when(catalog.provider()).thenReturn("jdbc-mysql");
           when(catalog.properties()).thenReturn(properties);
-          when(catalog.supportsSecrets()).thenThrow(UnsupportedOperationException.class);
           when(catalog.supportsCredentials()).thenThrow(UnsupportedOperationException.class);
           TableCatalog tables = mock(TableCatalog.class);
           when(catalog.asTableCatalog()).thenReturn(tables);
@@ -122,7 +120,7 @@ public class TestGravitinoJdbcTimestampRead {
                     Column.of("ts", Types.TimestampType.withoutTimeZone()),
                     Column.of("dt", Types.TimestampType.withoutTimeZone())
                   });
-          when(tables.loadTable(any(NameIdentifier.class), anySet())).thenReturn(metadata);
+          when(tables.loadTable(any(NameIdentifier.class))).thenReturn(metadata);
           when(manager.getGravitinoCatalogInfo(name)).thenReturn(catalog);
           spark.conf().set("spark.sql.catalog." + name, GravitinoJdbcCatalog.class.getName());
           if (source.equals("catalog")) {

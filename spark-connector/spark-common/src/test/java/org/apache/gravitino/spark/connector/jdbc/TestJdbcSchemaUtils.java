@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType$;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,12 +31,12 @@ public class TestJdbcSchemaUtils {
   @Test
   void testExactColumnNamesWinRegardlessOfOrder() {
     StructType schema =
-        new StructType().add("ts", DataTypes.TimestampNTZType).add("TS", DataTypes.TimestampType);
+        new StructType().add("ts", TimestampNTZType$.MODULE$).add("TS", DataTypes.TimestampType);
     for (StructType ordered :
         new StructType[] {
           schema, new StructType().add(schema.fields()[1]).add(schema.fields()[0])
         }) {
-      Assertions.assertEquals(DataTypes.TimestampNTZType, JdbcSchemaUtils.fieldType(ordered, "ts"));
+      Assertions.assertEquals(TimestampNTZType$.MODULE$, JdbcSchemaUtils.fieldType(ordered, "ts"));
       Assertions.assertEquals(DataTypes.TimestampType, JdbcSchemaUtils.fieldType(ordered, "TS"));
     }
     // An exact match after multiple case-insensitive candidates must still win.
@@ -46,8 +47,8 @@ public class TestJdbcSchemaUtils {
 
   @Test
   void testCaseInsensitiveFallbackMustBeUnique() {
-    StructType schema = new StructType().add("ts", DataTypes.TimestampNTZType);
-    Assertions.assertEquals(DataTypes.TimestampNTZType, JdbcSchemaUtils.fieldType(schema, "TS"));
+    StructType schema = new StructType().add("ts", TimestampNTZType$.MODULE$);
+    Assertions.assertEquals(TimestampNTZType$.MODULE$, JdbcSchemaUtils.fieldType(schema, "TS"));
     Assertions.assertNull(JdbcSchemaUtils.fieldType(schema, "missing"));
     Assertions.assertNull(
         JdbcSchemaUtils.fieldType(schema.add("TS", DataTypes.TimestampType), "Ts"));

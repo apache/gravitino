@@ -48,6 +48,7 @@ if (hasProperty("excludePackagesForSparkConnector")) {
 dependencies {
   implementation(project(":spark-connector:spark-common"))
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
+  compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
@@ -144,6 +145,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
@@ -224,4 +226,18 @@ tasks.clean {
 
 tasks.named<Jar>("sourcesJar") {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Exercise the common JDBC regressions with this version's Spark runtime.
+sourceSets.named("test") {
+  java.srcDir("../../spark-common/src/test/java/org/apache/gravitino/spark/connector/jdbc")
+}
+
+plugins.withId("com.diffplug.spotless") {
+  configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    java {
+      // Shared tests are formatted by their owning project.
+      target(project.fileTree("src") { include("**/*.java") })
+    }
+  }
 }

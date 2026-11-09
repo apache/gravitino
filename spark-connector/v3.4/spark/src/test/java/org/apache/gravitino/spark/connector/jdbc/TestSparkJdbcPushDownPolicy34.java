@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
 import scala.collection.immutable.HashMap;
 
 /** Expression-level pushdown decisions for JDBC tables. */
-public class TestSparkJdbcPushDownPolicy {
+public class TestSparkJdbcPushDownPolicy34 {
 
   private static final String URL = "jdbc:postgresql://localhost/test";
   private static final JdbcDialect DIALECT = JdbcDialects.get(URL);
@@ -260,7 +260,7 @@ public class TestSparkJdbcPushDownPolicy {
       StructType schema =
           new StructType().add("VALUE", DataTypes.StringType).add("value", DataTypes.StringType);
       SparkJdbcPushDownPolicy collision =
-          new SparkJdbcPushDownPolicy(columns, schema, schema, DIALECT, URL);
+          new SparkJdbcPushDownPolicy34(columns, schema, schema, DIALECT, URL);
       Assertions.assertFalse(collision.canPush(predicate("IS_NULL", col("VALUE"))));
       Assertions.assertFalse(collision.canPushAggregate(new Count(col("VALUE"), false)));
       Assertions.assertFalse(
@@ -280,9 +280,9 @@ public class TestSparkJdbcPushDownPolicy {
               Types.StructType.of(Types.StructType.Field.of("p", external, true, null)))
         }) {
       StructType schema =
-          new StructType().add("value", new SparkJdbcTypeConverter().toSparkType(type));
+          new StructType().add("value", new SparkJdbcTypeConverter34().toSparkType(type));
       SparkJdbcPushDownPolicy externalPolicy =
-          new SparkJdbcPushDownPolicy(
+          new SparkJdbcPushDownPolicy34(
               new Column[] {column("value", type)}, schema, schema, DIALECT, URL);
       Assertions.assertFalse(
           externalPolicy.canPush(predicate("IS_NULL", col("value"))), type.simpleString());
@@ -310,7 +310,7 @@ public class TestSparkJdbcPushDownPolicy {
           schema, new StructType().add(schema.fields()[1]).add(schema.fields()[0])
         }) {
       SparkJdbcPushDownPolicy policy =
-          new SparkJdbcPushDownPolicy(columns, reader, schema, DIALECT, URL);
+          new SparkJdbcPushDownPolicy34(columns, reader, schema, DIALECT, URL);
       Assertions.assertTrue(policy.canPushAggregate(new Max(col("ts"))));
       Assertions.assertTrue(policy.canPushAggregate(new Max(col("TS"))));
     }
@@ -345,7 +345,8 @@ public class TestSparkJdbcPushDownPolicy {
         reader = reader.add(field);
       }
     }
-    return new SparkJdbcPushDownPolicy(columns, reader, sparkSchema(), JdbcDialects.get(url), url);
+    return new SparkJdbcPushDownPolicy34(
+        columns, reader, sparkSchema(), JdbcDialects.get(url), url);
   }
 
   private static StructType sparkSchema() {

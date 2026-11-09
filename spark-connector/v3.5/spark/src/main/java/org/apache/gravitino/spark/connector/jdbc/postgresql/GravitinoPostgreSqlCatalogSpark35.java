@@ -20,14 +20,14 @@ package org.apache.gravitino.spark.connector.jdbc.postgresql;
 
 import java.util.Set;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
-import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalog;
+import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConverter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 
-public class GravitinoPostgreSqlCatalogSpark35 extends GravitinoJdbcCatalog {
+public class GravitinoPostgreSqlCatalogSpark35 extends GravitinoJdbcCatalogSpark35 {
   /** {@inheritDoc} */
   @Override
   public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)

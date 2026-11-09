@@ -20,25 +20,18 @@
 package org.apache.gravitino.spark.connector.jdbc;
 
 import java.util.Set;
-import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
-import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
-import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 
-public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalog {
+public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalogSpark34 {
 
   @Override
-  protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkJdbcTypeConverter34();
-  }
-
-  @Override
-  protected SparkTableChangeConverter getSparkTableChangeConverter(
-      SparkTypeConverter sparkTypeConverter) {
-    return new SparkTableChangeConverter34(sparkTypeConverter);
+  protected boolean supportsTimestampNtz() {
+    // Spark 3.4 reads NTZ through java.sql.Timestamp and shifts it with the JVM time zone.
+    // Spark 3.5 uses LocalDateTime, preserving the stored wall-clock value.
+    return true;
   }
 
   @Override

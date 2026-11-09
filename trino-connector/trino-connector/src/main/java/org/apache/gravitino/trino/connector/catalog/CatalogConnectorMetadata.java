@@ -18,12 +18,8 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
-<<<<<<< HEAD:trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/CatalogConnectorMetadata.java
-=======
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 
-import com.google.common.base.Preconditions;
->>>>>>> 7f88982b8 ([#14642] fix(jdbc): correct Spark reads and Trino metadata handling (#14643)):trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/catalog/CatalogConnectorMetadata.java
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;

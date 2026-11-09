@@ -163,6 +163,8 @@ public class TestSparkJdbcStringPushDown {
               .config("spark.sql.catalog.strings.url", url)
               .config("spark.sql.catalog.strings.user", user)
               .config("spark.sql.catalog.strings.password", "test")
+              .config("spark.sql.catalog.strings.pushDownAggregate", "true")
+              .config("spark.sql.catalog.strings.pushDownLimit", "true")
               .config(
                   "spark.sql.catalog.strings.driver",
                   postgres ? "org.postgresql.Driver" : "com.mysql.cj.jdbc.Driver")

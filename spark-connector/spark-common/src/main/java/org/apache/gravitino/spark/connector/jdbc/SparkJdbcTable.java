@@ -35,12 +35,14 @@ import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
+import org.apache.spark.sql.jdbc.JdbcDialect;
 import org.apache.spark.sql.jdbc.JdbcDialects;
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 public class SparkJdbcTable extends JDBCTable {
@@ -70,7 +72,7 @@ public class SparkJdbcTable extends JDBCTable {
             sparkTypeConverter);
     this.sparkSchema = alignTimestampArrays(gravitinoTableInfoHelper.schema(), jdbcTable.schema());
     this.pushDownPolicy =
-        new SparkJdbcPushDownPolicy(
+        createPushDownPolicy(
             gravitinoTable.columns(),
             jdbcTable.schema(),
             sparkSchema,
@@ -133,6 +135,15 @@ public class SparkJdbcTable extends JDBCTable {
     return gravitinoTableInfoHelper.properties();
   }
 
+  SparkJdbcPushDownPolicy createPushDownPolicy(
+      Column[] columns,
+      StructType readerSchema,
+      StructType visibleSchema,
+      JdbcDialect dialect,
+      String jdbcUrl) {
+    return new SparkJdbcPushDownPolicy(columns, readerSchema, visibleSchema, dialect, jdbcUrl);
+  }
+
   /**
    * Uses the reader's element type for timestamp arrays. Spark 3.5 reads PostgreSQL timestamp array
    * elements as TIMESTAMP even when top-level columns use TIMESTAMP_NTZ.
@@ -159,6 +170,6 @@ public class SparkJdbcTable extends JDBCTable {
   }
 
   private static boolean isTimestamp(DataType type) {
-    return DataTypes.TimestampType.equals(type) || DataTypes.TimestampNTZType.equals(type);
+    return DataTypes.TimestampType.equals(type) || type instanceof TimestampNTZType;
   }
 }

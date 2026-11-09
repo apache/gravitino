@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
-import com.google.common.collect.ImmutableSet;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Locale;
@@ -29,7 +28,6 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.connector.expressions.Cast;
 import org.apache.spark.sql.connector.expressions.Expression;
-import org.apache.spark.sql.connector.expressions.Extract;
 import org.apache.spark.sql.connector.expressions.Literal;
 import org.apache.spark.sql.connector.expressions.NamedReference;
 import org.apache.spark.sql.connector.expressions.aggregate.Count;
@@ -69,9 +67,6 @@ import org.apache.spark.sql.types.VarcharType;
  * from the type Spark sees, because the reader types the pushed aggregate result.
  */
 class SparkJdbcPushDownPolicy {
-
-  private static final Set<String> PUSHABLE_EXTRACT_FIELDS =
-      ImmutableSet.of("YEAR", "QUARTER", "MONTH", "DAY", "HOUR", "MINUTE");
 
   private final Set<String> sensitiveColumns;
   private final Set<String> nullPreservingColumns;
@@ -178,15 +173,6 @@ class SparkJdbcPushDownPolicy {
         return false;
       }
     }
-    if (expression instanceof Extract) {
-      Extract extract = (Extract) expression;
-      // Date parts of a TIMESTAMP depend on the time zone. Other fields, such as SECOND (fractions
-      // in PostgreSQL) or WEEK (MySQL week mode on Spark 3.5), can differ from Spark at the source.
-      if (!PUSHABLE_EXTRACT_FIELDS.contains(extract.field().toUpperCase(Locale.ROOT))
-          || referencesZonedTimestamp(extract.source())) {
-        return false;
-      }
-    }
     for (Expression child : expression.children()) {
       if (!canPush(child)) {
         return false;
@@ -265,7 +251,7 @@ class SparkJdbcPushDownPolicy {
     return reference.fieldNames().length == 1 && names.contains(columnName(reference));
   }
 
-  private boolean referencesZonedTimestamp(Expression expression) {
+  boolean referencesZonedTimestamp(Expression expression) {
     if (expression instanceof NamedReference) {
       return zonedTimestampColumns.contains(columnName((NamedReference) expression));
     }

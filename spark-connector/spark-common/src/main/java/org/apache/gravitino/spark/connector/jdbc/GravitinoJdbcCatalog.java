@@ -43,15 +43,10 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 public class GravitinoJdbcCatalog extends BaseCatalog {
 
-<<<<<<< HEAD
-=======
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
-
   private static final String PREFER_TIMESTAMP_NTZ = "preferTimestampNTZ";
 
   private boolean useTimestampNtz;
 
->>>>>>> 7f88982b8 ([#14642] fix(jdbc): correct Spark reads and Trino metadata handling (#14643))
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
@@ -71,6 +66,10 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
           PREFER_TIMESTAMP_NTZ,
           name);
       useTimestampNtz = Boolean.parseBoolean(value);
+      Preconditions.checkArgument(
+          !useTimestampNtz || supportsTimestampNtz(),
+          "preferTimestampNTZ=true in catalog %s requires Spark 3.5 or later; use false on earlier versions",
+          name);
     }
     // One value drives both the reader and converter for every provider. Explicitly disable NTZ
     // outside PostgreSQL, including when Spark's session timestamp type defaults to NTZ.
@@ -137,6 +136,24 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkJdbcTypeConverter(useTimestampNtz);
+  }
+
+  /**
+   * Returns whether this version's JDBC reader preserves timestamp-without-time-zone values.
+   *
+   * @return true for readers preserving wall-clock values with preferTimestampNTZ
+   */
+  protected boolean supportsTimestampNtz() {
+    return false;
+  }
+
+  /**
+   * Returns the timestamp mode selected when initializing this catalog.
+   *
+   * @return whether zone-free timestamps use TIMESTAMP_NTZ
+   */
+  protected boolean useTimestampNtz() {
+    return useTimestampNtz;
   }
 
   @Override

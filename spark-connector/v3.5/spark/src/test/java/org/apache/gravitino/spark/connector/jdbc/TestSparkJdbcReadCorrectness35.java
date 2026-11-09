@@ -62,7 +62,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
  */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestSparkJdbcReadCorrectness {
+public class TestSparkJdbcReadCorrectness35 {
 
   private static final String[] ZONES = {"UTC", "America/Los_Angeles", "Asia/Shanghai"};
 
@@ -87,14 +87,14 @@ public class TestSparkJdbcReadCorrectness {
       JDBCTable physical = (JDBCTable) super.loadTable(identifier);
       Table metadata = mock(Table.class);
       when(metadata.columns()).thenReturn(columns(identifier.name()));
-      return new SparkJdbcTable(
+      return new SparkJdbcTable34(
           identifier,
           metadata,
           physical,
           this,
           JdbcPropertiesConverter.getInstance(),
           new SparkTransformConverter(false),
-          new SparkJdbcTypeConverter(useTimestampNtz));
+          new SparkJdbcTypeConverter34(useTimestampNtz));
     }
 
     private static Column[] columns(String table) {
@@ -175,6 +175,8 @@ public class TestSparkJdbcReadCorrectness {
             .config("spark.sql.catalog.nativejdbc.password", "test")
             .config("spark.sql.catalog.nativejdbc.driver", "org.postgresql.Driver")
             .config("spark.sql.catalog.nativejdbc.preferTimestampNTZ", "true")
+            .config("spark.sql.catalog.nativejdbc.pushDownAggregate", "true")
+            .config("spark.sql.catalog.nativejdbc.pushDownLimit", "true")
             .config("spark.sql.catalog.legacy", SafeCatalog.class.getName())
             .config("spark.sql.catalog.legacy.url", url)
             .config("spark.sql.catalog.legacy.user", "postgres")
@@ -187,6 +189,8 @@ public class TestSparkJdbcReadCorrectness {
             .config("spark.sql.catalog.safe.password", "test")
             .config("spark.sql.catalog.safe.driver", "org.postgresql.Driver")
             .config("spark.sql.catalog.safe.preferTimestampNTZ", "true")
+            .config("spark.sql.catalog.safe.pushDownAggregate", "true")
+            .config("spark.sql.catalog.safe.pushDownLimit", "true")
             .config("spark.sql.catalog.safe.pushDownPredicate", "true")
             .config("spark.sql.catalog.safe.pushDownAggregate", "true")
             .config("spark.sql.catalog.safe.pushDownLimit", "true")
@@ -282,7 +286,7 @@ public class TestSparkJdbcReadCorrectness {
 
   @Test
   void testTimestampFilterOnTableWithoutStringColumns() {
-    boolean ntzLiteralSupported = !spark.version().startsWith("3.5.");
+    boolean ntzLiteralSupported = false;
     String query =
         "SELECT id FROM safe.public.timestamp_only"
             + " WHERE ts > TIMESTAMP_NTZ '2024-01-02 03:04:05.123456'";

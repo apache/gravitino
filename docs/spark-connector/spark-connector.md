@@ -163,8 +163,8 @@ limit and the aggregate of that query in Spark.
 #### PostgreSQL timestamps without time zone
 
 By default, a PostgreSQL timestamp without time zone maps to Spark `TIMESTAMP`, as before.
-Its value can change with the Spark session time zone. To read the stored wall-clock value,
-set `preferTimestampNTZ=true` on the Spark catalog, for example
+Its value can change with the Spark session time zone. On Spark 3.5, to read the stored
+wall-clock value, set `preferTimestampNTZ=true` on the Spark catalog, for example
 `spark.sql.catalog.<name>.preferTimestampNTZ=true`. You can also set the Gravitino catalog
 property `spark.bypass.preferTimestampNTZ=true`. The Spark catalog option wins when both are
 set. This is a catalog-level option: a per-read `spark.read.option("preferTimestampNTZ", ...)`
@@ -172,6 +172,11 @@ is ignored so that the reader and the fixed table schema cannot diverge. The opt
 PostgreSQL catalogs only. Other JDBC catalogs ignore this option and explicitly use
 `preferTimestampNTZ=false`, even when `spark.sql.timestampType=TIMESTAMP_NTZ`, to keep their
 reader and table schema on `TIMESTAMP`.
+
+Spark 3.3 does not support this JDBC reader option, and Spark 3.4's reader does not preserve
+wall-clock values when the JVM time zone differs from UTC. PostgreSQL catalogs therefore reject
+an explicit `preferTimestampNTZ=true` on Spark 3.3 and 3.4; leave it off to retain the existing
+`TIMESTAMP` mapping.
 
 With the option on:
 

@@ -36,6 +36,7 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType$;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -53,13 +54,13 @@ public class TestSparkJdbcTableWriteValidation {
         DataTypes.createArrayType(DataTypes.TimestampType),
         spark35.schema().fields()[0].dataType());
     SparkJdbcTable spark40 =
-        table(timestamps, DataTypes.createArrayType(DataTypes.TimestampNTZType));
+        table(timestamps, DataTypes.createArrayType(TimestampNTZType$.MODULE$));
     Assertions.assertEquals(
-        DataTypes.createArrayType(DataTypes.TimestampNTZType),
+        DataTypes.createArrayType(TimestampNTZType$.MODULE$),
         spark40.schema().fields()[0].dataType());
     // Top-level columns keep the converter's type.
     Assertions.assertEquals(
-        DataTypes.TimestampNTZType,
+        TimestampNTZType$.MODULE$,
         table(Types.TimestampType.withoutTimeZone(), DataTypes.TimestampType)
             .schema()
             .fields()[0]
@@ -70,7 +71,7 @@ public class TestSparkJdbcTableWriteValidation {
   void testTimestampArraysKeepCaseDistinctReaderTypes() {
     Column lower = Column.of("ts", Types.ListType.nullable(Types.TimestampType.withoutTimeZone()));
     Column upper = Column.of("TS", Types.ListType.nullable(Types.TimestampType.withTimeZone()));
-    DataType ntzArray = DataTypes.createArrayType(DataTypes.TimestampNTZType);
+    DataType ntzArray = DataTypes.createArrayType(TimestampNTZType$.MODULE$);
     DataType zonedArray = DataTypes.createArrayType(DataTypes.TimestampType);
     StructType readerSchema = new StructType().add("ts", ntzArray).add("TS", zonedArray);
     for (Column[] columns : new Column[][] {{lower, upper}, {upper, lower}}) {
