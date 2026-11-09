@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
@@ -27,6 +28,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
@@ -42,7 +44,14 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.types.ArrayType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +202,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           getOrCreateIcebergGlueCatalog(),
           propertiesConverter,
           sparkTransformConverter,
-          sparkTypeConverter);
+          getIcebergTypeConverter());
     }
 
     return new SparkHiveTable(
@@ -218,10 +227,81 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     return new SparkTransformConverter(false);
   }
 
+  /**
+   * Returns the type converter of Iceberg tables. They follow Iceberg type semantics, as with the
+   * Iceberg catalog, while the Hive rules of {@link #getSparkTypeConverter()} apply to the other
+   * tables. Spark versions that support {@code timestamp_ntz} override this method.
+   *
+   * @return the type converter of Iceberg tables
+   */
+  protected SparkTypeConverter getIcebergTypeConverter() {
+    return new SparkTypeConverter();
+  }
+
   /** {@inheritDoc} Returns the Hive-compatible type converter used for Glue tables. */
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  /**
+   * {@inheritDoc} A table created without {@code table-format} gets the catalog's default table
+   * format.
+   */
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter(Map<String, String> gravitinoTableProperties) {
+    String tableFormat =
+        gravitinoTableProperties.getOrDefault(
+            GlueConstants.TABLE_FORMAT,
+            catalogProperties == null
+                ? null
+                : catalogProperties.get(GlueConstants.DEFAULT_TABLE_FORMAT));
+    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
+        ? getIcebergTypeConverter()
+        : super.getSparkTypeConverter(gravitinoTableProperties);
+  }
+
+  /**
+   * {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. Hive and Iceberg
+   * differ on timestamp types only, so the table is loaded just for changes that set one.
+   */
+  @Override
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      Identifier ident, TableChange[] changes) {
+    if (Arrays.stream(changes).noneMatch(GravitinoGlueCatalog::setsTimestampType)) {
+      return super.getSparkTableChangeConverter(ident, changes);
+    }
+    try {
+      if (isIcebergTable(loadGravitinoTable(ident))) {
+        return getSparkTableChangeConverter(getIcebergTypeConverter());
+      }
+    } catch (NoSuchTableException e) {
+      // The alter reports the missing table.
+    }
+    return super.getSparkTableChangeConverter(ident, changes);
+  }
+
+  private static boolean setsTimestampType(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      return containsTimestampType(((TableChange.AddColumn) change).dataType());
+    }
+    return change instanceof TableChange.UpdateColumnType
+        && containsTimestampType(((TableChange.UpdateColumnType) change).newDataType());
+  }
+
+  private static boolean containsTimestampType(DataType type) {
+    if (type instanceof ArrayType) {
+      return containsTimestampType(((ArrayType) type).elementType());
+    }
+    if (type instanceof MapType) {
+      return containsTimestampType(((MapType) type).keyType())
+          || containsTimestampType(((MapType) type).valueType());
+    }
+    if (type instanceof StructType) {
+      return Arrays.stream(((StructType) type).fields())
+          .anyMatch(field -> containsTimestampType(field.dataType()));
+    }
+    return type instanceof TimestampType || type instanceof TimestampNTZType;
   }
 
   /**
