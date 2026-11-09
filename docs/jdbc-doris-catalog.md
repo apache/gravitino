@@ -158,11 +158,14 @@ Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYe
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
+The table above describes type mappings; it does not guarantee that every type can be used to create a table through Gravitino. `BITMAP` and `HLL` columns are supported only when loading metadata for existing Doris tables. Creating tables with these column types through Gravitino is not supported.
+
 Doris `array`, `map`, and `struct` types are loaded as `ExternalType` with the full type string preserved (e.g. `array<int(11)>`). They are not resolved into Gravitino native composite types (`ListType`, `MapType`, `StructType`). The type identifier in `ExternalType` is always lowercase (e.g. `"json"`, not `"JSON"`), matching Doris JDBC metadata behavior.
 :::
 
 :::tip Version Compatibility
 - `DateV2` type: Doris 1.2+ (required on 4.0.x where `disable_datev1=true`)
+- `JSON` type name: Doris 2.0+; Doris 1.2 uses `JSONB`, so `ExternalType("json")` cannot be used to create a JSON column on Doris 1.2.
 - `Binary` / `VarBinary` type: Doris 4.0+ (not available on 3.x)
 - `Auto-Increment` column: Doris 2.1+
 - `INVERTED` index: Doris 3.0+
