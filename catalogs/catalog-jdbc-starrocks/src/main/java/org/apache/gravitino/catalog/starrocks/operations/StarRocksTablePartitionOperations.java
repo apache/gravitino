@@ -241,6 +241,6 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
   }
 
   private static String quote(String identifier) {
-    return JdbcConnectorUtils.quoteIdentifier(identifier, '`');
+    return StarRocksUtils.quoteIdentifier(identifier);
   }
 }

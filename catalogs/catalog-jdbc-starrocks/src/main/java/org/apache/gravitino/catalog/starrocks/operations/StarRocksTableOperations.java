@@ -46,7 +46,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
-import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -318,6 +317,20 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
     return String.format("ALTER TABLE %s RENAME %s", quote(oldTableName), quote(newTableName));
+  }
+
+  /**
+   * Quotes an identifier using StarRocks-specific restrictions, including for inherited SQL
+   * builders.
+   *
+   * @param identifier the unquoted identifier
+   * @return the backtick-quoted identifier
+   * @throws IllegalArgumentException if the identifier contains a backtick
+   */
+  @Override
+  protected String quoteIdentifier(String identifier) {
+    // Also protect inherited SQL generation, especially DROP TABLE.
+    return quote(identifier);
   }
 
   @Override
@@ -654,6 +667,6 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   }
 
   private static String quote(String identifier) {
-    return JdbcConnectorUtils.quoteIdentifier(identifier, '`');
+    return StarRocksUtils.quoteIdentifier(identifier);
   }
 }

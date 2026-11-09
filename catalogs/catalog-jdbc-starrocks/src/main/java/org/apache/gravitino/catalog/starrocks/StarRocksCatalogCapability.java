@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.starrocks;
 
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -29,6 +30,12 @@ public class StarRocksCatalogCapability implements Capability {
   /** {@inheritDoc} */
   @Override
   public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope == Scope.TABLE || scope == Scope.COLUMN) {
+      CapabilityResult result = StarRocksUtils.checkIdentifier(name);
+      if (!result.supported()) {
+        return result;
+      }
+    }
     if (scope == Scope.TABLE) {
       return JdbcConnectorUtils.existingQuotedTableName(name);
     }

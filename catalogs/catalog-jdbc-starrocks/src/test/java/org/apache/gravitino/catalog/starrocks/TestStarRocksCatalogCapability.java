@@ -18,20 +18,63 @@
  */
 package org.apache.gravitino.catalog.starrocks;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TableNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /** Existing-name capability regression tests. */
 class TestStarRocksCatalogCapability {
   @Test
+  void testDispatcherRejectsBackticksBeforeCallingTableOperations() {
+    TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(new StarRocksCatalogCapability());
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(manager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(downstream, manager);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.dropTable(NameIdentifier.of("metalake", "catalog", "schema", "vic`tim")));
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "victim");
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.deleteColumn(new String[] {"na`me"}, false),
+          TableChange.addColumn(
+              new String[] {"added"},
+              Types.IntegerType.get(),
+              TableChange.ColumnPosition.after("na`me")),
+          TableChange.updateColumnPosition(
+              new String[] {"name"}, TableChange.ColumnPosition.after("i`d"))
+        }) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> dispatcher.alterTable(table, change));
+    }
+    Mockito.verifyNoInteractions(downstream);
+  }
+
+  @Test
   void testExistingColumnNamesUseSafeNativeReferences() {
     var capability = new StarRocksCatalogCapability();
-    for (String name : new String[] {"native column", "native.column", "col`name", "col\"name"}) {
+    for (String name : new String[] {"native column", "native.column", "col\"name"}) {
       Assertions.assertTrue(
           capability.specificationOnExistingName(Capability.Scope.COLUMN, name).supported());
     }
-    for (String invalid : new String[] {"", "bad\0name", "*"}) {
+    for (String invalid : new String[] {"", "bad\0name", "*", "col`name"}) {
       Assertions.assertFalse(
           capability.specificationOnExistingName(Capability.Scope.COLUMN, invalid).supported());
     }
@@ -48,7 +91,8 @@ class TestStarRocksCatalogCapability {
         capability
             .specificationOnExistingName(Capability.Scope.SCHEMA, "native schema")
             .supported());
-    for (String invalid : new String[] {"", "native.table", "bad\0name", "*"}) {
+    for (String invalid :
+        new String[] {"", "native.table", "bad\0name", "*", "vic`tim", "`victim`"}) {
       Assertions.assertFalse(
           capability.specificationOnExistingName(Capability.Scope.TABLE, invalid).supported());
     }
