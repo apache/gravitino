@@ -40,6 +40,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,10 +50,14 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Only {@link Driver#connect} runs on a worker. Validation, metadata queries and DDL stay on the
  * caller. A connection that arrives after timeout or interruption is closed by its worker and is
- * never handed to a pool. Cancellation is best effort: a driver ignoring interruption retains a
- * worker until it returns. A JVM-wide limit of 64 workers, with no queue, bounds that retention;
- * excess attempts fail with {@link SQLTransientConnectionException}. Workers are daemon threads and
- * release their catalog context class loader after each attempt. Each attempt, including late
+ * never handed to a pool. An abandoned attempt's worker is interrupted from a separate cancellation
+ * thread, never from the request thread, because an interrupt can synchronously run a driver's
+ * blocking channel-close callback. The interrupt is delivered only while the worker is still inside
+ * {@link Driver#connect}, so it cannot reach a later attempt on the same worker. A driver that
+ * ignores interruption retains its worker until it returns. A JVM-wide limit of 64 workers, with no
+ * queue, bounds that retention; excess attempts fail with {@link SQLTransientConnectionException}.
+ * Abandoned attempts, their completion and rejected attempts are logged. Workers are daemon threads
+ * and release their catalog context class loader after each attempt. Each attempt, including late
  * connection cleanup, runs with the submitting caller's access-control context and JAAS subject;
  * shared workers do not inherit the creating request's JAAS subject. This does not isolate
  * arbitrary {@link ThreadLocal} or {@link InheritableThreadLocal} state. Delegates must clean up
@@ -71,28 +76,21 @@ public final class BoundedConnectionDriver implements Driver {
   private static final AccessControlContext WORKER_CONTEXT =
       new AccessControlContext(new ProtectionDomain[0]);
 
-  private static final ExecutorService WORKERS =
-      new ThreadPoolExecutor(
-          0,
-          64,
-          60,
-          TimeUnit.SECONDS,
-          new SynchronousQueue<>(),
-          task ->
-              AccessController.doPrivileged(
-                  (PrivilegedAction<Thread>)
-                      () -> {
-                        Thread thread = new Thread(task, "jdbc-connect-timeout");
-                        thread.setDaemon(true);
-                        thread.setContextClassLoader(
-                            BoundedConnectionDriver.class.getClassLoader());
-                        return thread;
-                      },
-                  WORKER_CONTEXT));
+  private static final ExecutorService WORKERS = daemonPool(64, "jdbc-connect-timeout");
+
+  // One cancellation per abandoned attempt; with the shared workers this stays within their limit.
+  // If a cancellation is still rejected, the worker is not interrupted and a warning is logged.
+  private static final ExecutorService CANCELLERS = daemonPool(64, "jdbc-connect-cancel");
+
+  private static final long REJECTION_LOG_INTERVAL_NANOS = TimeUnit.MINUTES.toNanos(1);
+  private static final AtomicLong LAST_REJECTION_LOG =
+      new AtomicLong(System.nanoTime() - REJECTION_LOG_INTERVAL_NANOS);
+  private static final AtomicLong REJECTIONS = new AtomicLong();
 
   private final Driver delegate;
   private final long timeoutMs;
   private final ExecutorService workers;
+  private final ExecutorService cancellers;
   private final AtomicInteger abandonedAttempts = new AtomicInteger();
 
   /**
@@ -107,12 +105,18 @@ public final class BoundedConnectionDriver implements Driver {
   }
 
   BoundedConnectionDriver(Driver delegate, long timeoutMs, ExecutorService workers) {
+    this(delegate, timeoutMs, workers, CANCELLERS);
+  }
+
+  BoundedConnectionDriver(
+      Driver delegate, long timeoutMs, ExecutorService workers, ExecutorService cancellers) {
     if (timeoutMs <= 0) {
       throw new IllegalArgumentException("JDBC connect timeout must be positive");
     }
     this.delegate = delegate;
     this.timeoutMs = timeoutMs;
     this.workers = workers;
+    this.cancellers = cancellers;
   }
 
   /**
@@ -144,6 +148,7 @@ public final class BoundedConnectionDriver implements Driver {
                       },
                   callerContext));
     } catch (RejectedExecutionException e) {
+      logRejection();
       throw new SQLTransientConnectionException(
           "The JDBC connection attempt limit has been reached. Try again after an attempt finishes.",
           "08001",
@@ -218,24 +223,111 @@ public final class BoundedConnectionDriver implements Driver {
     return delegate.getParentLogger();
   }
 
+  /** Names the delegate driver in logs; the URL is omitted because it may carry credentials. */
+  private String driverName() {
+    return delegate.getClass().getName();
+  }
+
+  /** Logs rejected attempts at most once a minute, with the count since the last log. */
+  private void logRejection() {
+    REJECTIONS.incrementAndGet();
+    long now = System.nanoTime();
+    long last = LAST_REJECTION_LOG.get();
+    if (now - last >= REJECTION_LOG_INTERVAL_NANOS && LAST_REJECTION_LOG.compareAndSet(last, now)) {
+      LOG.warn(
+          "Rejected {} JDBC connection attempt(s) since the last report, including one for {}: all "
+              + "connection workers are busy, likely with abandoned attempts against an "
+              + "unreachable backend",
+          REJECTIONS.getAndSet(0),
+          driverName());
+    }
+  }
+
+  private static ExecutorService daemonPool(int maxThreads, String name) {
+    return new ThreadPoolExecutor(
+        0,
+        maxThreads,
+        60,
+        TimeUnit.SECONDS,
+        new SynchronousQueue<>(),
+        task ->
+            AccessController.doPrivileged(
+                (PrivilegedAction<Thread>)
+                    () -> {
+                      Thread thread = new Thread(task, name);
+                      thread.setDaemon(true);
+                      thread.setContextClassLoader(BoundedConnectionDriver.class.getClassLoader());
+                      return thread;
+                    },
+                WORKER_CONTEXT));
+  }
+
   private final class Attempt {
     private final CompletableFuture<Connection> result = new CompletableFuture<>();
     private final CountDownLatch decision = new CountDownLatch(1);
+    private final long startNanos = System.nanoTime();
     private boolean accepted;
     private boolean abandoned;
     private boolean finished;
-    @Nullable private Thread runner;
+    @Nullable private Thread worker;
+    private boolean connecting;
+    private boolean cancelling;
 
     synchronized void accept() {
       accepted = true;
     }
 
-    synchronized void abandon() {
-      if (!finished) {
+    void abandon() {
+      synchronized (this) {
+        if (finished) {
+          return;
+        }
         abandoned = true;
         abandonedAttempts.incrementAndGet();
-        if (runner != null) {
-          runner.interrupt();
+      }
+      LOG.warn(
+          "Abandoned a {} connection attempt (deadline {} ms); interrupting its worker if it is "
+              + "still connecting",
+          driverName(),
+          timeoutMs);
+      try {
+        // Thread.interrupt may synchronously run a driver's blocking channel-close callback, so
+        // it must not run on this request thread, which would defeat the connection deadline.
+        cancellers.execute(this::cancel);
+      } catch (RejectedExecutionException e) {
+        LOG.warn("Could not schedule interruption of an abandoned JDBC connection attempt", e);
+      }
+    }
+
+    /** Interrupts the worker only while it is still inside {@link Driver#connect}. */
+    private void cancel() {
+      Thread target;
+      synchronized (this) {
+        if (!connecting) {
+          return;
+        }
+        target = worker;
+        cancelling = true;
+      }
+      try {
+        target.interrupt();
+      } finally {
+        synchronized (this) {
+          cancelling = false;
+          notifyAll();
+        }
+      }
+    }
+
+    /** Ends the interruptible phase; waits for an in-flight interrupt to be delivered. */
+    private synchronized void endConnect() {
+      connecting = false;
+      while (cancelling) {
+        try {
+          wait();
+        } catch (InterruptedException e) {
+          // The wait consumes the in-flight cancellation; the worker must not carry it into
+          // cleanup or the next attempt.
         }
       }
     }
@@ -248,12 +340,17 @@ public final class BoundedConnectionDriver implements Driver {
       boolean interrupted = false;
       try {
         synchronized (this) {
-          runner = current;
           if (abandoned) {
             return;
           }
+          worker = current;
+          connecting = true;
         }
-        connection = delegate.connect(url, properties);
+        try {
+          connection = delegate.connect(url, properties);
+        } finally {
+          endConnect();
+        }
         result.complete(connection);
         while (true) {
           try {
@@ -285,9 +382,13 @@ public final class BoundedConnectionDriver implements Driver {
         } finally {
           synchronized (this) {
             finished = true;
-            runner = null;
+            worker = null;
             if (abandoned) {
               abandonedAttempts.decrementAndGet();
+              LOG.info(
+                  "An abandoned {} connection attempt finished after {} ms",
+                  driverName(),
+                  TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
             }
           }
           current.setContextClassLoader(previous);

@@ -129,8 +129,14 @@ their own budgets.
 
 The core-loaded adapter shares at most 64 daemon workers per server JVM, with no queue.
 Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
-healthy connects. Cancellation is best effort: an uninterruptible driver or close can retain
-a worker and its driver resources until it returns or the server restarts. Completed workers
+healthy connects. An abandoned attempt's worker is interrupted from a separate cancellation thread,
+not the cancelling caller, because a driver's interrupt callback can block synchronously; the
+interrupt is delivered only while the worker is still connecting. It releases the worker only from
+interruptible waits: blocking `java.net` socket I/O is not interruptible on JDK 17, so a driver
+blocked in a socket connect or read keeps its worker until its own socket timeout, and a driver or
+close that never returns keeps it until the server restarts.
+Abandoned and completed-after-abandonment attempts are logged; rejected attempts are aggregated
+into at most one log line a minute. Completed workers
 restore their context class loader. The adapter does not bound arbitrary driver constructor
 work or clean up driver-owned global threads.
 
@@ -143,3 +149,8 @@ or `InheritableThreadLocal` state. Drivers using the shared workers must clean u
 thread-local state and must not depend on inherited thread locals for caller authentication.
 Drivers that cannot meet these requirements must not opt into this adapter. Isolating workers
 by catalog alone would not isolate different users of the same catalog.
+
+A JDBC catalog whose driver does not enforce a login timeout can also bound its runtime physical
+connections with this adapter by overriding `JdbcCatalogOperations#configureDataSource` and
+installing it as the data source's driver. Pool waits, SQL execution and tree-lock acquisition are
+separate from this physical connection deadline.

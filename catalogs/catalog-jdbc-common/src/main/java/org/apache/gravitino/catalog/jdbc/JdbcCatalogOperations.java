@@ -170,6 +170,12 @@ public class JdbcCatalogOperations
     this.jdbcConfig = new JdbcConfig(resultConf);
     this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
+    try {
+      configureDataSource(dataSource, jdbcConfig);
+    } catch (RuntimeException e) {
+      DataSourceUtils.closeDataSource(dataSource);
+      throw e;
+    }
 
     checkJDBCDriverVersion();
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
@@ -188,6 +194,29 @@ public class JdbcCatalogOperations
       metricsSystem.register(catalogMetricsSource);
     }
   }
+
+  /**
+   * Configures the validated, lazy DBCP data source before any connection is borrowed.
+   *
+   * <p>The default makes no changes. A connector whose driver does not enforce a login timeout can
+   * bound physical connection creation with {@link
+   * org.apache.gravitino.utils.BoundedConnectionDriver}:
+   *
+   * <pre>{@code
+   * ((BasicDataSource) dataSource)
+   *     .setDriver(
+   *         new BoundedConnectionDriver(
+   *             DataSourceUtils.configuredDriver(config), config.getConnectTimeoutMs()));
+   * }</pre>
+   *
+   * <p>Implementations must keep the URL, credentials and pool settings that the common JDBC
+   * factory applied, and must not close the data source; these operations own its lifecycle. A
+   * runtime exception closes the data source and fails initialization.
+   *
+   * @param dataSource the DBCP data source created by the common JDBC factory
+   * @param config validated JDBC configuration
+   */
+  protected void configureDataSource(DataSource dataSource, JdbcConfig config) {}
 
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
