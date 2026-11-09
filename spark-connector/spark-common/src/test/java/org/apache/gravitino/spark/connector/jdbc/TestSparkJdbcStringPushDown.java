@@ -66,16 +66,27 @@ public class TestSparkJdbcStringPushDown {
     public JDBCTable loadTable(Identifier identifier) {
       JDBCTable physical = (JDBCTable) super.loadTable(identifier);
       Table metadata = mock(Table.class);
-      when(metadata.columns())
-          .thenReturn(
-              identifier.name().equals("composites")
-                  ? new Column[] {
-                    Column.of("id", Types.IntegerType.get()),
-                    Column.of("p", Types.ExternalType.of("pair"))
-                  }
-                  : new Column[] {
-                    Column.of("id", Types.IntegerType.get()), Column.of("s", Types.StringType.get())
-                  });
+      Column[] columns;
+      if (identifier.name().equals("composites")) {
+        columns =
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("p", Types.ExternalType.of("pair"))
+            };
+      } else if (identifier.name().equals("collisions")) {
+        columns =
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("value", Types.StringType.get()),
+              Column.of("VALUE", Types.ExternalType.of("pair"))
+            };
+      } else {
+        columns =
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("s", Types.StringType.get())
+            };
+      }
+      when(metadata.columns()).thenReturn(columns);
       return new SparkJdbcTable(
           identifier,
           metadata,
@@ -128,6 +139,8 @@ public class TestSparkJdbcStringPushDown {
         if (postgres) {
           statement.execute("CREATE TYPE pair AS (x int, y int)");
           statement.execute("CREATE TABLE composites(id int, p pair)");
+          statement.execute("CREATE TABLE collisions(id int, value text, \"VALUE\" pair)");
+          statement.execute("INSERT INTO collisions VALUES (1, 'text', ROW(1,NULL))");
           statement.execute(
               "INSERT INTO composites VALUES (1, ROW(1,NULL)), (2, ROW(NULL,NULL)), (3, ROW(1,2)), (4, NULL)");
         }
@@ -160,6 +173,7 @@ public class TestSparkJdbcStringPushDown {
         String table = "strings." + (postgres ? "public" : "test") + ".strings";
         if (postgres) {
           assertCompositeNullChecksStayInSpark(spark);
+          assertCaseSensitiveColumnsDoNotSharePrefilters(spark);
         }
         assertPrefilter(spark, table, "s = 'V500'", List.of());
         assertPrefilter(spark, table, "s = 'a'", List.of(2));
@@ -224,6 +238,30 @@ public class TestSparkJdbcStringPushDown {
     String columnCountPlan = plan(spark, columnCount);
     Assertions.assertFalse(columnCountPlan.contains("PushedAggregates: [COUNT"), columnCountPlan);
     Assertions.assertEquals(3L, spark.sql(columnCount).head().getLong(0));
+  }
+
+  private static void assertCaseSensitiveColumnsDoNotSharePrefilters(SparkSession spark) {
+    String original = spark.conf().get("spark.sql.caseSensitive");
+    try {
+      spark.conf().set("spark.sql.caseSensitive", "true");
+      String table = "strings.public.collisions";
+      for (String predicate :
+          new String[] {"`VALUE` = 'not-a-composite'", "`VALUE` = '(1,)'", "value = 'text'"}) {
+        String sql = "SELECT id FROM " + table + " WHERE " + predicate;
+        List<Integer> actual =
+            spark.sql(sql).collectAsList().stream()
+                .map(row -> row.getInt(0))
+                .collect(Collectors.toList());
+        String actualPlan = plan(spark, sql);
+        Assertions.assertTrue(actualPlan.contains("Filter "), actualPlan);
+        String pushed = actualPlan.substring(actualPlan.indexOf("PushedFilters:"));
+        Assertions.assertFalse(pushed.contains("VALUE =") || pushed.contains("value ="), pushed);
+        List<Integer> expected = predicate.contains("not-a-composite") ? List.of() : List.of(1);
+        Assertions.assertEquals(expected, actual);
+      }
+    } finally {
+      spark.conf().set("spark.sql.caseSensitive", original);
+    }
   }
 
   private static void assertNonBinaryCollationIsNotPrefiltered(String url) {

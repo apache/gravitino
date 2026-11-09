@@ -263,6 +263,10 @@ public class TestSparkJdbcPushDownPolicy {
           new SparkJdbcPushDownPolicy(columns, schema, schema, DIALECT, URL);
       Assertions.assertFalse(collision.canPush(predicate("IS_NULL", col("VALUE"))));
       Assertions.assertFalse(collision.canPushAggregate(new Count(col("VALUE"), false)));
+      Assertions.assertFalse(
+          collision.canPrefilter(eq(col("VALUE"), lit("not-a-composite", DataTypes.StringType))));
+      Assertions.assertFalse(
+          collision.canPrefilter(eq(col("value"), lit("text", DataTypes.StringType))));
     }
     Type external = Types.ExternalType.of("pair");
     for (Type type :

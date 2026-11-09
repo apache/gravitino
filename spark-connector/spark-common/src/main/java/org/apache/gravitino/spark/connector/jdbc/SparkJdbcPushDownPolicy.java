@@ -96,7 +96,12 @@ class SparkJdbcPushDownPolicy {
     this.stringPrefilterSupported =
         url.startsWith("jdbc:postgresql:") || url.startsWith("jdbc:mysql:");
     Set<String> externalColumns = new HashSet<>();
+    Set<String> columnNames = new HashSet<>();
+    Set<String> ambiguousColumns = new HashSet<>();
     for (Column column : columns) {
+      if (!columnNames.add(normalize(column.name()))) {
+        ambiguousColumns.add(normalize(column.name()));
+      }
       Type type = column.dataType();
       if (containsExternal(type)) {
         externalColumns.add(normalize(column.name()));
@@ -115,6 +120,8 @@ class SparkJdbcPushDownPolicy {
     }
     // Case-insensitive matching must not let a safe column mask a same-spelling external one.
     nullPreservingColumns.removeAll(externalColumns);
+    nullPreservingColumns.removeAll(ambiguousColumns);
+    stringColumns.removeAll(ambiguousColumns);
     this.readerTypeMismatchColumns = new HashSet<>();
     this.zonedTimestampColumns = new HashSet<>();
     for (StructField field : sparkSchema.fields()) {

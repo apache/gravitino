@@ -183,8 +183,8 @@ For PostgreSQL and MySQL, a simple positive string equality or `IN` filter can a
 to the source as a prefilter, while Spark rechecks it. This reduces rows transferred to Spark
 without trusting the source collation to produce an exact match. These prefilters require
 Spark's default binary string comparison. Negated comparisons, casts, compound expressions,
-and literals containing a backslash or NUL remain in Spark. Other JDBC sources retain the
-conservative string policy.
+and literals containing a backslash or NUL remain in Spark. Column names differing only by case are excluded from string prefiltering.
+Other JDBC sources retain the conservative string policy.
 
 Other expressions are still pushed down, for example `id = 1`, `count(*)`, `LIMIT 10`, or
 `ORDER BY id LIMIT 3`. They run with the source semantics. For example, a source `avg()` can
