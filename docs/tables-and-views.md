@@ -157,7 +157,9 @@ exposes it on load when the underlying catalog provides it. Setting `defaultValu
 provider-specific as below.
 
 For example, Iceberg format-version 3 maps `write-default` to `defaultValue` and
-`initial-default` to `initialDefaultValue`.
+`initial-default` to `initialDefaultValue`. An Iceberg `timestamptz` default is exposed as a
+UTC `LocalDateTime` with type `timestamp_tz` (with time zone): clients should treat the
+`LocalDateTime` fields as UTC when recovering the instant.
 
 PostgreSQL, MySQL, Doris, StarRocks, OceanBase, and Hologres share function-default write
 validation: function names must be unquoted identifiers (optionally qualified), and arguments

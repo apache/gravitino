@@ -382,6 +382,10 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
   | `write-default`   | `defaultValue`         |
   | `initial-default` | `initialDefaultValue`  |
 
+  Iceberg `timestamptz` defaults are exposed as a UTC `LocalDateTime` with
+  Gravitino type `timestamp_tz`. Clients should treat those `LocalDateTime`
+  fields as UTC when recovering the instant.
+
 - Setting column default values through the Gravitino API is not supported yet.
 
 ### Table Partitions

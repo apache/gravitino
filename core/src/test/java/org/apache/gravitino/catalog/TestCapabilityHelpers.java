@@ -366,6 +366,43 @@ public class TestCapabilityHelpers {
   }
 
   @Test
+  void testUpdateColumnDefaultValueDoesNotCheckInitialDefault() {
+    // Alter update-default only validates write-default capability; it must not reject because a
+    // previously loaded Iceberg v3 column carried initialDefaultValue (that field is not on the
+    // TableChange).
+    TableChange[] applied =
+        CapabilityHelpers.applyCapabilities(
+            Capability.DEFAULT,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"region"}, Literals.stringLiteral("EU")));
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertInstanceOf(TableChange.UpdateColumnDefaultValue.class, applied[0]);
+    Assertions.assertEquals(
+        Literals.stringLiteral("EU"),
+        ((TableChange.UpdateColumnDefaultValue) applied[0]).getNewDefaultValue());
+  }
+
+  @Test
+  void testAddColumnDoesNotCarryInitialDefault() {
+    // AddColumn has no initialDefaultValue; capability apply must succeed and leave initial unset.
+    TableChange[] applied =
+        CapabilityHelpers.applyCapabilities(
+            Capability.DEFAULT,
+            TableChange.addColumn(
+                new String[] {"region"},
+                Types.StringType.get(),
+                "comment",
+                TableChange.ColumnPosition.defaultPos(),
+                true,
+                false,
+                Literals.stringLiteral("EU")));
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertInstanceOf(TableChange.AddColumn.class, applied[0]);
+    Assertions.assertEquals(
+        Literals.stringLiteral("EU"), ((TableChange.AddColumn) applied[0]).getDefaultValue());
+  }
+
+  @Test
   void testNormalizeMetadataIdentifierKeepsExactStoredColumnName() throws IOException {
     CatalogManager catalogManager = foldingCatalogManager();
     EntityStore store = Mockito.mock(EntityStore.class);

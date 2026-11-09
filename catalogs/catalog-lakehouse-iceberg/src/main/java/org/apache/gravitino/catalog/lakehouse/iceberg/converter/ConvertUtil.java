@@ -188,7 +188,7 @@ public class ConvertUtil {
       default:
         // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
         // rather than failing table load.
-        LOG.warn("Dropping Iceberg column default of unsupported type {} as unset", type.typeId());
+        LOG.debug("Dropping Iceberg column default of unsupported type {} as unset", type.typeId());
         return unset;
     }
   }
