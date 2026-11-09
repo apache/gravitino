@@ -365,7 +365,9 @@ a one-level namespace identifies a catalog, a two-level namespace identifies a s
 three-level table identifier identifies a table.
 
 Requests may set `X-Gravitino-Active-Roles` to `ALL` (also the default when omitted), `NONE`, or
-a comma-separated list of assigned role names. This selection reaches both operation checks
+a comma-separated list of assigned role names; see
+[Role Names Outside ASCII](./security/access-control.md#role-names-outside-ascii) for names with
+non-ASCII characters. This selection reaches both operation checks
 and listing filters. Malformed selections return `400`; selecting an unassigned role is forbidden.
 Ownership is independent of role selection, so `NONE` does not remove ownership privileges.
 
