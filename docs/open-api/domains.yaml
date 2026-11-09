@@ -200,7 +200,11 @@ paths:
       summary: Delete a domain
       operationId: deleteDomain
       description: >-
-        Deletes the domain and its parent edge, leaving its backing tag unchanged. Returns dropped=false if absent; a domain with subdomains cannot be deleted. Domain authorization is pending access-control integration.
+        Deletes only the domain and its parent edge. The backing tag, its assignments and member
+        metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
+        not cascade to subdomains: a domain with subdomains fails with HTTP 409,
+        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent.
+        Domain authorization is pending access-control integration.
       responses:
         "200":
           description: Successful domain operation.
