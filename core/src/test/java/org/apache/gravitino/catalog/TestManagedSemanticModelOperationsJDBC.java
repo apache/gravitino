@@ -22,6 +22,7 @@ import static org.apache.gravitino.semantic.SemanticModelTestUtils.sources;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -301,6 +302,51 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
     assertEquals(2, writeValidationCount.get());
   }
 
+  /**
+   * Verifies that a replacement retains the resolved source ID if the source is recreated before
+   * the model write.
+   *
+   * @throws Exception if persistence fails
+   */
+  @TestTemplate
+  public void testReplacementRetainsResolvedIdAfterSourceRecreation() throws Exception {
+    TableEntity source = createAndInsertTableEntity(modelIdent.namespace(), "orders");
+    NameIdentifier sourceIdent =
+        NameIdentifier.of(
+            modelIdent.namespace().level(1), modelIdent.namespace().level(2), source.name());
+    SemanticModelDefinition initialDefinition = definition("orders", sourceIdent);
+    SemanticModelEntity created =
+        (SemanticModelEntity)
+            operations.createSemanticModel(
+                modelIdent,
+                null,
+                initialDefinition,
+                Map.of(),
+                SemanticModelSourceUpdate.replace(
+                    List.of(
+                        new SemanticModelSource("orders", Entity.EntityType.TABLE, source.id()))));
+
+    SemanticModelDefinition replacementDefinition = definition("recent_orders", sourceIdent);
+    SemanticModelSourceUpdate resolvedUpdate =
+        SemanticModelSourceUpdate.replace(
+            List.of(
+                new SemanticModelSource("recent_orders", Entity.EntityType.TABLE, source.id())));
+
+    // Reproduce source recreation after validation has resolved the ID, but before the model write.
+    assertTrue(backend.delete(source.nameIdentifier(), source.type(), false));
+    TableEntity recreated = createAndInsertTableEntity(modelIdent.namespace(), source.name());
+    assertNotEquals(source.id(), recreated.id());
+
+    operations.alterSemanticModel(
+        modelIdent, resolvedUpdate, SemanticModelChange.replaceDefinition(replacementDefinition));
+
+    assertEquals(replacementDefinition, operations.loadSemanticModel(modelIdent).definition());
+    assertEquals(
+        resolvedUpdate.sources(),
+        liveAssociations(created.id()).stream().map(Association::source).toList());
+    assertEquals(2, writeValidationCount.get());
+  }
+
   private List<Association> liveAssociations(long modelId) throws Exception {
     try (SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
@@ -331,10 +377,15 @@ public class TestManagedSemanticModelOperationsJDBC extends TestJDBCBackend {
   private record Association(long id, SemanticModelSource source) {}
 
   private static SemanticModelDefinition definition(String datasetName) {
+    return definition(
+        datasetName, NameIdentifier.of("source_catalog", "source_schema", datasetName));
+  }
+
+  private static SemanticModelDefinition definition(String datasetName, NameIdentifier source) {
     Dataset dataset =
         Dataset.builder()
             .withName(datasetName)
-            .withSource(NameIdentifier.of("source_catalog", "source_schema", datasetName))
+            .withSource(source)
             .withPrimaryKey(new String[0])
             .withUniqueKeys(new String[0][])
             .withCustomExtensions(new CustomExtension[0])
