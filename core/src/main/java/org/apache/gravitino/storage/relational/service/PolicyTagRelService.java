@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -123,6 +125,25 @@ public class PolicyTagRelService {
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove)
       throws IOException {
+    return updateRelations(tagIdentifier, targetsToAdd, targetsToRemove, null);
+  }
+
+  /**
+   * Updates policy relations with explicit creation audit metadata.
+   *
+   * @param tagIdentifier The tag identifier.
+   * @param targetsToAdd Policy relations to create.
+   * @param targetsToRemove Policy relations to remove.
+   * @param auditInfo The audit to preserve, or null to use the current principal and time.
+   * @return The resulting policy targets.
+   * @throws IOException If storage or serialization fails.
+   */
+  public List<PolicyEntity> updateRelations(
+      NameIdentifier tagIdentifier,
+      RelationEdgeTarget[] targetsToAdd,
+      RelationEdgeTarget[] targetsToRemove,
+      @Nullable Audit auditInfo)
+      throws IOException {
     NameIdentifierUtil.checkTag(tagIdentifier);
     String metalake = tagIdentifier.namespace().level(0);
     RelationEdgeTarget[] targetsToAddOrEmpty = nullToEmpty(targetsToAdd);
@@ -138,7 +159,7 @@ public class PolicyTagRelService {
             try {
               updatedPolicies.addAll(
                   updateRelationsWithoutCommit(
-                      tagIdentifier, targetsToAddOrEmpty, targetsToRemoveOrEmpty));
+                      tagIdentifier, targetsToAddOrEmpty, targetsToRemoveOrEmpty, auditInfo));
             } catch (IOException e) {
               throw new UncheckedIOException(e);
             }
@@ -152,7 +173,8 @@ public class PolicyTagRelService {
   private List<PolicyEntity> updateRelationsWithoutCommit(
       NameIdentifier tagIdentifier,
       RelationEdgeTarget[] targetsToAdd,
-      RelationEdgeTarget[] targetsToRemove)
+      RelationEdgeTarget[] targetsToRemove,
+      @Nullable Audit auditInfo)
       throws IOException {
     String metalake = tagIdentifier.namespace().level(0);
     NameIdentifier metalakeIdentifier = NameIdentifier.of(metalake);
@@ -186,7 +208,8 @@ public class PolicyTagRelService {
           target.nameIdentifier(),
           policyId,
           tagId,
-          target.relationValue().orElse(null));
+          target.relationValue().orElse(null),
+          auditInfo);
     }
 
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
@@ -259,14 +282,18 @@ public class PolicyTagRelService {
       NameIdentifier policyIdentifier,
       long policyId,
       long tagId,
-      String selector)
+      String selector,
+      @Nullable Audit auditInfo)
       throws IOException {
     PolicyTagRelPO relation =
         PolicyTagRelPO.builder()
             .withPolicyId(policyId)
             .withTagId(tagId)
             .withSelector(selector)
-            .withAuditInfo(auditInfo())
+            .withAuditInfo(
+                auditInfo == null
+                    ? auditInfo()
+                    : JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)

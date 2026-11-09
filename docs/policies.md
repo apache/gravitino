@@ -385,8 +385,24 @@ The UI supports policy lifecycle operations such as creating custom policies, ed
 content, and changing their enabled state. Use the REST API or Java client to manage
 policy-to-tag associations and to read the resulting object policies. The
 [Manage Policies](./manage-policies-in-gravitino.md) guide has requests and examples.
-For existing direct object policy associations, see
-[Migration Guide](./migration-guide.md).
+Creating a policy also creates its server-managed hidden tag and policy-to-tag relation
+in the same metadata transaction. The hidden tag starts without object assignments, so creating
+a policy does not apply it to any object. Renaming or updating the policy preserves this tag;
+deleting the policy removes it and its assignments in the same transaction.
+Hidden tags participate in policy resolution but do not appear in ordinary tag listings.
+Tag API requests for hidden tags return not-found, and hidden tags cannot receive owners or user grants.
+Deleting their policy also removes any existing ownership and grant rows for the hidden tag.
+Internal tags use the `gravitino_hidden_{policyId}` name. The `gravitino_hidden_` prefix,
+including alternate casing, determines visibility and is reserved for internal use. REST tag
+creation and rename requests cannot use this prefix. Other names, including the generic `reserved_`
+prefix, remain available to users.
+The internal binding operation loads the policy's existing hidden tag and writes the tag-to-object
+assignment. Endpoint validation and the transaction belong to the relation operation. It does not
+inspect or modify policy-to-tag relations. Updating or overwriting an existing policy does not
+create a missing hidden tag.
+
+Do not run old and new server versions together after internal policy tags have been created:
+old servers do not recognize the internal name prefix and can expose or modify these tags.
 
 To add or remove an association, a user must own the metalake or have the required access to both
 the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy
