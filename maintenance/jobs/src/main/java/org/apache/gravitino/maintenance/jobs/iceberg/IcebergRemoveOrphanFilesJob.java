@@ -39,7 +39,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -197,10 +196,9 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
       throws Exception {
     OrphanCleanupResult orphan =
         executeWithMetrics(spark, catalogName, tableIdentifier, argsByName);
-    return new TableSnapshotMetrics(
+    return TableSnapshotMetrics.of(
         IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
-        IcebergMaintenanceMetrics.toJson(
-            orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed())));
+        orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed()));
   }
 
   /**

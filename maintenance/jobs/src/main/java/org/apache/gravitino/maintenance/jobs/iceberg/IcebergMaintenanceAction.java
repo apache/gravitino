@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.spark.sql.SparkSession;
 
 /**

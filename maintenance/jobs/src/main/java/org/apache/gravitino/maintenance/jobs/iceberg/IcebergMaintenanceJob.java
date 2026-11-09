@@ -40,7 +40,6 @@ import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequ
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.jobs.MaintenanceActionHttpClient;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;

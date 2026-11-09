@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
@@ -435,7 +434,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     long snapshotId =
         IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
-    return new TableSnapshotMetrics(snapshotId, IcebergMaintenanceMetrics.toJson(payload));
+    return TableSnapshotMetrics.of(snapshotId, payload);
   }
 
   @Override
@@ -458,10 +457,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("sort-order")),
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
-    return new TableSnapshotMetrics(
+    return TableSnapshotMetrics.of(
         IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier),
-        IcebergMaintenanceMetrics.toJson(
-            collectCompactionMetrics(spark, catalogName, tableIdentifier)));
+        collectCompactionMetrics(spark, catalogName, tableIdentifier));
   }
 
   // -------------------------------------------------------------------------

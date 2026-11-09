@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
@@ -221,7 +220,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
         IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = expireBeforeMetrics(preExpireData.snapshotCount());
-    return new TableSnapshotMetrics(snapshotId, IcebergMaintenanceMetrics.toJson(payload));
+    return TableSnapshotMetrics.of(snapshotId, payload);
   }
 
   @Override
@@ -255,9 +254,9 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     PreExpireData after = collectTableData(spark, catalogName, tableIdentifier);
     PreExpireData beforeData = preExpireData == null ? after : preExpireData;
     preExpireData = null;
-    return new TableSnapshotMetrics(
+    return TableSnapshotMetrics.of(
         IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
-        IcebergMaintenanceMetrics.toJson(expireAfterMetrics(beforeData, after)));
+        expireAfterMetrics(beforeData, after));
   }
 
   /**

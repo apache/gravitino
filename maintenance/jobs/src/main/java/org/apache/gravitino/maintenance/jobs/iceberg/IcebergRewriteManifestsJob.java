@@ -29,7 +29,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
-import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.iceberg.ManifestFile;
@@ -270,7 +269,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
     long snapshotId =
         IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
     Map<String, Object> payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
-    return new TableSnapshotMetrics(snapshotId, IcebergMaintenanceMetrics.toJson(payload));
+    return TableSnapshotMetrics.of(snapshotId, payload);
   }
 
   @Override
@@ -301,9 +300,9 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
           rewritten,
           ((Number) result.get(1)).longValue());
     }
-    return new TableSnapshotMetrics(
+    return TableSnapshotMetrics.of(
         IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier),
-        IcebergMaintenanceMetrics.toJson(manifestAfterMetrics(rewritten)));
+        manifestAfterMetrics(rewritten));
   }
 
   private static void printUsage() {
