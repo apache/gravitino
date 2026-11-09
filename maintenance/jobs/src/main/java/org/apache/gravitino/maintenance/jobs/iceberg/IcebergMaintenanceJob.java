@@ -527,9 +527,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       case EXPIRE_SNAPSHOTS:
         expireInventory =
             IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
-        payload =
-            IcebergExpireSnapshotsJob.expireBeforeMetrics(
-                expireInventory.snapshotCount(), expireInventory.totalFileSize());
+        payload = IcebergExpireSnapshotsJob.expireBeforeMetrics(expireInventory.snapshotCount());
         break;
       case REMOVE_ORPHAN_FILES:
         throw new IllegalStateException("Orphan cleanup must not sample before-metrics");

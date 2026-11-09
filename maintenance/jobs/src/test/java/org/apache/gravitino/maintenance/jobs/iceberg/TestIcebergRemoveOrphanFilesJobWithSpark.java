@@ -96,9 +96,9 @@ public class TestIcebergRemoveOrphanFilesJobWithSpark {
     assertEquals(0, IcebergRemoveOrphanFilesJob.execute(spark, args));
   }
 
-  /** Verifies TMS executeWithMetrics measures bytes; CLI execute does not. */
+  /** Verifies TMS executeWithMetrics measures removed file size; CLI execute does not. */
   @Test
-  public void testBytesReclaimedMeasuredBeforeDelete() throws Exception {
+  public void testRemovedFileSizeMeasuredBeforeDelete() throws Exception {
     spark.sql("CREATE TABLE test_catalog.db.bytes (id INT) USING iceberg");
     Path root = tempDir.resolve("db/bytes");
     byte[] payload = new byte[] {1, 2, 3, 4, 5, 6, 7};

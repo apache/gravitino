@@ -348,18 +348,16 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   /** TMS S0: snapshot number before expire. */
   public static final String SNAPSHOT_NUMBER_METRIC = "custom-snapshot-number";
 
-  /** TMS S0: distinct reachable content-file bytes across history. */
-  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
-
   /** TMS S1: snapshots present in S0 but absent after expire. */
   public static final String EXPIRED_SNAPSHOT_NUMBER_METRIC = "custom-expired-snapshot-number";
 
   /** TMS S1: content-file bytes present in S0 but absent after expire. */
-  public static final String RECLAIMED_FILE_SIZE_METRIC = "custom-reclaimed-file-size";
+  public static final String EXPIRED_FILE_SIZE_METRIC = "custom-expired-file-size";
 
   /**
    * Snapshot-expiry inventory for TMS S0 and set-difference S1. Concurrent commits only add
-   * ids/paths to the after set; cleared/reclaimed count ids/paths that disappeared.
+   * ids/paths to the after set; cleared/expired count ids/paths that disappeared. File sizes stay
+   * in memory for S1 set-diff and are not reported in S0 metrics.
    */
   @VisibleForTesting
   static final class ExpireInventory {
@@ -382,21 +380,12 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     long snapshotCount() {
       return snapshotIds.size();
     }
-
-    long totalFileSize() {
-      long total = 0L;
-      for (Long size : fileSizesByPath.values()) {
-        total += size == null ? 0L : size;
-      }
-      return total;
-    }
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireBeforeMetrics(long snapshotNumber, long totalFileSize) {
+  static Map<String, Object> expireBeforeMetrics(long snapshotNumber) {
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(SNAPSHOT_NUMBER_METRIC, snapshotNumber);
-    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
     return metrics;
   }
 
@@ -408,11 +397,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(
-      long expiredSnapshotNumber, long reclaimedFileSize) {
+  static Map<String, Object> expireAfterMetrics(long expiredSnapshotNumber, long expiredFileSize) {
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(EXPIRED_SNAPSHOT_NUMBER_METRIC, expiredSnapshotNumber);
-    metrics.put(RECLAIMED_FILE_SIZE_METRIC, reclaimedFileSize);
+    metrics.put(EXPIRED_FILE_SIZE_METRIC, expiredFileSize);
     return metrics;
   }
 

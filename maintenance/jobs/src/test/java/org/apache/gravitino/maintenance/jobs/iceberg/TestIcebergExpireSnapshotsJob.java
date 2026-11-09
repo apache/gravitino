@@ -525,4 +525,16 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(sql.contains("FROM `cat`.`db`.`tbl`.`all_files`"));
     assertTrue(sql.contains("GROUP BY file_path"));
   }
+
+  @Test
+  public void testExpireMetricNames() {
+    Map<String, Object> before = IcebergExpireSnapshotsJob.expireBeforeMetrics(3L);
+    assertEquals(1, before.size());
+    assertEquals(3L, before.get(IcebergExpireSnapshotsJob.SNAPSHOT_NUMBER_METRIC));
+
+    Map<String, Object> after = IcebergExpireSnapshotsJob.expireAfterMetrics(2L, 100L);
+    assertEquals(2, after.size());
+    assertEquals(2L, after.get(IcebergExpireSnapshotsJob.EXPIRED_SNAPSHOT_NUMBER_METRIC));
+    assertEquals(100L, after.get(IcebergExpireSnapshotsJob.EXPIRED_FILE_SIZE_METRIC));
+  }
 }

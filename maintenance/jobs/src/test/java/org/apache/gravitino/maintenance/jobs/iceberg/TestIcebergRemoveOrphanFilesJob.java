@@ -103,6 +103,15 @@ public class TestIcebergRemoveOrphanFilesJob {
     assertTrue(sql.contains("/a/b\\'c"));
   }
 
+  @Test
+  public void testOrphanAfterMetricNames() {
+    java.util.Map<String, Object> metrics =
+        IcebergRemoveOrphanFilesJob.orphanAfterMetrics(10L, 200L);
+    assertEquals(2, metrics.size());
+    assertEquals(10L, metrics.get(IcebergRemoveOrphanFilesJob.REMOVED_FILE_NUMBER_METRIC));
+    assertEquals(200L, metrics.get(IcebergRemoveOrphanFilesJob.REMOVED_FILE_SIZE_METRIC));
+  }
+
   /** Verifies location boundaries. */
   @Test
   public void testLocationBoundaries() {
