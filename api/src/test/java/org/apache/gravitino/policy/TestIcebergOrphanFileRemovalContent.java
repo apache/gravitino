@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.policy;
 
+import java.util.Map;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -129,5 +132,49 @@ class TestIcebergOrphanFileRemovalContent {
         () ->
             IcebergOrphanFileRemovalContent.validateLocationWithinTable(
                 "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t1/data"));
+  }
+
+  @Test
+  void requireCompatibleBindingAllowsTableContainment() {
+    IcebergOrphanFileRemovalContent content =
+        (IcebergOrphanFileRemovalContent)
+            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
+    content.requireCompatibleBinding(
+        MetadataObject.Type.TABLE, Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
+  }
+
+  @Test
+  void requireCompatibleBindingRejectsNonTable() {
+    IcebergOrphanFileRemovalContent content =
+        (IcebergOrphanFileRemovalContent)
+            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                content.requireCompatibleBinding(
+                    MetadataObject.Type.SCHEMA,
+                    Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2")));
+    Assertions.assertTrue(error.getMessage().contains("TABLE"));
+  }
+
+  @Test
+  void requireCompatibleBindingRejectsMissingTableLocation() {
+    IcebergOrphanFileRemovalContent content =
+        (IcebergOrphanFileRemovalContent)
+            PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> content.requireCompatibleBinding(MetadataObject.Type.TABLE, null));
+    Assertions.assertTrue(error.getMessage().contains(Table.PROPERTY_LOCATION));
+  }
+
+  @Test
+  void requireCompatibleBindingNoopsWithoutLocation() {
+    IcebergOrphanFileRemovalContent content =
+        (IcebergOrphanFileRemovalContent) PolicyContents.icebergOrphanFileRemoval();
+    Assertions.assertDoesNotThrow(
+        () -> content.requireCompatibleBinding(MetadataObject.Type.SCHEMA, null));
   }
 }

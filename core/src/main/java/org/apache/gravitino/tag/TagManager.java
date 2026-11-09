@@ -61,7 +61,6 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
-import org.apache.gravitino.policy.OrphanLocationPolicyGuard;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
@@ -83,8 +82,6 @@ public class TagManager implements TagDispatcher {
 
   private final ObjectPolicyResolver objectPolicyResolver;
 
-  private final OrphanLocationPolicyGuard orphanLocationPolicyGuard;
-
   private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
       Sets.newHashSet(
           MetadataObject.Type.CATALOG,
@@ -102,7 +99,6 @@ public class TagManager implements TagDispatcher {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
-    this.orphanLocationPolicyGuard = new OrphanLocationPolicyGuard(entityStore);
   }
 
   public String[] listTags(String metalake) {
@@ -433,12 +429,12 @@ public class TagManager implements TagDispatcher {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    orphanLocationPolicyGuard.requireCompatibleWhenAssociatingPolicy(metalake, tagName, policy);
-    if (!policy.policyType().uniqueAtSameLevel()) {
-      return;
-    }
-
     for (MetadataObject object : listMetadataObjectsForTag(metalake, tagName)) {
+      objectPolicyResolver.requireCompatibleBinding(
+          metalake, policy.name(), tagName, policy.content(), object);
+      if (!policy.policyType().uniqueAtSameLevel()) {
+        continue;
+      }
       Tag tagOnObject;
       try {
         tagOnObject = getTagForMetadataObject(metalake, object, tagName);
@@ -491,7 +487,7 @@ public class TagManager implements TagDispatcher {
 
     try {
       if (tagValuesToAdd.length > 0) {
-        orphanLocationPolicyGuard.requireCompatibleWhenAssigningTags(
+        requireCompatibleBindingsForTags(
             metalake,
             metadataObject,
             Arrays.stream(tagValuesToAdd)
@@ -543,6 +539,37 @@ public class TagManager implements TagDispatcher {
     } catch (IOException e) {
       LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
       throw new RuntimeException(e);
+    }
+  }
+
+  private void requireCompatibleBindingsForTags(
+      String metalake, MetadataObject metadataObject, Iterable<String> tagNames)
+      throws IOException {
+    for (String tagName : tagNames) {
+      NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, tagName);
+      List<PolicyEntity> policies;
+      try {
+        if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
+          continue;
+        }
+        policies =
+            entityStore
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    List.of(tagId),
+                    Entity.EntityType.TAG)
+                .stream()
+                .map(RelationalEntity::targetEntity)
+                .map(PolicyEntity.class::cast)
+                .toList();
+      } catch (NoSuchEntityException e) {
+        continue;
+      }
+      for (PolicyEntity policy : policies) {
+        objectPolicyResolver.requireCompatibleBinding(
+            metalake, policy.name(), tagName, policy.content(), metadataObject);
+      }
     }
   }
 

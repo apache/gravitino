@@ -66,7 +66,6 @@ public class PolicyManager implements PolicyDispatcher {
   private final EntityStore entityStore;
   private final TagManager tagManager;
   private final ObjectPolicyResolver objectPolicyResolver;
-  private final OrphanLocationPolicyGuard orphanLocationPolicyGuard;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore, TagManager tagManager) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
@@ -81,7 +80,6 @@ public class PolicyManager implements PolicyDispatcher {
     this.entityStore = entityStore;
     this.tagManager = Preconditions.checkNotNull(tagManager, "tagManager");
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
-    this.orphanLocationPolicyGuard = new OrphanLocationPolicyGuard(entityStore);
   }
 
   @Override
@@ -167,7 +165,7 @@ public class PolicyManager implements PolicyDispatcher {
       throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    requireOrphanLocationCompatibleWithPlacements(metalake, policyName, changes);
+    requireCompatibleBindingsForPlacements(metalake, policyName, changes);
     try {
       return entityStore.update(
           NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -427,14 +425,36 @@ public class PolicyManager implements PolicyDispatcher {
     return contentUpdated ? builder.build() : builder.buildSkippingContentValidation();
   }
 
-  private void requireOrphanLocationCompatibleWithPlacements(
+  private void requireCompatibleBindingsForPlacements(
       String metalake, String policyName, PolicyChange... changes) {
     for (PolicyChange change : changes) {
       if (!(change instanceof PolicyChange.UpdateContent)) {
         continue;
       }
       PolicyContent content = ((PolicyChange.UpdateContent) change).getContent();
-      orphanLocationPolicyGuard.requireCompatibleWithTagPlacements(metalake, policyName, content);
+      List<String> tagNames;
+      try {
+        tagNames =
+            entityStore
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    List.of(NameIdentifierUtil.ofPolicy(metalake, policyName)),
+                    Entity.EntityType.POLICY)
+                .stream()
+                .map(rel -> rel.targetEntity().name())
+                .toList();
+      } catch (NoSuchEntityException e) {
+        continue;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      for (String tagName : tagNames) {
+        for (MetadataObject object : tagManager.listMetadataObjectsForTag(metalake, tagName)) {
+          objectPolicyResolver.requireCompatibleBinding(
+              metalake, policyName, tagName, content, object);
+        }
+      }
     }
   }
 

@@ -21,6 +21,7 @@ package org.apache.gravitino.policy;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 
@@ -64,5 +65,23 @@ public interface PolicyContent {
   default void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         CollectionUtils.isNotEmpty(supportedObjectTypes()), "supportedObjectTypes cannot be empty");
+  }
+
+  /**
+   * Validates that this content may become effective on a metadata object reached through a tag.
+   *
+   * <p>Invoked on write paths that associate a policy with a tag, assign a tagged policy to an
+   * object, or update content while tag placements already exist. Default is a no-op; built-in
+   * maintenance contents override when they have object-scoped parameter constraints (for example
+   * orphan-scan {@code location} containment).
+   *
+   * @param objectType type of the metadata object
+   * @param objectProperties object properties available for the check (for tables, typically
+   *     including {@code location}); may be null or empty when the object has none or is not loaded
+   * @throws IllegalArgumentException if the content parameters are incompatible with the object
+   */
+  default void requireCompatibleBinding(
+      MetadataObject.Type objectType, @Nullable Map<String, String> objectProperties) {
+    // No object-scoped constraints by default.
   }
 }

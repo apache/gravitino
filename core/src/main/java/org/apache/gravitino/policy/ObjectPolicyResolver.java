@@ -32,17 +32,22 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.tag.EffectiveTagResolver;
 import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +58,8 @@ import org.slf4j.LoggerFactory;
  * <p>The resolver evaluates relation selectors, filters disabled policies, and deduplicates
  * repeated matches by policy entity ID while preserving contributing metadata-object sources.
  * Same-level conflicts for Iceberg maintenance policy types are rejected when associating tags or
- * policies.
+ * policies. Callers also use {@link #requireCompatibleBinding} so each {@link PolicyContent} can
+ * enforce object-scoped parameter constraints on the same write path.
  */
 public class ObjectPolicyResolver {
 
@@ -261,6 +267,56 @@ public class ObjectPolicyResolver {
           String.format(
               "Metadata object %s has conflicting %s policies at the same level: %s",
               metadataObject, policy.policyType().policyType(), names));
+    }
+  }
+
+  /**
+   * Loads object properties when needed and delegates to {@link
+   * PolicyContent#requireCompatibleBinding(MetadataObject.Type, Map)}. Callers walk the pending
+   * policy↔tag↔object edges; content types without object-scoped constraints no-op.
+   *
+   * @param metalake metalake name
+   * @param policyName policy name for error messages
+   * @param tagName tag linking the policy to the object
+   * @param content policy content being placed
+   * @param metadataObject object that would receive the policy via the tag
+   */
+  public void requireCompatibleBinding(
+      String metalake,
+      String policyName,
+      String tagName,
+      PolicyContent content,
+      MetadataObject metadataObject) {
+    Map<String, String> objectProperties = Map.of();
+    if (metadataObject.type() == MetadataObject.Type.TABLE) {
+      objectProperties = loadTableProperties(metalake, metadataObject);
+    }
+    try {
+      content.requireCompatibleBinding(metadataObject.type(), objectProperties);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Policy %s is associated with tag %s regarding %s %s: %s",
+              policyName, tagName, metadataObject.type(), metadataObject, e.getMessage()),
+          e);
+    }
+  }
+
+  private Map<String, String> loadTableProperties(String metalake, MetadataObject tableObject) {
+    TableDispatcher dispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
+    if (dispatcher == null) {
+      dispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    }
+    if (dispatcher == null) {
+      throw new IllegalStateException("TableDispatcher is not initialized");
+    }
+    try {
+      Table table = dispatcher.loadTable(MetadataObjectUtil.toEntityIdent(metalake, tableObject));
+      Map<String, String> properties = table == null ? null : table.properties();
+      return properties == null ? Map.of() : properties;
+    } catch (NoSuchTableException e) {
+      throw new IllegalArgumentException(
+          String.format("Table %s does not exist while validating policy binding", tableObject), e);
     }
   }
 
