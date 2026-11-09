@@ -33,6 +33,7 @@ import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -47,8 +48,11 @@ import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.metrics.MetricsSystem;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests {@link JdbcCatalogOperations#configureDataSource(DataSource, JdbcConfig)}. */
 public class TestJdbcCatalogOperationsDataSourceHook {
@@ -76,22 +80,30 @@ public class TestJdbcCatalogOperationsDataSourceHook {
     }
   }
 
-  @Test
-  void testHookFailureClosesDataSourceAndPropagates() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testHookFailureClosesDataSourceAndPropagates(boolean metricsEnabled) throws Exception {
     IllegalStateException failure = new IllegalStateException("cannot configure");
     AtomicReference<BasicDataSource> configured = new AtomicReference<>();
-    try (JdbcCatalogOperations operations =
-        new HookedOperations(
-            (dataSource, config) -> {
-              configured.set((BasicDataSource) dataSource);
-              throw failure;
-            })) {
+    GravitinoEnv environment = GravitinoEnv.getInstance();
+    MetricsSystem previousMetrics =
+        (MetricsSystem) FieldUtils.readField(environment, "metricsSystem", true);
+    try (MetricsSystem metricsSystem = metricsEnabled ? new MetricsSystem() : null;
+        JdbcCatalogOperations operations =
+            new HookedOperations(
+                (dataSource, config) -> {
+                  configured.set((BasicDataSource) dataSource);
+                  throw failure;
+                })) {
+      FieldUtils.writeField(environment, "metricsSystem", metricsSystem, true);
       IllegalStateException thrown =
           Assertions.assertThrows(
               IllegalStateException.class,
               () -> operations.initialize(properties(), catalogInfo(), new TestJdbcCatalog()));
       Assertions.assertSame(failure, thrown);
       Assertions.assertTrue(configured.get().isClosed());
+    } finally {
+      FieldUtils.writeField(environment, "metricsSystem", previousMetrics, true);
     }
   }
 

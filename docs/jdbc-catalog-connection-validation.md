@@ -123,26 +123,31 @@ existing connector is automatically switched to this adapter by this addition.
 Only `Driver.connect` runs on a worker. Metadata, validation and SQL remain on the caller;
 this does not introduce delayed DDL or an automatic retry. A connection returned after
 timeout/interruption is closed by the worker and never handed to the caller or pool.
-While an abandoned attempt is still connecting or closing, new attempts through that wrapper
-fail immediately. Pool waits, connection validation, SQL and total request duration retain
+While an abandoned attempt is connecting, waiting for an in-flight interrupt callback, or closing,
+new attempts through that wrapper fail immediately. Pool waits, connection validation, SQL and total request duration retain
 their own budgets.
 
-The core-loaded adapter shares at most 64 daemon workers per server JVM, with no queue.
-Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
+The core-loaded adapter shares at most 64 daemon connection workers and 64 daemon cancellation
+threads per server JVM, with no queue in either pool. Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
 healthy connects. An abandoned attempt's worker is interrupted from a separate cancellation thread,
 not the cancelling caller, because a driver's interrupt callback can block synchronously; the
 interrupt is delivered only while the worker is still connecting. It releases the worker only from
 interruptible waits: blocking `java.net` socket I/O is not interruptible on JDK 17, so a driver
 blocked in a socket connect or read keeps its worker until its own socket timeout, and a driver or
 close that never returns keeps it until the server restarts.
-Abandoned and completed-after-abandonment attempts are logged; rejected attempts are aggregated
-into at most one log line a minute. Completed workers
+Abandoned and completed-after-abandonment attempts are logged at INFO; worker-admission rejections
+are aggregated into at most one WARN log line a minute. A rejected cancellation is logged at WARN
+and is not retried or run on the caller. Its worker remains quarantined until the driver and cleanup
+return; if they never return, recovery requires a server restart. Cancellation is best-effort, not
+forced thread termination. Completed workers
 restore their context class loader. The adapter does not bound arbitrary driver constructor
 work or clean up driver-owned global threads.
 
-Each attempt and its late connection cleanup use the submitting caller's access-control
-context and JAAS subject. Shared workers are created without inheriting the first caller's
-subject, so reusing a worker does not reuse that caller's JAAS subject.
+Each attempt, its driver interrupt callback, and its late connection cleanup use the submitting
+caller's access-control context, JAAS subject, and context class loader. Cancellation threads
+restore their prior context after the callback. Interrupts consumed while waiting for cancellation
+are restored after connection cleanup. Shared workers are created without inheriting the first
+caller's subject, so reusing a worker does not reuse that caller's JAAS subject.
 
 This guarantee covers access-control contexts and JAAS subjects, not arbitrary `ThreadLocal`
 or `InheritableThreadLocal` state. Drivers using the shared workers must clean up their own
@@ -152,5 +157,6 @@ by catalog alone would not isolate different users of the same catalog.
 
 A JDBC catalog whose driver does not enforce a login timeout can also bound its runtime physical
 connections with this adapter by overriding `JdbcCatalogOperations#configureDataSource` and
-installing it as the data source's driver. Pool waits, SQL execution and tree-lock acquisition are
-separate from this physical connection deadline.
+installing it as the data source's driver. The hook must not borrow connections, start the pool,
+retain the data source, or change its validated URL, credentials and pool settings. Pool waits, SQL
+execution and tree-lock acquisition are separate from this physical connection deadline.

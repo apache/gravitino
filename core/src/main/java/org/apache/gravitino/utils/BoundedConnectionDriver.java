@@ -58,11 +58,13 @@ import org.slf4j.LoggerFactory;
  * queue, bounds that retention; excess attempts fail with {@link SQLTransientConnectionException}.
  * Abandoned attempts, their completion and rejected attempts are logged. Workers are daemon threads
  * and release their catalog context class loader after each attempt. Each attempt, including late
- * connection cleanup, runs with the submitting caller's access-control context and JAAS subject;
- * shared workers do not inherit the creating request's JAAS subject. This does not isolate
- * arbitrary {@link ThreadLocal} or {@link InheritableThreadLocal} state. Delegates must clean up
- * such state and must not rely on it to carry a caller's identity. Drivers that cannot meet this
- * requirement must not use this adapter's shared workers.
+ * connection cleanup, runs with the submitting caller's access-control context and JAAS subject.
+ * Driver interrupt callbacks use that same context and context class loader, restoring the
+ * cancellation thread's context afterward; shared workers do not inherit the creating request's
+ * JAAS subject. This does not isolate arbitrary {@link ThreadLocal} or {@link
+ * InheritableThreadLocal} state. Delegates must clean up such state and must not rely on it to
+ * carry a caller's identity. Drivers that cannot meet this requirement must not use this adapter's
+ * shared workers.
  *
  * <p>After a timeout, further attempts through this instance fail immediately until the abandoned
  * attempt finishes cleanup. This prevents a lazy pool's initialization lock from serializing a
@@ -159,7 +161,7 @@ public final class BoundedConnectionDriver implements Driver {
       attempt.accept();
       return connection;
     } catch (TimeoutException e) {
-      attempt.abandon();
+      attempt.abandon(context, callerContext);
       throw new SQLTimeoutException(
           "JDBC connection attempt exceeded "
               + timeoutMs
@@ -167,7 +169,7 @@ public final class BoundedConnectionDriver implements Driver {
           "08001",
           e);
     } catch (InterruptedException e) {
-      attempt.abandon();
+      attempt.abandon(context, callerContext);
       Thread.currentThread().interrupt();
       throw new SQLTimeoutException("Interrupted while opening a JDBC connection", "08001", e);
     } catch (ExecutionException e) {
@@ -277,7 +279,7 @@ public final class BoundedConnectionDriver implements Driver {
       accepted = true;
     }
 
-    void abandon() {
+    void abandon(@Nullable ClassLoader context, AccessControlContext callerContext) {
       synchronized (this) {
         if (finished) {
           return;
@@ -285,7 +287,7 @@ public final class BoundedConnectionDriver implements Driver {
         abandoned = true;
         abandonedAttempts.incrementAndGet();
       }
-      LOG.warn(
+      LOG.info(
           "Abandoned a {} connection attempt (deadline {} ms); interrupting its worker if it is "
               + "still connecting",
           driverName(),
@@ -293,9 +295,30 @@ public final class BoundedConnectionDriver implements Driver {
       try {
         // Thread.interrupt may synchronously run a driver's blocking channel-close callback, so
         // it must not run on this request thread, which would defeat the connection deadline.
-        cancellers.execute(this::cancel);
+        cancellers.execute(
+            () ->
+                AccessController.doPrivileged(
+                    (PrivilegedAction<Void>)
+                        () -> {
+                          Thread current = Thread.currentThread();
+                          ClassLoader previous = current.getContextClassLoader();
+                          try {
+                            // An interrupt can execute driver code, so it needs the same caller
+                            // context as connect and late connection cleanup.
+                            current.setContextClassLoader(context);
+                            cancel();
+                          } finally {
+                            current.setContextClassLoader(previous);
+                          }
+                          return null;
+                        },
+                    callerContext));
       } catch (RejectedExecutionException e) {
-        LOG.warn("Could not schedule interruption of an abandoned JDBC connection attempt", e);
+        LOG.warn(
+            "Could not schedule interruption of an abandoned {} connection attempt; it remains "
+                + "quarantined until the driver returns",
+            driverName(),
+            e);
       }
     }
 
@@ -319,17 +342,24 @@ public final class BoundedConnectionDriver implements Driver {
       }
     }
 
-    /** Ends the interruptible phase; waits for an in-flight interrupt to be delivered. */
-    private synchronized void endConnect() {
+    /**
+     * Ends the interruptible phase and waits for an in-flight interrupt to be delivered.
+     *
+     * @return whether the barrier consumed an interrupt, to restore after connection cleanup
+     */
+    private synchronized boolean endConnect() {
+      boolean interrupted = false;
       connecting = false;
       while (cancelling) {
         try {
           wait();
         } catch (InterruptedException e) {
-          // The wait consumes the in-flight cancellation; the worker must not carry it into
-          // cleanup or the next attempt.
+          // An external interrupt can arrive during cancellation too. Preserve the signal, but
+          // restore it only after cleanup so an interrupt-sensitive close still succeeds.
+          interrupted = true;
         }
       }
+      return interrupted;
     }
 
     void run(String url, Properties properties, @Nullable ClassLoader context) {
@@ -349,7 +379,7 @@ public final class BoundedConnectionDriver implements Driver {
         try {
           connection = delegate.connect(url, properties);
         } finally {
-          endConnect();
+          interrupted |= endConnect();
         }
         result.complete(connection);
         while (true) {

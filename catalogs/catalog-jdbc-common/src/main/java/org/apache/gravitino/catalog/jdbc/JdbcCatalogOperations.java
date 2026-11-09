@@ -210,8 +210,9 @@ public class JdbcCatalogOperations
    * }</pre>
    *
    * <p>Implementations must keep the URL, credentials and pool settings that the common JDBC
-   * factory applied, and must not close the data source; these operations own its lifecycle. A
-   * runtime exception closes the data source and fails initialization.
+   * factory applied. They must not borrow connections or start the pool in this hook, and must not
+   * retain or close the data source; these operations own its lifecycle. A runtime exception closes
+   * the data source and fails initialization.
    *
    * @param dataSource the DBCP data source created by the common JDBC factory
    * @param config validated JDBC configuration
@@ -223,7 +224,7 @@ public class JdbcCatalogOperations
   public void close() {
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    if (metricsSystem != null) {
+    if (metricsSystem != null && catalogMetricsSource != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
