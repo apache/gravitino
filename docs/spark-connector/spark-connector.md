@@ -199,9 +199,10 @@ set `preferTimestampNTZ=true` on the Spark catalog, for example
 `spark.sql.catalog.<name>.preferTimestampNTZ=true`. You can also set the Gravitino catalog
 property `spark.bypass.preferTimestampNTZ=true`. The Spark catalog option wins when both are
 set. This is a catalog-level option: a per-read `spark.read.option("preferTimestampNTZ", ...)`
-is ignored so that the reader and the fixed table schema cannot diverge. The option applies to PostgreSQL catalogs only. Do not set it on other JDBC catalogs:
-Spark would read their timestamps as `TIMESTAMP_NTZ`, but the table schema still shows
-`TIMESTAMP`.
+is ignored so that the reader and the fixed table schema cannot diverge. The option applies to
+PostgreSQL catalogs only. Other JDBC catalogs ignore this option and explicitly use
+`preferTimestampNTZ=false`, even when `spark.sql.timestampType=TIMESTAMP_NTZ`, to keep their
+reader and table schema on `TIMESTAMP`.
 
 With the option on:
 

@@ -58,9 +58,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     applyJdbcCredential(gravitinoCatalogClient, all);
+    useTimestampNtz = false;
     if ("jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider())) {
-      // For PostgreSQL, one value drives both the reader and the type converter.
-      // Remove every spelling of the key first; otherwise the reader may use any one of them.
       String value = preferTimestampNtz(options, properties);
       Preconditions.checkArgument(
           "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
@@ -71,8 +70,10 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
           PREFER_TIMESTAMP_NTZ,
           name);
       useTimestampNtz = Boolean.parseBoolean(value);
-      setPreferTimestampNtz(all, useTimestampNtz);
     }
+    // One value drives both the reader and converter for every provider. Explicitly disable NTZ
+    // outside PostgreSQL, including when Spark's session timestamp type defaults to NTZ.
+    setPreferTimestampNtz(all, useTimestampNtz);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return jdbcTableCatalog;
   }
