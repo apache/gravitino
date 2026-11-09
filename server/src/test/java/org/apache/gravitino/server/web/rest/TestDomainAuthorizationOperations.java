@@ -25,26 +25,34 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -67,9 +75,11 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.RequestContext;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -236,6 +246,8 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   void restoreAuthorization() throws Exception {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", savedConfig, true);
     GravitinoEnv.getInstance().setGravitinoAuthorizer(savedAuthorizer);
+    RequestContext.resetOperationFailureFired();
+    RequestContext.clear();
   }
 
   @Test
@@ -352,6 +364,105 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
     expect("GET", "/metalakes/lake/objects/table/cat.db.trades/domains", null, 403);
   }
 
+  @Test
+  void createChecksMetalakeManagementBeforeNameCollision() throws Exception {
+    current.set(domain("Hidden", null, Domain.Status.DRAFT));
+    doThrow(new EntityAlreadyExistsException("Name already exists"))
+        .when(transactions)
+        .insertDomainWithNewBackingTag(any(), any(), any());
+    String request = "{\"name\":\"Hidden\",\"backingTag\":{\"name\":\"tag\",\"create\":true}}";
+
+    expect("POST", BASE, request, 403);
+    verify(transactions, never()).insertDomainWithNewBackingTag(any(), any(), any());
+
+    allows.add("lake:MANAGE_DOMAIN");
+    allows.add("lake:CREATE_TAG");
+    denies.add("Hidden:MANAGE_DOMAIN");
+    expect("GET", BASE + "/Hidden", null, 404);
+    expect("POST", BASE, request, 409);
+    verify(transactions).insertDomainWithNewBackingTag(any(), any(), any());
+  }
+
+  @Test
+  void renameChecksSourceManagementBeforeNameCollision() throws Exception {
+    current.set(domain("Trading", "Finance", Domain.Status.PUBLISHED));
+    doReturn(domain("Hidden", null, Domain.Status.DRAFT))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "Hidden")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    AtomicInteger collisionChecks = new AtomicInteger();
+    when(store.update(any(), eq(DomainEntity.class), eq(EntityType.DOMAIN), any()))
+        .thenAnswer(
+            call -> {
+              DomainEntity updated =
+                  call.<Function<DomainEntity, DomainEntity>>getArgument(3).apply(current.get());
+              assertEquals("Hidden", updated.name());
+              collisionChecks.incrementAndGet();
+              throw new EntityAlreadyExistsException("Name already exists");
+            });
+    String request = "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"Hidden\"}]}";
+
+    expect("PUT", BASE + "/Trading", request, 403);
+    assertEquals(0, collisionChecks.get());
+
+    allows.add("Trading:MANAGE_DOMAIN");
+    expect("GET", BASE + "/Hidden", null, 404);
+    expect("PUT", BASE + "/Trading", request, 409);
+    assertEquals(1, collisionChecks.get());
+    assertEquals("Trading", current.get().name());
+  }
+
+  @Test
+  void deleteMembershipCheckRunsBeforeMissingAndDraftMasking() throws Throwable {
+    doReturn(false)
+        .when(transactions)
+        .deleteDomain(eq(NameIdentifierUtil.ofDomain("lake", "missing")), any());
+    for (String name : new String[] {"missing", "Trading"}) {
+      MethodInvocation invocation = deleteInvocation(name);
+      try (Response response = interceptDelete(invocation)) {
+        assertEquals(403, response.getStatus());
+      }
+      verify(invocation, never()).proceed();
+    }
+    verify(transactions, never()).deleteDomain(any(), any());
+
+    when(authorizer.isMetalakeUser(eq("lake"), any())).thenReturn(true);
+    for (String name : new String[] {"missing", "Trading"}) {
+      MethodInvocation invocation = deleteInvocation(name);
+      try (Response response = interceptDelete(invocation)) {
+        assertEquals(200, response.getStatus());
+        assertEquals(false, ((DropResponse) response.getEntity()).dropped());
+      }
+      verify(invocation).proceed();
+    }
+
+    current.set(current.get().toBuilder().withStatus(Domain.Status.PUBLISHED).build());
+    try (Response response = interceptDelete(deleteInvocation("Trading"))) {
+      assertEquals(403, response.getStatus());
+    }
+  }
+
+  private MethodInvocation deleteInvocation(String name) throws Throwable {
+    DomainOperations operations = new DomainOperations(new DomainHookDispatcher(manager));
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    Method method = DomainOperations.class.getMethod("deleteDomain", String.class, String.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments()).thenReturn(new Object[] {"lake", name});
+    when(invocation.proceed()).thenAnswer(ignored -> operations.deleteDomain("lake", name));
+    return invocation;
+  }
+
+  private Response interceptDelete(MethodInvocation invocation) throws Throwable {
+    return (Response)
+        new GravitinoInterceptionService()
+            .getMethodInterceptors(invocation.getMethod())
+            .get(0)
+            .invoke(invocation);
+  }
+
   private LockedDomainState state() {
     DomainEntity child = current.get();
     return new LockedDomainState(
@@ -379,7 +490,9 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
       if (status >= 400) {
         assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
         assertEquals(
-            status == 404 ? "NoSuchDomainException" : "ForbiddenException",
+            status == 404
+                ? "NoSuchDomainException"
+                : status == 409 ? "DomainAlreadyExistsException" : "ForbiddenException",
             response.readEntity(ErrorResponse.class).getType());
       }
     }
