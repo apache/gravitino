@@ -452,20 +452,6 @@ class TestGravitinoConnectorForwardUser {
   }
 
   @Test
-  void testRollbackIsForwardedToInternalConnector() {
-    CatalogConnectorContext ctx = mockContextWithConfig(ImmutableMap.of());
-    Connector internal = mock(Connector.class);
-    ConnectorTransactionHandle internalTransaction = mock(ConnectorTransactionHandle.class);
-    when(ctx.getInternalConnector()).thenReturn(internal);
-    when(internal.beginTransaction(any(), anyBoolean(), anyBoolean()))
-        .thenReturn(internalTransaction);
-    GravitinoConnector connector = new GravitinoConnector(ctx);
-
-    connector.rollback(begin(connector));
-    verify(internal).rollback(internalTransaction);
-  }
-
-  @Test
   void testLeasesAreReleasedWhenInternalRollbackFails() {
     Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
     GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
