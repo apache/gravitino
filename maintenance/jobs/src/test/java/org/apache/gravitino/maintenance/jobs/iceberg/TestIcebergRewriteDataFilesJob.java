@@ -723,11 +723,11 @@ public class TestIcebergRewriteDataFilesJob {
         ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
     assertEquals(
         126877696D,
-        ((Number) metrics.get(IcebergRewriteDataFilesJob.AVG_FILE_SIZE_METRIC)).doubleValue());
+        ((Number) metrics.get(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC)).doubleValue());
     assertEquals(
         9876543210L,
-        ((Number) metrics.get(IcebergRewriteDataFilesJob.TOTAL_FILE_SIZE_METRIC)).longValue());
+        ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
     assertEquals(
-        80L, ((Number) metrics.get(IcebergRewriteDataFilesJob.FILE_NUMBER_METRIC)).longValue());
+        80L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
   }
 }

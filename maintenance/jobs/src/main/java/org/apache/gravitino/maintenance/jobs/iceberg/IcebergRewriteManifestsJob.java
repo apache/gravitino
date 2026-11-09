@@ -275,17 +275,6 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   // TMS metrics helpers (not used by CLI {@link #main} / {@link #execute})
   // -------------------------------------------------------------------------
 
-  /** TMS S0: total manifest count. */
-  public static final String MANIFEST_NUMBER_METRIC =
-      IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC;
-
-  /** TMS S0: average manifest size in bytes. */
-  public static final String AVG_MANIFEST_SIZE_METRIC =
-      IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC;
-
-  /** TMS S1: manifests rewritten by the procedure. */
-  public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
-
   /**
    * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
    * CLI entry points never call this.
@@ -309,15 +298,16 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
   @VisibleForTesting
   static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(MANIFEST_NUMBER_METRIC, manifestNumber);
-    metrics.put(AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, manifestNumber);
+    metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
     return metrics;
   }
 
   @VisibleForTesting
   static Map<String, Object> manifestAfterMetrics(long rewrittenManifestNumber) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(REWRITTEN_MANIFEST_NUMBER_METRIC, rewrittenManifestNumber);
+    metrics.put(
+        IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewrittenManifestNumber);
     return metrics;
   }
 

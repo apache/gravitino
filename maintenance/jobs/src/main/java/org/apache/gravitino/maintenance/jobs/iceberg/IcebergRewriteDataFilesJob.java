@@ -406,15 +406,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   // TMS metrics helpers (not used by CLI {@link #main} / {@link #run})
   // -------------------------------------------------------------------------
 
-  /** TMS S0/S1: average data file size in bytes. */
-  public static final String AVG_FILE_SIZE_METRIC = "custom-avg-file-size";
-
-  /** TMS S0/S1: total data+delete file size in bytes. */
-  public static final String TOTAL_FILE_SIZE_METRIC = "custom-total-file-size";
-
-  /** TMS S0/S1: total file count. */
-  public static final String FILE_NUMBER_METRIC = "custom-file-number";
-
   /**
    * Collects compaction inventory metrics for TMS before/after reporting. Uses the same {@code
    * files} metadata SQL as {@link IcebergUpdateStatsAndMetricsJob}. CLI entry points never call
@@ -475,9 +466,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     Map<String, Object> metrics = new HashMap<>();
     metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
     metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
-    metrics.put(AVG_FILE_SIZE_METRIC, avgFileSize);
-    metrics.put(TOTAL_FILE_SIZE_METRIC, totalFileSize);
-    metrics.put(FILE_NUMBER_METRIC, fileNumber);
+    metrics.put(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC, avgFileSize);
+    metrics.put(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    metrics.put(IcebergDataCompactionContent.FILE_NUMBER_METRIC, fileNumber);
     return metrics;
   }
 

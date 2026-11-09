@@ -30,6 +30,7 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.maintenance.jobs.BuiltInJobTemplateProvider;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.junit.jupiter.api.Test;
 
 /** Tests orphan cleanup templates, SQL arguments, and location boundaries. */
@@ -108,8 +109,8 @@ public class TestIcebergRemoveOrphanFilesJob {
     java.util.Map<String, Object> metrics =
         IcebergRemoveOrphanFilesJob.orphanAfterMetrics(10L, 200L);
     assertEquals(2, metrics.size());
-    assertEquals(10L, metrics.get(IcebergRemoveOrphanFilesJob.REMOVED_FILE_NUMBER_METRIC));
-    assertEquals(200L, metrics.get(IcebergRemoveOrphanFilesJob.REMOVED_FILE_SIZE_METRIC));
+    assertEquals(10L, metrics.get(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC));
+    assertEquals(200L, metrics.get(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC));
   }
 
   /** Verifies location boundaries. */

@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergExpireSnapshotsJob {
@@ -530,11 +531,11 @@ public class TestIcebergExpireSnapshotsJob {
   public void testExpireMetricNames() {
     Map<String, Object> before = IcebergExpireSnapshotsJob.expireBeforeMetrics(3L);
     assertEquals(1, before.size());
-    assertEquals(3L, before.get(IcebergExpireSnapshotsJob.SNAPSHOT_NUMBER_METRIC));
+    assertEquals(3L, before.get(IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC));
 
     Map<String, Object> after = IcebergExpireSnapshotsJob.expireAfterMetrics(2L, 100L);
     assertEquals(2, after.size());
-    assertEquals(2L, after.get(IcebergExpireSnapshotsJob.EXPIRED_SNAPSHOT_NUMBER_METRIC));
-    assertEquals(100L, after.get(IcebergExpireSnapshotsJob.EXPIRED_FILE_SIZE_METRIC));
+    assertEquals(2L, after.get(IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC));
+    assertEquals(100L, after.get(IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC));
   }
 }

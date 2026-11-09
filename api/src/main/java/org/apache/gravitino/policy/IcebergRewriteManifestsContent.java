@@ -60,6 +60,8 @@ public class IcebergRewriteManifestsContent extends AbstractExecutablePolicyCont
   public static final String MANIFEST_NUMBER_METRIC = "custom-manifest-number";
   /** S0 metric: average manifest size in bytes (TMS / in-job gate). */
   public static final String AVG_MANIFEST_SIZE_METRIC = "custom-avg-manifest-size";
+  /** S1 metric: manifests rewritten by the procedure. */
+  public static final String REWRITTEN_MANIFEST_NUMBER_METRIC = "custom-rewritten-manifest-number";
   /** Rule key for the requested partition spec ID; omission selects Iceberg's current default. */
   public static final String SPEC_ID = "spec_id";
   /** Rule key for caching option, or null for the Iceberg default. */

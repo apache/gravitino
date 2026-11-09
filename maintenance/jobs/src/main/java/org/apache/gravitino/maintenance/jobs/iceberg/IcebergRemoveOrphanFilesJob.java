@@ -41,6 +41,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.AnalysisException;
@@ -55,15 +56,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
   private static final String VERSION = "v1";
-
-  /** TMS S1: orphan files removed (or found in dry-run). */
-  public static final String REMOVED_FILE_NUMBER_METRIC = "custom-removed-file-number";
-
-  /**
-   * TMS S1: bytes of orphan files removed. Measured from paths before delete (procedure returns
-   * locations only).
-   */
-  public static final String REMOVED_FILE_SIZE_METRIC = "custom-removed-file-size";
 
   /**
    * Outcome of a TMS orphan cleanup with byte measurement.
@@ -208,8 +200,8 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   @VisibleForTesting
   static Map<String, Object> orphanAfterMetrics(long removedFileNumber, long removedFileSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(REMOVED_FILE_NUMBER_METRIC, removedFileNumber);
-    metrics.put(REMOVED_FILE_SIZE_METRIC, removedFileSize);
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, removedFileNumber);
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, removedFileSize);
     return metrics;
   }
 

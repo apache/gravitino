@@ -30,6 +30,7 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
@@ -345,15 +346,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   // TMS metrics helpers (not used by CLI {@link #main})
   // -------------------------------------------------------------------------
 
-  /** TMS S0: snapshot number before expire. */
-  public static final String SNAPSHOT_NUMBER_METRIC = "custom-snapshot-number";
-
-  /** TMS S1: snapshots present in S0 but absent after expire. */
-  public static final String EXPIRED_SNAPSHOT_NUMBER_METRIC = "custom-expired-snapshot-number";
-
-  /** TMS S1: content-file bytes present in S0 but absent after expire. */
-  public static final String EXPIRED_FILE_SIZE_METRIC = "custom-expired-file-size";
-
   /**
    * Snapshot-expiry inventory for TMS S0 and set-difference S1. Concurrent commits only add
    * ids/paths to the after set; cleared/expired count ids/paths that disappeared. File sizes stay
@@ -385,7 +377,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   @VisibleForTesting
   static Map<String, Object> expireBeforeMetrics(long snapshotNumber) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(SNAPSHOT_NUMBER_METRIC, snapshotNumber);
+    metrics.put(IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, snapshotNumber);
     return metrics;
   }
 
@@ -399,8 +391,9 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   @VisibleForTesting
   static Map<String, Object> expireAfterMetrics(long expiredSnapshotNumber, long expiredFileSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(EXPIRED_SNAPSHOT_NUMBER_METRIC, expiredSnapshotNumber);
-    metrics.put(EXPIRED_FILE_SIZE_METRIC, expiredFileSize);
+    metrics.put(
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC, expiredSnapshotNumber);
+    metrics.put(IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC, expiredFileSize);
     return metrics;
   }
 
