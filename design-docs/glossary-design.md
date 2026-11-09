@@ -158,11 +158,31 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
 - **Cycle check**: adding A → B fails with 400 if B already reaches A through `BROADER` links. The
   server walks up from B, level by level, under the hierarchy lock (see Locking). A term cannot be
   its own parent.
+- **Depth limit**: a `BROADER` chain has at most 20 levels. A new link that makes a chain longer
+  fails with 400. This bounds the cycle check and the hierarchy read.
+- **No overlap**: two terms cannot be `RELATED` if one is an ancestor of the other. Adding such a
+  `RELATED` link, or a `BROADER` link that creates such a pair, fails with 400. This follows the
+  SKOS rule. The check uses the same walk as the cycle check.
+- **No recursive SQL**: the walk runs in code, with one batched query per level. The backend still
+  supports MySQL 5.7, which has no `WITH RECURSIVE`.
 - A hierarchy read returns all ancestors or all descendants of a term. There are no cycles, so the
   walk always ends.
 - Deprecating a term does not change its children. Deleting a term removes its links. Each child
   that loses a parent gets its own audit record. The child keeps its other parents, or becomes a
   top-level term.
+
+How other systems store term relations:
+
+| System           | Where relations are stored                     | Parents per term | Cycle check         |
+| ---------------- | ---------------------------------------------- | ---------------- | ------------------- |
+| DataHub          | a list of outgoing links on the source term    | one term group   | not documented      |
+| OpenMetadata     | one shared relation table for all entities     | one              | tree, so not needed |
+| Apache Atlas     | edges in a graph database                      | many (`isA`)     | self-link only      |
+| Gravitino Domain | `DomainRel { parentId, childId }` edge table   | one, one level   | not needed          |
+| This design      | `glossary_term_rel` edge table, like DomainRel | many, any depth  | yes, under a lock   |
+
+All of them store one direction and derive the other. The only new part here is many parents at
+any depth. That is why this design needs the cycle check and the hierarchy lock.
 
 ### Domain membership
 
@@ -340,9 +360,9 @@ Both can write bindings. The server checks each term in the request separately:
   in two ways: creating a term with the same name returns 409, and adding a synonym equal to its
   name returns 400.
 - **Revision**: each change to the name, definition, synonyms, links, properties, relations,
-  domains or bindings increases `current_version` by one, in the same transaction. Responses return
-  it as `version`, so a client can see that a term changed after it read it. Owner, tag and status
-  changes are only audited.
+  domains, bindings or status increases `current_version` by one, in the same transaction.
+  Responses return it as `version`, so a client can see that a term changed after it read it.
+  Owner and tag changes are only audited.
 - **No snapshots in Step 1**: the audit log holds the change record. There is no history API.
   `glossary_term_version_info` is created with the other tables, but Step 1 writes no rows to it.
   Term reads and writes do not need it. A revision is not an approved version.
@@ -409,16 +429,19 @@ Each row is locked only once, in its final mode.
 | ----------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
 | Create                        | metalake (shared) → domains (shared)                                    | metalake or domain drop                  |
 | Edit content, status, domains | term (exclusive) → added domains (shared)                               | edits at the same time; domain drop      |
-| Add a `BROADER` link          | metalake (shared) → hierarchy lock → child (exclusive)                  | two links that together form a cycle     |
-| Add a `RELATED` link          | both terms (exclusive, ID order)                                        | the other term being deleted             |
+| Add or remove a relation      | metalake (shared) → hierarchy lock → both terms (exclusive, ID order)   | a cycle or overlap; the other term drop  |
 | Bind / unbind                 | object chain (`lockLiveEndpoint`, shared) → terms (exclusive, ID order) | object drop; term edits at the same time |
-| Delete                        | term (exclusive)                                                        | edits at the same time                   |
+| Delete                        | metalake (shared) → hierarchy lock → term (exclusive)                   | a new link to the term being deleted     |
 
 - The **hierarchy lock** is a `SELECT … FOR UPDATE` on one row per metalake in
   `glossary_hierarchy_lock`. The row is inserted on first use. Locking only the two terms is not
   enough. Example: A → B and C → D are added at the same time, then B → C and D → A. Each link
-  passes its own check, but together they form a cycle. `BROADER` edits are rare, so running them
-  one at a time per metalake is cheap.
+  passes its own check, but together they form a cycle. So every relation change takes the lock,
+  and so does a delete. Without it, A → B could be added while B is being deleted, and A would
+  point to a deleted term. Relation changes and deletes are rare, so running them one at a time per
+  metalake is cheap.
+- The walk runs after the lock is taken, so it reads the committed links. If a term was deleted
+  before the lock was taken, the server sees that when it locks the term row, and returns 404.
 - For operations by name, the server finds the row by name, locks it, and then checks the name and
   `deleted_at` again. If they changed, it returns 404. The unique key on the name protects
   concurrent creates (409).
