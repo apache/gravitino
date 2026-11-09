@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
@@ -50,15 +51,18 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.common.DynMethods;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.responses.BaseScanTaskResponse;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -70,6 +74,16 @@ import org.slf4j.LoggerFactory;
 public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  // The experimental Iceberg runtime makes both spec-map methods protected. Resolve them once
+  // rather than linking calls compiled against their public Iceberg 1.11 signatures.
+  private static final DynMethods.UnboundMethod SCAN_RESPONSE_SPECS =
+      DynMethods.builder("specsById").hiddenImpl(BaseScanTaskResponse.class).build();
+
+  private static final DynMethods.UnboundMethod SCAN_RESPONSE_WITH_SPECS =
+      DynMethods.builder("withSpecsById")
+          .hiddenImpl(BaseScanTaskResponse.Builder.class, Map.class)
+          .build();
 
   /**
    * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
@@ -347,15 +361,26 @@ public class IcebergRESTUtils {
   static PlanTableScanResponse copyWithCredentials(
       PlanTableScanResponse response,
       List<org.apache.iceberg.rest.credentials.Credential> credentials) {
-    return PlanTableScanResponse.builder()
+    return scanPlanResponseBuilder(scanResponseSpecs(response))
         .withPlanStatus(response.planStatus())
         .withPlanId(response.planId())
         .withPlanTasks(response.planTasks())
         .withFileScanTasks(response.fileScanTasks())
-        .withSpecsById(response.specsById())
         .withErrorResponse(response.errorResponse())
         .withCredentials(credentials)
         .build();
+  }
+
+  /** Creates a scan response builder with specs on both supported Iceberg runtimes. */
+  static PlanTableScanResponse.Builder scanPlanResponseBuilder(
+      @Nullable Map<Integer, PartitionSpec> specs) {
+    return SCAN_RESPONSE_WITH_SPECS.invoke(PlanTableScanResponse.builder(), specs);
+  }
+
+  /** Returns the full response spec map, including historical specs not referenced by tasks. */
+  @Nullable
+  static Map<Integer, PartitionSpec> scanResponseSpecs(PlanTableScanResponse response) {
+    return SCAN_RESPONSE_SPECS.invoke(response);
   }
 
   public static <T> Response ok(T t) {
