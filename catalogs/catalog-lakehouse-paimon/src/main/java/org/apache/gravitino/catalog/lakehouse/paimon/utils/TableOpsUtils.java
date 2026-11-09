@@ -129,7 +129,7 @@ public class TableOpsUtils {
 
   private static void checkColumnDefaultValue(String fieldName, Expression defaultValue) {
     Preconditions.checkArgument(
-        defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET),
+        defaultValue == null || defaultValue.equals(Column.DEFAULT_VALUE_NOT_SET),
         String.format(
             "Paimon set column default value through table properties instead of column info. Illegal column: %s.",
             fieldName));
