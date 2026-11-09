@@ -50,12 +50,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TMS Spark job: collect before-metrics → gate → execute procedure → report after-metrics → release
- * soft slot.
+ * TMS Spark job: collect before-metrics → gate → execute procedure → report after-metrics → finish
+ * the maintenance action.
  *
  * <p>Started only from the built-in template (cron or commit-chain). {@code maintenance_types} is
  * one type or a comma-separated chain; {@code policy_ids} / {@code action_ids} align 1:1 with those
- * types. Soft-slot HTTP callbacks use {@code action_ids}.
+ * types. {@code action_ids} identify the TMS actions this job must finish when done.
  *
  * <p>{@code metricsJson} carries only metric fields (no {@code maintenanceType} / {@code
  * snapshotId}; those live on the action/policy and {@code table_snapshot_metrics.snapshot_id}).
@@ -82,7 +82,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   /** JobConf: policy ids parallel to {@link #MAINTENANCE_TYPES_KEY}. */
   public static final String POLICY_IDS_KEY = "policy_ids";
 
-  /** JobConf: soft-slot action ids parallel to {@link #POLICY_IDS_KEY}. */
+  /** JobConf: TMS action ids parallel to {@link #POLICY_IDS_KEY}. */
   public static final String ACTION_IDS_KEY = "action_ids";
 
   /** Values accepted in {@code maintenance_types}. */
@@ -195,20 +195,20 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (MaintenanceActionHttpClient client =
           MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
-        // Soft slots are opened by TMS for every (table, policy) before this job runs.
-        Set<String> releasedSlots = new HashSet<>();
+        // TMS opens one action per (table, policy) before this job runs; finish each when done.
+        Set<String> finishedTablePolicyKeys = new HashSet<>();
         try {
           for (TargetTable table : tables) {
             for (int i = 0; i < types.size(); i++) {
               MaintenanceType type = types.get(i);
               long policyId = policyIds.get(i);
               long actionId = actionIds.get(i);
-              String slot = table.tableId + ":" + policyId;
+              String tablePolicyKey = table.tableId + ":" + policyId;
               try {
                 runMaintenanceForType(spark, client, type, table, policyId, actionId, argsByName);
               } finally {
-                releaseSoftSlot(client, actionId, table.tableId, policyId);
-                releasedSlots.add(slot);
+                finishMaintenanceAction(client, actionId, table.tableId, policyId);
+                finishedTablePolicyKeys.add(tablePolicyKey);
               }
             }
           }
@@ -220,9 +220,9 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           for (TargetTable table : tables) {
             for (int i = 0; i < policyIds.size(); i++) {
               long policyId = policyIds.get(i);
-              String slot = table.tableId + ":" + policyId;
-              if (!releasedSlots.contains(slot)) {
-                releaseSoftSlot(client, actionIds.get(i), table.tableId, policyId);
+              String tablePolicyKey = table.tableId + ":" + policyId;
+              if (!finishedTablePolicyKeys.contains(tablePolicyKey)) {
+                finishMaintenanceAction(client, actionIds.get(i), table.tableId, policyId);
               }
             }
           }
@@ -590,7 +590,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     }
   }
 
-  private static void releaseSoftSlot(
+  private static void finishMaintenanceAction(
       MaintenanceActionHttpClient client, long actionId, long tableId, long policyId) {
     try {
       client.finish(actionId, new MaintenanceActionFinishRequest(tableId, policyId));
@@ -605,7 +605,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
   }
 
   /**
-   * Reports before-metrics. Failure means the soft slot is abandoned/unbound — do not run the
+   * Reports before-metrics. Failure means the TMS action is abandoned/unbound — do not run the
    * procedure.
    */
   private static boolean reportBeforeMetricsOrStop(
