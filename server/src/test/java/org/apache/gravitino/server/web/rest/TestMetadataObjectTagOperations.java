@@ -48,6 +48,7 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -63,6 +64,8 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestMetadataObjectTagOperations extends BaseOperationsTest {
@@ -136,6 +139,40 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
       }
     }
     Mockito.verifyNoInteractions(tagManager);
+  }
+
+  /**
+   * Hidden tag path objects return the same error as missing tags in both response formats.
+   *
+   * @param verbose Whether to request detailed tag metadata.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTagPathObjectVisibility(boolean verbose) {
+    MetadataObject hidden = MetadataObjects.parse("gravitino_hidden_123", MetadataObject.Type.TAG);
+    MetadataObject missing = MetadataObjects.parse("missing_tag", MetadataObject.Type.TAG);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, hidden)).thenReturn(new Tag[0]);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, missing))
+        .thenThrow(new NoSuchMetadataObjectException("Tag does not exist"));
+
+    for (MetadataObject object : new MetadataObject[] {hidden, missing}) {
+      try (Response response =
+          target(basePath(metalake))
+              .path("tag")
+              .path(object.fullName())
+              .path("tags")
+              .queryParam("details", verbose)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .get()) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, error.getCode());
+        Assertions.assertEquals(
+            NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      }
+    }
+    Mockito.verify(tagManager, Mockito.never()).listTagsInfoForMetadataObject(metalake, hidden);
   }
 
   @Test

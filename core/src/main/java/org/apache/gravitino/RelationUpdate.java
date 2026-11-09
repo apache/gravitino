@@ -86,9 +86,10 @@ public final class RelationUpdate {
    *
    * @param auditInfo The audit metadata to preserve, for example during an offline migration.
    * @return A copy carrying the supplied audit metadata.
+   * @throws IllegalArgumentException If auditInfo is null.
    */
   public RelationUpdate withAuditInfo(Audit auditInfo) {
-    Preconditions.checkNotNull(auditInfo, "auditInfo must not be null");
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
     return new RelationUpdate(
         relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, auditInfo);
   }

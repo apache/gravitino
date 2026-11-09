@@ -214,7 +214,8 @@ public class TestPolicyObjectBindings extends TestJDBCBackend {
                 policy.name(),
                 MetadataObjects.parse("policy", MetadataObject.Type.POLICY),
                 AUDIT_INFO));
-    assertThrows(NullPointerException.class, () -> addPolicy(policy.name(), catalog.name(), null));
+    assertThrows(
+        IllegalArgumentException.class, () -> addPolicy(policy.name(), catalog.name(), null));
     assertCounts(1, 1, 0);
   }
 

@@ -115,9 +115,7 @@ public class MetadataObjectTagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
             TagOperations.checkVisibleTag(metalake, tagName);
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
@@ -186,9 +184,7 @@ public class MetadataObjectTagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
 
             Map<String, TagDTO> tags = new LinkedHashMap<>();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
@@ -309,7 +305,7 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject object = parseMetadataObject(type, fullName);
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
             Arrays.stream(ArrayUtils.addAll(request.getTagsToAdd(), request.getTagsToRemove()))
                 .forEach(name -> TagOperations.checkVisibleTag(metalake, name));
             String[] tagNames =
@@ -350,7 +346,7 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject object = parseMetadataObject(type, fullName);
+            MetadataObject object = parseMetadataObject(metalake, type, fullName);
             Arrays.stream(ArrayUtils.addAll(request.tagNamesToAdd(), request.tagNamesToRemove()))
                 .forEach(name -> TagOperations.checkVisibleTag(metalake, name));
             String[] tagNames =
@@ -371,9 +367,11 @@ public class MetadataObjectTagOperations {
     }
   }
 
-  private static MetadataObject parseMetadataObject(String type, String fullName) {
-    return MetadataObjects.parse(
-        fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+  private static MetadataObject parseMetadataObject(String metalake, String type, String fullName) {
+    MetadataObject object =
+        MetadataObjects.parse(fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+    TagOperations.checkVisibleTag(metalake, object);
+    return object;
   }
 
   private static void logAssociatedTags(

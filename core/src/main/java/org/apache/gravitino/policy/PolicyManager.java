@@ -94,12 +94,13 @@ public class PolicyManager implements PolicyDispatcher {
    * @return The policy's hidden tag ID.
    * @throws IOException If an entity or relation cannot be persisted.
    * @throws NoSuchEntityException If the policy, hidden tag or target object does not exist.
-   * @throws IllegalArgumentException If the object type does not support tag assignments.
+   * @throws IllegalArgumentException If auditInfo is null or the object type does not support tag
+   *     assignments.
    */
   public long addPolicyToObject(
       String metalake, String policyName, MetadataObject object, Audit auditInfo)
       throws IOException {
-    Preconditions.checkNotNull(auditInfo, "Policy binding audit information is required");
+    Preconditions.checkArgument(auditInfo != null, "Policy binding audit information is required");
     Preconditions.checkArgument(
         SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(object.type()),
         "Unsupported policy binding object type: %s",
