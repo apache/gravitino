@@ -63,12 +63,16 @@ public final class DomainAuthzHelper {
     if (object.type() != MetadataObject.Type.DOMAIN) {
       return MetadataObjects.parent(object);
     }
-    return GravitinoEnv.getInstance()
-        .internalDomainDispatcher()
-        .getDomain(metalake, object.fullName())
-        .parent()
-        .map(name -> MetadataObjects.of(null, name, MetadataObject.Type.DOMAIN))
-        .orElse(null);
+    try {
+      return GravitinoEnv.getInstance()
+          .internalDomainDispatcher()
+          .getDomain(metalake, object.fullName())
+          .parent()
+          .map(name -> MetadataObjects.of(null, name, MetadataObject.Type.DOMAIN))
+          .orElse(null);
+    } catch (NoSuchDomainException e) {
+      return null;
+    }
   }
 
   /**

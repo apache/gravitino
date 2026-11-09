@@ -139,6 +139,31 @@ public class TestDomainMetaService extends TestJDBCBackend {
             current -> Assertions.assertEquals(finance.id(), current.id())));
   }
 
+  /** Verifies deletion authorizes the current parent as well as the locked child row. */
+  @TestTemplate
+  public void testDeleteAuthorizationReceivesCurrentParent() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    DomainMetaService service = DomainMetaService.getInstance();
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "parent");
+    DomainEntity trading = newDomain(METALAKE_NAME, "Trading", "child");
+    service.insertDomain(finance, false);
+    service.insertDomain(trading, false);
+    DomainRelService.getInstance()
+        .setDomainParentAndGet(
+            trading.nameIdentifier(), finance.nameIdentifier(), AUDIT_INFO, state -> {});
+
+    Assertions.assertTrue(
+        service.deleteDomain(
+            trading.nameIdentifier(),
+            current -> {
+              Assertions.assertEquals(trading.id(), current.id());
+              Assertions.assertEquals("Finance", current.parent().orElse(null));
+            }));
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> service.getDomainByIdentifier(trading.nameIdentifier()));
+    Assertions.assertEquals(finance, service.getDomainByIdentifier(finance.nameIdentifier()));
+  }
+
   @TestTemplate
   public void testInsertGetAndListDomains() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);

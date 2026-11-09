@@ -40,6 +40,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainDispatcher;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -145,6 +146,42 @@ class TestDomainParentAuthorization {
               context(),
               principal,
               Optional.of("DOMAIN")));
+    }
+  }
+
+  @Test
+  void missingDomainFailsClosedForAccessOwnerAndGrantChecks() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    DomainDispatcher domains = mock(DomainDispatcher.class);
+    when(env.internalDomainDispatcher()).thenReturn(domains);
+    when(domains.getDomain("lake", "missing"))
+        .thenThrow(new NoSuchDomainException("Missing domain"));
+    JcasbinAuthorizer authorizer = mock(JcasbinAuthorizer.class);
+    doCallRealMethod().when(authorizer).canAccessDomain(any(), anyString(), any(), any());
+    doCallRealMethod()
+        .when(authorizer)
+        .hasSetOwnerPermission(anyString(), anyString(), anyString(), any());
+    doCallRealMethod()
+        .when(authorizer)
+        .hasMetadataPrivilegePermission(anyString(), anyString(), anyString(), any());
+    Principal principal = () -> "reader";
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator(
+            AuthorizationExpressionConstants.CAN_ACCESS_METADATA, authorizer);
+    try (MockedStatic<GravitinoEnv> environment = mockStatic(GravitinoEnv.class);
+        MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class)) {
+      environment.when(GravitinoEnv::getInstance).thenReturn(env);
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+      assertFalse(
+          evaluator.evaluate(
+              NameIdentifierUtil.splitNameIdentifier(
+                  "lake", Entity.EntityType.DOMAIN, NameIdentifierUtil.ofDomain("lake", "missing")),
+              context(),
+              principal,
+              Optional.of("DOMAIN")));
+      assertFalse(authorizer.hasSetOwnerPermission("lake", "domain", "missing", context()));
+      assertFalse(
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "missing", context()));
     }
   }
 

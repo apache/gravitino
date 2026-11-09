@@ -586,7 +586,9 @@ public class DomainMetaService {
           () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
           () -> {
             DomainPO lockedDomainPO = lockAndGetDomainPO(identifier, domainPO);
-            check.accept(fromDomainPOWithParent(lockedDomainPO, identifier.namespace()));
+            check.accept(
+                DomainRelService.getInstance()
+                    .toEntityWithParent(lockedDomainPO, identifier.namespace()));
             DomainRelService.getInstance().checkDomainHasNoSubDomains(identifier, domainId);
             deleteDomainWithVersion(identifier, lockedDomainPO);
             EntityChangeLogWriter.append(identifier, Entity.EntityType.DOMAIN, OperateType.DROP);

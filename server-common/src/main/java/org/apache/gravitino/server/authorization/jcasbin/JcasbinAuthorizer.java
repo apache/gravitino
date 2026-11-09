@@ -62,6 +62,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -367,10 +368,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (object == null || object.type() != MetadataObject.Type.DOMAIN) {
       return false;
     }
-    DomainEntity domain =
-        GravitinoEnv.getInstance()
-            .internalDomainDispatcher()
-            .getDomain(metalake, object.fullName());
+    DomainEntity domain;
+    try {
+      domain =
+          GravitinoEnv.getInstance()
+              .internalDomainDispatcher()
+              .getDomain(metalake, object.fullName());
+    } catch (NoSuchDomainException e) {
+      return false;
+    }
     return DomainAuthzHelper.allowed(
         this,
         principal,

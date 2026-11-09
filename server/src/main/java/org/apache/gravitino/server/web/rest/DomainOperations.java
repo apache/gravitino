@@ -38,6 +38,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -53,6 +54,7 @@ import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTRequest;
@@ -294,8 +296,10 @@ public class DomainOperations {
         () -> {
           boolean deleted =
               DomainAuthzHelper.managed(domainDispatcher, metalake).deleteDomain(metalake, domain);
-          if (!deleted) {
-            DomainAuthzHelper.requireManage(metalake, null);
+          if (!deleted
+              && !DomainAuthzHelper.allowed(metalake, null, Privilege.Name.MANAGE_DOMAIN)) {
+            throw new NoSuchDomainException(
+                "Domain %s under metalake %s does not exist", domain, metalake);
           }
           return Utils.ok(new DropResponse(deleted));
         });

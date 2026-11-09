@@ -20,10 +20,12 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +57,7 @@ import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.dto.responses.DomainResponse;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.hook.DomainHookDispatcher;
@@ -267,6 +270,33 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
     owners.add("Finance");
     expect("GET", BASE + "/Trading", null, 200);
     expect("PATCH", BASE + "/Trading", "{\"status\":\"draft\"}", 200);
+  }
+
+  @Test
+  void parentOnlyManagerAndOwnerCanDeleteChildBeforeDetach() {
+    for (Domain.Status status : Domain.Status.values()) {
+      current.set(domain("Trading", "Finance", status));
+      allows.add("Finance:MANAGE_DOMAIN");
+      expect("DELETE", BASE + "/Trading", null, 200);
+      allows.clear();
+      owners.add("Finance");
+      expect("DELETE", BASE + "/Trading", null, 200);
+      owners.clear();
+    }
+  }
+
+  @Test
+  void missingAndHiddenDraftDeletesHaveTheSameNotFoundResponse() throws Exception {
+    doReturn(false)
+        .when(transactions)
+        .deleteDomain(eq(NameIdentifierUtil.ofDomain("lake", "missing")), any());
+    expect("DELETE", BASE + "/missing", null, 404);
+    expect("DELETE", BASE + "/Trading", null, 404);
+    allows.add("lake:MANAGE_DOMAIN");
+    try (Response response = target(BASE + "/missing").request().delete()) {
+      assertEquals(200, response.getStatus());
+      assertFalse(response.readEntity(DropResponse.class).dropped());
+    }
   }
 
   @Test

@@ -233,7 +233,9 @@ paths:
         Deletes only the domain and its parent edge. The backing tag, its assignments and member
         metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
         not cascade to subdomains: a domain with subdomains fails with HTTP 409,
-        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent.
+        NonEmptyDomainException and error code 1005. For an absent domain, returns dropped=false
+        only if the caller can manage domains at the metalake level or authorization is disabled;
+        otherwise returns 404.
         Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake.
         Hidden drafts return 404; other permission failures return 403.
       responses:
@@ -250,7 +252,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake does not exist or the requested domain is a hidden draft. An absent domain returns HTTP 200 with dropped=false.
+          description: The metalake does not exist, the domain is a hidden draft, or the domain is absent and the caller cannot manage domains at the metalake level. An absent domain returns HTTP 200 with dropped=false for callers with metalake-level management access or when authorization is disabled.
           content:
             application/json:
               schema:
