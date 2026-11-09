@@ -175,7 +175,7 @@ public class ObjectPolicyResolver {
    * @param directTags projected direct tags with {@code source == metadataObject}
    * @throws IllegalArgumentException when a same-level same-type conflict would exist
    */
-  public void checkMaintenanceTypeUniqueness(
+  public void checkDirectTagsUnique(
       String metalake, MetadataObject metadataObject, ResolvedTag[] directTags) {
     if (directTags.length == 0) {
       return;
@@ -221,7 +221,7 @@ public class ObjectPolicyResolver {
    * @param selector policy-to-tag selector
    * @throws IllegalArgumentException when a same-level same-type conflict would exist
    */
-  public void checkMaintenanceTypeUniqueness(
+  public void checkPolicyUnique(
       String metalake,
       MetadataObject metadataObject,
       TagAssignment assignment,

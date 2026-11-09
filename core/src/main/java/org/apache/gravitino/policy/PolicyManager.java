@@ -329,7 +329,7 @@ public class PolicyManager implements PolicyDispatcher {
         } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
           continue;
         }
-        objectPolicyResolver.checkMaintenanceTypeUniqueness(
+        objectPolicyResolver.checkPolicyUnique(
             metalake,
             object,
             tagOnObject.assignment().orElseGet(TagAssignment::noValue),

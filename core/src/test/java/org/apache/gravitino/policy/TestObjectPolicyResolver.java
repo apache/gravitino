@@ -358,7 +358,7 @@ public class TestObjectPolicyResolver {
     IllegalArgumentException thrown =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> resolver.checkMaintenanceTypeUniqueness(METALAKE, OBJECT, directTags));
+            () -> resolver.checkDirectTagsUnique(METALAKE, OBJECT, directTags));
     Assertions.assertTrue(thrown.getMessage().contains("compact_hot"));
     Assertions.assertTrue(thrown.getMessage().contains("compact_strict"));
   }

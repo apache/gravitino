@@ -445,7 +445,7 @@ public class TagManager implements TagDispatcher {
       } catch (NoSuchTagException | NoSuchMetadataObjectException e) {
         continue;
       }
-      objectPolicyResolver.checkMaintenanceTypeUniqueness(
+      objectPolicyResolver.checkPolicyUnique(
           metalake,
           object,
           tagOnObject.assignment().orElseGet(TagAssignment::noValue),
@@ -546,7 +546,7 @@ public class TagManager implements TagDispatcher {
                 : TagAssignment.noValue();
         projected.add(new ResolvedTag(tagEntity.copyWithAssignment(assignment), metadataObject));
       }
-      objectPolicyResolver.checkMaintenanceTypeUniqueness(
+      objectPolicyResolver.checkDirectTagsUnique(
           metalake, metadataObject, projected.toArray(new ResolvedTag[0]));
     }
 
