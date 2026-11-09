@@ -29,6 +29,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMe
 import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.VISIBLE_VERSION;
 import static org.apache.gravitino.catalog.doris.DorisTablePartitionPropertiesMetadata.VISIBLE_VERSION_TIME;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
+import static org.apache.gravitino.catalog.doris.utils.DorisUtils.isAutoRangeTransform;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -52,6 +53,7 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -151,7 +153,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
 
       if (partition instanceof RangePartition) {
         Preconditions.checkArgument(
-            partitionInfo instanceof Transforms.RangeTransform,
+            partitionInfo instanceof Transforms.RangeTransform
+                || isAutoRangeTransform(partitionInfo),
             "Table %s is non-range-partitioned, but trying to add a range partition",
             loadedTable.name());
 
@@ -237,10 +240,21 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
     ImmutableMap<String, String> properties = propertiesBuilder.build();
 
     String[] partitionKeys = partitionKey.split(", ");
-    if (partitionInfo instanceof Transforms.RangeTransform) {
+    if (partitionInfo instanceof Transforms.RangeTransform || isAutoRangeTransform(partitionInfo)) {
       if (partitionKeys.length != 1) {
         throw new UnsupportedOperationException(
             "Multi-column range partitioning in Doris is not supported yet");
+      }
+      if (isAutoRangeTransform(partitionInfo)) {
+        String[] fieldNames =
+            ((NamedReference.FieldReference)
+                    ((Transforms.ApplyTransform) partitionInfo).arguments()[0])
+                .fieldName();
+        Preconditions.checkState(
+            fieldNames[0].equals(partitionKeys[0]),
+            "Doris partition key %s does not match AUTO RANGE column %s",
+            partitionKeys[0],
+            fieldNames[0]);
       }
       Type partitionColumnType = columnTypes.get(partitionKeys[0]);
       Literal<?> lower = Literals.NULL;
