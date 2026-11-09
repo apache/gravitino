@@ -32,6 +32,15 @@ import org.junit.jupiter.api.Test;
 public class TestSemanticModelCatalog {
 
   @Test
+  public void testMetricDiscoveryIsUnsupportedByDefault() {
+    SemanticModelCatalog catalog = new ExistsOnlySemanticModelCatalog();
+    assertThrows(
+        UnsupportedOperationException.class, () -> catalog.listMetrics(Namespace.of("schema")));
+    assertThrows(
+        UnsupportedOperationException.class, () -> catalog.listMetricInfos(Namespace.of("schema")));
+  }
+
+  @Test
   public void testSemanticModelExists() {
     SemanticModelCatalog catalog = new ExistsOnlySemanticModelCatalog();
 

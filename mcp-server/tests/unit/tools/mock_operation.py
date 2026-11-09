@@ -37,7 +37,9 @@ from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
-    def __init__(self, metalake, uri, authorization="", *, auth=None):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         pass
 
     def as_table_operation(self) -> TableOperation:
@@ -492,6 +494,14 @@ class MockViewOperation(ViewOperation):
 
 
 class MockSemanticModelOperation(SemanticModelOperation):
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        return "[]"
+
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        return "[]"
+
     async def list_of_semantic_models(
         self, catalog_name: str, schema_name: str
     ) -> str:

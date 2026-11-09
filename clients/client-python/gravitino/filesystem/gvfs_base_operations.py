@@ -41,6 +41,7 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
+    ForbiddenException,
     NoSuchCredentialException,
     NoSuchLocationNameException,
     NotFoundException,
@@ -562,7 +563,7 @@ class BaseGVFSOperations(ABC):
     def _load_static_catalog_credential_info(catalog) -> Optional[Dict[str, str]]:
         """Load expire==0 credential_info and map keys to GVFS option names.
 
-        Returns an empty dict when credentials are unsupported or absent.
+        Returns an empty dict when catalog credentials are unsupported, absent, or denied.
         Returns None on transient REST failure.
         """
         static_info: Dict[str, str] = {}
@@ -591,6 +592,11 @@ class BaseGVFSOperations(ABC):
             logger.debug(
                 "Catalog does not support credential recovery via get_credentials: %s",
                 exc,
+            )
+        except ForbiddenException:
+            # Catalog-wide credentials are optional; fileset path authorization is separate.
+            logger.debug(
+                "Catalog credentials are not permitted; using fileset credential vending"
             )
         except RESTException as exc:
             logger.warning(

@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -83,6 +86,40 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     } catch (IOException e) {
       throw new RuntimeException("Failed to list Semantic Models in namespace " + namespace, e);
+    }
+  }
+
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    try {
+      return store.listSemanticModelMetrics(namespace).stream()
+          .sorted(
+              Comparator.comparing(
+                      (NameIdentifier ident) -> ident.namespace().levels(), Arrays::compare)
+                  .thenComparing(NameIdentifier::name))
+          .toArray(NameIdentifier[]::new);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to list Semantic Model metrics in namespace " + namespace, e);
+    }
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    try {
+      return store.listSemanticModelMetricInfos(namespace).stream()
+          .sorted(
+              Comparator.comparing(
+                      (SemanticModelMetric info) -> info.namespace().levels(), Arrays::compare)
+                  .thenComparing(info -> info.metric().name()))
+          .toArray(SemanticModelMetric[]::new);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to list Semantic Model metrics in namespace " + namespace, e);
     }
   }
 

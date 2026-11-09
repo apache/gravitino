@@ -35,7 +35,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.maintenance.MaintenanceMetricsService;
+import org.apache.gravitino.maintenance.MaintenanceMetricsManager;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionFinishRequest;
 import org.apache.gravitino.maintenance.dto.requests.MaintenanceActionMetricsRequest;
 import org.apache.gravitino.maintenance.web.TableMaintenanceRESTUtils;
@@ -61,31 +61,31 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 @Produces("application/vnd.gravitino.v1+json")
 public class TableMaintenanceActionOperations {
 
-  private final MaintenanceMetricsService metricsService;
+  private final MaintenanceMetricsManager metricsManager;
 
   @Context private HttpServletRequest httpRequest;
 
   /**
    * Creates the resource.
    *
-   * @param metricsService metrics report domain service
+   * @param metricsManager metrics report manager
    */
   @Inject
-  public TableMaintenanceActionOperations(MaintenanceMetricsService metricsService) {
-    this.metricsService = metricsService;
+  public TableMaintenanceActionOperations(MaintenanceMetricsManager metricsManager) {
+    this.metricsManager = metricsManager;
   }
 
   /**
-   * Persists S0 metrics and {@code before_snapshot_id} for the action bound to {@code jobId}.
+   * Persists S0 metrics and {@code before_metrics_id} for {@code actionId}.
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
+   * @param actionId maintenance action id injected at submit
    * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request metrics payload
    * @return empty success response
    */
   @POST
-  @Path("{jobId}/metrics/before")
+  @Path("{actionId}/metrics/before")
   @Timed(
       name = "maintenance-action-metrics-before." + MetricNames.HTTP_PROCESS_DURATION,
       absolute = true)
@@ -94,32 +94,32 @@ public class TableMaintenanceActionOperations {
   public Response reportBeforeMetrics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("jobId") long jobId,
+      @PathParam("actionId") long actionId,
       @QueryParam("finish") @DefaultValue("false") boolean finish,
       MaintenanceActionMetricsRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportBeforeMetrics(metalake, jobId, finish, request);
+          metricsManager.reportBeforeMetrics(metalake, actionId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "report-before-metrics",
-        jobId,
+        actionId,
         metalake);
   }
 
   /**
-   * Persists S1 metrics for the action bound to {@code jobId}.
+   * Persists S1 metrics for {@code actionId}.
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
+   * @param actionId maintenance action id injected at submit
    * @param finish when {@code true}, close the soft slot after storing metrics
    * @param request metrics payload
    * @return empty success response
    */
   @POST
-  @Path("{jobId}/metrics/after")
+  @Path("{actionId}/metrics/after")
   @Timed(
       name = "maintenance-action-metrics-after." + MetricNames.HTTP_PROCESS_DURATION,
       absolute = true)
@@ -128,48 +128,48 @@ public class TableMaintenanceActionOperations {
   public Response reportAfterMetrics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("jobId") long jobId,
+      @PathParam("actionId") long actionId,
       @QueryParam("finish") @DefaultValue("false") boolean finish,
       MaintenanceActionMetricsRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.reportAfterMetrics(metalake, jobId, finish, request);
+          metricsManager.reportAfterMetrics(metalake, actionId, finish, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "report-after-metrics",
-        jobId,
+        actionId,
         metalake);
   }
 
   /**
-   * Closes the soft slot for one bound table without writing metrics.
+   * Closes the soft slot for one bound action without writing metrics.
    *
    * @param metalake metalake name from the request path
-   * @param jobId Gravitino job run id bound to the action
+   * @param actionId maintenance action id injected at submit
    * @param request finish payload
    * @return empty success response
    */
   @POST
-  @Path("{jobId}/finish")
+  @Path("{actionId}/finish")
   @Timed(name = "maintenance-action-finish." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "maintenance-action-finish", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::RUN_JOB")
   public Response finishAction(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("jobId") long jobId,
+      @PathParam("actionId") long actionId,
       MaintenanceActionFinishRequest request) {
     return TableMaintenanceRESTUtils.doAs(
         httpRequest,
         () -> {
           requireBody(request);
-          metricsService.finishAction(metalake, jobId, request);
+          metricsManager.finishAction(metalake, actionId, request);
           return TableMaintenanceRESTUtils.ok(new BaseResponse());
         },
         "finish",
-        jobId,
+        actionId,
         metalake);
   }
 

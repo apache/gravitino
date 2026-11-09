@@ -56,6 +56,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -114,21 +115,32 @@ public class MetalakeMetaService {
     return metalakeId;
   }
 
+  /**
+   * Returns the metalake PO for the given name.
+   *
+   * @param metalakeName the metalake name
+   * @return the metalake PO
+   * @throws NoSuchEntityException if the metalake does not exist
+   */
+  public MetalakePO requireMetalakeByName(String metalakeName) {
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+    if (metalakePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          metalakeName);
+    }
+    return metalakePO;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getMetalakeByIdentifier")
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkMetalake(ident);
-    MetalakePO metalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
-    if (metalakePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          ident.toString());
-    }
-    return POConverters.fromMetalakePO(metalakePO);
+    return POConverters.fromMetalakePO(requireMetalakeByName(ident.name()));
   }
 
   @Monitored(
@@ -160,15 +172,7 @@ public class MetalakeMetaService {
   public <E extends Entity & HasIdentifier> BaseMetalake updateMetalake(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkMetalake(ident);
-    MetalakePO oldMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
-    if (oldMetalakePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          ident.toString());
-    }
+    MetalakePO oldMetalakePO = requireMetalakeByName(ident.name());
 
     BaseMetalake oldMetalakeEntity = POConverters.fromMetalakePO(oldMetalakePO);
     BaseMetalake newMetalakeEntity = (BaseMetalake) updater.apply((E) oldMetalakeEntity);
@@ -208,15 +212,7 @@ public class MetalakeMetaService {
       baseMetricName = "deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
-    MetalakePO metalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
-    if (metalakePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          ident.toString());
-    }
+    MetalakePO metalakePO = requireMetalakeByName(ident.name());
     Long metalakeId = metalakePO.getMetalakeId();
     Long currentVersion = metalakePO.getCurrentVersion();
     if (metalakeId != null) {
@@ -353,7 +349,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelMetricMapper.class,
-                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelSourceMapper.class,
+                    mapper -> mapper.softDeleteByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {

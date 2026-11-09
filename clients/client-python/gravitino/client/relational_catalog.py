@@ -188,7 +188,19 @@ class RelationalCatalog(
             f"Table namespace must be non-null and have 1 level, the input namespace is {namespace}",
         )
 
+    def _check_full_schema_namespace(
+        self, namespace: Namespace, entity_type: str
+    ) -> None:
+        Namespace.check(
+            namespace is not None and namespace.length() == 3,
+            (
+                f"{entity_type} full namespace must be non-null and have 3 levels "
+                f'in the format "metalake.catalog.schema", the input namespace is {namespace}'
+            ),
+        )
+
     def _format_table_request_path(self, ns: Namespace) -> str:
+        self._check_full_schema_namespace(ns, "Table")
         schema_ns = Namespace.of(ns.level(0), ns.level(1))
         return (
             f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}"
@@ -228,6 +240,7 @@ class RelationalCatalog(
         )
 
     def _format_view_request_path(self, ns: Namespace) -> str:
+        self._check_full_schema_namespace(ns, "View")
         schema_ns = Namespace.of(ns.level(0), ns.level(1))
         return (
             f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}"

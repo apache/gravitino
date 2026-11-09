@@ -22,9 +22,12 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
@@ -164,6 +167,30 @@ public class TestRoleOperations extends BaseOperationsTest {
             .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testCreateRoleRejectsDottedName() {
+    clearInvocations(manager);
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "a.b",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(securableObject)});
+
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(manager, never()).createRole(any(), any(), any(), any());
   }
 
   @Test

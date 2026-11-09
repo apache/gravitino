@@ -30,7 +30,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import org.apache.gravitino.maintenance.TableMaintenanceConfig;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.maintenance.storage.mapper.TableMaintenanceActionMapper;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.metrics.Monitored;
@@ -55,26 +55,28 @@ public class TableMaintenanceActionMetaService {
    * Tries to acquire an unbound occupancy claim before {@code runJob}.
    *
    * <ol>
-   *   <li>CAS-{@code UPDATE created_at} on an expired unbound row ({@code finished_at = 0}), using
-   *       the database clock for lease age
-   *   <li>Otherwise {@code INSERT} with {@code finished_at = 0} and DB {@code created_at}; unique
+   *   <li>Abandon an expired unbound row by setting {@code finished_at} to the database clock (row
+   *       is retained; soft slot freed)
+   *   <li>{@code INSERT} a new row with {@code finished_at = 0} and DB {@code created_at}; unique
    *       conflict means lost race
    * </ol>
    *
    * <p>{@code finished_at = 0} is the soft exclusive slot (like {@code deleted_at}); it stays until
    * {@link #markFinished}. {@code created_at} is the unbound claim lease start from the database
-   * clock so multi-node TTL does not depend on JVM skew.
+   * clock so multi-node TTL does not depend on JVM skew. TTL abandon never reuses {@code
+   * action_id}; Spark must be injected with the new id.
    *
    * <p><b>Submit contract:</b> {@link #bindJobId} only fences the DB bind. It cannot undo a {@code
-   * runJob} that already succeeded. OccupancyGate / submit follow-ups must make {@code runJob}
-   * idempotent on {@link OccupancyClaim#id()} (or use an outbox / reconcile-before-reclaim) so a
-   * reclaim after a crash between submit and bind cannot double-submit Spark work.
+   * runJob} that already succeeded. {@link
+   * org.apache.gravitino.maintenance.MaintenanceActionManager} / submit follow-ups must cancel
+   * orphaned Spark work when bind fails so a crash between submit and bind cannot leave dual
+   * runners.
    *
    * @param tableId table entity id
    * @param policyId policy entity id
    * @param claimTimeoutMs unbound claim TTL
-   * @return claim ({@code id} + DB {@code created_at}) when acquired, empty when another live claim
-   *     or open run holds the slot
+   * @return claim ({@code action_id} + DB {@code created_at}) when acquired, empty when another
+   *     live claim or open run holds the slot
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -82,13 +84,9 @@ public class TableMaintenanceActionMetaService {
   public Optional<OccupancyClaim> tryAcquireInFlight(
       long tableId, long policyId, long claimTimeoutMs) {
     Preconditions.checkArgument(claimTimeoutMs > 0, "claimTimeoutMs must be positive");
-    int reclaimed =
-        SessionUtils.doWithCommitAndFetchResult(
-            TableMaintenanceActionMapper.class,
-            mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs));
-    if (reclaimed == 1) {
-      return Optional.of(readUnboundClaim(tableId, policyId));
-    }
+    SessionUtils.doWithCommit(
+        TableMaintenanceActionMapper.class,
+        mapper -> mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs));
 
     TableMaintenanceActionPO live =
         SessionUtils.getWithoutCommit(
@@ -113,22 +111,19 @@ public class TableMaintenanceActionMetaService {
       }
       throw e;
     }
-    Preconditions.checkState(actionMeta.id() != null, "insert did not return generated id");
     TableMaintenanceActionPO inserted =
         SessionUtils.getWithoutCommit(
-            TableMaintenanceActionMapper.class, mapper -> mapper.selectById(actionMeta.id()));
-    Preconditions.checkState(
-        inserted != null && inserted.createdAt() != null, "insert lost created_at");
-    return Optional.of(new OccupancyClaim(inserted.id(), inserted.createdAt()));
+            TableMaintenanceActionMapper.class, mapper -> mapper.selectById(actionMeta.actionId()));
+    return Optional.of(new OccupancyClaim(inserted.actionId(), inserted.createdAt()));
   }
 
   /**
    * Tries to acquire unbound soft slots for every entry in {@code policyIds} in one transaction
    * (commit-chain submit).
    *
-   * <p>Expired unbound rows are reclaimed first; remaining policies are inserted with a single
-   * multi-row {@code INSERT}. Any live slot or unique conflict aborts the transaction so the caller
-   * never holds a partial chain.
+   * <p>Expired unbound rows are abandoned ({@code finished_at = now}) first; every policy is then
+   * inserted with a single multi-row {@code INSERT} (new {@code action_id}s). Any live slot or
+   * unique conflict aborts the transaction so the caller never holds a partial chain.
    *
    * @param tableId table entity id
    * @param policyIds chain member policy ids (duplicates collapsed, order preserved)
@@ -165,63 +160,21 @@ public class TableMaintenanceActionMetaService {
       long tableId,
       List<Long> policyIds,
       long claimTimeoutMs) {
-    List<Long> toInsert = new ArrayList<>();
     for (long policyId : policyIds) {
-      int reclaimed = mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs);
-      if (reclaimed == 1) {
-        continue;
-      }
+      mapper.reclaimExpiredUnbound(tableId, policyId, claimTimeoutMs);
       TableMaintenanceActionPO live =
           mapper.selectLiveUnboundByTableAndPolicy(tableId, policyId, claimTimeoutMs);
       if (live != null) {
         throw new SoftSlotBusyException();
       }
-      toInsert.add(policyId);
     }
-    if (!toInsert.isEmpty()) {
-      mapper.insertActions(tableId, toInsert);
-    }
+    mapper.insertActions(tableId, policyIds);
     List<OccupancyClaim> claims = new ArrayList<>(policyIds.size());
     for (long policyId : policyIds) {
       TableMaintenanceActionPO unbound = mapper.selectUnboundByTableAndPolicy(tableId, policyId);
-      Preconditions.checkState(
-          unbound != null && unbound.id() != null && unbound.createdAt() != null,
-          "batch acquire lost unbound row for table %s policy %s",
-          tableId,
-          policyId);
-      claims.add(new OccupancyClaim(unbound.id(), unbound.createdAt()));
+      claims.add(new OccupancyClaim(unbound.actionId(), unbound.createdAt()));
     }
     return claims;
-  }
-
-  /**
-   * Acquires an unbound claim using {@link TableMaintenanceConfig#claimTimeoutMs()} or fails.
-   *
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param config maintenance config supplying the unbound claim TTL
-   * @return acquired claim
-   */
-  public OccupancyClaim insertInFlight(long tableId, long policyId, TableMaintenanceConfig config) {
-    Preconditions.checkNotNull(config, "config must not be null");
-    return insertInFlight(tableId, policyId, config.claimTimeoutMs());
-  }
-
-  /**
-   * Acquires an unbound claim with the given claim timeout or fails.
-   *
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param claimTimeoutMs unbound claim TTL
-   * @return acquired claim
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "insertTableMaintenanceAction")
-  public OccupancyClaim insertInFlight(long tableId, long policyId, long claimTimeoutMs) {
-    Optional<OccupancyClaim> acquired = tryAcquireInFlight(tableId, policyId, claimTimeoutMs);
-    Preconditions.checkState(acquired.isPresent(), "failed to acquire unbound occupancy claim");
-    return acquired.get();
   }
 
   /**
@@ -239,7 +192,7 @@ public class TableMaintenanceActionMetaService {
    * <p>This CAS does <em>not</em> prevent duplicate Spark submissions if {@code runJob} already
    * ran; see {@link #tryAcquireInFlight} submit contract.
    *
-   * @param claim claim returned by {@link #tryAcquireInFlight} / {@link #insertInFlight}
+   * @param claim claim returned by {@link #tryAcquireInFlight}
    * @param jobId Gravitino job run id
    */
   @Monitored(
@@ -250,11 +203,11 @@ public class TableMaintenanceActionMetaService {
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.bindJobId(claim.id(), jobId, claim.createdAt()));
+            mapper -> mapper.bindJobId(claim.actionId(), jobId, claim.createdAt()));
     if (updated == 1) {
       return;
     }
-    TableMaintenanceActionPO current = getById(claim.id());
+    TableMaintenanceActionPO current = getById(claim.actionId());
     if (current != null
         && Objects.equals(current.jobId(), jobId)
         && current.finishedAt() != null
@@ -264,41 +217,6 @@ public class TableMaintenanceActionMetaService {
     throw new IllegalStateException(
         String.format(
             "expected to bind job_id on exactly one in-flight action, updated=%s", updated));
-  }
-
-  /**
-   * Lazy-binds {@code jobId} onto the unbound in-flight claim for {@code (tableId, policyId)}.
-   *
-   * <p>Used when a Spark metrics/finish callback arrives before submit-side {@link #bindJobId}.
-   * Does nothing (returns {@code false}) when there is no unbound row for that pair.
-   *
-   * @param tableId table entity id from the callback
-   * @param policyId policy entity id from the callback
-   * @param jobId Gravitino job run id from the callback path
-   * @return {@code true} when a row is now bound to {@code jobId}
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "bindTableMaintenanceActionJobIdIfUnbound")
-  public boolean bindJobIdIfUnbound(long tableId, long policyId, long jobId) {
-    TableMaintenanceActionPO already = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
-    if (already != null && already.finishedAt() != null && already.finishedAt() == 0L) {
-      return true;
-    }
-    TableMaintenanceActionPO unbound =
-        SessionUtils.getWithoutCommit(
-            TableMaintenanceActionMapper.class,
-            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-    if (unbound == null || unbound.id() == null || unbound.createdAt() == null) {
-      return false;
-    }
-    try {
-      bindJobId(new OccupancyClaim(unbound.id(), unbound.createdAt()), jobId);
-      return true;
-    } catch (IllegalStateException e) {
-      TableMaintenanceActionPO bound = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
-      return bound != null && bound.finishedAt() != null && bound.finishedAt() == 0L;
-    }
   }
 
   /**
@@ -321,26 +239,26 @@ public class TableMaintenanceActionMetaService {
         mapper -> {
           for (OccupancyClaim claim : claims) {
             Preconditions.checkNotNull(claim, "claim must not be null");
-            int updated = mapper.bindJobId(claim.id(), jobId, claim.createdAt());
+            int updated = mapper.bindJobId(claim.actionId(), jobId, claim.createdAt());
             if (updated == 1) {
               continue;
             }
-            TableMaintenanceActionPO current = mapper.selectById(claim.id());
+            TableMaintenanceActionPO current = mapper.selectById(claim.actionId());
             Preconditions.checkState(
                 current != null
                     && Objects.equals(current.jobId(), jobId)
                     && current.finishedAt() != null
                     && current.finishedAt() == 0L,
                 "expected to bind job_id on claim id=%s, updated=%s",
-                claim.id(),
+                claim.actionId(),
                 updated);
           }
         });
   }
 
   /**
-   * Releases unbound claims after a failed submit. Each delete is fenced on {@code (id,
-   * created_at)} so a concurrent reclaim's live claim is not removed.
+   * Releases unbound claims after a failed submit. Each delete is fenced on {@code (action_id,
+   * created_at)} so a concurrent abandon's new soft slot is not removed.
    *
    * @param claims claims to release
    */
@@ -356,28 +274,17 @@ public class TableMaintenanceActionMetaService {
     }
   }
 
-  private static OccupancyClaim readUnboundClaim(long tableId, long policyId) {
-    TableMaintenanceActionPO unbound =
-        SessionUtils.getWithoutCommit(
-            TableMaintenanceActionMapper.class,
-            mapper -> mapper.selectUnboundByTableAndPolicy(tableId, policyId));
-    Preconditions.checkState(
-        unbound != null && unbound.id() != null && unbound.createdAt() != null,
-        "reclaim lost unbound row");
-    return new OccupancyClaim(unbound.id(), unbound.createdAt());
-  }
-
   /**
-   * @param id action row id
+   * @param actionId action row id
    * @return action row or null
    */
   @Nullable
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableMaintenanceActionById")
-  public TableMaintenanceActionPO getById(long id) {
+  public TableMaintenanceActionPO getById(long actionId) {
     return SessionUtils.getWithoutCommit(
-        TableMaintenanceActionMapper.class, mapper -> mapper.selectById(id));
+        TableMaintenanceActionMapper.class, mapper -> mapper.selectById(actionId));
   }
 
   /**
@@ -430,118 +337,105 @@ public class TableMaintenanceActionMetaService {
   }
 
   /**
-   * Convenience for single-table jobs. Prefer {@link #getByJobIdAndTableIdAndPolicyId}, {@link
-   * #getByJobIdAndTableId}, or {@link #listByJobId} when a job may cover multiple tables or
-   * policies.
+   * Records the S0 metrics row id for a bound in-flight action.
    *
-   * @param jobId Gravitino job run id
-   * @return the sole action row, or null when none
-   * @throws IllegalStateException when more than one table is bound to {@code jobId}
-   */
-  @Nullable
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getTableMaintenanceActionByJobId")
-  public TableMaintenanceActionPO getByJobId(long jobId) {
-    List<TableMaintenanceActionPO> rows = listByJobId(jobId);
-    if (rows.isEmpty()) {
-      return null;
-    }
-    Preconditions.checkState(
-        rows.size() == 1,
-        "multiple maintenance actions for job_id=%s; use getByJobIdAndTableIdAndPolicyId or listByJobId",
-        jobId);
-    return rows.get(0);
-  }
-
-  /**
-   * Records the sampled Iceberg snapshot id ({@code S0}) for a running action on one table/policy.
+   * <p>Requires {@code job_id IS NOT NULL} and {@code finished_at = 0}. Safe to retry with the same
+   * {@code beforeMetricsId}. A different metrics id on an already-set row fails.
    *
-   * <p>Safe to retry with the same {@code beforeSnapshotId} (cron / in-job re-entry after a partial
-   * sample). A different snapshot id on an already-set row fails.
-   *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param beforeSnapshotId sampled snapshot id
+   * @param actionId action row id
+   * @param beforeMetricsId {@code table_snapshot_metrics.metrics_id} for S0
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "recordTableMaintenanceActionBeforeSnapshot")
-  public void recordBeforeSnapshot(long jobId, long tableId, long policyId, long beforeSnapshotId) {
+      baseMetricName = "recordTableMaintenanceActionBeforeMetrics")
+  public void recordBeforeMetrics(long actionId, long beforeMetricsId) {
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.updateBeforeSnapshot(jobId, tableId, policyId, beforeSnapshotId));
+            mapper -> mapper.updateBeforeMetrics(actionId, beforeMetricsId));
     if (updated == 1) {
       return;
     }
-    TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO current = getById(actionId);
     Preconditions.checkState(
-        current != null && current.finishedAt() != null && current.finishedAt() == 0L,
-        "expected an unfinished action for job_id=%s table_id=%s policy_id=%s",
-        jobId,
-        tableId,
-        policyId);
+        current != null
+            && current.jobId() != null
+            && current.finishedAt() != null
+            && current.finishedAt() == 0L,
+        "expected a bound unfinished action for action_id=%s",
+        actionId);
     Preconditions.checkState(
-        current.beforeSnapshotId() != null && current.beforeSnapshotId() == beforeSnapshotId,
-        "before_snapshot_id already set to %s, refusing %s",
-        current.beforeSnapshotId(),
-        beforeSnapshotId);
+        current.beforeMetricsId() != null && current.beforeMetricsId() == beforeMetricsId,
+        "before_metrics_id already set to %s, refusing %s",
+        current.beforeMetricsId(),
+        beforeMetricsId);
   }
 
   /**
-   * Marks one in-flight action finished for {@code (jobId, tableId, policyId)}.
+   * Records the S1 metrics row id for a bound in-flight action.
+   *
+   * <p>Safe to retry with the same {@code afterMetricsId}. A different metrics id on an already-set
+   * row fails.
+   *
+   * @param actionId action row id
+   * @param afterMetricsId {@code table_snapshot_metrics.metrics_id} for S1
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "recordTableMaintenanceActionAfterMetrics")
+  public void recordAfterMetrics(long actionId, long afterMetricsId) {
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableMaintenanceActionMapper.class,
+            mapper -> mapper.updateAfterMetrics(actionId, afterMetricsId));
+    if (updated == 1) {
+      return;
+    }
+    TableMaintenanceActionPO current = getById(actionId);
+    Preconditions.checkState(
+        current != null
+            && current.jobId() != null
+            && current.finishedAt() != null
+            && current.finishedAt() == 0L,
+        "expected a bound unfinished action for action_id=%s",
+        actionId);
+    Preconditions.checkState(
+        current.afterMetricsId() != null && current.afterMetricsId() == afterMetricsId,
+        "after_metrics_id already set to %s, refusing %s",
+        current.afterMetricsId(),
+        afterMetricsId);
+  }
+
+  /**
+   * Marks one bound in-flight action finished by {@code action_id}.
    *
    * <p>{@code UNIQUE(table_id, policy_id, finished_at)} exists so {@code finished_at = 0} is a
    * single soft slot per pair (like {@code deleted_at}). Only one in-flight row can finish that
    * pair at a time, so two completed rows cannot race to the same millisecond {@code finished_at}.
    *
-   * <p>If the row was already closed with a null after snapshot, a later call may still backfill a
-   * real S1 when {@code afterSnapshotId} is non-null. Safe to retry when the row is already
-   * finished with a null after and {@code afterSnapshotId} is also null.
+   * <p>Does not write metrics pointers; call {@link #recordBeforeMetrics} / {@link
+   * #recordAfterMetrics} separately when sampling. Safe to retry when the row is already finished.
    *
-   * @param jobId Gravitino job run id
-   * @param tableId table entity id
-   * @param policyId policy entity id
-   * @param afterSnapshotId terminal snapshot id, or null when releasing without an S1
+   * @param actionId action row id
    * @param finishedAt finish timestamp millis
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "markTableMaintenanceActionFinished")
-  public void markFinished(
-      long jobId, long tableId, long policyId, Long afterSnapshotId, long finishedAt) {
+  public void markFinished(long actionId, long finishedAt) {
     Preconditions.checkArgument(finishedAt > 0, "finishedAt must be positive");
     int updated =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.markFinished(jobId, tableId, policyId, afterSnapshotId, finishedAt));
+            mapper -> mapper.markFinished(actionId, finishedAt));
     if (updated == 1) {
       return;
     }
-    if (afterSnapshotId != null) {
-      int backfilled =
-          SessionUtils.doWithCommitAndFetchResult(
-              TableMaintenanceActionMapper.class,
-              mapper -> mapper.backfillAfterSnapshot(jobId, tableId, policyId, afterSnapshotId));
-      Preconditions.checkState(
-          backfilled == 1,
-          "expected to finish or backfill action for job_id=%s table_id=%s policy_id=%s, finished=%s, backfilled=%s",
-          jobId,
-          tableId,
-          policyId,
-          updated,
-          backfilled);
-      return;
-    }
-    TableMaintenanceActionPO current = getByJobIdAndTableIdAndPolicyId(jobId, tableId, policyId);
+    TableMaintenanceActionPO current = getById(actionId);
     Preconditions.checkState(
         current != null && current.finishedAt() != null && current.finishedAt() > 0L,
-        "expected finished action for job_id=%s table_id=%s policy_id=%s, updated=%s",
-        jobId,
-        tableId,
-        policyId,
+        "expected finished action for action_id=%s, updated=%s",
+        actionId,
         updated);
   }
 
@@ -549,23 +443,24 @@ public class TableMaintenanceActionMetaService {
    * Deletes the {@code table_maintenance_action} row. Does not delete {@code
    * table_snapshot_metrics}; metrics are retained for TTL/N cleanup.
    *
-   * @param id action row id
+   * @param actionId action row id
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteTableMaintenanceActionById")
-  public void deleteById(long id) {
-    SessionUtils.doWithCommit(TableMaintenanceActionMapper.class, mapper -> mapper.deleteById(id));
+  public void deleteById(long actionId) {
+    SessionUtils.doWithCommit(
+        TableMaintenanceActionMapper.class, mapper -> mapper.deleteById(actionId));
   }
 
   /**
    * Releases an unbound occupancy claim when submit / bind fails.
    *
-   * <p>Deletes only when {@code (id, created_at)} still match and the row is unbound. A concurrent
-   * reclaim that CAS-updated {@code created_at} leaves the new owner's live claim intact (returns
-   * {@code false}).
+   * <p>Deletes only when {@code (action_id, created_at)} still match and the row is unbound. A
+   * concurrent abandon that closed this row leaves the successor soft slot intact (returns {@code
+   * false}).
    *
-   * @param claim claim returned by {@link #tryAcquireInFlight} / {@link #insertInFlight}
+   * @param claim claim returned by {@link #tryAcquireInFlight}
    * @return {@code true} when this claim lease was deleted
    */
   @Monitored(
@@ -576,7 +471,7 @@ public class TableMaintenanceActionMetaService {
     int deleted =
         SessionUtils.doWithCommitAndFetchResult(
             TableMaintenanceActionMapper.class,
-            mapper -> mapper.deleteUnboundClaim(claim.id(), claim.createdAt()));
+            mapper -> mapper.deleteUnboundClaim(claim.actionId(), claim.createdAt()));
     return deleted == 1;
   }
 

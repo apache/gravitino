@@ -21,11 +21,14 @@ package org.apache.gravitino.catalog.jdbc.converter;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -38,6 +41,9 @@ public class JdbcColumnDefaultValueConverter {
 
   /** The DDL rendering of the current timestamp default value function. */
   public static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
+
+  private static final Pattern FUNCTION_NAME =
+      Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_$]*+(?:\\.[\\p{L}_][\\p{L}\\p{N}_$]*+){0,2}");
 
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
@@ -61,12 +67,32 @@ public class JdbcColumnDefaultValueConverter {
 
     if (defaultValue instanceof FunctionExpression) {
       FunctionExpression functionExpression = (FunctionExpression) defaultValue;
-      if (functionExpression.functionName().equalsIgnoreCase(CURRENT_TIMESTAMP)) {
-        // CURRENT_TIMESTAMP is a special case(key word), it should not be wrapped in parentheses
+      String name = functionExpression.functionName();
+      Preconditions.checkArgument(
+          name != null && FUNCTION_NAME.matcher(name).matches(),
+          "JDBC column default function name must be a plain or qualified identifier: %s",
+          name);
+      Expression[] arguments = functionExpression.arguments();
+      Preconditions.checkArgument(
+          arguments != null, "JDBC default function arguments must not be null");
+      if (name.equalsIgnoreCase(CURRENT_TIMESTAMP)) {
+        Preconditions.checkArgument(
+            arguments.length == 0, "CURRENT_TIMESTAMP default does not accept arguments");
         return CURRENT_TIMESTAMP;
-      } else {
-        return String.format("(%s)", functionExpression);
       }
+      String[] sqlArguments = new String[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        Preconditions.checkArgument(
+            arguments[i] instanceof Literal || arguments[i] instanceof FunctionExpression,
+            "Unsupported JDBC column default function argument at index %s",
+            i);
+        sqlArguments[i] = fromGravitino(arguments[i]);
+        Preconditions.checkArgument(
+            sqlArguments[i] != null,
+            "JDBC column default function argument at index %s must have a value",
+            i);
+      }
+      return "(" + name + "(" + String.join(", ", sqlArguments) + "))";
     }
 
     if (defaultValue instanceof Literal) {
@@ -85,14 +111,35 @@ public class JdbcColumnDefaultValueConverter {
           value = validateNumericLiteral(value);
         }
         return value;
-      } else if (type instanceof Types.TimestampType) {
-        /**
-         * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
-         */
-        if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
-          return quoteStringLiteral(literal.value().toString().replace("T", " "));
+      } else if (type instanceof Types.BinaryType && literal.value() instanceof byte[]) {
+        return binaryLiteral((byte[]) literal.value());
+      } else if (type instanceof Types.BinaryType
+          && literal.value() instanceof String
+          && ((String) literal.value()).startsWith("0x")) {
+        byte[] value;
+        try {
+          value =
+              BaseEncoding.base16()
+                  .lowerCase()
+                  .decode(((String) literal.value()).substring(2).toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(
+              "Invalid binary column default value: use 0x followed by hexadecimal byte pairs", e);
         }
-        return quoteStringLiteral(String.valueOf(literal.value()));
+        return binaryLiteral(value);
+      } else if (type instanceof Types.TimestampType) {
+        // java.time omits seconds for whole-minute values, but MySQL requires them.
+        String value =
+            literal
+                .value()
+                .toString()
+                .replace("T", " ")
+                .replaceFirst("^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})(?=$|Z|[+-])", "$1:00");
+        if (((Types.TimestampType) type).hasTimeZone() && value.endsWith("Z")) {
+          // MySQL accepts numeric offsets but rejects the equivalent ISO UTC suffix.
+          value = value.substring(0, value.length() - 1) + "+00:00";
+        }
+        return quoteStringLiteral(value);
       } else {
         return quoteStringLiteral(String.valueOf(literal.value()));
       }
@@ -119,6 +166,16 @@ public class JdbcColumnDefaultValueConverter {
    */
   protected String quoteStringLiteral(String value) {
     return "'" + escapeSqlLiteral(value, '\'') + "'";
+  }
+
+  /**
+   * Renders binary bytes as a SQL literal. Dialects can override their binary literal syntax.
+   *
+   * @param value the bytes to preserve
+   * @return a SQL expression containing the binary value
+   */
+  protected String binaryLiteral(byte[] value) {
+    return "X'" + BaseEncoding.base16().lowerCase().encode(value) + "'";
   }
 
   private static String validateNumericLiteral(String value) {

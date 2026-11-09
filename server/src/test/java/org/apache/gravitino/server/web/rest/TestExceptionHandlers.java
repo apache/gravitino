@@ -22,15 +22,37 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.BadRequestException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionHandlers {
+
+  @Test
+  void testBackendRefusedRequestReturnsBadRequest() {
+    BadRequestException failure =
+        new BadRequestException("cannot drop table t because other objects depend on it");
+    try (Response tableResponse =
+            ExceptionHandlers.handleTableException(OperationType.DROP, "t", "schema", failure);
+        Response schemaResponse =
+            ExceptionHandlers.handleSchemaException(
+                OperationType.CREATE, "schema", "catalog", failure)) {
+      for (Response response : List.of(tableResponse, schemaResponse)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("other objects depend on it"));
+      }
+    }
+  }
 
   @Test
   void testConcurrentActiveJobReturnsConflict() {
@@ -133,6 +155,38 @@ public class TestExceptionHandlers {
   }
 
   @Test
+  public void testServiceUnavailableReturnsServiceUnavailable() {
+    Response response =
+        ExceptionHandlers.handleTableException(
+            OperationType.LOAD,
+            "table",
+            "schema",
+            new ServiceUnavailableException("secret provider 'vault' is unavailable"));
+
+    Assertions.assertEquals(
+        Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.SERVICE_UNAVAILABLE_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        ServiceUnavailableException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  void testPartitionForbiddenReturnsForbidden() {
+    Response response =
+        ExceptionHandlers.handlePartitionException(
+            OperationType.LIST,
+            "",
+            "table",
+            new ForbiddenException("not authorized to perform: glue:GetTable"));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   void testUnsupportedOperationReturnsNotImplemented() {
     UnsupportedOperationException exception =
         new UnsupportedOperationException("Operation is not supported");
@@ -155,6 +209,20 @@ public class TestExceptionHandlers {
           Assertions.assertEquals(
               UnsupportedOperationException.class.getSimpleName(), errorResponse.getType());
         });
+  }
+
+  @Test
+  void testUnsupportedSecretObjectTypeReturnsBadRequest() {
+    String reason = "Doesn't support secret property operations for metadata object type";
+    try (Response response =
+        ExceptionHandlers.handleSecretException(
+            OperationType.GET, "probe_tag", new IllegalArgumentException(reason))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("probe_tag"));
+      Assertions.assertTrue(error.getMessage().contains(reason));
+    }
   }
 
   @Test

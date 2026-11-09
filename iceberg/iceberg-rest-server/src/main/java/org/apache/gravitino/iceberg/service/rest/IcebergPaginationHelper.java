@@ -49,6 +49,8 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
  *       implementations and is generally acceptable.
  *   <li>When {@code pageToken} is provided without {@code pageSize}, the response returns all items
  *       after the cursor with no {@code nextPageToken}.
+ *   <li>Without a {@code pageToken} parameter all items are returned, even when {@code pageSize} is
+ *       set, as the REST spec requires; an empty {@code pageToken} requests the first page.
  * </ul>
  */
 class IcebergPaginationHelper {
@@ -59,8 +61,8 @@ class IcebergPaginationHelper {
    * Paginate a {@link ListNamespacesResponse}.
    *
    * @param response the full (unpaginated) response
-   * @param pageToken cursor-based page token (name of last item on previous page), or empty for the
-   *     first page
+   * @param pageToken cursor-based page token (name of last item on previous page), an empty string
+   *     for the first page, or absent to return all results
    * @param pageSize maximum items per page, or empty for no limit
    * @return a new response containing only the requested page
    */
@@ -77,8 +79,8 @@ class IcebergPaginationHelper {
    * Paginate a {@link ListTablesResponse}. Works for both table and view list responses.
    *
    * @param response the full (unpaginated) response
-   * @param pageToken cursor-based page token (name of last item on previous page), or empty for the
-   *     first page
+   * @param pageToken cursor-based page token (name of last item on previous page), an empty string
+   *     for the first page, or absent to return all results
    * @param pageSize maximum items per page, or empty for no limit
    * @return a new response containing only the requested page
    */
@@ -98,7 +100,8 @@ class IcebergPaginationHelper {
    * cursor token. The next-page token is the key of the last item on the returned page.
    *
    * @param items the complete list of items to paginate
-   * @param pageToken cursor string (key of last item on previous page), or empty for the first page
+   * @param pageToken cursor string (key of last item on previous page), an empty string for the
+   *     first page, or absent when the request has no pageToken parameter
    * @param pageSize maximum items per page, or empty for no limit
    * @param keyExtractor function to extract a comparable cursor key from each item
    * @return a {@link PaginatedPage} containing the requested page of items and optional next token
@@ -108,13 +111,22 @@ class IcebergPaginationHelper {
       Optional<String> pageToken,
       Optional<Integer> pageSize,
       Function<T, String> keyExtractor) {
-    String token = pageToken.orElse("");
-    if (!pageSize.isPresent() && token.isEmpty()) {
-      return new PaginatedPage<>(items, Optional.empty());
-    }
-
     pageSize.ifPresent(
         size -> Preconditions.checkArgument(size > 0, "pageSize must be positive, got: %s", size));
+
+    // The REST spec: a server that supports pagination returns all results, with no next-page
+    // token, when the request has no pageToken parameter. A client starts paging by sending an
+    // empty pageToken, so pageSize alone does not start paging.
+    if (!pageToken.isPresent()) {
+      return new PaginatedPage<>(items, Optional.empty());
+    }
+    String token = pageToken.get();
+
+    // An empty pageToken with no pageSize asks for every item from the start, which is the
+    // unsorted list as given; skip the sort.
+    if (token.isEmpty() && !pageSize.isPresent()) {
+      return new PaginatedPage<>(items, Optional.empty());
+    }
 
     List<T> sorted =
         items.stream().sorted(Comparator.comparing(keyExtractor)).collect(Collectors.toList());

@@ -43,7 +43,6 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -183,15 +182,7 @@ public class GroupMetaService {
       NameIdentifier metalakeIdent =
           NameIdentifier.of(NameIdentifierUtil.getMetalake(groupEntity.nameIdentifier()));
       MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.selectMetalakeMetaByName(metalakeIdent.name()));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeIdent.name());
-      }
+          MetalakeMetaService.getInstance().requireMetalakeByName(metalakeIdent.name());
 
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       GroupPO groupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
