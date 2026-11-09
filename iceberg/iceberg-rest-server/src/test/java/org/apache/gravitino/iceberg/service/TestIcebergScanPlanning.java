@@ -125,31 +125,18 @@ public class TestIcebergScanPlanning {
 
   @Test
   public void testTimestamptzFilterWithoutZoneIsClientError() {
-    // #14421: a zone-less timestamp literal vs timestamptz raises DateTimeParseException on bind.
-    // Filters are bound eagerly so the client error is returned even before any data file exists
-    // (Iceberg would otherwise defer binding until InclusiveMetricsEvaluator runs).
+    // #14421: binding a zone-less timestamp literal to timestamptz throws DateTimeParseException
+    // only while files are planned (empty tables return 200, matching Iceberg).
     TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tstz");
-    wrapper
-        .getCatalog()
-        .createTable(
-            ident,
-            new Schema(
-                Types.NestedField.required(1, "id", Types.LongType.get()),
-                Types.NestedField.optional(2, "c_tstz", Types.TimestampType.withZone())),
-            PartitionSpec.unpartitioned());
-
-    IllegalArgumentException emptyTable =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                planFiles(
-                    ident,
-                    PlanTableScanRequest.builder()
-                        .withFilter(Expressions.equal("c_tstz", "2024-06-01T12:00:00"))));
-    Assertions.assertTrue(
-        emptyTable.getMessage().contains("Invalid scan parameters"), emptyTable.getMessage());
-
-    Table tstz = wrapper.getCatalog().loadTable(ident);
+    Table tstz =
+        wrapper
+            .getCatalog()
+            .createTable(
+                ident,
+                new Schema(
+                    Types.NestedField.required(1, "id", Types.LongType.get()),
+                    Types.NestedField.optional(2, "c_tstz", Types.TimestampType.withZone())),
+                PartitionSpec.unpartitioned());
     tstz.newFastAppend()
         .appendFile(
             DataFiles.builder(PartitionSpec.unpartitioned())

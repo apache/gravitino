@@ -71,9 +71,7 @@ import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.ValidationException;
-import org.apache.iceberg.expressions.Binder;
 import org.apache.iceberg.expressions.Expression;
-import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -806,12 +804,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (scanRequest.filter() != null) {
       try {
         Expression filter = scanRequest.filter();
-        // Iceberg only binds filters while InclusiveMetricsEvaluator runs over data files, so an
-        // empty table (or a planner that sees no files) never surfaces bind failures. Bind eagerly
-        // against the scan schema so malformed filters — unknown columns, wrong literal types,
-        // zone-less timestamptz (#14421) — always become client errors.
-        Binder.bind(
-            scan.schema().asStruct(), Expressions.rewriteNot(filter), scanRequest.caseSensitive());
         scan = (T) scan.filter(filter);
         LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
