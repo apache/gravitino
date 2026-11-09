@@ -133,7 +133,6 @@ import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
@@ -1731,7 +1730,7 @@ public class TestTagManager {
             .withNamespace(Namespace.of(METALAKE))
             .withPolicyType(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL)
             .withEnabled(true)
-            .withContent(PolicyContents.icebergOrphanFileRemoval(3, "file:///", false))
+            .withContent(PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/data", false))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build(),
@@ -1747,22 +1746,15 @@ public class TestTagManager {
               tagManager.associateTagsForMetadataObject(
                   METALAKE, schemaObject, new String[] {tagName}, null));
 
-      Table table = mock(Table.class);
-      when(table.properties())
-          .thenReturn(ImmutableMap.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
-      when(tableDispatcher.loadTable(NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE)))
-          .thenReturn(table);
       MetadataObject tableObject =
           NameIdentifierUtil.toMetadataObject(
               NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE),
               Entity.EntityType.TABLE);
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
+      Assertions.assertDoesNotThrow(
           () ->
               tagManager.associateTagsForMetadataObject(
                   METALAKE, tableObject, new String[] {tagName}, null));
 
-      // Associating the policy onto a tag that already sits on a schema is also rejected.
       tagManager.createTag(METALAKE, "schema_orphan_tag", null, null);
       tagManager.associateTagsForMetadataObject(
           METALAKE, schemaObject, new String[] {"schema_orphan_tag"}, null);

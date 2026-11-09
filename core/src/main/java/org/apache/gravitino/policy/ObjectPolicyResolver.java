@@ -32,22 +32,17 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.tag.EffectiveTagResolver;
 import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -271,9 +266,9 @@ public class ObjectPolicyResolver {
   }
 
   /**
-   * Loads object properties when needed and delegates to {@link
-   * PolicyContent#requireCompatibleBinding(MetadataObject.Type, Map)}. Callers walk the pending
-   * policy↔tag↔object edges; content types without object-scoped constraints no-op.
+   * Delegates to {@link PolicyContent#requireCompatibleBinding(MetadataObject.Type, Map)}. Callers
+   * walk the pending policy↔tag↔object edges; content types without object-scoped constraints
+   * no-op. Object properties are not loaded here; contents that need them can be extended later.
    *
    * @param metalake metalake name
    * @param policyName policy name for error messages
@@ -287,36 +282,14 @@ public class ObjectPolicyResolver {
       String tagName,
       PolicyContent content,
       MetadataObject metadataObject) {
-    Map<String, String> objectProperties = Map.of();
-    if (metadataObject.type() == MetadataObject.Type.TABLE) {
-      objectProperties = loadTableProperties(metalake, metadataObject);
-    }
     try {
-      content.requireCompatibleBinding(metadataObject.type(), objectProperties);
+      content.requireCompatibleBinding(metadataObject.type(), null);
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           String.format(
-              "Policy %s is associated with tag %s regarding %s %s: %s",
-              policyName, tagName, metadataObject.type(), metadataObject, e.getMessage()),
+              "Policy %s under metalake %s is associated with tag %s regarding %s %s: %s",
+              policyName, metalake, tagName, metadataObject.type(), metadataObject, e.getMessage()),
           e);
-    }
-  }
-
-  private Map<String, String> loadTableProperties(String metalake, MetadataObject tableObject) {
-    TableDispatcher dispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
-    if (dispatcher == null) {
-      dispatcher = GravitinoEnv.getInstance().tableDispatcher();
-    }
-    if (dispatcher == null) {
-      throw new IllegalStateException("TableDispatcher is not initialized");
-    }
-    try {
-      Table table = dispatcher.loadTable(MetadataObjectUtil.toEntityIdent(metalake, tableObject));
-      Map<String, String> properties = table == null ? null : table.properties();
-      return properties == null ? Map.of() : properties;
-    } catch (NoSuchTableException e) {
-      throw new IllegalArgumentException(
-          String.format("Table %s does not exist while validating policy binding", tableObject), e);
     }
   }
 

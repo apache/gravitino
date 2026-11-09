@@ -31,7 +31,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.rel.Table;
 
 /** Configuration for table-level Iceberg orphan cleanup on an optimizer invocation. */
 public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyContent {
@@ -147,8 +146,9 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   }
 
   /**
-   * When {@link #location()} is set, only {@link MetadataObject.Type#TABLE} is allowed and the scan
-   * location must lie within the table {@link Table#PROPERTY_LOCATION}.
+   * When {@link #location()} is non-null, the policy may only bind through tags on {@link
+   * MetadataObject.Type#TABLE}. {@code null} location means "use the table root" and remains valid
+   * on catalog/schema/table. Path containment is enforced at job time, not here.
    */
   @Override
   public void requireCompatibleBinding(
@@ -160,14 +160,6 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
         objectType == MetadataObject.Type.TABLE,
         "orphan-file-removal policy with location can only be assigned to TABLE, got %s",
         objectType);
-    String tableLocation =
-        objectProperties == null ? null : objectProperties.get(Table.PROPERTY_LOCATION);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(tableLocation),
-        "table has no '%s' property; cannot verify containment for location %s",
-        Table.PROPERTY_LOCATION,
-        location);
-    validateLocationWithinTable(tableLocation, location);
   }
 
   /**

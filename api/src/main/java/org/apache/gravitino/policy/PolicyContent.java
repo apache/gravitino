@@ -73,11 +73,10 @@ public interface PolicyContent {
    * <p>Invoked on write paths that associate a policy with a tag, assign a tagged policy to an
    * object, or update content while tag placements already exist. Default is a no-op; built-in
    * maintenance contents override when they have object-scoped parameter constraints (for example
-   * orphan-scan {@code location} containment).
+   * orphan-scan {@code location} requiring {@code TABLE}).
    *
    * @param objectType type of the metadata object
-   * @param objectProperties object properties available for the check (for tables, typically
-   *     including {@code location}); may be null or empty when the object has none or is not loaded
+   * @param objectProperties optional object properties for contents that need them; may be null
    * @throws IllegalArgumentException if the content parameters are incompatible with the object
    */
   default void requireCompatibleBinding(

@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Map;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -119,7 +117,7 @@ class TestIcebergOrphanFileRemovalContent {
   }
 
   @Test
-  void validatesLocationAndBinding() {
+  void validatesLocationWithinTable() {
     IcebergOrphanFileRemovalContent.validateLocationWithinTable(
         "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t2/data");
     Assertions.assertThrows(
@@ -127,18 +125,21 @@ class TestIcebergOrphanFileRemovalContent {
         () ->
             IcebergOrphanFileRemovalContent.validateLocationWithinTable(
                 "file:///tmp/wh/s1/t2", "file:///tmp/wh/s1/t1/data"));
+  }
 
+  @Test
+  void requireCompatibleBindingRequiresTableWhenLocationSet() {
     IcebergOrphanFileRemovalContent withLocation =
         (IcebergOrphanFileRemovalContent)
             PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/wh/s1/t2/data", false);
-    withLocation.requireCompatibleBinding(
-        MetadataObject.Type.TABLE, Map.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> withLocation.requireCompatibleBinding(MetadataObject.Type.SCHEMA, Map.of()));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
+    Assertions.assertDoesNotThrow(
         () -> withLocation.requireCompatibleBinding(MetadataObject.Type.TABLE, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> withLocation.requireCompatibleBinding(MetadataObject.Type.SCHEMA, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> withLocation.requireCompatibleBinding(MetadataObject.Type.CATALOG, null));
     Assertions.assertDoesNotThrow(
         () ->
             ((IcebergOrphanFileRemovalContent) PolicyContents.icebergOrphanFileRemoval())

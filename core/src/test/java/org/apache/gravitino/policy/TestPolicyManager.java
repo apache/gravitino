@@ -104,7 +104,6 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -863,7 +862,7 @@ public class TestPolicyManager {
   }
 
   @Test
-  public void testAlterOrphanLocationRejectsIncompatibleTablePlacement() {
+  public void testAlterOrphanLocationRejectsSchemaPlacement() {
     String policyName = "orphan_loc_" + UUID.randomUUID().toString().replace("-", "");
     String tagName = "orphan_tag_" + UUID.randomUUID().toString().replace("-", "");
     policyManager.createPolicy(
@@ -875,16 +874,10 @@ public class TestPolicyManager {
         PolicyContents.icebergOrphanFileRemoval());
     tagManager.createTag(METALAKE, tagName, null, null);
     tagManager.addPolicyForTag(METALAKE, tagName, policyName, AllValuesSelector.get());
-    MetadataObject tableObject =
+    MetadataObject schemaObject =
         NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
-    tagManager.associateTagsForMetadataObject(METALAKE, tableObject, new String[] {tagName}, null);
-
-    Table table = mock(Table.class);
-    when(table.properties())
-        .thenReturn(ImmutableMap.of(Table.PROPERTY_LOCATION, "file:///tmp/wh/s1/t2"));
-    when(tableDispatcher.loadTable(NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE)))
-        .thenReturn(table);
+            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
+    tagManager.associateTagsForMetadataObject(METALAKE, schemaObject, new String[] {tagName}, null);
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -894,7 +887,7 @@ public class TestPolicyManager {
                 policyName,
                 PolicyChange.updateContent(
                     Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL.policyType(),
-                    PolicyContents.icebergOrphanFileRemoval(3, "file:///", false))));
+                    PolicyContents.icebergOrphanFileRemoval(3, "file:///tmp/data", false))));
   }
 
   @Test
