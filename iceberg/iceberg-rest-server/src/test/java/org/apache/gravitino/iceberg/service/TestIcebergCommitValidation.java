@@ -317,6 +317,118 @@ public class TestIcebergCommitValidation {
     Assertions.assertEquals(2, catalog.loadTable(IDENT).schemas().size());
   }
 
+  /**
+   * Same evolution rules as Iceberg {@code UpdateSchema} / the Gravitino API: illegal changes are
+   * refused even when the table has no snapshots. Covers the #14429 OSS suite cases that still
+   * returned IRC 200 on empty tables.
+   */
+  @Test
+  public void testSchemaEvolutionRulesApplyWithoutSnapshots() {
+    TableIdentifier empty = TableIdentifier.of(Namespace.of("db"), "empty_evo");
+    Schema start =
+        new Schema(
+            Types.NestedField.optional(1, "l", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get()),
+            Types.NestedField.optional(3, "i", Types.IntegerType.get()),
+            Types.NestedField.optional(4, "f", Types.FloatType.get()),
+            Types.NestedField.optional(5, "db", Types.DoubleType.get()),
+            Types.NestedField.optional(6, "d", Types.DecimalType.of(9, 2)));
+    catalog.createTable(
+        empty, start, PartitionSpec.unpartitioned(), ImmutableMap.of("format-version", "2"));
+    Assertions.assertNull(catalog.loadTable(empty).currentSnapshot());
+
+    // long -> int
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // string -> int
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // int -> string
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // float -> int
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // double -> float
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // decimal(9,2) -> decimal(9,3) and decimal(8,2)
+    for (String decimal : new String[] {"decimal(9, 3)", "decimal(8, 2)"}) {
+      assertEmptyEvolutionRefused(
+          empty,
+          "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+              + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+              + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+              + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+              + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+              + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\""
+              + decimal
+              + "\"}");
+    }
+    // int -> required
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":true,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"}");
+    // add_required without default
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"l\",\"required\":false,\"type\":\"long\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},"
+            + "{\"id\":3,\"name\":\"i\",\"required\":false,\"type\":\"int\"},"
+            + "{\"id\":4,\"name\":\"f\",\"required\":false,\"type\":\"float\"},"
+            + "{\"id\":5,\"name\":\"db\",\"required\":false,\"type\":\"double\"},"
+            + "{\"id\":6,\"name\":\"d\",\"required\":false,\"type\":\"decimal(9, 2)\"},"
+            + "{\"id\":7,\"name\":\"nr\",\"required\":true,\"type\":\"string\"}");
+
+    Assertions.assertEquals(1, catalog.loadTable(empty).schemas().size());
+    Assertions.assertEquals(start.asStruct(), catalog.loadTable(empty).schema().asStruct());
+  }
+
+  private void assertEmptyEvolutionRefused(TableIdentifier ident, String fields) {
+    Assertions.assertThrows(
+        ValidationException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog,
+                ident,
+                request(addSchema(fields), new MetadataUpdate.SetCurrentSchema(-1))));
+  }
+
   @Test
   public void testOptionalFieldCannotBecomeRequired() {
     // Add optional s (id 2) and make it current; the table already has data without it.
