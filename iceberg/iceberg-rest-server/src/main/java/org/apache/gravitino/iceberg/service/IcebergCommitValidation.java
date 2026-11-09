@@ -361,9 +361,14 @@ public final class IcebergCommitValidation implements UpdateRequirement {
    * Gravitino API path: a field id that exists in the current schema keeps its kind, may only
    * change type by an allowed promotion and cannot go from optional to required; a field id not in
    * the current schema must be new (above last-column-id) or identical to the field that had the id
-   * before; and a new required field needs a default. These checks apply whether or not the table
-   * already has snapshots. A replace (which removes main) starts from no retained data, so only the
-   * id rule applies to it.
+   * before; and a new required field needs a default.
+   *
+   * <p>Intentional behavior change: these checks are <em>not</em> gated on existing snapshots.
+   * Iceberg's {@code UpdateSchema} (see {@code SchemaUpdate}) rejects the same incompatible changes
+   * on empty tables unless {@code allowIncompatibleChanges()} is set; Gravitino API does the same.
+   * IRC previously skipped them when {@code hasData} was false, so empty-table clients that relied
+   * on 200 may now get 4xx. A replace (which removes main) starts from no retained data, so only
+   * the id rule applies to it.
    */
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
@@ -383,6 +388,7 @@ public final class IcebergCommitValidation implements UpdateRequirement {
       Schema schema = ((MetadataUpdate.AddSchema) update).schema();
       for (Types.NestedField field : TypeUtil.indexById(schema.asStruct()).values()) {
         Types.NestedField existing = current.get(field.fieldId());
+        // No hasData gate: align with Iceberg UpdateSchema + Gravitino API (empty tables too).
         if (existing == null) {
           checkNewField(base, field, !replacesTable);
         } else if (!replacesTable) {

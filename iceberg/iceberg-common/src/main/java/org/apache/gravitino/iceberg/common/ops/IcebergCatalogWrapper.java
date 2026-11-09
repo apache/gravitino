@@ -344,7 +344,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
-   * @throws BadRequestException if the location cannot be read as a metadata file
+   * @throws BadRequestException if the location is missing, not a metadata file, or uses a scheme
+   *     the catalog cannot read
+   * @throws RuntimeIOException for other IO failures (storage outage, credentials, timeouts)
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     validateTableLocation(metadataLocation);
@@ -355,17 +357,25 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // by the REST spec for a namespace or table that does not exist.
       throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
     } catch (IllegalArgumentException e) {
-      // TableMetadataParser throws this when the path is a directory or otherwise not a metadata
-      // file. Keep it as a BadRequestException so authz can propagate it as HTTP 400 instead of
-      // wrapping the plain IllegalArgumentException as an authorization system error.
-      throw new BadRequestException(
-          "Metadata location %s is not a valid metadata file: %s",
-          metadataLocation, e.getMessage());
+      // TableMetadataParser rejects a directory / non-metadata path with this message. Other
+      // IllegalArgumentExceptions (e.g. FileIO setup) must not be masked as client 400.
+      String msg = e.getMessage();
+      if (msg != null && msg.contains("is not a valid metadata file")) {
+        throw new BadRequestException(
+            "Metadata location %s is not a valid metadata file: %s", metadataLocation, msg);
+      }
+      throw e;
     } catch (RuntimeIOException e) {
-      // Unreadable scheme (for example s3:// on a local catalog) is also a client-supplied path
-      // problem, not a server failure.
-      throw new BadRequestException(
-          "Cannot read metadata location %s: %s", metadataLocation, e.getMessage());
+      // Unsupported scheme (e.g. s3:// on a local catalog) is a client path error → 400.
+      // Other IO failures (storage outage, credentials, timeouts) stay RuntimeIOException → 5xx.
+      String msg = e.getMessage();
+      if (msg != null
+          && (msg.contains("No FileSystem for scheme")
+              || msg.contains("Failed to get file system for path"))) {
+        throw new BadRequestException(
+            "Cannot read metadata location %s: %s", metadataLocation, msg);
+      }
+      throw e;
     }
   }
 
