@@ -60,21 +60,18 @@ public class ExpressionUtil {
   private static final Pattern IDENTIFILER_PATTERN =
       Pattern.compile(IDENTIFIER, Pattern.CASE_INSENSITIVE);
 
-  private static final String SORT_DIRECTION_ASC = "ASC";
   private static final String SORT_DIRECTION_DESC = "DESC";
-  private static final String NULL_ORDERING_FIRST = "NULLS FIRST";
-  private static final String NULL_ORDERING_LAST = "NULLS LAST";
-  private static final String SORT_DIRECTION =
-      "(" + SORT_DIRECTION_ASC + "|" + SORT_DIRECTION_DESC + ")";
-  private static final String NULL_ORDERING =
-      "(" + NULL_ORDERING_FIRST + "|" + NULL_ORDERING_LAST + ")";
-  private static final Pattern SROT_ORDER_PATTERN =
-      Pattern.compile(IDENTIFIER, Pattern.CASE_INSENSITIVE);
-  private static final Pattern SORT_ORDER_WITH_SORT_DIRECTION_PATTERN =
-      Pattern.compile("(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION, Pattern.CASE_INSENSITIVE);
-  private static final Pattern SORT_ORDER_WITH_SORT_DIRECTION_AND_NULL_ORDERING_PATTERN =
+  private static final String NULL_ORDERING_FIRST = "FIRST";
+  private static final String QUOTED_IDENTIFIER = "\"(?:\"\"|[^\"])*\"";
+  // The sort field grammar of the Trino Iceberg connector: the direction and the null ordering are
+  // both optional, and a column name outside the plain identifier form is double-quoted.
+  private static final Pattern SORT_FIELD_PATTERN =
       Pattern.compile(
-          "(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION + "\\s+" + NULL_ORDERING,
+          "\\s*("
+              + IDENTIFIER
+              + "|"
+              + QUOTED_IDENTIFIER
+              + ")(?:\\s+(ASC|DESC))?(?:\\s+NULLS\\s+(FIRST|LAST))?\\s*",
           Pattern.CASE_INSENSITIVE);
 
   /**
@@ -264,7 +261,7 @@ public class ExpressionUtil {
           "Only supported sort expression of NamedReference, the expression: " + orderExpression);
     }
 
-    String columnName = ((NamedReference) orderExpression).fieldName()[0];
+    String columnName = columnToIdentifier(((NamedReference) orderExpression).fieldName()[0]);
     if (order.direction() == SortDirection.ASCENDING) {
       if (order.nullOrdering() == NullOrdering.NULLS_LAST) {
         return String.format("%s ASC NULLS LAST", columnName);
@@ -283,47 +280,43 @@ public class ExpressionUtil {
 
   private static void parseSortOrder(List<SortOrder> sortOrders, String value) {
     boolean match =
-        false
-            || tryMatch(
-                value,
-                SROT_ORDER_PATTERN,
-                (m) -> {
-                  NamedReference.FieldReference sortField = NamedReference.field(m.group(0));
-                  sortOrders.add(SortOrders.ascending(sortField));
-                })
-            || tryMatch(
-                value,
-                SORT_ORDER_WITH_SORT_DIRECTION_PATTERN,
-                (m) -> {
-                  NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
-                  SortDirection sortDirection =
-                      m.group(2).equalsIgnoreCase(SORT_DIRECTION_ASC)
-                          ? SortDirection.ASCENDING
-                          : SortDirection.DESCENDING;
-                  NullOrdering nullOrdering =
-                      sortDirection.equals(SortDirection.ASCENDING)
-                          ? NullOrdering.NULLS_FIRST
-                          : NullOrdering.NULLS_LAST;
-                  sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
-                })
-            || tryMatch(
-                value,
-                SORT_ORDER_WITH_SORT_DIRECTION_AND_NULL_ORDERING_PATTERN,
-                (m) -> {
-                  NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
-                  SortDirection sortDirection =
-                      m.group(2).equalsIgnoreCase(SORT_DIRECTION_ASC)
-                          ? SortDirection.ASCENDING
-                          : SortDirection.DESCENDING;
-                  NullOrdering nullOrdering =
-                      m.group(3).equalsIgnoreCase(NULL_ORDERING_FIRST)
-                          ? NullOrdering.NULLS_FIRST
-                          : NullOrdering.NULLS_LAST;
-                  sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
-                });
+        tryMatch(
+            value,
+            SORT_FIELD_PATTERN,
+            (m) -> {
+              NamedReference.FieldReference sortField =
+                  NamedReference.field(identifierToColumn(m.group(1)));
+              SortDirection sortDirection =
+                  SORT_DIRECTION_DESC.equalsIgnoreCase(m.group(2))
+                      ? SortDirection.DESCENDING
+                      : SortDirection.ASCENDING;
+              if (m.group(3) == null) {
+                sortOrders.add(SortOrders.of(sortField, sortDirection));
+              } else {
+                NullOrdering nullOrdering =
+                    NULL_ORDERING_FIRST.equalsIgnoreCase(m.group(3))
+                        ? NullOrdering.NULLS_FIRST
+                        : NullOrdering.NULLS_LAST;
+                sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
+              }
+            });
     if (!match) {
       throw new IllegalArgumentException("Unparsed expression: " + value);
     }
+  }
+
+  private static String identifierToColumn(String identifier) {
+    if (identifier.startsWith("\"")) {
+      return identifier.substring(1, identifier.length() - 1).replace("\"\"", "\"");
+    }
+    return identifier;
+  }
+
+  private static String columnToIdentifier(String column) {
+    if (IDENTIFILER_PATTERN.matcher(column).matches()) {
+      return column;
+    }
+    return "\"" + column.replace("\"", "\"\"") + "\"";
   }
 
   interface MatchHandler {

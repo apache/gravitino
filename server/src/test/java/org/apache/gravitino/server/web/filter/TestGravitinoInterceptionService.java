@@ -99,7 +99,10 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationFullNa
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
@@ -688,11 +691,13 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  /** Verifies that unexpected authorizer configuration errors retain server-error handling. */
   @Test
   public void testUnexpectedIllegalArgumentExceptionRemainsInternalError() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
-            mockStatic(GravitinoAuthorizerProvider.class)) {
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<ServerHealth> healths = mockStatic(ServerHealth.class)) {
       principalUtilsMocked
           .when(PrincipalUtils::getCurrentPrincipal)
           .thenReturn(new UserPrincipal("tester"));
@@ -701,8 +706,11 @@ public class TestGravitinoInterceptionService {
       MethodInvocation methodInvocation = mock(MethodInvocation.class);
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer())
-          .thenThrow(new IllegalArgumentException("Invalid authorizer configuration"));
+      IllegalArgumentException failure =
+          new IllegalArgumentException("Invalid authorizer configuration");
+      when(mockedProvider.getGravitinoAuthorizer()).thenThrow(failure);
+      ServerHealth health = mock(ServerHealth.class);
+      healths.when(ServerHealth::getInstance).thenReturn(health);
 
       GravitinoInterceptionService gravitinoInterceptionService =
           new GravitinoInterceptionService();
@@ -718,7 +726,112 @@ public class TestGravitinoInterceptionService {
       assertEquals(
           "Authorization failed due to system internal error. Please contact administrator.",
           errorResponse.getMessage());
+      assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+      assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
       assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+      verify(health).recordFailure(failure);
+      verify(methodInvocation, never()).proceed();
+    }
+  }
+
+  /**
+   * Verifies that raw execution failures are not classified as malformed client input.
+   *
+   * @param failInExecutor whether the executor fails instead of the REST resource method
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testExecutionIllegalArgumentExceptionRemainsInternalError(boolean failInExecutor)
+      throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<AuthorizationUtils> authorization = mockStatic(AuthorizationUtils.class);
+        MockedStatic<AuthorizeExecutorFactory> factories =
+            mockStatic(AuthorizeExecutorFactory.class);
+        MockedStatic<ServerHealth> healths = mockStatic(ServerHealth.class)) {
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      ServerHealth health = mock(ServerHealth.class);
+      healths.when(ServerHealth::getInstance).thenReturn(health);
+      AuthorizationExecutor executor = mock(AuthorizationExecutor.class);
+      factories
+          .when(
+              () ->
+                  AuthorizeExecutorFactory.create(
+                      any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+          .thenReturn(executor);
+      Method method = TestOperations.class.getMethod("testMethod", String.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"metalake"});
+      IllegalArgumentException failure =
+          new IllegalArgumentException("Invalid backend configuration");
+      if (failInExecutor) {
+        when(executor.execute(any())).thenThrow(failure);
+      } else {
+        when(executor.execute(any())).thenReturn(true);
+        when(invocation.proceed()).thenThrow(failure);
+      }
+
+      try (Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation)) {
+        assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, error.getCode());
+        assertEquals(RuntimeException.class.getSimpleName(), error.getType());
+        assertEquals(
+            "Authorization failed due to system internal error. Please contact administrator.",
+            error.getMessage());
+      }
+      verify(health).recordFailure(failure);
+      verify(executor).execute(any());
+      if (failInExecutor) {
+        verify(invocation, never()).proceed();
+      } else {
+        verify(invocation).proceed();
+      }
+    }
+  }
+
+  /**
+   * Verifies that blank Catalog names are rejected before the resource method is invoked.
+   *
+   * @param catalogName the whitespace-only Catalog name
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\t", "\n", " \t\n"})
+  public void testBlankCatalogNameReturnsBadRequest(String catalogName) throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        // Bypass checkCurrentUser's GravitinoEnv lookup to isolate catalog-name validation.
+        MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class)) {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      when(provider.getGravitinoAuthorizer()).thenReturn(mock(GravitinoAuthorizer.class));
+
+      Method method = CatalogOperations.class.getMethod("loadCatalog", String.class, String.class);
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments()).thenReturn(new Object[] {"testMetalake", catalogName});
+
+      Response response =
+          (Response)
+              new GravitinoInterceptionService()
+                  .getMethodInterceptors(method)
+                  .get(0)
+                  .invoke(invocation);
+
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+      assertEquals(IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+      assertEquals("Metadata object full name cannot be blank", errorResponse.getMessage());
+      verify(invocation, never()).proceed();
     }
   }
 

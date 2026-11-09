@@ -284,10 +284,13 @@ public class AuthorizationRequestContext {
   }
 
   /**
-   * Normalizes a raw name while remembering capability failures for its catalog in this request.
+   * Normalizes a raw name while remembering normalization failures for its catalog in this request.
    *
    * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
-   * Missing catalogs are not memoized; a fresh request can retry any capability failure.
+   * Any failure except not found is remembered for the whole catalog, including one that only
+   * concerns a single object, such as a physical table-name or stored-column read. Later objects in
+   * the same catalog then fail in this request, which denies them. Missing catalogs are not
+   * memoized; a fresh request retries every failure.
    *
    * @param key the raw metadata object's cache key
    * @param catalogIdentifier the containing catalog, including its metalake
