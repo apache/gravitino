@@ -141,7 +141,7 @@ public class SparkJdbcTable extends JDBCTable {
     StructField[] fields = sparkSchema.fields().clone();
     for (int i = 0; i < fields.length; i++) {
       DataType sparkType = fields[i].dataType();
-      DataType readerType = readerType(readerSchema, fields[i].name());
+      DataType readerType = JdbcSchemaUtils.fieldType(readerSchema, fields[i].name());
       if (sparkType instanceof ArrayType
           && readerType instanceof ArrayType
           && isTimestamp(((ArrayType) sparkType).elementType())
@@ -156,15 +156,6 @@ public class SparkJdbcTable extends JDBCTable {
       }
     }
     return new StructType(fields);
-  }
-
-  private static DataType readerType(StructType readerSchema, String name) {
-    for (StructField field : readerSchema.fields()) {
-      if (field.name().equalsIgnoreCase(name)) {
-        return field.dataType();
-      }
-    }
-    return null;
   }
 
   private static boolean isTimestamp(DataType type) {

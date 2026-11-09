@@ -43,6 +43,7 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -103,6 +104,11 @@ public class TestSparkJdbcReadCorrectness {
             Column.of("id", Types.IntegerType.get()),
             Column.of("ts", Types.TimestampType.withoutTimeZone())
           };
+        case "timestamp_array_collisions":
+          return new Column[] {
+            Column.of("ts", Types.ListType.nullable(Types.TimestampType.withoutTimeZone())),
+            Column.of("TS", Types.ListType.nullable(Types.TimestampType.withTimeZone()))
+          };
         case "zoned_only":
           return new Column[] {
             Column.of("id", Types.IntegerType.get()),
@@ -151,12 +157,24 @@ public class TestSparkJdbcReadCorrectness {
       statement.execute("CREATE TABLE zoned_only(id int, tz timestamptz)");
       statement.execute(
           "INSERT INTO zoned_only VALUES (1, '2024-01-01 00:00:00+00'), (2, '2024-01-02 00:00:00+00')");
+      statement.execute(
+          "CREATE TABLE timestamp_array_collisions(ts timestamp[], \"TS\" timestamptz[])");
+      statement.execute(
+          "INSERT INTO timestamp_array_collisions VALUES "
+              + "(ARRAY[TIMESTAMP '2024-01-02 00:00:00'], "
+              + "ARRAY[TIMESTAMPTZ '2024-01-02 00:00:00+00'])");
     }
     spark =
         SparkSession.builder()
             .master("local[1]")
             .appName("jdbc-read-regression")
             .config("spark.ui.enabled", "false")
+            .config("spark.sql.catalog.nativejdbc", JDBCTableCatalog.class.getName())
+            .config("spark.sql.catalog.nativejdbc.url", url)
+            .config("spark.sql.catalog.nativejdbc.user", "postgres")
+            .config("spark.sql.catalog.nativejdbc.password", "test")
+            .config("spark.sql.catalog.nativejdbc.driver", "org.postgresql.Driver")
+            .config("spark.sql.catalog.nativejdbc.preferTimestampNTZ", "true")
             .config("spark.sql.catalog.legacy", SafeCatalog.class.getName())
             .config("spark.sql.catalog.legacy.url", url)
             .config("spark.sql.catalog.legacy.user", "postgres")
@@ -350,6 +368,31 @@ public class TestSparkJdbcReadCorrectness {
     } finally {
       spark.conf().set("spark.sql.session.timeZone", originalSessionZone);
       TimeZone.setDefault(original);
+    }
+  }
+
+  @Test
+  void testCaseSensitiveTimestampArraysMatchNativeReader() {
+    String originalCaseSensitive = spark.conf().get("spark.sql.caseSensitive");
+    String originalSessionZone = spark.conf().get("spark.sql.session.timeZone");
+    TimeZone originalJvmZone = TimeZone.getDefault();
+    try {
+      spark.conf().set("spark.sql.caseSensitive", "true");
+      spark.conf().set("spark.sql.session.timeZone", "America/Los_Angeles");
+      TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+      String source = "nativejdbc.public.timestamp_array_collisions";
+      String wrapped = "safe.public.timestamp_array_collisions";
+      StructType readerSchema = spark.table(source).schema();
+      Assertions.assertEquals(
+          readerSchema.catalogString(), spark.table(wrapped).schema().catalogString());
+      String projection = "SELECT CAST(ts AS STRING), CAST(`TS` AS STRING) FROM ";
+      List<Row> expected = spark.sql(projection + source).collectAsList();
+      Assertions.assertEquals("[2024-01-01 16:00:00]", expected.get(0).getString(1));
+      Assertions.assertEquals(expected, spark.sql(projection + wrapped).collectAsList());
+    } finally {
+      spark.conf().set("spark.sql.caseSensitive", originalCaseSensitive);
+      spark.conf().set("spark.sql.session.timeZone", originalSessionZone);
+      TimeZone.setDefault(originalJvmZone);
     }
   }
 

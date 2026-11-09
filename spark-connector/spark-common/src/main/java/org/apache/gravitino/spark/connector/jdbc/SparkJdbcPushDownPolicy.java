@@ -111,7 +111,7 @@ class SparkJdbcPushDownPolicy {
       if ((type instanceof Types.StringType
               || type instanceof Types.VarCharType
               || type instanceof Types.FixedCharType)
-          && DataTypes.StringType.equals(fieldType(sparkSchema, column.name()))) {
+          && DataTypes.StringType.equals(JdbcSchemaUtils.fieldType(sparkSchema, column.name()))) {
         stringColumns.add(normalize(column.name()));
       }
       if (isSensitive(column.dataType())) {
@@ -128,7 +128,7 @@ class SparkJdbcPushDownPolicy {
       if (field.dataType() instanceof TimestampType) {
         zonedTimestampColumns.add(normalize(field.name()));
       }
-      DataType readerType = fieldType(readerSchema, field.name());
+      DataType readerType = JdbcSchemaUtils.fieldType(readerSchema, field.name());
       // Only timestamp differences change pushed aggregate results; Spark widens numeric results
       // safely. catalogString ignores nullability, which does not change pushed results.
       if (readerType == null
@@ -366,15 +366,6 @@ class SparkJdbcPushDownPolicy {
       return false;
     }
     return leaf.isInstance(type);
-  }
-
-  private static DataType fieldType(StructType schema, String name) {
-    for (StructField field : schema.fields()) {
-      if (field.name().equalsIgnoreCase(name)) {
-        return field.dataType();
-      }
-    }
-    return null;
   }
 
   private static String columnName(NamedReference reference) {

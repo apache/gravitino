@@ -297,6 +297,25 @@ public class TestSparkJdbcPushDownPolicy {
     return new Predicate(name, children);
   }
 
+  @Test
+  void testCaseDistinctTimestampColumnsUseTheirOwnReaderTypes() {
+    Column[] columns = {
+      column("ts", Types.TimestampType.withoutTimeZone()),
+      column("TS", Types.TimestampType.withTimeZone())
+    };
+    StructType schema =
+        new StructType().add("ts", DataTypes.TimestampNTZType).add("TS", DataTypes.TimestampType);
+    for (StructType reader :
+        new StructType[] {
+          schema, new StructType().add(schema.fields()[1]).add(schema.fields()[0])
+        }) {
+      SparkJdbcPushDownPolicy policy =
+          new SparkJdbcPushDownPolicy(columns, reader, schema, DIALECT, URL);
+      Assertions.assertTrue(policy.canPushAggregate(new Max(col("ts"))));
+      Assertions.assertTrue(policy.canPushAggregate(new Max(col("TS"))));
+    }
+  }
+
   private static SparkJdbcPushDownPolicy policy() {
     return policy(URL);
   }
