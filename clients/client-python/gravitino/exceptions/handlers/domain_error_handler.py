@@ -53,6 +53,9 @@ class DomainErrorHandler(CodeMappingErrorHandler):
                 TagAlreadyExistsException,
             )
         },
+        ErrorConstants.NON_EMPTY_CODE: {
+            NonEmptyDomainException.__name__: NonEmptyDomainException,
+        },
         ErrorConstants.UNSUPPORTED_OPERATION_CODE: {
             NonEmptyDomainException.__name__: NonEmptyDomainException,
         },

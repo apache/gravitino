@@ -440,6 +440,7 @@ class TestDomainClient(unittest.TestCase):
             (409, ErrorConstants.ALREADY_EXISTS_CODE, DomainAlreadyExistsException),
             (409, ErrorConstants.ALREADY_EXISTS_CODE, TagAlreadyExistsException),
             (409, ErrorConstants.ALREADY_EXISTS_CODE, BackingTagAlreadyBoundException),
+            (409, ErrorConstants.NON_EMPTY_CODE, NonEmptyDomainException),
             (409, ErrorConstants.UNSUPPORTED_OPERATION_CODE, NonEmptyDomainException),
             (
                 409,
