@@ -54,6 +54,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestIcebergTableValidation {
 
@@ -186,37 +187,24 @@ class TestIcebergTableValidation {
   }
 
   @ParameterizedTest
-  @MethodSource("versionThreeTypes")
-  void testVersionThreeTypeWithVersionTwoIsBadRequest(Type type) {
+  @ValueSource(strings = {"0", "999", "not-a-version"})
+  void testInvalidFormatVersionIsBadRequest(String version) {
     Exception failure =
         assertThrows(
             IllegalArgumentException.class,
-            () -> create("unsupported_type", new Column[] {Column.of("value", type)}));
+            () ->
+                operations.createTable(
+                    table("invalid_version"),
+                    new Column[] {Column.of("value", Types.IntegerType.get())},
+                    "",
+                    Map.of("format-version", version),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[0]));
+    assertTrue(failure.getMessage().contains("format-version"));
     assertEquals(400, tableError(OperationType.CREATE, failure));
-    assertFalse(operations.tableExists(table("unsupported_type")));
-  }
-
-  @ParameterizedTest
-  @MethodSource("versionThreeTypes")
-  void testVersionThreeTypeRoundTrip(Type type) {
-    operations.createTable(
-        table("version_three"),
-        new Column[] {Column.of("value", type)},
-        "",
-        Map.of("format-version", "3"),
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-    assertEquals(type, operations.loadTable(table("version_three")).columns()[0].dataType());
-  }
-
-  private static Stream<Type> versionThreeTypes() {
-    return Stream.of(
-        Types.NullType.get(),
-        Types.VariantType.get(),
-        Types.GeometryType.of("OGC:CRS84"),
-        Types.GeographyType.of("OGC:CRS84", "spherical"));
+    assertFalse(operations.tableExists(table("invalid_version")));
   }
 
   private static Stream<Arguments> incompatiblePartitionTransforms() {

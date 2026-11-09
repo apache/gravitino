@@ -24,11 +24,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
->>>>>>> 4c419787f ([#14765] fix(iceberg): validate requests and record load authorization denials (#14766))
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
