@@ -147,6 +147,59 @@ public class TestPaimonCatalog {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  void testNonFilesystemBackendRequiresUriBeforeCreate() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    for (String backend : new String[] {"hive", "jdbc"}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalog.validateConfiguration(
+                      ImmutableMap.of(
+                          PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                          backend,
+                          PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                          "s3://bucket/paimon/")),
+              backend);
+      Assertions.assertTrue(error.getMessage().contains("URI"), error.getMessage());
+    }
+  }
+
+  @Test
+  void testValidBackendConfigurationsAreAccepted() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "filesystem",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "/tmp/paimon")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "hive",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "s3://bucket/paimon/",
+                    PaimonCatalogPropertiesMetadata.URI,
+                    "thrift://127.0.0.1:9083")));
+  }
+
+  @Test
+  void testS3AFileSystemIsAvailable() throws IOException {
+    Class<? extends FileSystem> fileSystemClass =
+        FileSystem.getFileSystemClass("s3a", new Configuration());
+
+    Assertions.assertEquals("org.apache.hadoop.fs.s3a.S3AFileSystem", fileSystemClass.getName());
+  }
+
+  @Test
+>>>>>>> f475443da ([#14706] fix(paimon): validate backend settings on catalog create and alter (#14709))
   void testAsViewCatalog() {
     PaimonCatalog paimonCatalog = newPaimonCatalog("catalog_view");
     ViewCatalog viewCatalog = paimonCatalog.asViewCatalog();

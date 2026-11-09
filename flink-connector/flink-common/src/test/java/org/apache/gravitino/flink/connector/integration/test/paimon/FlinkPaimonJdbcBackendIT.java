@@ -51,10 +51,11 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
                 + "'warehouse'='%s',"
                 + "'metastore'='jdbc',"
                 + "'uri'='%s',"
+                + "'jdbc-driver'='%s',"
                 + "'jdbc.user'='%s',"
                 + "'jdbc.password'='%s'"
                 + ")",
-            catalogName, warehouseDir, databaseUrl, mysqlUsername, mysqlPassword));
+            catalogName, warehouseDir, databaseUrl, mysqlDriver, mysqlUsername, mysqlPassword));
   }
 
   @Override
