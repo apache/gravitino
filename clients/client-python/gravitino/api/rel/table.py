@@ -30,6 +30,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.supports_statistics import SupportsStatistics
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -118,6 +119,9 @@ class Table(Auditable):
 
     def supports_tags(self) -> SupportsTags:
         raise UnsupportedOperationException("Table does not support tag operations.")
+
+    def supports_policies(self) -> SupportsPolicies:
+        raise UnsupportedOperationException("Table does not support policy operations.")
 
     def supports_roles(self) -> SupportsRoles:
         """Return role operations supported by this table.

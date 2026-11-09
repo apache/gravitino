@@ -106,6 +106,21 @@ public interface Capability {
   }
 
   /**
+   * Checks an existing table or schema name for deletion, or an existing column reference.
+   *
+   * <p>The default preserves the create-time restrictions. A catalog may accept additional native
+   * names only when the corresponding operations safely quote them. This does not relax creation or
+   * rename-target validation.
+   *
+   * @param scope the table, schema, or column scope
+   * @param name the existing name to check
+   * @return whether the existing name is supported
+   */
+  default CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    return specificationOnName(scope, name);
+  }
+
+  /**
    * Check if the metadata entity is fully managed by Gravitino for the passed-in scope. This is
    * used to determine whether Gravitino should manage the lifecycle of the metadata and related
    * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will

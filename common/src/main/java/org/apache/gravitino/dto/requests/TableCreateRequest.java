@@ -38,6 +38,7 @@ import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to create a table. */
 @Getter
@@ -120,8 +121,15 @@ public class TableCreateRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    RequestValidation.properties(properties);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+
+    RequestValidation.elements(partitioning, "partitioning");
+    RequestValidation.elements(indexes, "indexes");
+
+    // DTO conversion can normalize null literals and discard their declared types.
+    WritableDataTypeValidator.validateTable(columns, partitioning, distribution, sortOrders);
 
     if (sortOrders != null) {
       Arrays.stream(sortOrders).forEach(sortOrder -> sortOrder.validate(columns));

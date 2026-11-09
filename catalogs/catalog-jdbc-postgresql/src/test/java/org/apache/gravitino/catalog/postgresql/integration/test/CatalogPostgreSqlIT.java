@@ -136,7 +136,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     clearTableAndSchema();
     String[] schemaNames = catalog.asSchemas().listSchemas();
     for (String schemaName : schemaNames) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+      clearTableAndSchema(schemaName);
     }
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
@@ -152,6 +152,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   private void clearTableAndSchema() {
+    clearTableAndSchema(schemaName);
+  }
+
+  private void clearTableAndSchema(String schemaName) {
+    // PostgreSQL schema drops are restrictive even when cascade is requested. Remove the test
+    // tables explicitly before dropping each schema, including schemas created outside the fixture.
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -1088,12 +1094,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_DATE"), column.defaultValue());
+          // An expression default must not be mistaken for a string literal of the same text.
+          Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_TIMESTAMP"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
