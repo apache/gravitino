@@ -208,6 +208,8 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+  // The embedded JDBC credential integration test loads this driver by class name.
+  testRuntimeOnly(libs.sqlite.jdbc)
 }
 
 tasks {
