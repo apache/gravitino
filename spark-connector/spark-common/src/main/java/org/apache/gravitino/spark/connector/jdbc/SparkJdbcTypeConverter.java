@@ -31,6 +31,26 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkJdbcTypeConverter.class);
 
+  private final boolean useTimestampNtz;
+
+  /** Creates a converter retaining the existing JDBC timestamp mapping. */
+  public SparkJdbcTypeConverter() {
+    this(false);
+  }
+
+  /**
+   * Creates a converter with provider-specific timestamp handling.
+   *
+   * <p>When {@code useTimestampNtz} is true, the Spark JDBC reader of the same catalog must also
+   * use {@code preferTimestampNTZ=true}. Otherwise the table schema and the scanned rows use
+   * different timestamp types.
+   *
+   * @param useTimestampNtz whether zone-free timestamps use Spark TimestampNTZType
+   */
+  public SparkJdbcTypeConverter(boolean useTimestampNtz) {
+    this.useTimestampNtz = useTimestampNtz;
+  }
+
   @Override
   public DataType toSparkType(Type gravitinoType) {
     // if spark version lower than 3.4.4, using VarCharType will throw an exception: Unsupported
@@ -45,7 +65,13 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
           "Reading type {} as a string, Gravitino cannot represent it",
           ((Types.ExternalType) gravitinoType).catalogString());
       return DataTypes.StringType;
+<<<<<<< HEAD
     } else if (gravitinoType instanceof Types.TimestampType) {
+=======
+    } else if (gravitinoType instanceof Types.TimestampType && !useTimestampNtz) {
+      // Both timestamp flavors map to TimestampType, never TimestampNTZType: the MySQL dialect only
+      // pushes TimestampType literals down correctly, and NTZ literals produce invalid SQL.
+>>>>>>> 7f88982b8 ([#14642] fix(jdbc): correct Spark reads and Trino metadata handling (#14643))
       return DataTypes.TimestampType;
     } else {
       return super.toSparkType(gravitinoType);

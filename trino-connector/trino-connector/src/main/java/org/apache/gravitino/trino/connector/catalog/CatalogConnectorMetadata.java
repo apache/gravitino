@@ -18,6 +18,12 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+<<<<<<< HEAD:trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/CatalogConnectorMetadata.java
+=======
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
+import com.google.common.base.Preconditions;
+>>>>>>> 7f88982b8 ([#14642] fix(jdbc): correct Spark reads and Trino metadata handling (#14643)):trino-connector/src/common/main/java/org/apache/gravitino/trino/connector/catalog/CatalogConnectorMetadata.java
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
@@ -26,7 +32,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -313,7 +318,7 @@ public class CatalogConnectorMetadata {
    * @param target the name of the target schema
    */
   public void renameSchema(String source, String target) {
-    throw new NotImplementedException();
+    throw new TrinoException(NOT_SUPPORTED, "This connector does not support renaming schemas");
   }
 
   private void applyAlter(SchemaTableName tableName, TableChange... change) {
