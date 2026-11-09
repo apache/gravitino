@@ -59,6 +59,36 @@ public class TestPostgreSqlSchemaOperations extends TestPostgreSql {
   }
 
   @Test
+  void testRefusedDropNamesTheBlockerOnTheFirstLine() throws SQLException {
+    String schema = RandomNameUtils.genRandomName("blocked_source");
+    String other = RandomNameUtils.genRandomName("blocked_other");
+    try (Connection connection = DATA_SOURCE.getConnection()) {
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + schema);
+      JdbcConnectorUtils.executeUpdate(connection, "CREATE SCHEMA " + other);
+      try {
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE TABLE " + schema + ".parent (id int PRIMARY KEY)");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "CREATE VIEW " + other + ".v AS SELECT * FROM " + schema + ".parent");
+
+        NonEmptySchemaException error =
+            Assertions.assertThrows(
+                NonEmptySchemaException.class, () -> DATABASE_OPERATIONS.delete(schema, true));
+
+        // Clients keep only the first line of a message and treat the rest as the server stack
+        // trace, so the object in the other schema that blocks the drop must be on that line.
+        Assertions.assertFalse(error.getMessage().contains("\n"), error.getMessage());
+        Assertions.assertTrue(error.getMessage().contains(other + ".v"), error.getMessage());
+        Assertions.assertEquals("2BP01", ((SQLException) error.getCause()).getSQLState());
+      } finally {
+        JdbcConnectorUtils.executeUpdate(connection, "DROP SCHEMA IF EXISTS " + other + " CASCADE");
+        JdbcConnectorUtils.executeUpdate(
+            connection, "DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+      }
+    }
+  }
+
+  @Test
   void testCascadeDropPreservesExternalDependents() throws SQLException {
     String schema = RandomNameUtils.genRandomName("cascade_source");
     String other = RandomNameUtils.genRandomName("cascade_other");
