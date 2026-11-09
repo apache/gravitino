@@ -122,6 +122,67 @@ public class TestManagedTableOperations {
   }
 
   @Test
+  void testUnicodeCommentValidationAndRoundTrip() {
+    NameIdentifier ident =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "unicode_comments");
+    for (String comment :
+        new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096), "bad\0comment"}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.createTable(
+                  ident,
+                  new Column[] {Column.of("c", Types.StringType.get(), comment)},
+                  "comment",
+                  StringIdentifier.newPropertiesWithId(
+                      StringIdentifier.fromId(idGenerator.nextId()), Map.of()),
+                  new Transform[0],
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  Indexes.EMPTY_INDEXES));
+    }
+    String comment = "😀".repeat(2048);
+    Table created =
+        tableOperations.createTable(
+            ident,
+            new Column[] {Column.of("c", Types.StringType.get(), comment)},
+            "comment",
+            StringIdentifier.newPropertiesWithId(
+                StringIdentifier.fromId(idGenerator.nextId()), Map.of()),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            Indexes.EMPTY_INDEXES);
+    Assertions.assertEquals(comment, created.columns()[0].comment());
+    Assertions.assertEquals(comment, tableOperations.loadTable(ident).columns()[0].comment());
+    String mixed = "a".repeat(4094) + "😀";
+    Table altered =
+        tableOperations.alterTable(
+            ident,
+            TableChange.updateColumnComment(new String[] {"c"}, mixed),
+            TableChange.addColumn(new String[] {"added"}, Types.StringType.get(), comment));
+    Assertions.assertEquals(mixed, altered.columns()[0].comment());
+    Assertions.assertEquals(comment, altered.columns()[1].comment());
+    for (String invalid :
+        new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096), "bad\0comment"}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.alterTable(
+                  ident, TableChange.updateColumnComment(new String[] {"c"}, invalid)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tableOperations.alterTable(
+                  ident,
+                  TableChange.addColumn(
+                      new String[] {"rejected"}, Types.StringType.get(), invalid)));
+      Assertions.assertEquals(mixed, tableOperations.loadTable(ident).columns()[0].comment());
+      Assertions.assertEquals(2, tableOperations.loadTable(ident).columns().length);
+    }
+  }
+
+  @Test
   public void testCreateAndListTables() {
     // Create a table
     NameIdentifier table1Ident =
@@ -334,6 +395,75 @@ public class TestManagedTableOperations {
         .withNullable(true)
         .withAutoIncrement(false)
         .build();
+  }
+
+  @Test
+  public void testAlterTableDeleteAndRenameInOneRequest() {
+    // Deleting a lower-position column shifts the columns after it, so renaming the last one in
+    // the same request must not re-insert it past the end of the list.
+    NameIdentifier lastIdent = createThreeColumnTable("rename_last");
+    Table renamedLast =
+        tableOperations.alterTable(
+            lastIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col3"}, "col3_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2", "col3_renamed"},
+        Arrays.stream(renamedLast.columns()).map(Column::name).toArray(String[]::new));
+
+    // After deleting col1 in the same request, renaming col2 must not move it behind col3.
+    NameIdentifier middleIdent = createThreeColumnTable("rename_middle");
+    Table renamedMiddle =
+        tableOperations.alterTable(
+            middleIdent,
+            TableChange.deleteColumn(new String[] {"col1"}, false),
+            TableChange.renameColumn(new String[] {"col2"}, "col2_renamed"));
+    Assertions.assertArrayEquals(
+        new String[] {"col2_renamed", "col3"},
+        Arrays.stream(renamedMiddle.columns()).map(Column::name).toArray(String[]::new));
+  }
+
+  @Test
+  public void testAlterTableRejectsNestedColumnChanges() {
+    NameIdentifier tableIdent = createThreeColumnTable("nested_changes");
+    List<TableChange> nestedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"col1", "nested"}, Types.StringType.get()),
+            TableChange.renameColumn(new String[] {"col1", "nested"}, "renamed"),
+            TableChange.deleteColumn(new String[] {"col1", "nested"}, true),
+            TableChange.updateColumnComment(new String[] {"col1", "nested"}, "comment"));
+
+    for (TableChange change : nestedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> tableOperations.alterTable(tableIdent, change));
+    }
+    Assertions.assertArrayEquals(
+        new String[] {"col1", "col2", "col3"},
+        Arrays.stream(tableOperations.loadTable(tableIdent).columns())
+            .map(Column::name)
+            .toArray(String[]::new));
+  }
+
+  private NameIdentifier createThreeColumnTable(String tableName) {
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, tableName);
+    Column[] columns =
+        new Column[] {
+          createColumn("col1", Types.StringType.get(), null),
+          createColumn("col2", Types.IntegerType.get(), Literals.integerLiteral(1)),
+          createColumn("col3", Types.StringType.get(), null)
+        };
+    tableOperations.createTable(
+        tableIdent,
+        columns,
+        "Test bundled alters",
+        StringIdentifier.newPropertiesWithId(
+            StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        Indexes.EMPTY_INDEXES);
+    return tableIdent;
   }
 
   @Test

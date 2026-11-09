@@ -63,6 +63,7 @@ include(
 // in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-server-experiment")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
@@ -71,12 +72,12 @@ val skipTrinoConnector: Boolean =
   gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
 if (!skipTrinoConnector) {
   include(
-    "trino-connector:trino-connector",
-    "trino-connector:trino-connector-440-445",
-    "trino-connector:trino-connector-446-451",
-    "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
-    "trino-connector:trino-connector-473-478",
+    "trino-connector:trino-connector-473-477",
+    "trino-connector:trino-connector-478-479",
+    "trino-connector:trino-connector-480",
+    "trino-connector:trino-connector-481",
+    "trino-connector:trino-connector-482-483",
     "trino-connector:integration-test"
   )
 } else {
@@ -100,11 +101,16 @@ if (scalaVersion == "2.12") {
   project(":flink-connector:flink-runtime-1.20").projectDir =
     file("flink-connector/v1.20/flink-runtime")
 }
-// Flink 2.x removed the Scala APIs entirely, so the flink-2.1 modules are not gated by scalaVersion.
+// These connectors use Flink Java APIs, so they do not need scalaVersion gating.
+// Flink internals still use Scala.
 include("flink-connector:flink-2.1", "flink-connector:flink-runtime-2.1")
 project(":flink-connector:flink-2.1").projectDir = file("flink-connector/v2.1/flink")
 project(":flink-connector:flink-runtime-2.1").projectDir =
   file("flink-connector/v2.1/flink-runtime")
+include("flink-connector:flink-2.2", "flink-connector:flink-runtime-2.2")
+project(":flink-connector:flink-2.2").projectDir = file("flink-connector/v2.2/flink")
+project(":flink-connector:flink-runtime-2.2").projectDir =
+  file("flink-connector/v2.2/flink-runtime")
 include("spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
@@ -127,7 +133,10 @@ include(":catalogs:hadoop-auth")
 include(":lineage")
 include(":mcp-server")
 include(":plugins:idp-basic")
+include(":plugins:k8s-job-executor")
+include(":plugins:maintenance")
 include(
+  ":maintenance:maintenance-common",
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",

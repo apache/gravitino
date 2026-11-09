@@ -1558,6 +1558,8 @@ public class POConverters {
   public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
     try {
       Policy.BuiltInType policyType = Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType());
+      // Skip PolicyContent.validate() so stricter checks added after write do not break load,
+      // rename, comment, or enable of already-stored policies. Create/UpdateContent still validate.
       return PolicyEntity.builder()
           .withId(policyPO.getPolicyId())
           .withName(policyPO.getPolicyName())
@@ -1570,7 +1572,7 @@ public class POConverters {
                   .readValue(policyPO.getPolicyVersionPO().getContent(), policyType.contentClass()))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
-          .build();
+          .buildSkippingContentValidation();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }

@@ -29,6 +29,11 @@ dependencies {
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
+  compileOnly(libs.aws.dynamodb)
+  // GlueCatalog implements Configurable<Configuration>, which subclasses need only to compile.
+  compileOnly(libs.hadoop3.common) {
+    exclude("*")
+  }
   compileOnly(libs.lombok)
 
   implementation(project(":catalogs:catalog-common")) {
@@ -44,7 +49,7 @@ dependencies {
   implementation(libs.iceberg.api)
   implementation(libs.iceberg.aws)
   implementation(libs.iceberg.core)
-  runtimeOnly(project(":bundles:aws"))
+  implementation(project(":bundles:aws"))
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)
@@ -53,6 +58,9 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":core"))
 
+  testImplementation(libs.hadoop3.common) {
+    exclude("*")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.slf4j.api)

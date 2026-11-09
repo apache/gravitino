@@ -472,7 +472,7 @@ public class TestAccessControlManagerForPermissions {
             .build(),
         false);
     PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
-    Privilege semantic = Privileges.SelectSemanticModel.allow();
+    Privilege semantic = Privileges.UseSemanticModel.allow();
     Privilege table = Privileges.SelectTable.allow();
     SecurableObject tableObject = SecurableObjects.parse(fullName, type, List.of(table));
     SecurableObject semanticObject = SecurableObjects.parse(fullName, type, List.of(semantic));

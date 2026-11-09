@@ -46,7 +46,20 @@ public class TestSparkJdbcTypeConverter {
   }
 
   @Test
+  void testConvertFixedTypeToSparkBinary() {
+    Assertions.assertEquals(
+        DataTypes.BinaryType, sparkJdbcTypeConverter.toSparkType(Types.FixedType.of(16)));
+  }
+
+  @Test
   void testConvertExternalTypeToSparkString() {
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      Assertions.assertEquals(
+          DataTypes.StringType,
+          sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+
     Assertions.assertEquals(
         DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("numeric")));
     Assertions.assertEquals(

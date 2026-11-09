@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.io.BaseEncoding;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -104,9 +105,17 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.ColumnMaskContent;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
+import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -290,8 +299,14 @@ public class DTOConverters {
     return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
+        // Connector results are snapshotted through here before the table dispatcher rejects a
+        // missing column list with a clear error, so a null list must not throw here.
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            table.columns() == null
+                ? null
+                : Arrays.stream(table.columns())
+                    .map(DTOConverters::toDTO)
+                    .toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(toDTOs(table.sortOrder()))
         .withDistribution(toDTO(table.distribution()))
@@ -666,6 +681,12 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
+    PolicyExecutionSpec executionSpec = null;
+    if (policyContent instanceof ExecutablePolicyContent) {
+      PolicyExecutionSpec spec = ((ExecutablePolicyContent) policyContent).executionSpec();
+      executionSpec = spec.hasAny() ? spec : null;
+    }
+
     if (policyContent instanceof PolicyContents.CustomContent) {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
@@ -675,6 +696,35 @@ public class DTOConverters {
           .build();
     }
 
+    if (policyContent instanceof IcebergOrphanFileRemovalContent) {
+      IcebergOrphanFileRemovalContent content = (IcebergOrphanFileRemovalContent) policyContent;
+      return PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withLocation(content.location())
+          .withDryRun(content.dryRun())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergSnapshotExpirationContent) {
+      IcebergSnapshotExpirationContent content = (IcebergSnapshotExpirationContent) policyContent;
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withRetainLast(content.retainLast())
+          .withStreamResults(content.streamResults())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
@@ -684,7 +734,32 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+          .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+
+    if (policyContent instanceof RowFilterContent) {
+      RowFilterContent content = (RowFilterContent) policyContent;
+      return PolicyContentDTO.RowFilterContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof ColumnMaskContent) {
+      ColumnMaskContent content = (ColumnMaskContent) policyContent;
+      return PolicyContentDTO.ColumnMaskContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof AccessControlContent) {
+      AccessControlContent accessControlContent = (AccessControlContent) policyContent;
+      return PolicyContentDTO.AccessControlContentDTO.builder()
+          .withPrivileges(accessControlContent.privileges())
+          .withApplicableRoles(accessControlContent.applicableRoles())
           .build();
     }
 
@@ -733,6 +808,12 @@ public class DTOConverters {
       }
 
       Object value = ((Literal) expression).value();
+      // Binary literals use an explicit hexadecimal representation on the string-valued wire API.
+      // byte[].toString() is an object identity and cannot preserve the literal's bytes.
+      if (((Literal) expression).dataType() instanceof Types.BinaryType
+          && value instanceof byte[]) {
+        value = "0x" + BaseEncoding.base16().lowerCase().encode((byte[]) value);
+      }
       return LiteralDTO.builder()
           .withValue(value == null ? null : value.toString())
           .withDataType(((Literal) expression).dataType())
@@ -1532,16 +1613,39 @@ public class DTOConverters {
           customContentDTO.properties());
     }
 
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
+      return ((PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      return ((PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
-      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
-          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergDataCompaction(
-          icebergCompactionContentDTO.minDataFileMse(),
-          icebergCompactionContentDTO.minDeleteFileNumber(),
-          icebergCompactionContentDTO.dataFileMseWeight(),
-          icebergCompactionContentDTO.deleteFileNumberWeight(),
-          icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteOptions());
+      return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
+      PolicyContentDTO.RowFilterContentDTO contentDTO =
+          (PolicyContentDTO.RowFilterContentDTO) policyContentDTO;
+      return PolicyContents.rowFilter(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.ColumnMaskContentDTO) {
+      PolicyContentDTO.ColumnMaskContentDTO contentDTO =
+          (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
+      return PolicyContents.columnMask(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.AccessControlContentDTO) {
+      PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+          (PolicyContentDTO.AccessControlContentDTO) policyContentDTO;
+      return PolicyContents.accessControl(
+          accessControlContentDTO.privileges(), accessControlContentDTO.applicableRoles());
     }
 
     throw new IllegalArgumentException(

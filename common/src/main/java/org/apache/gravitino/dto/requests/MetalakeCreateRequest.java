@@ -73,6 +73,7 @@ public class MetalakeCreateRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    RequestValidation.properties(properties);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
   }

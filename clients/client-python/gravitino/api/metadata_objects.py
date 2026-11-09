@@ -49,6 +49,7 @@ class MetadataObjects:
             MetadataObject.Type.MODEL,
             MetadataObject.Type.VIEW,
             MetadataObject.Type.FUNCTION,
+            MetadataObject.Type.SEMANTIC_MODEL,
         },
         4: {MetadataObject.Type.COLUMN},
     }
@@ -94,7 +95,7 @@ class MetadataObjects:
         )
         Precondition.check_argument(
             names_len != 3 or type_ in MetadataObjects._NAMES_LEN_CONDS[3],
-            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW or FUNCTION",
+            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW, FUNCTION or SEMANTIC_MODEL",
         )
         Precondition.check_argument(
             names_len != 4 or type_ in MetadataObjects._NAMES_LEN_CONDS[4],
@@ -141,6 +142,7 @@ class MetadataObjects:
             MetadataObject.Type.TOPIC,
             MetadataObject.Type.MODEL,
             MetadataObject.Type.FUNCTION,
+            MetadataObject.Type.SEMANTIC_MODEL,
             MetadataObject.Type.VIEW,
         }:
             parent_type = MetadataObject.Type.SCHEMA

@@ -21,6 +21,26 @@ name: MCP Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
       java-version:
         required: true
         description: 'Java version'
@@ -33,6 +53,15 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: ./.github/actions/setup-java-toolchains
         with:

@@ -48,14 +48,29 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The authentication type for simple authentication. */
   public static final String SIMPLE_AUTH_TYPE = "simple";
 
+  /** The authentication type for basic authentication. */
+  public static final String BASIC_AUTH_TYPE = "basic";
+
   /** The authentication type for oauth2 authentication. */
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
 
   /** The authentication type for kerberos authentication. */
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
 
+  // basic
+  /** The configuration key prefix for basic authentication. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PREFIX = "fs.gravitino.client.basic.";
+
+  /** The configuration key for the basic authentication username. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_USERNAME_KEY =
+      "fs.gravitino.client.basic.username";
+
+  /** The configuration key for the basic authentication password. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PASSWORD_KEY =
+      "fs.gravitino.client.basic.password";
+
   // oauth2
-  /** The configuration key prefix for oauth2 */
+  /** The configuration key prefix for oauth2. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_PREFIX = "fs.gravitino.client.oauth2.";
 
   /** The configuration key for the URI of the default OAuth server. */

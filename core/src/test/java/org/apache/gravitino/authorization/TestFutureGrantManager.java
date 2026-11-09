@@ -207,12 +207,12 @@ public class TestFutureGrantManager {
         SecurableObjects.ofMetalake(
             METALAKE,
             Lists.newArrayList(
-                Privileges.SelectTable.allow(), Privileges.SelectSemanticModel.allow()));
+                Privileges.SelectTable.allow(), Privileges.UseSemanticModel.allow()));
     SecurableObject semanticModel =
         SecurableObjects.parse(
             "old_catalog.schema.model",
             MetadataObject.Type.SEMANTIC_MODEL,
-            Lists.newArrayList(Privileges.SelectSemanticModel.allow()));
+            Lists.newArrayList(Privileges.UseSemanticModel.allow()));
     SecurableObject otherTable =
         SecurableObjects.parse(
             "old_catalog.schema.table",

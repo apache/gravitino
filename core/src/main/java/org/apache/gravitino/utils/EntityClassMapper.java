@@ -27,6 +27,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -40,6 +41,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 
 /**
  * Utility class that provides mapping between entity types and their corresponding entity classes.
@@ -53,6 +55,8 @@ public class EntityClassMapper {
           .put(Entity.EntityType.CATALOG, CatalogEntity.class)
           .put(Entity.EntityType.SCHEMA, SchemaEntity.class)
           .put(Entity.EntityType.TABLE, TableEntity.class)
+          .put(Entity.EntityType.VIEW, ViewEntity.class)
+          .put(Entity.EntityType.FUNCTION, FunctionEntity.class)
           .put(Entity.EntityType.FILESET, FilesetEntity.class)
           .put(Entity.EntityType.MODEL, ModelEntity.class)
           .put(Entity.EntityType.TOPIC, TopicEntity.class)

@@ -36,6 +36,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -254,6 +255,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             droppedFromStore = store.delete(ident, TOPIC);
           } catch (NoSuchEntityException e) {
             LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
+          } catch (OptimisticLockException e) {
+            throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -310,6 +313,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     try {
       store.put(topicEntity, true);
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);

@@ -197,7 +197,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v2", version);
+    assertEquals("v3", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 

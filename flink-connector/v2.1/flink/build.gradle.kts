@@ -56,7 +56,8 @@ val flinkVersion: String = libs.versions.flink21.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4flink21.get()
 val paimonVersion: String = libs.versions.paimon4flink21.get()
-// Flink 2.x removed the Scala APIs entirely, so unlike the 1.x modules there is no scala suffix.
+// This connector uses Flink Java APIs, so its artifacts need no Scala-version suffix.
+// Flink internals still use Scala.
 val artifactName = "${rootProject.name}-flink-$flinkMajorVersion"
 
 dependencies {
@@ -70,8 +71,8 @@ dependencies {
     // can't simply be excluded: the connector's lineage extraction actually calls into it at
     // runtime (JdbcSource.getLineageVertex). Force this newer release instead, which ships an
     // up-to-date bundled copy.
-    compileOnly(libs.openlineageSqlJava21)
-    testImplementation(libs.openlineageSqlJava21)
+    compileOnly(libs.openlineageSqlJava)
+    testImplementation(libs.openlineageSqlJava)
   }
 
   // Dependencies needed to compile flink-common's sources (mirrors flink-common/build.gradle.kts).
