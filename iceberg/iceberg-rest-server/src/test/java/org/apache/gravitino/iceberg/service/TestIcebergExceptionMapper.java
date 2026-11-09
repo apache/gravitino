@@ -77,8 +77,9 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new CommitStateUnknownException("", new RuntimeException()), 500);
     checkExceptionStatus(new ServiceUnavailableException(""), 503);
     checkExceptionStatus(new RuntimeException(), 500);
-    // Iceberg NotFoundException is file/location missing (not NoSuchTable); map to 400.
-    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 400);
+    // Iceberg NotFoundException stays unmapped → 500. Client-supplied metadata-location misses are
+    // converted to BadRequestException at the call site, not here.
+    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 500);
   }
 
   @Test

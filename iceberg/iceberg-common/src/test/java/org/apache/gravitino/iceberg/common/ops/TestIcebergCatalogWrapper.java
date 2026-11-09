@@ -480,7 +480,8 @@ public class TestIcebergCatalogWrapper {
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
       Assertions.assertTrue(
-          e.getMessage().contains("Cannot read metadata location"), e.getMessage());
+          e.getMessage().contains("unsupported or unreadable scheme"), e.getMessage());
+      Assertions.assertFalse(e.getMessage().contains("No FileSystem"), e.getMessage());
     }
   }
 

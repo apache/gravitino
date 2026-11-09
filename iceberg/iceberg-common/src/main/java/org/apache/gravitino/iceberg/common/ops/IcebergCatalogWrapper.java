@@ -38,6 +38,7 @@ import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
@@ -351,31 +352,28 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     validateTableLocation(metadataLocation);
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
-      return TableMetadataParser.read(fileIO, metadataLocation);
-    } catch (NotFoundException e) {
-      // The location comes from the request, so a missing file is a client error. 404 is reserved
-      // by the REST spec for a namespace or table that does not exist.
-      throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
-    } catch (IllegalArgumentException e) {
-      // TableMetadataParser rejects a directory / non-metadata path with this message. Other
-      // IllegalArgumentExceptions (e.g. FileIO setup) must not be masked as client 400.
-      String msg = e.getMessage();
-      if (msg != null && msg.contains("is not a valid metadata file")) {
+      try {
+        return TableMetadataParser.read(fileIO, metadataLocation);
+      } catch (NotFoundException e) {
+        // Request-supplied location missing: client error. 404 is for missing namespace/table.
+        LOG.info("Metadata location does not exist: {}", metadataLocation, e);
+        throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
+      } catch (IllegalArgumentException e) {
+        // Directory / non-metadata path from TableMetadataParser. Catch only around read().
+        LOG.info("Metadata location is not a valid metadata file: {}", metadataLocation, e);
         throw new BadRequestException(
-            "Metadata location %s is not a valid metadata file: %s", metadataLocation, msg);
+            "Metadata location %s is not a valid metadata file", metadataLocation);
+      } catch (RuntimeIOException e) {
+        // Unsupported scheme via cause type (not message text). Other IO stays 5xx.
+        if (e.getCause() instanceof UnsupportedFileSystemException) {
+          LOG.info(
+              "Cannot read metadata location with unsupported scheme: {}", metadataLocation, e);
+          throw new BadRequestException(
+              "Cannot read metadata location %s: unsupported or unreadable scheme",
+              metadataLocation);
+        }
+        throw e;
       }
-      throw e;
-    } catch (RuntimeIOException e) {
-      // Unsupported scheme (e.g. s3:// on a local catalog) is a client path error → 400.
-      // Other IO failures (storage outage, credentials, timeouts) stay RuntimeIOException → 5xx.
-      String msg = e.getMessage();
-      if (msg != null
-          && (msg.contains("No FileSystem for scheme")
-              || msg.contains("Failed to get file system for path"))) {
-        throw new BadRequestException(
-            "Cannot read metadata location %s: %s", metadataLocation, msg);
-      }
-      throw e;
     }
   }
 
