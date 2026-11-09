@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -85,6 +86,21 @@ public class TestIcebergScanResponses {
   void tearDown() throws Exception {
     if (wrapper != null) {
       wrapper.close();
+    }
+  }
+
+  @Test
+  void testMissingScanMethodHasActionableError() {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      IllegalStateException error =
+          assertThrows(
+              IllegalStateException.class,
+              () -> IcebergRESTUtils.resolveScanResponseMethod(Object.class, "specsById"));
+      assertTrue(error.getMessage().contains("java.lang.Object.specsById"));
+      assertTrue(error.getMessage().contains("supported Iceberg runtime"));
+      assertTrue(error.getCause() instanceof NoSuchMethodException);
+      // A failed lookup must not poison the utility class for unrelated REST operations.
+      assertEquals(PlanStatus.COMPLETED, plan().planStatus());
     }
   }
 
