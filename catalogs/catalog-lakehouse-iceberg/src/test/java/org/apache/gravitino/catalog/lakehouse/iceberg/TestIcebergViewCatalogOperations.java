@@ -517,7 +517,7 @@ public class TestIcebergViewCatalogOperations {
   }
 
   @Test
-  public void testAlterViewAddsVersionsForRepeatedDefinitions() throws InterruptedException {
+  public void testAlterViewAddsVersionsForRepeatedDefinitions() {
     Column[] columnsA = {Column.of("id", Types.IntegerType.get(), null)};
     Column[] columnsB = {
       Column.of("id", Types.IntegerType.get(), null),
@@ -532,7 +532,6 @@ public class TestIcebergViewCatalogOperations {
 
     operations.alterView(ident, replacement(columnsB, sqlB));
     operations.alterView(ident, replacement(columnsA, sqlA));
-    Thread.sleep(2L);
     View replaced = operations.alterView(ident, replacement(columnsB, sqlB));
 
     Assertions.assertEquals(4, metadata.get().currentVersionId());
@@ -543,7 +542,6 @@ public class TestIcebergViewCatalogOperations {
     Assertions.assertEquals(2, replaced.columns().length);
     Assertions.assertEquals("value", replaced.properties().get("keep"));
 
-    Thread.sleep(2L);
     operations.alterView(ident, replacement(columnsB, sqlB));
 
     ViewVersion latest = metadata.get().currentVersion();
@@ -552,9 +550,12 @@ public class TestIcebergViewCatalogOperations {
     Assertions.assertEquals(5, metadata.get().history().size());
     Assertions.assertEquals(2, metadata.get().schemas().size());
     Assertions.assertEquals("alter", latest.summary().get("operation"));
-    Assertions.assertEquals(
-        Long.toString(latest.timestampMillis()), latest.summary().get("timestamp-ms"));
-    Assertions.assertNotEquals(metadata.get().version(4).summary(), latest.summary());
+    String previousReplacementId =
+        metadata.get().version(4).summary().get("gravitino.view-replacement-id");
+    String latestReplacementId = latest.summary().get("gravitino.view-replacement-id");
+    Assertions.assertNotNull(previousReplacementId);
+    Assertions.assertNotNull(latestReplacementId);
+    Assertions.assertNotEquals(previousReplacementId, latestReplacementId);
   }
 
   @Test
