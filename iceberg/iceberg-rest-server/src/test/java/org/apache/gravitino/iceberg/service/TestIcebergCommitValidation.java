@@ -419,6 +419,64 @@ public class TestIcebergCommitValidation {
     Assertions.assertEquals(start.asStruct(), catalog.loadTable(empty).schema().asStruct());
   }
 
+  /**
+   * Per Iceberg Table Spec schema evolution (no empty-table exemption): ordinary evolution on an
+   * empty table is refused, but replace / create-then-replace may redefine the schema because
+   * removing {@code main} is not evolution — type and nullability checks stay exempt.
+   */
+  @Test
+  public void testEmptyTableReplaceMayRedefineSchema() {
+    TableIdentifier empty = TableIdentifier.of(Namespace.of("db"), "empty_replace");
+    catalog.createTable(
+        empty,
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.LongType.get()),
+            Types.NestedField.optional(2, "s", Types.StringType.get())),
+        PartitionSpec.unpartitioned(),
+        ImmutableMap.of("format-version", "2"));
+    Assertions.assertNull(catalog.loadTable(empty).currentSnapshot());
+
+    // Without RemoveSnapshotRef(main) these evolutions are refused on an empty table.
+    assertEmptyEvolutionRefused(
+        empty,
+        "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"string\"},"
+            + "{\"id\":2,\"name\":\"s\",\"required\":true,\"type\":\"string\"}");
+
+    // create-then-replace: drop main and install an incompatible schema in one commit.
+    CatalogHandlers.updateTable(
+        catalog,
+        empty,
+        request(
+            new MetadataUpdate.RemoveSnapshotRef(SnapshotRef.MAIN_BRANCH),
+            addSchema(
+                "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"string\"},"
+                    + "{\"id\":2,\"name\":\"s\",\"required\":true,\"type\":\"string\"}"),
+            new MetadataUpdate.SetCurrentSchema(-1)));
+
+    Table replaced = catalog.loadTable(empty);
+    Assertions.assertNull(replaced.currentSnapshot());
+    Assertions.assertEquals(Types.StringType.get(), replaced.schema().findType("id"));
+    Assertions.assertTrue(replaced.schema().findField("id").isRequired());
+    Assertions.assertTrue(replaced.schema().findField("s").isRequired());
+  }
+
+  /**
+   * Staged create-transaction (AssertTableDoesNotExist) committing a required column is correct per
+   * Iceberg create (not Table Spec schema evolution), so removing {@code hasData} must not reject
+   * it.
+   */
+  @Test
+  public void testStagedCreateTransactionStillSucceeds() {
+    TableIdentifier staged = TableIdentifier.of(Namespace.of("db"), "staged_create_ok");
+    UpdateTableRequest create = stagedCreateRequest(staged);
+    CatalogHandlers.updateTable(catalog, staged, IcebergCommitValidation.withValidation(create));
+    Assertions.assertTrue(catalog.tableExists(staged));
+    Assertions.assertNull(catalog.loadTable(staged).currentSnapshot());
+    Assertions.assertEquals(
+        Types.LongType.get(), catalog.loadTable(staged).schema().findType("id"));
+    Assertions.assertTrue(catalog.loadTable(staged).schema().findField("id").isRequired());
+  }
+
   private void assertEmptyEvolutionRefused(TableIdentifier ident, String fields) {
     Assertions.assertThrows(
         ValidationException.class,
