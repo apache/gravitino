@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -145,11 +146,45 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   }
 
   /**
-   * Validates orphan-scan location syntax shared by policy write-time checks and job submission.
+   * Validates that a scan location is within the table storage root. Same lexical containment rule
+   * used at job submission; filesystem symlink checks remain a job concern.
    *
-   * <p>Mirrors {@code OrphanFileLocationUtils.normalizeLocation} lexical rules so values that would
-   * fail {@link URI#create(String)} or absolute-path checks are rejected when the policy is stored,
-   * not only when a cleanup job later runs.
+   * @param tableLocation table storage root
+   * @param location requested scan location
+   * @throws IllegalArgumentException if {@code location} is outside {@code tableLocation}
+   */
+  public static void validateLocationWithinTable(String tableLocation, String location) {
+    URI root = normalizeLocation(tableLocation);
+    URI requested = normalizeLocation(location);
+    String rootPath = root.getPath().replaceAll("/+$", "");
+    String childPath = requested.getPath().replaceAll("/+$", "");
+    boolean sameStorage =
+        Objects.equals(root.getScheme(), requested.getScheme())
+            && Objects.equals(root.getAuthority(), requested.getAuthority());
+    Preconditions.checkArgument(
+        sameStorage
+            && (childPath.equals(rootPath)
+                || childPath.startsWith(rootPath.endsWith("/") ? rootPath : rootPath + "/")),
+        "location must be within the table's storage location: %s",
+        tableLocation);
+  }
+
+  /**
+   * Normalizes an absolute location after {@link #parseAndValidateLocation(String)}.
+   *
+   * @param value input location
+   * @return normalized URI
+   */
+  public static URI normalizeLocation(String value) {
+    URI uri = parseAndValidateLocation(value);
+    if (uri.getScheme() == null || "file".equals(uri.getScheme())) {
+      return (uri.getScheme() == null ? Paths.get(value) : Paths.get(uri)).normalize().toUri();
+    }
+    return uri.normalize();
+  }
+
+  /**
+   * Validates orphan-scan location syntax shared by policy write-time checks and job submission.
    *
    * @param location non-null scan location
    * @return parsed URI after syntax checks

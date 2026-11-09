@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -60,6 +61,7 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.ObjectPolicyResolver;
+import org.apache.gravitino.policy.OrphanLocationPolicyGuard;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
@@ -81,6 +83,8 @@ public class TagManager implements TagDispatcher {
 
   private final ObjectPolicyResolver objectPolicyResolver;
 
+  private final OrphanLocationPolicyGuard orphanLocationPolicyGuard;
+
   private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
       Sets.newHashSet(
           MetadataObject.Type.CATALOG,
@@ -98,6 +102,7 @@ public class TagManager implements TagDispatcher {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
+    this.orphanLocationPolicyGuard = new OrphanLocationPolicyGuard(entityStore);
   }
 
   public String[] listTags(String metalake) {
@@ -428,6 +433,7 @@ public class TagManager implements TagDispatcher {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    orphanLocationPolicyGuard.requireCompatibleWhenAssociatingPolicy(metalake, tagName, policy);
     if (!policy.policyType().uniqueAtSameLevel()) {
       return;
     }
@@ -485,6 +491,13 @@ public class TagManager implements TagDispatcher {
 
     try {
       if (tagValuesToAdd.length > 0) {
+        orphanLocationPolicyGuard.requireCompatibleWhenAssigningTags(
+            metalake,
+            metadataObject,
+            Arrays.stream(tagValuesToAdd)
+                .map(TagValue::name)
+                .distinct()
+                .collect(Collectors.toList()));
         objectPolicyResolver.checkDirectTagsUnique(
             metalake,
             metadataObject,

@@ -66,6 +66,7 @@ public class PolicyManager implements PolicyDispatcher {
   private final EntityStore entityStore;
   private final TagManager tagManager;
   private final ObjectPolicyResolver objectPolicyResolver;
+  private final OrphanLocationPolicyGuard orphanLocationPolicyGuard;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore, TagManager tagManager) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
@@ -80,6 +81,7 @@ public class PolicyManager implements PolicyDispatcher {
     this.entityStore = entityStore;
     this.tagManager = Preconditions.checkNotNull(tagManager, "tagManager");
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
+    this.orphanLocationPolicyGuard = new OrphanLocationPolicyGuard(entityStore);
   }
 
   @Override
@@ -165,6 +167,7 @@ public class PolicyManager implements PolicyDispatcher {
       throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
+    requireOrphanLocationCompatibleWithPlacements(metalake, policyName, changes);
     try {
       return entityStore.update(
           NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -422,6 +425,17 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withContent(newContent);
 
     return contentUpdated ? builder.build() : builder.buildSkippingContentValidation();
+  }
+
+  private void requireOrphanLocationCompatibleWithPlacements(
+      String metalake, String policyName, PolicyChange... changes) {
+    for (PolicyChange change : changes) {
+      if (!(change instanceof PolicyChange.UpdateContent)) {
+        continue;
+      }
+      PolicyContent content = ((PolicyChange.UpdateContent) change).getContent();
+      orphanLocationPolicyGuard.requireCompatibleWithTagPlacements(metalake, policyName, content);
+    }
   }
 
   private static void validateReadRestrictionContent(
