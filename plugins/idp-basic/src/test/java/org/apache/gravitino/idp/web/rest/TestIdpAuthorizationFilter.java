@@ -53,9 +53,15 @@ class TestIdpAuthorizationFilter {
         IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "bob"), "alice"));
     assertFalse(
         IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "groups", "alice"), "alice"));
+    assertFalse(
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("PUT", "idp", "users", "alice", "enabled"), "alice"));
     assertTrue(
         IdpAuthorizationFilter.isSelfUserAccess(request("GET", "idp", "users", "alice"), "alice"));
     assertTrue(
+        IdpAuthorizationFilter.isSelfUserAccess(
+            request("PUT", "idp", "users", "alice", "password"), "alice"));
+    assertFalse(
         IdpAuthorizationFilter.isSelfUserAccess(request("PUT", "idp", "users", "alice"), "alice"));
   }
 

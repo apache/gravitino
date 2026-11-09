@@ -29,6 +29,10 @@ dependencies {
   constraints {
     implementation(libs.thrift)
   }
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
+  constraints {
+    implementation(libs.xnio.api)
+  }
 
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))

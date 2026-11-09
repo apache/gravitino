@@ -39,7 +39,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -139,7 +139,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
-        System.out.println("Applied custom Spark configurations: " + customConfigs);
       } catch (IllegalArgumentException e) {
         System.err.println("Error: " + e.getMessage());
         printUsage();

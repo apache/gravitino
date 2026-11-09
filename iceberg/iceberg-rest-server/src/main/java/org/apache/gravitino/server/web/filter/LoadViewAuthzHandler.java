@@ -98,6 +98,11 @@ public class LoadViewAuthzHandler implements AuthorizationHandler {
     return true;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.VIEW;
+  }
+
   /**
    * Perform VIEW-level authorization aligned with {@link
    * org.apache.gravitino.iceberg.service.rest.IcebergViewOperations#loadView}: evaluate the primary

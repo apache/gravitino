@@ -41,7 +41,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -65,10 +64,17 @@ public class UserMetaService {
   private UserMetaService() {}
 
   private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName) {
+    return getUserPOByMetalakeIdAndName(metalakeId, userName, false);
+  }
+
+  private UserPO getUserPOByMetalakeIdAndName(Long metalakeId, String userName, boolean withRoles) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
+            mapper ->
+                withRoles
+                    ? mapper.selectUserWithRolesByMetalakeIdAndName(metalakeId, userName)
+                    : mapper.selectUserMetaByMetalakeIdAndName(metalakeId, userName));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
@@ -105,8 +111,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = userPO.requireRolePOs();
 
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
@@ -135,15 +141,7 @@ public class UserMetaService {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
       String metalakeName = userEntity.namespace().level(0);
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
@@ -239,8 +237,8 @@ public class UserMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name(), true);
+    List<RolePO> rolePOs = oldUserPO.requireRolePOs();
     UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
 
     UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);

@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -70,6 +71,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -89,6 +91,7 @@ import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetricService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -124,6 +127,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
+  }
+
+  @Override
+  public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    return SemanticModelMetricService.getInstance().listMetrics(namespace);
+  }
+
+  @Override
+  public List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    return SemanticModelMetricService.getInstance().listMetricInfos(namespace);
   }
 
   @Override
@@ -421,37 +435,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
+    return deleteWithCallback(
+        ident,
+        entityType,
+        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+        postDeleteAction);
+  }
 
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      FilesetEntity deletedFileset;
-      try {
-        deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
-      } catch (NoSuchEntityException e) {
-        // Only the delete itself may report the fileset as missing. A NoSuchEntityException from
-        // any later step means the delete did happen and something else failed, which must not be
-        // reported to the caller as "there was nothing to delete".
-        return Optional.empty();
-      }
-      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
-      E deletedEntity = clazz.cast(deletedFileset);
-      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
-      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
-      postDeleteAction.accept(deletedEntity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return Optional.of(deletedEntity);
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    return deleteWithCallback(
+        ident,
+        Entity.EntityType.SCHEMA,
+        () -> SchemaMetaService.getInstance().deleteSchemaAndGet(ident, false, cascadeFunctions),
+        postDeleteAction);
   }
 
   @Override
@@ -744,6 +743,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       case POLICY_TAG_REL:
         return PolicyTagRelService.getInstance().listRelations(nameIdentifiers, identType);
+      case TAG_METADATA_OBJECT_REL:
+        return TagMetaService.getInstance().listTagsForMetadataObjects(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -870,6 +871,42 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             update.sourceEntityType(),
             toNameIdentifiers(update.targetsToAdd()),
             toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> Optional<E> deleteWithCallback(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Supplier<E> deleteAction,
+      Consumer<E> postDeleteAction) {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      E deletedEntity;
+      try {
+        deletedEntity = deleteAction.get();
+      } catch (NoSuchEntityException e) {
+        // Only the delete itself may report the entity as missing. A NoSuchEntityException from
+        // any later step means the delete did happen and something else failed, which must not be
+        // reported to the caller as "there was nothing to delete".
+        return Optional.empty();
+      }
+      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
+      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
+      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
+      postDeleteAction.accept(deletedEntity);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return Optional.of(deletedEntity);
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 

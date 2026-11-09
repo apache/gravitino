@@ -170,6 +170,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
 
     } catch (ExpiredJWTException e) {
       throw new TokenExpiredException(e, "Authentication token is expired");
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       LOG.warn(
           "JWKS JWT validation failed for principal [{}]: {}",

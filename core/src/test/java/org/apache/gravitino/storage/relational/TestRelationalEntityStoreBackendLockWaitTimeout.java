@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.storage.relational;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
@@ -39,7 +36,6 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
@@ -50,39 +46,8 @@ import org.mockito.Mockito;
  * Verifies real backend lock timeouts, transaction cleanup, and retries through the entity store.
  */
 @Tag("gravitino-docker-test")
+@DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestRelationalEntityStoreBackendLockWaitTimeout extends TestJDBCBackend {
-
-  @AfterEach
-  void closeBackend() throws Exception {
-    String databasePath = null;
-    try {
-      if ("h2".equals(backendType)) {
-        BasicDataSource source =
-            (BasicDataSource)
-                SqlSessionFactoryHelper.getInstance()
-                    .getSqlSessionFactory()
-                    .getConfiguration()
-                    .getEnvironment()
-                    .getDataSource();
-        databasePath = source.getUrl().substring("jdbc:h2:file:".length()).split(";")[0];
-        // The shared fixture uses DB_CLOSE_DELAY=-1, so close the engine before deleting its files.
-        try (Connection connection = source.getConnection();
-            Statement statement = connection.createStatement()) {
-          statement.execute("SHUTDOWN");
-        }
-      }
-    } finally {
-      try {
-        backend.close();
-      } finally {
-        if (databasePath != null) {
-          FileUtils.deleteDirectory(Path.of(databasePath).toFile());
-          Files.deleteIfExists(Path.of(databasePath + ".mv.db"));
-          Files.deleteIfExists(Path.of(databasePath + ".trace.db"));
-        }
-      }
-    }
-  }
 
   @TestTemplate
   void testDropTimeoutPreservesTableAndRetrySucceeds() throws Exception {

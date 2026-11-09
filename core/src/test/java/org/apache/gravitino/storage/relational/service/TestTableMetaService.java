@@ -100,6 +100,50 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetMetalakeNameByTableId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_metalake_by_id",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    Assertions.assertEquals(
+        metalakeName, TableMetaService.getInstance().getMetalakeNameByTableId(table.id()));
+    Assertions.assertNull(TableMetaService.getInstance().getMetalakeNameByTableId(table.id() + 1));
+  }
+
+  /**
+   * Verifies every relational backend stores the full 300-character column name and its identity.
+   *
+   * @throws IOException if the backend write fails
+   */
+  @TestTemplate
+  public void testLongColumnNamesRoundTrip() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace namespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    String name = "c".repeat(300);
+    ColumnEntity original = column(name, Types.StringType.get());
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_long_column")
+            .withNamespace(namespace)
+            .withColumns(List.of(original))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService service = TableMetaService.getInstance();
+    service.insertTable(table, false);
+    TableEntity loaded = service.getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals(name, loaded.columns().get(0).name());
+    Assertions.assertEquals(original.id(), loaded.columns().get(0).id());
+  }
+
+  @TestTemplate
   public void testLegacyTimelineDeleteKeepsLiveVersionsOfSameTable() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

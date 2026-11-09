@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
@@ -42,6 +43,8 @@ import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -61,6 +64,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,11 +171,8 @@ public class TagManager implements TagDispatcher {
           "Tag with name %s under metalake %s does not exist", name, metalake);
     } catch (EntityAlreadyExistsException e) {
       String newName =
-          Arrays.stream(changes)
-              .filter(c -> c instanceof TagChange.RenameTag)
-              .map(c -> ((TagChange.RenameTag) c).getNewName())
-              .findFirst()
-              .orElse(name);
+          RenameUtils.getLastRenameName(
+              name, changes, TagChange.RenameTag.class, TagChange.RenameTag::getNewName);
       throw new TagAlreadyExistsException(
           e, "Tag with name %s under metalake %s already exists", newName, metalake);
     } catch (OptimisticLockException ole) {
@@ -330,10 +331,8 @@ public class TagManager implements TagDispatcher {
 
   public Tag[] listTagsInfoForMetadataObject(String metalake, MetadataObject metadataObject)
       throws NoSuchMetadataObjectException {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     try {
       checkMetalake(NameIdentifier.of(metalake), entityStore);
@@ -354,11 +353,9 @@ public class TagManager implements TagDispatcher {
 
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name)
       throws NoSuchMetadataObjectException {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     try {
       checkMetalake(NameIdentifier.of(metalake), entityStore);
@@ -423,10 +420,8 @@ public class TagManager implements TagDispatcher {
     validateTagValuesToAdd(tagsToAdd);
     validateTagValuesToRemove(tagsToRemove);
 
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     Set<TagValue> tagsToAddSet =
         tagsToAdd == null ? new LinkedHashSet<>() : new LinkedHashSet<>(Arrays.asList(tagsToAdd));
@@ -482,6 +477,24 @@ public class TagManager implements TagDispatcher {
       LOG.error("Failed to associate tags for metadata object {}", metadataObject, e);
       throw new RuntimeException(e);
     }
+  }
+
+  private NameIdentifier checkAndNormalizeMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    // Existence checks use normalizing dispatchers and must see the original request. Applying
+    // normalization first would fold quoted names again after their quotes have been removed.
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    if (!SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type())
+        || metadataObject.type() == MetadataObject.Type.CATALOG) {
+      return ident;
+    }
+
+    return CapabilityHelpers.normalizeMetadataIdentifier(
+        ident,
+        Capability.Scope.valueOf(metadataObject.type().name()),
+        GravitinoEnv.getInstance().catalogManager(),
+        () -> entityStore);
   }
 
   private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {

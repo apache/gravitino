@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.List;
+import javax.annotation.Nullable;
 
 public class GroupPO {
   private Long groupId;
@@ -29,6 +31,32 @@ public class GroupPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  @Nullable private List<RolePO> rolePOs;
+
+  /**
+   * Returns the membership rows loaded in the same statement as this entity.
+   *
+   * @return the snapshot, empty when loaded without children, or null for metadata-only reads
+   */
+  @Nullable
+  public List<RolePO> getRolePOs() {
+    return rolePOs;
+  }
+
+  /**
+   * Requires the aggregate snapshot before a complete entity is assembled or updated.
+   *
+   * @return the loaded membership snapshot, which may be empty
+   * @throws IllegalStateException if only the entity metadata was loaded
+   */
+  public List<RolePO> requireRolePOs() {
+    Preconditions.checkState(
+        rolePOs != null,
+        "The membership snapshot was not loaded for group %s; use an aggregate mapper",
+        groupId);
+    return rolePOs;
+  }
 
   public Long getGroupId() {
     return groupId;
