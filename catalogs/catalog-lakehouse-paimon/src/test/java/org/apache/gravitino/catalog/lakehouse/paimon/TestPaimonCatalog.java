@@ -147,8 +147,6 @@ public class TestPaimonCatalog {
   }
 
   @Test
-<<<<<<< HEAD
-=======
   void testNonFilesystemBackendRequiresUriBeforeCreate() {
     PaimonCatalog catalog = new PaimonCatalog();
     for (String backend : new String[] {"hive", "jdbc"}) {
@@ -191,15 +189,6 @@ public class TestPaimonCatalog {
   }
 
   @Test
-  void testS3AFileSystemIsAvailable() throws IOException {
-    Class<? extends FileSystem> fileSystemClass =
-        FileSystem.getFileSystemClass("s3a", new Configuration());
-
-    Assertions.assertEquals("org.apache.hadoop.fs.s3a.S3AFileSystem", fileSystemClass.getName());
-  }
-
-  @Test
->>>>>>> f475443da ([#14706] fix(paimon): validate backend settings on catalog create and alter (#14709))
   void testAsViewCatalog() {
     PaimonCatalog paimonCatalog = newPaimonCatalog("catalog_view");
     ViewCatalog viewCatalog = paimonCatalog.asViewCatalog();
