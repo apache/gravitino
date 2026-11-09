@@ -148,7 +148,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @VisibleForTesting String warehouseLocation;
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
-  @VisibleForTesting org.apache.iceberg.catalog.Catalog icebergGlueCatalog;
+  @VisibleForTesting GravitinoGlueCatalog icebergGlueCatalog;
 
   private final GlueTypeConverter typeConverter = new GlueTypeConverter();
 
@@ -451,10 +451,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       // Iceberg table; the Glue columns are a Hive-style copy. A table whose metadata cannot be
       // read is reported as an error rather than with the Glue copy.
       if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
+        String metadataLocation = rawGlueTable.parameters().get(GlueConstants.METADATA_LOCATION);
         try {
-          GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
+          GlueIcebergTableHelper.loadTable(
+              icebergGlueCatalog, dbName, ident.name(), metadataLocation, table);
         } catch (RuntimeException e) {
-          String metadataLocation = rawGlueTable.parameters().get(GlueConstants.METADATA_LOCATION);
           throw GlueExceptionConverter.toIcebergException(
               e,
               metadataLocation == null
