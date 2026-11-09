@@ -117,9 +117,6 @@ public class ConvertUtil {
   private static Expression toGravitinoLiteral(
       Literal<?> icebergDefault, Type type, Expression unset) {
     Object value = icebergDefault.value();
-    if (value == null) {
-      return Literals.NULL;
-    }
 
     switch (type.typeId()) {
       case BOOLEAN:
@@ -188,7 +185,7 @@ public class ConvertUtil {
       default:
         // Nested types cannot carry non-null Iceberg defaults; other V3 types are left unset
         // rather than failing table load.
-        LOG.debug("Dropping Iceberg column default of unsupported type {} as unset", type.typeId());
+        LOG.warn("Dropping Iceberg column default of unsupported type {} as unset", type.typeId());
         return unset;
     }
   }
