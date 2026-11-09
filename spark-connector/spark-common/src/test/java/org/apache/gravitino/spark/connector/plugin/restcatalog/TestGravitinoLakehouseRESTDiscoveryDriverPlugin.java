@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
@@ -92,6 +94,117 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     assertEquals(
         "java.lang.Runnable,example.UserExtension",
         sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+  }
+
+  @Test
+  void testLanceUsesHadoopUserForDiscoveryAndCatalogs() {
+    SparkConf sparkConf = new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
+
+    driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
+
+    assertEquals("Basic ZXR1c2VyOnVudXNlZA==", LanceAuthProvider.discoveryAuthorization);
+    assertEquals(
+        LanceAuthProvider.discoveryAuthorization,
+        sparkConf.get(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLanceUsesHadoopUserWithExplicitSimpleAuthentication() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set("spark.sql.gravitino.lanceREST.uri", "rest-uri")
+            .set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "simple");
+
+    driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
+
+    assertEquals("Basic ZXR1c2VyOnVudXNlZA==", LanceAuthProvider.discoveryAuthorization);
+    assertEquals(
+        LanceAuthProvider.discoveryAuthorization,
+        sparkConf.get(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLanceDoesNotGenerateAuthorizationForOtherAuthenticationTypes() {
+    for (String authType : Arrays.asList("basic", "oauth2", "kerberos", "token", "unknown", "")) {
+      SparkConf sparkConf =
+          new SparkConf(false)
+              .set("spark.sql.gravitino.lanceREST.uri", "rest-uri")
+              .set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, authType);
+
+      driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
+
+      assertNull(LanceAuthProvider.discoveryAuthorization);
+      assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+    }
+  }
+
+  @Test
+  void testLancePreservesExplicitAuthorizationForOtherAuthenticationTypes() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set("spark.sql.gravitino.lanceREST.uri", "rest-uri")
+            .set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "oauth2")
+            .set(
+                "spark.sql.gravitino.lanceREST.catalogProperties.headers.Authorization",
+                "Bearer discovery-token")
+            .set(CATALOG_PREFIX + "catalog_a.headers.Authorization", "Bearer catalog-token");
+
+    driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
+
+    assertEquals("Bearer discovery-token", LanceAuthProvider.discoveryAuthorization);
+    assertEquals(
+        "Bearer catalog-token", sparkConf.get(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLancePreservesExplicitAuthorization() {
+    SparkConf sparkConf =
+        new SparkConf(false)
+            .set("spark.sql.gravitino.lanceREST.uri", "rest-uri")
+            .set(
+                "spark.sql.gravitino.lanceREST.catalogProperties.headers.authorization",
+                "Bearer discovery-token")
+            .set(CATALOG_PREFIX + "catalog_a.headers.AUTHORIZATION", "Bearer catalog-token");
+
+    driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
+
+    assertEquals("Bearer discovery-token", LanceAuthProvider.discoveryAuthorization);
+    assertEquals(
+        "Bearer catalog-token", sparkConf.get(CATALOG_PREFIX + "catalog_a.headers.AUTHORIZATION"));
+    assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a.headers.authorization"));
+    assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLanceWithoutHadoopUserDoesNotGenerateAuthorization() {
+    for (String userName : Arrays.asList(null, "", "  ")) {
+      SparkConf sparkConf =
+          new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
+
+      driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), userName);
+
+      assertNull(LanceAuthProvider.discoveryAuthorization);
+      assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+    }
+  }
+
+  @Test
+  void testHadoopUserDoesNotChangeOtherFormats() {
+    SparkConf sparkConf = baseConf();
+
+    driver().initialize(sparkConf, providerClasses("fake", FakeProvider.class), "etuser");
+
+    assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLanceEncodesHadoopUserAsUtf8() {
+    SparkConf sparkConf = new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
+
+    driver()
+        .initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "\u7528\u6237");
+
+    assertEquals("Basic 55So5oi3OnVudXNlZA==", LanceAuthProvider.discoveryAuthorization);
   }
 
   @Test
@@ -465,6 +578,30 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     @Override
     public String[] sparkExtensions() {
       return new String[] {Runnable.class.getName()};
+    }
+  }
+
+  static class LanceAuthProvider extends FakeProvider {
+
+    private static String discoveryAuthorization;
+
+    /** Creates the Lance provider that records discovery authentication. */
+    public LanceAuthProvider() {}
+
+    @Override
+    public String format() {
+      return "lance";
+    }
+
+    @Override
+    public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
+      discoveryAuthorization =
+          catalogProperties.entrySet().stream()
+              .filter(entry -> "headers.Authorization".equalsIgnoreCase(entry.getKey()))
+              .map(Map.Entry::getValue)
+              .findFirst()
+              .orElse(null);
+      return super.listCatalogs(uri, catalogProperties);
     }
   }
 

@@ -79,6 +79,25 @@ Set `spark.sql.gravitino.lanceREST.catalogProperties.namespaceDelimiter` when th
 server uses a namespace delimiter other than the default `$`. The property is used for the
 discovery request and is also copied to each discovered catalog.
 
+### User identity
+
+When `spark.sql.gravitino.authType` is `simple` (the default), the discovery plugin reads
+`HADOOP_USER_NAME` from the Spark driver environment and automatically supplies
+`headers.Authorization` using HTTP Basic with the UTF-8 encoded value `<user>:unused`.
+The same header is used for catalog discovery and copied to
+each automatically registered Lance catalog. No additional user variable or manually encoded header
+is required. The `unused` password is a placeholder; simple authentication does not validate it.
+
+An explicit `spark.sql.gravitino.lanceREST.catalogProperties.headers.Authorization` takes precedence
+over the environment-derived default. A per-catalog `spark.sql.catalog.<name>.headers.Authorization`
+overrides the header for that catalog's operations, but does not apply to catalog discovery.
+When `HADOOP_USER_NAME` is missing or blank, or `spark.sql.gravitino.authType` is not `simple`, no
+authentication header is generated. Other authentication mechanisms should use explicitly configured
+credentials. The shared `authType` setting describes Gravitino authentication; it does not discover
+the Lance REST server's authentication mechanism. If a standalone Lance REST server uses a different
+mechanism, configure its authentication header explicitly. User-defined catalogs that skip automatic
+registration must continue to configure their own authentication.
+
 ## Registration policy
 
 By default, every discovered catalog is registered under its discovered name. To filter or rename

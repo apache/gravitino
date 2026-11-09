@@ -63,6 +63,12 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
 
     ApiClient apiClient = new ApiClient().setBasePath(normalizeUri(uri));
     try (Closeable httpClient = getHttpClient(apiClient)) {
+      catalogProperties.forEach(
+          (key, value) -> {
+            if (StringUtils.startsWithIgnoreCase(key, "headers.")) {
+              apiClient.addDefaultHeader(key.substring("headers.".length()), value);
+            }
+          });
       NamespaceApi namespaceApi = new NamespaceApi(apiClient);
       do {
         ListNamespacesResponse response =

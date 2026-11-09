@@ -24,8 +24,10 @@ import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.removeDup
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -35,7 +37,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
@@ -84,6 +89,14 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf, Map<String, String> providerClassNames) {
+    initialize(sparkConf, providerClassNames, System.getenv("HADOOP_USER_NAME"));
+  }
+
+  @VisibleForTesting
+  void initialize(
+      SparkConf sparkConf,
+      Map<String, String> providerClassNames,
+      @Nullable String hadoopUserName) {
     validatePluginOrder(sparkConf);
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
@@ -105,6 +118,18 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
+          if ("lance".equals(format)
+              && AuthProperties.isSimple(
+                  userConf.get(
+                      GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE))
+              && StringUtils.isNotBlank(hadoopUserName)
+              && globalProperties.keySet().stream()
+                  .noneMatch("headers.Authorization"::equalsIgnoreCase)) {
+            String credentials =
+                Base64.getEncoder()
+                    .encodeToString((hadoopUserName + ":unused").getBytes(StandardCharsets.UTF_8));
+            globalProperties.put("headers.Authorization", "Basic " + credentials);
+          }
           List<String> discoveredCatalogs = listCatalogs(provider, format, uri, globalProperties);
           if (discoveredCatalogs.isEmpty()) {
             LOG.warn("Discovered no {} REST catalog from {}.", format, uri);
@@ -438,7 +463,11 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
       registration.properties.forEach(
           (key, value) -> {
             String sparkConfigKey = catalogPrefix + "." + key;
-            if (!userConf.contains(sparkConfigKey)) {
+            boolean explicitAuthorization =
+                "headers.Authorization".equalsIgnoreCase(key)
+                    && Arrays.stream(userConf.getAllWithPrefix(catalogPrefix + "."))
+                        .anyMatch(entry -> "headers.Authorization".equalsIgnoreCase(entry._1));
+            if (!userConf.contains(sparkConfigKey) && !explicitAuthorization) {
               sparkConf.set(sparkConfigKey, value);
             }
           });

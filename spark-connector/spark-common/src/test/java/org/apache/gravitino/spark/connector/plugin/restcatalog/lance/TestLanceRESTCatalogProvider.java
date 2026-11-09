@@ -32,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -104,6 +105,35 @@ public class TestLanceRESTCatalogProvider {
     assertEquals(Collections.singletonList("catalog_a"), catalogs);
     assertEquals(1, rawQueries.size());
     assertTrue(rawQueries.get(0).contains("delimiter=%23"));
+  }
+
+  @Test
+  void testDiscoverySendsConfiguredHeadersOnEveryPage() {
+    List<String> authorizationHeaders = new CopyOnWriteArrayList<>();
+    List<String> customHeaders = new CopyOnWriteArrayList<>();
+    server.createContext(
+        "/lance/v1/namespace/$/list",
+        exchange -> {
+          authorizationHeaders.add(exchange.getRequestHeaders().getFirst("Authorization"));
+          customHeaders.add(exchange.getRequestHeaders().getFirst("X-Test-User"));
+          if (authorizationHeaders.size() == 1) {
+            respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"],\"page_token\":\"next\"}");
+          } else {
+            respond(exchange, 200, "{\"namespaces\":[\"catalog_b\"]}");
+          }
+        });
+    server.start();
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("headers.authorization", "Basic ZXR1c2VyOnVudXNlZA==");
+    properties.put("headers.X-Test-User", "etuser");
+
+    List<String> catalogs = new LanceRESTCatalogProvider().listCatalogs(serverUri, properties);
+
+    assertEquals(Arrays.asList("catalog_a", "catalog_b"), catalogs);
+    assertEquals(
+        Arrays.asList("Basic ZXR1c2VyOnVudXNlZA==", "Basic ZXR1c2VyOnVudXNlZA=="),
+        authorizationHeaders);
+    assertEquals(Arrays.asList("etuser", "etuser"), customHeaders);
   }
 
   @Test
