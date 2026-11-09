@@ -26,9 +26,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.iceberg.Snapshot;
@@ -36,6 +38,8 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for expiring old snapshots from Iceberg tables.
@@ -43,11 +47,16 @@ import org.apache.spark.sql.SparkSession;
  * <p>This job leverages Iceberg's ExpireSnapshots procedure to remove snapshot metadata and
  * associated data files that are no longer needed, preventing unbounded metadata growth.
  */
-public class IcebergExpireSnapshotsJob implements BuiltInJob {
+public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenanceAction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergExpireSnapshotsJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
   private static final String VERSION = "v1";
+
+  /** Full table inventory captured before expire; used to compute S1 set-diff. */
+  @Nullable private PreExpireData preExpireData;
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -158,18 +167,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
-      // Build the procedure call SQL
-      String sql =
-          buildProcedureCall(catalogName, tableIdentifier, olderThan, retainLast, streamResults);
-
-      System.out.println("Executing Iceberg expire_snapshots procedure: " + sql);
-
-      // Execute the procedure
-      Row[] results = (Row[]) spark.sql(sql).collect();
-
-      // Print results
-      if (results.length > 0) {
-        Row result = results[0];
+      List<Row> results =
+          execute(spark, catalogName, tableIdentifier, olderThan, retainLast, streamResults);
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
         System.out.printf(
             "Expire Snapshots Results:%n"
                 + "  Deleted data files: %d%n"
@@ -186,6 +187,77 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     } finally {
       spark.stop();
     }
+  }
+
+  /**
+   * Runs {@code expire_snapshots} on an existing Spark session. Shared by CLI {@link #main} and TMS
+   * {@link #executeAndCollectAfter}.
+   *
+   * @return procedure result rows
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String olderThan,
+      @Nullable String retainLast,
+      boolean streamResults) {
+    validateRetainLast(retainLast);
+    String sql =
+        buildProcedureCall(catalogName, tableIdentifier, olderThan, retainLast, streamResults);
+    LOG.info("Executing Iceberg expire_snapshots: {}", sql);
+    return spark.sql(sql).collectAsList();
+  }
+
+  @Override
+  public boolean hasBeforeMetrics() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId =
+        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
+    preExpireData = collectTableData(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload = expireBeforeMetrics(preExpireData.snapshotCount());
+    return new TableSnapshotMetrics(snapshotId, IcebergMaintenanceMetrics.toJson(payload));
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return false;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before) {
+    List<Row> results =
+        execute(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("retain-last")),
+            parseStreamResults(
+                IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("stream-results"))));
+    if (!results.isEmpty()) {
+      LOG.info(
+          "Expire snapshots deleted data/manifest/manifest-list files: {}/{}/{}",
+          results.get(0).getLong(0),
+          results.get(0).getLong(1),
+          results.get(0).getLong(2));
+    }
+    PreExpireData after = collectTableData(spark, catalogName, tableIdentifier);
+    PreExpireData beforeData = preExpireData == null ? after : preExpireData;
+    preExpireData = null;
+    return new TableSnapshotMetrics(
+        IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
+        IcebergMaintenanceMetrics.toJson(expireAfterMetrics(beforeData, after)));
   }
 
   /**
@@ -347,16 +419,17 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   // -------------------------------------------------------------------------
 
   /**
-   * Snapshot-expiry inventory for TMS S0 and set-difference S1. Concurrent commits only add
-   * ids/paths to the after set; cleared/expired count ids/paths that disappeared. File sizes stay
-   * in memory for S1 set-diff and are not reported in S0 metrics.
+   * Full table inventory before expire (all snapshot ids and reachable files). Used with a
+   * post-expire capture to compute S1 set-diff. Concurrent commits only add ids/paths to the after
+   * set; cleared/expired count ids/paths that disappeared. File sizes stay in memory for S1 and are
+   * not reported in S0 metrics.
    */
   @VisibleForTesting
-  static final class ExpireInventory {
+  static final class PreExpireData {
     private final Set<Long> snapshotIds;
     private final Map<String, Long> fileSizesByPath;
 
-    ExpireInventory(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
+    PreExpireData(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
       this.snapshotIds = Collections.unmodifiableSet(new HashSet<>(snapshotIds));
       this.fileSizesByPath = Collections.unmodifiableMap(new HashMap<>(fileSizesByPath));
     }
@@ -382,7 +455,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(ExpireInventory before, ExpireInventory after) {
+  static Map<String, Object> expireAfterMetrics(PreExpireData before, PreExpireData after) {
     return expireAfterMetrics(
         snapshotsCleared(before.snapshotIds(), after.snapshotIds()),
         bytesReclaimed(before.fileSizesByPath(), after.fileSizesByPath()));
@@ -420,13 +493,14 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
   }
 
   /**
-   * Collects expire inventory for TMS. CLI entry points never call this.
+   * Collects full table data (snapshot ids + reachable files) for TMS set-diff. CLI entry points
+   * never call this.
    *
    * <p>Uses {@code all_files} metadata SQL (same style as compaction's {@code files} SQL) plus
    * Iceberg snapshot ids.
    */
   @VisibleForTesting
-  static ExpireInventory collectExpireInventory(
+  static PreExpireData collectTableData(
       SparkSession spark, String catalogName, String tableIdentifier) {
     Set<Long> snapshotIds = new HashSet<>();
     for (Snapshot snapshot : loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
@@ -443,7 +517,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
       Number size = row.getAs("file-size");
       fileSizesByPath.put(path, size == null ? 0L : size.longValue());
     }
-    return new ExpireInventory(snapshotIds, fileSizesByPath);
+    return new PreExpireData(snapshotIds, fileSizesByPath);
   }
 
   /**

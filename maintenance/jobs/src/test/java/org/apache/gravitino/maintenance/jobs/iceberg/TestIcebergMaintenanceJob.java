@@ -83,11 +83,23 @@ public class TestIcebergMaintenanceJob {
 
   @Test
   public void testSnapshotDriftGateOnlyForCompactionAndManifest() {
-    assertTrue(
-        IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REWRITE_DATA_FILES));
-    assertTrue(IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REWRITE_MANIFESTS));
-    assertFalse(IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.EXPIRE_SNAPSHOTS));
+    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_DATA_FILES));
+    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_MANIFESTS));
+    assertFalse(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.EXPIRE_SNAPSHOTS));
     assertFalse(
-        IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REMOVE_ORPHAN_FILES));
+        IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REMOVE_ORPHAN_FILES));
+  }
+
+  @Test
+  public void testMaintenanceActionsWireToJobClasses() {
+    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action() instanceof IcebergRewriteDataFilesJob);
+    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action() instanceof IcebergRewriteManifestsJob);
+    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action() instanceof IcebergExpireSnapshotsJob);
+    assertTrue(MaintenanceType.REMOVE_ORPHAN_FILES.action() instanceof IcebergRemoveOrphanFilesJob);
+
+    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action().hasBeforeMetrics());
+    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action().hasBeforeMetrics());
+    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action().hasBeforeMetrics());
+    assertFalse(MaintenanceType.REMOVE_ORPHAN_FILES.action().hasBeforeMetrics());
   }
 }

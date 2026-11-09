@@ -24,13 +24,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for rewriting Iceberg table data files.
@@ -38,7 +42,9 @@ import org.apache.spark.sql.SparkSession;
  * <p>This job leverages Iceberg's RewriteDataFilesProcedure to optimize data file layout through
  * binpack or sort strategies. Z-order is a type of sort order, not a strategy.
  */
-public class IcebergRewriteDataFilesJob implements BuiltInJob {
+public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanceAction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRewriteDataFilesJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
@@ -162,44 +168,12 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
-      // Build the procedure call SQL
-      String sql =
-          buildProcedureCall(
-              catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
-
-      System.out.println("Executing Iceberg rewrite_data_files procedure: " + sql);
-
-      // Execute the procedure
-      Row[] results = (Row[]) spark.sql(sql).collect();
-
-      // Print results
-      if (results.length > 0) {
-        Row result = results[0];
-        // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
-        if (result.size() >= 5) {
-          System.out.printf(
-              "Rewrite Data Files Results:%n"
-                  + "  Rewritten data files: %d%n"
-                  + "  Added data files: %d%n"
-                  + "  Rewritten bytes: %d%n"
-                  + "  Failed data files: %d%n"
-                  + "  Removed delete files: %d%n",
-              result.getInt(0),
-              result.getInt(1),
-              result.getLong(2),
-              result.getInt(3),
-              result.getInt(4));
-        } else {
-          System.out.printf(
-              "Rewrite Data Files Results:%n"
-                  + "  Rewritten data files: %d%n"
-                  + "  Added data files: %d%n"
-                  + "  Rewritten bytes: %d%n"
-                  + "  Failed data files: %d%n",
-              result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
-        }
+      List<Row> results =
+          execute(
+              spark, catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
+      if (!results.isEmpty()) {
+        printRewriteResults(results.get(0));
       }
-
       System.out.println("Rewrite data files job completed successfully");
     } catch (Exception e) {
       System.err.println("Error executing rewrite data files job: " + e.getMessage());
@@ -207,6 +181,32 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       System.exit(1);
     } finally {
       spark.stop();
+    }
+  }
+
+  private static void printRewriteResults(Row result) {
+    // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
+    if (result.size() >= 5) {
+      System.out.printf(
+          "Rewrite Data Files Results:%n"
+              + "  Rewritten data files: %d%n"
+              + "  Added data files: %d%n"
+              + "  Rewritten bytes: %d%n"
+              + "  Failed data files: %d%n"
+              + "  Removed delete files: %d%n",
+          result.getInt(0),
+          result.getInt(1),
+          result.getLong(2),
+          result.getInt(3),
+          result.getInt(4));
+    } else {
+      System.out.printf(
+          "Rewrite Data Files Results:%n"
+              + "  Rewritten data files: %d%n"
+              + "  Added data files: %d%n"
+              + "  Rewritten bytes: %d%n"
+              + "  Failed data files: %d%n",
+          result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
     }
   }
 
@@ -402,8 +402,70 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 
+  /**
+   * Runs {@code rewrite_data_files} on an existing Spark session. Shared by CLI {@link #main} and
+   * TMS {@link #executeAndCollectAfter}.
+   *
+   * @return procedure result rows
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String strategy,
+      @Nullable String sortOrder,
+      @Nullable String whereClause,
+      @Nullable String optionsJson) {
+    validateStrategy(strategy);
+    String sql =
+        buildProcedureCall(
+            catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
+    LOG.info("Executing Iceberg rewrite_data_files: {}", sql);
+    return spark.sql(sql).collectAsList();
+  }
+
+  @Override
+  public boolean hasBeforeMetrics() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId =
+        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    return new TableSnapshotMetrics(snapshotId, IcebergMaintenanceMetrics.toJson(payload));
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before) {
+    execute(
+        spark,
+        catalogName,
+        tableIdentifier,
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("strategy")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("sort-order")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
+    return new TableSnapshotMetrics(
+        IcebergMaintenanceSnapshots.requireCurrentId(spark, catalogName, tableIdentifier),
+        IcebergMaintenanceMetrics.toJson(
+            collectCompactionMetrics(spark, catalogName, tableIdentifier)));
+  }
+
   // -------------------------------------------------------------------------
-  // TMS metrics helpers (not used by CLI {@link #main} / {@link #run})
+  // TMS metrics helpers (not used by CLI {@link #main})
   // -------------------------------------------------------------------------
 
   /**

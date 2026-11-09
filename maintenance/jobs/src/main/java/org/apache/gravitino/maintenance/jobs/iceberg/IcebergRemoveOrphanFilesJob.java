@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.model.TableSnapshotMetrics;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
@@ -51,7 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Removes unreferenced Iceberg files after validating the requested scan location. */
-public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
+public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenanceAction {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
@@ -155,8 +156,56 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   }
 
   /**
-   * TMS-only path: dry-run list → FileIO sizes → optional real delete. CLI {@link #main} never
-   * calls this.
+   * TMS path: builds options from job args then runs {@link #executeWithMetrics(SparkSession,
+   * Map)}.
+   */
+  static OrphanCleanupResult executeWithMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier, Map<String, String> jobArgs)
+      throws IOException, AnalysisException {
+    Map<String, String> options = new HashMap<>();
+    options.put("catalog", catalogName);
+    options.put("table", tableIdentifier);
+    putIfPresent(options, "older-than", jobArgs.get("older-than"));
+    putIfPresent(options, "location", jobArgs.get("location"));
+    putIfPresent(options, "dry-run", jobArgs.get("dry-run"));
+    return executeWithMetrics(spark, options);
+  }
+
+  @Override
+  public boolean hasBeforeMetrics() {
+    return false;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return false;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before)
+      throws Exception {
+    OrphanCleanupResult orphan =
+        executeWithMetrics(spark, catalogName, tableIdentifier, argsByName);
+    return new TableSnapshotMetrics(
+        IcebergMaintenanceSnapshots.currentIdOrEmpty(spark, catalogName, tableIdentifier),
+        IcebergMaintenanceMetrics.toJson(
+            orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed())));
+  }
+
+  /**
+   * TMS-only path: dry-run list → FileIO sizes → optional real delete. CLI {@link #main} uses
+   * {@link #execute(SparkSession, Map)} instead (single procedure call, no byte measurement).
    */
   static OrphanCleanupResult executeWithMetrics(SparkSession spark, Map<String, String> options)
       throws IOException, AnalysisException {
@@ -364,6 +413,13 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
     }
     RemoteLocationValidator.validate(
         spark.sparkContext().hadoopConfiguration(), tableLocation, location);
+  }
+
+  private static void putIfPresent(Map<String, String> target, String key, @Nullable String raw) {
+    String value = IcebergJobUtils.nullIfUnresolvedPlaceholder(raw);
+    if (value != null && !value.isEmpty()) {
+      target.put(key, value);
+    }
   }
 
   private static String requireOption(Map<String, String> options, String key) {
