@@ -294,6 +294,27 @@ paths:
   /metalakes/{metalake}/secrets/providers:
     $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1secrets~1providers"
 
+  /metalakes/{metalake}/domains/{domain}/objects:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1objects"
+
+  /metalakes/{metalake}/objects/{type}/{fullName}/domains:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7Btype%7D~1%7BfullName%7D~1domains"
+
+  /metalakes/{metalake}/domains:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains"
+
+  /metalakes/{metalake}/domains/{domain}:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D"
+
+  /metalakes/{metalake}/domains/{domain}/parent:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1parent"
+
+  /metalakes/{metalake}/domains/{domain}/backingTag:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1backingTag"
+
+  /metalakes/{metalake}/domains/{domain}/subdomains:
+    $ref: "./domains.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1domains~1%7Bdomain%7D~1subdomains"
+
 components:
 
   schemas:
