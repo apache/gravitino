@@ -581,6 +581,53 @@ public class TestAccessControlManagerForPermissions {
         List.of(Privileges.CreateTable.allow()), role.securableObjects().get(0).privileges());
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "CREATE_MODEL,REGISTER_MODEL",
+    "REGISTER_MODEL,CREATE_MODEL",
+    "CREATE_MODEL_VERSION,LINK_MODEL_VERSION",
+    "LINK_MODEL_VERSION,CREATE_MODEL_VERSION"
+  })
+  void testEquivalentGrantPreservesStoredDuplicatePrivileges(
+      Privilege.Name heldName, Privilege.Name grantedName)
+      throws IOException, IllegalAccessException {
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    MetadataObject object = MetadataObjects.parse(METALAKE, MetadataObject.Type.METALAKE);
+    for (Privilege.Condition condition : Privilege.Condition.values()) {
+      Privilege held =
+          condition == Privilege.Condition.ALLOW
+              ? Privileges.allow(heldName)
+              : Privileges.deny(heldName);
+      Privilege granted =
+          condition == Privilege.Condition.ALLOW
+              ? Privileges.allow(grantedName)
+              : Privileges.deny(grantedName);
+      for (boolean aliasDuplicate : new boolean[] {false, true}) {
+        String name = "duplicates_" + heldName + "_" + condition + "_" + aliasDuplicate;
+        List<Privilege> stored = List.of(held, aliasDuplicate ? granted : held);
+        SecurableObject storedObject = SecurableObjects.parse(METALAKE, object.type(), stored);
+        // Simulate stored duplicates without the constructor's automatic deduplication.
+        FieldUtils.writeField(storedObject, "privileges", stored, true);
+        entityStore.put(
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName(name)
+                .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(List.of(storedObject))
+                .build(),
+            false);
+        reset(authorizationPlugin);
+        Role role = manager.grantPrivilegesToRole(METALAKE, name, object, Set.of(granted));
+        Assertions.assertEquals(stored, role.securableObjects().get(0).privileges());
+        Assertions.assertEquals(
+            stored,
+            accessControlManager.getRole(METALAKE, name).securableObjects().get(0).privileges());
+        Mockito.verifyNoInteractions(authorizationPlugin);
+      }
+    }
+  }
+
   @Test
   public void testGrantPrivilegeToRole() {
     reset(authorizationPlugin);

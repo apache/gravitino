@@ -477,10 +477,11 @@ class PermissionManager {
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
     Set<Privilege> updatePrivileges = Sets.newHashSet(targetObject.privileges());
-    Set<Privilege> canonicalPrivileges =
+    Set<Privilege> existingCanonicalPrivileges =
         targetObject.privileges().stream()
             .map(p -> AuthorizationUtils.replaceLegacyPrivilege(p.name(), p.condition()))
             .collect(Collectors.toSet());
+    Set<Privilege> canonicalPrivileges = Sets.newHashSet(existingCanonicalPrivileges);
     for (Privilege privilege : privileges) {
       if (canonicalPrivileges.add(
           AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()))) {
@@ -488,7 +489,7 @@ class PermissionManager {
       }
     }
     // Preserve the stored spelling when an equivalent privilege is already held.
-    if (updatePrivileges.size() == targetObject.privileges().size()) {
+    if (canonicalPrivileges.equals(existingCanonicalPrivileges)) {
       return targetObject;
     } else {
       AuthorizationUtils.checkDuplicatedNamePrivilege(updatePrivileges);

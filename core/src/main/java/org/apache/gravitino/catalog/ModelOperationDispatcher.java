@@ -57,7 +57,10 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   }
 
   /**
-   * Checks whether a model exists in a catalog that supports models.
+   * Checks whether a model exists, treating catalogs without model operations as empty.
+   *
+   * <p>Metadata-object validation uses this probe to report a missing model as a client error.
+   * Model operations such as {@link #getModel(NameIdentifier)} still reject unsupported catalogs.
    *
    * @param ident the model identifier
    * @return whether the model exists

@@ -101,6 +101,7 @@ class TestCatalogObjectExistence {
   @Test
   void testUnsupportedCatalogObjectsReturnNotFound() {
     when(catalog.ops()).thenReturn(mock(CatalogOperations.class));
+    Assertions.assertFalse(models.modelExists(IDENT));
     GravitinoEnv env = mock(GravitinoEnv.class);
     when(env.internalFilesetDispatcher())
         .thenReturn(new FilesetNormalizeDispatcher(filesets, manager));
