@@ -464,19 +464,10 @@ public class DorisTableOperations extends JdbcTableOperations {
                       requireSingleTopLevelIndexField(index.name(), index.fieldNames());
                   String usingClause = mapIndexTypeToUsingClause(index.type());
                   if (usingClause.isEmpty()) {
-<<<<<<< HEAD
-                    return String.format("INDEX `%s` (`%s`)", index.name(), fieldName);
+                    return String.format("INDEX %s (%s)", quote(index.name()), quote(fieldName));
                   }
                   return String.format(
-                      "INDEX `%s` (`%s`) %s", index.name(), fieldName, usingClause);
-=======
-                    return String.format("INDEX %s (%s)", quote(index.name()), quote(fieldName))
-                        + propertiesSql;
-                  }
-                  return String.format(
-                          "INDEX %s (%s) %s", quote(index.name()), quote(fieldName), usingClause)
-                      + propertiesSql;
->>>>>>> 85a0501f2 ([#14762] fix(jdbc): Safely quote existing native table and column names (#14764))
+                      "INDEX %s (%s) %s", quote(index.name()), quote(fieldName), usingClause);
                 })
             .collect(Collectors.joining(",\n"));
 
@@ -942,12 +933,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       return "";
     }
     // Return the generated SQL statement
-<<<<<<< HEAD
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
-=======
-    String result =
-        "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", nonEmptyAlterSql) + ";";
->>>>>>> 85a0501f2 ([#14762] fix(jdbc): Safely quote existing native table and column names (#14764))
+    String result = "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
@@ -1283,18 +1269,10 @@ public class DorisTableOperations extends JdbcTableOperations {
         requireSingleTopLevelIndexField(addIndex.getName(), addIndex.getFieldNames());
     String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
     if (usingClause.isEmpty()) {
-<<<<<<< HEAD
-      return String.format("ADD INDEX `%s` (`%s`)", addIndex.getName(), fieldName);
-    }
-    return String.format("ADD INDEX `%s` (`%s`) %s", addIndex.getName(), fieldName, usingClause);
-=======
-      return String.format("ADD INDEX %s (%s)", quote(addIndex.getName()), quote(fieldName))
-          + propertiesSql;
+      return String.format("ADD INDEX %s (%s)", quote(addIndex.getName()), quote(fieldName));
     }
     return String.format(
-            "ADD INDEX %s (%s) %s", quote(addIndex.getName()), quote(fieldName), usingClause)
-        + propertiesSql;
->>>>>>> 85a0501f2 ([#14762] fix(jdbc): Safely quote existing native table and column names (#14764))
+        "ADD INDEX %s (%s) %s", quote(addIndex.getName()), quote(fieldName), usingClause);
   }
 
   static String deleteIndexDefinition(

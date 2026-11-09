@@ -483,23 +483,10 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       TableChange.UpdateColumnPosition updateColumnPosition =
           (TableChange.UpdateColumnPosition) change;
-<<<<<<< HEAD
-      if (updateColumnPosition.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        String afterFieldName =
-            applyCaseSensitiveOnName(
-                Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        applyExistingColumnName(afterFieldName, capabilities);
-        return TableChange.updateColumnPosition(
-            fieldName, TableChange.ColumnPosition.after(afterFieldName));
-      }
-      return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
-=======
       return TableChange.updateColumnPosition(
           fieldName,
           normalizeColumnPosition(
               updateColumnPosition.getPosition(), capabilities, fieldName.length == 1));
->>>>>>> 85a0501f2 ([#14762] fix(jdbc): Safely quote existing native table and column names (#14764))
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return TableChange.updateColumnType(
@@ -512,9 +499,10 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.AddColumn addColumn, Capability capabilities) {
+    String[] fieldName = applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities);
     Column column =
         Column.of(
-            addColumn.fieldName()[0],
+            fieldName[0],
             addColumn.getDataType(),
             addColumn.getComment(),
             addColumn.isNullable(),
@@ -528,10 +516,10 @@ public class CapabilityHelpers {
       applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
     } else {
       // For a nested addition the first component names an existing parent column.
-      applyExistingColumnName(addColumn.fieldName()[0], capabilities);
+      applyExistingColumnName(fieldName[0], capabilities);
     }
     return TableChange.addColumn(
-        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        fieldName,
         column.dataType(),
         column.comment(),
         normalizeColumnPosition(addColumn.getPosition(), capabilities, topLevel),
@@ -545,10 +533,11 @@ public class CapabilityHelpers {
     // Nested siblings follow the connector's own field rules rather than top-level name rules.
     if (position instanceof TableChange.After && topLevel) {
       // AFTER identifies an existing sibling; it does not introduce a new column name.
-      String afterColumn = ((TableChange.After) position).getColumn();
+      String afterColumn =
+          applyCaseSensitiveOnName(
+              Capability.Scope.COLUMN, ((TableChange.After) position).getColumn(), capabilities);
       applyExistingColumnName(afterColumn, capabilities);
-      return TableChange.ColumnPosition.after(
-          applyCaseSensitiveOnName(Capability.Scope.COLUMN, afterColumn, capabilities));
+      return TableChange.ColumnPosition.after(afterColumn);
     }
     return position;
   }
