@@ -48,7 +48,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-manifests";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v1";
 
   @Override
   public SparkJobTemplate jobTemplate() {

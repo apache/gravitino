@@ -71,7 +71,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-maintenance-task";
 
   // Bump when template behavior / args / class wiring changes (required by built-in registration).
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v1";
 
   /** JobConf: one wire name, or comma-separated commit chain. */
   public static final String MAINTENANCE_TYPES_KEY = "maintenance_types";

@@ -46,7 +46,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v1";
 
   @Override
   public SparkJobTemplate jobTemplate() {

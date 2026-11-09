@@ -54,7 +54,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRemoveOrphanFilesJob.class);
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-remove-orphan-files";
-  private static final String VERSION = "v4";
+  private static final String VERSION = "v1";
 
   /** TMS S1: orphan files removed (or found in dry-run). */
   public static final String REMOVED_ORPHAN_NUMBER_METRIC = "custom-removed-orphan-number";
