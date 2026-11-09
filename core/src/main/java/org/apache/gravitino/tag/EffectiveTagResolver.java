@@ -300,8 +300,9 @@ public class EffectiveTagResolver {
       case TOPIC:
       case MODEL:
       case SEMANTIC_MODEL:
-        // Check existence using the original request first. Normalizing an already unquoted name
-        // again can change its meaning, so each lookup starts from the original chain node.
+        // resolveWithSources checks the original requested objects before building the chain.
+        // Normalize each original chain node: normalizing an already unquoted name again can
+        // change its meaning.
         NameIdentifier identifier =
             CapabilityHelpers.normalizeMetadataIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, object),
