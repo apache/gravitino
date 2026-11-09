@@ -54,6 +54,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
@@ -100,6 +101,7 @@ public class TestRoleOperations extends BaseOperationsTest {
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private static final TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
   private static final FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+  private static final ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
   private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -133,6 +135,8 @@ public class TestRoleOperations extends BaseOperationsTest {
         GravitinoEnv.getInstance(), "internalTopicDispatcher", topicDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalFilesetDispatcher", filesetDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalModelDispatcher", modelDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -218,6 +222,39 @@ public class TestRoleOperations extends BaseOperationsTest {
       Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
       Assertions.assertTrue(error.getMessage().contains("a.b"));
     }
+    verify(manager, never()).createRole(any(), any(), any(), any());
+  }
+
+  @Test
+  void testCreateRoleRejectsMissingModel() throws IOException {
+    clearInvocations(manager, modelDispatcher);
+    when(modelDispatcher.modelExists(any())).thenReturn(false);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    SecurableObject model =
+        SecurableObjects.parse(
+            "catalog.schema.model",
+            MetadataObject.Type.MODEL,
+            Lists.newArrayList(Privileges.UseModel.allow()));
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "model_role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(model)});
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("catalog.schema.model"));
+    }
+    verify(modelDispatcher).modelExists(any());
     verify(manager, never()).createRole(any(), any(), any(), any());
   }
 

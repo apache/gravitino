@@ -22,8 +22,11 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
@@ -48,6 +51,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
@@ -90,6 +94,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
   private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -115,6 +120,8 @@ public class TestPermissionOperations extends BaseOperationsTest {
         GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalModelDispatcher", modelDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -571,6 +578,36 @@ public class TestPermissionOperations extends BaseOperationsTest {
     errorResponse = nsrResponse.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
     Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  void testGrantPrivilegeRejectsMissingModel() throws IOException {
+    clearInvocations(manager, modelDispatcher);
+    when(modelDispatcher.modelExists(any())).thenReturn(false);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    PrivilegeGrantRequest request =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.USE_MODEL)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+    try (Response response =
+        target("/metalakes/metalake1/permissions/roles/role1/model/catalog.schema.model/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains("catalog.schema.model"));
+    }
+    verify(modelDispatcher).modelExists(any());
+    verify(manager, never()).grantPrivilegeToRole(any(), any(), any(), any());
   }
 
   @Test
