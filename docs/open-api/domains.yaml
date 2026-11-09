@@ -45,7 +45,7 @@ paths:
                   - $ref: "#/components/schemas/DomainNameListResponse"
                   - $ref: "#/components/schemas/DomainListResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake does not exist.
           content:
             application/json:
               schema:
@@ -80,7 +80,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake, requested parent domain, or existing backing tag to bind does not exist.
           content:
             application/json:
               schema:
@@ -112,7 +112,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DomainResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake or domain does not exist.
           content:
             application/json:
               schema:
@@ -147,7 +147,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake or domain does not exist.
           content:
             application/json:
               schema:
@@ -182,7 +182,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake or domain does not exist.
           content:
             application/json:
               schema:
@@ -213,7 +213,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DomainDropResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake does not exist. An absent domain returns HTTP 200 with dropped=false.
           content:
             application/json:
               schema:
@@ -253,7 +253,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake, domain, or requested parent domain does not exist.
           content:
             application/json:
               schema:
@@ -282,7 +282,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake or domain does not exist.
           content:
             application/json:
               schema:
@@ -322,7 +322,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequestResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake, domain, or supplied backing tag does not exist.
           content:
             application/json:
               schema:
@@ -363,7 +363,7 @@ paths:
                   - $ref: "#/components/schemas/DomainNameListResponse"
                   - $ref: "#/components/schemas/DomainListResponse"
         "404":
-          description: The metalake, domain, parent or backing tag does not exist.
+          description: The metalake or domain does not exist.
           content:
             application/json:
               schema:
