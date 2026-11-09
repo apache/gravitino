@@ -318,6 +318,61 @@ public class TestIcebergCommitValidation {
   }
 
   @Test
+  public void testOptionalFieldCannotBecomeRequired() {
+    // Add optional s (id 2) and make it current; the table already has data without it.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+
+    commitFails(
+        ValidationException.class,
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":true,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertTrue(catalog.loadTable(IDENT).schema().findField(2).isOptional());
+
+    // Allowed: required to optional.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":false,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertTrue(catalog.loadTable(IDENT).schema().findField(1).isOptional());
+  }
+
+  @Test
+  public void testDecimalChangesFollowPromotionRules() {
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\"decimal(10, 2)\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+
+    for (String type : new String[] {"decimal(10, 3)", "decimal(9, 2)"}) {
+      commitFails(
+          ValidationException.class,
+          addSchema(
+              "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                  + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\""
+                  + type
+                  + "\"}"),
+          new MetadataUpdate.SetCurrentSchema(-1));
+    }
+
+    // Allowed: widening precision at the same scale.
+    commit(
+        addSchema(
+            "{\"id\":1,\"name\":\"id\",\"required\":true,\"type\":\"long\"},"
+                + "{\"id\":2,\"name\":\"d\",\"required\":false,\"type\":\"decimal(12, 2)\"}"),
+        new MetadataUpdate.SetCurrentSchema(-1));
+    Assertions.assertEquals(
+        Types.DecimalType.of(12, 2), catalog.loadTable(IDENT).schema().findType("d"));
+  }
+
+  @Test
   public void testReusingADroppedFieldIdIsRefused() {
     // Schema 1 adds b (id 2); schema 2 drops it; a later schema may not give id 2 to another field.
     commit(
