@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -217,29 +218,41 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
                       .withProperties(current.properties())
                       .withAuditInfo(current.auditInfo())
                       .withColumns(
-                          Arrays.asList(
-                              current.columns().get(0),
-                              ColumnEntity.toColumnEntity(
-                                  columns[1], 1, current.columns().get(1).id(), modified),
-                              ColumnEntity.toColumnEntity(
-                                  columns[2], 2, current.columns().get(2).id(), owned)))
+                          current.columns().stream()
+                              .map(
+                                  column ->
+                                      ColumnEntity.toColumnEntity(
+                                          columns[column.position()],
+                                          column.position(),
+                                          column.id(),
+                                          "modified".equals(column.name())
+                                              ? modified
+                                              : "owned".equals(column.name())
+                                                  ? owned
+                                                  : AuditInfo.EMPTY))
+                              .collect(Collectors.toList()))
                       .build());
       f.tables.importTable(table, ALICE);
       TableEntity stored = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
+      Map<String, ColumnEntity> storedColumns =
+          stored.columns().stream().collect(Collectors.toMap(ColumnEntity::name, column -> column));
       Assertions.assertEquals("alice", stored.auditInfo().creator());
-      Assertions.assertEquals("alice", stored.columns().get(0).auditInfo().creator());
-      Assertions.assertEquals(Instant.EPOCH, stored.columns().get(0).auditInfo().createTime());
-      Assertions.assertEquals("alice", stored.columns().get(1).auditInfo().creator());
+      Assertions.assertEquals("alice", storedColumns.get("missing").auditInfo().creator());
+      Assertions.assertEquals(Instant.EPOCH, storedColumns.get("missing").auditInfo().createTime());
+      Assertions.assertEquals("alice", storedColumns.get("modified").auditInfo().creator());
       Assertions.assertEquals(
-          modified.createTime(), stored.columns().get(1).auditInfo().createTime());
+          modified.createTime(), storedColumns.get("modified").auditInfo().createTime());
       Assertions.assertEquals(
-          modified.lastModifier(), stored.columns().get(1).auditInfo().lastModifier());
+          modified.lastModifier(), storedColumns.get("modified").auditInfo().lastModifier());
       Assertions.assertEquals(
-          modified.lastModifiedTime(), stored.columns().get(1).auditInfo().lastModifiedTime());
-      Assertions.assertEquals(before.columns().get(2), stored.columns().get(2));
-      for (int i = 0; i < columns.length; i++) {
-        ColumnEntity expected = before.columns().get(i);
-        ColumnEntity actual = stored.columns().get(i);
+          modified.lastModifiedTime(),
+          storedColumns.get("modified").auditInfo().lastModifiedTime());
+      Assertions.assertEquals(columns.length, storedColumns.size());
+      for (ColumnEntity expected : before.columns()) {
+        ColumnEntity actual = storedColumns.get(expected.name());
+        if ("owned".equals(expected.name())) {
+          Assertions.assertEquals(expected, actual);
+        }
         Assertions.assertEquals(expected.id(), actual.id());
         Assertions.assertEquals(expected.name(), actual.name());
         Assertions.assertEquals(expected.position(), actual.position());
