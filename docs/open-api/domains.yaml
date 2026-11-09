@@ -1,0 +1,868 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+  # Domain authorization and DRAFT visibility are pending access-control integration.
+  /metalakes/{metalake}/domains:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags: [domain]
+      summary: List domains
+      operationId: listDomains
+      description: >-
+        List domains. Domain authorization and DRAFT visibility are pending access-control integration.
+      parameters:
+        - name: details
+          in: query
+          description: Return domain snapshots instead of names.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DomainNameListResponse"
+                  - $ref: "#/components/schemas/DomainListResponse"
+        "404":
+          description: The metalake does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is not in use.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+    post:
+      tags: [domain]
+      summary: Create a domain
+      operationId: createDomain
+      description: >-
+        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Domain authorization is pending access-control integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainCreateRequest"
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake, requested parent domain, or existing backing tag to bind does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/domains/{domain}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/domain"
+    get:
+      tags: [domain]
+      summary: Get a domain
+      operationId: getDomain
+      description: >-
+        Get a domain. Domain authorization and DRAFT visibility are pending access-control integration.
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is not in use.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+    put:
+      tags: [domain]
+      summary: Alter a domain
+      operationId: alterDomain
+      description: >-
+        Alter a domain. Domain authorization and DRAFT visibility are pending access-control integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainUpdatesRequest"
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+    patch:
+      tags: [domain]
+      summary: Publish or unpublish a domain
+      operationId: setDomainStatus
+      description: >-
+        Sets the domain status and returns its snapshot. Publishing requires a published parent; unpublishing requires no published subdomains. Setting the current status is a no-op. Domain authorization is pending access-control integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainSetRequest"
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+    delete:
+      tags: [domain]
+      summary: Delete a domain
+      operationId: deleteDomain
+      description: >-
+        Deletes only the domain and its parent edge. The backing tag, its assignments and member
+        metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
+        not cascade to subdomains: a domain with subdomains fails with HTTP 409,
+        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent.
+        Domain authorization is pending access-control integration.
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainDropResponse"
+        "404":
+          description: The metalake does not exist. An absent domain returns HTTP 200 with dropped=false.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/domains/{domain}/parent:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/domain"
+    put:
+      tags: [domain]
+      summary: Attach or move a domain
+      operationId: setDomainParent
+      description: >-
+        Attaches the child addressed by this path under a top-level parent, replacing its current parent. The backing tag is unchanged. Domain authorization is pending access-control integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainParentSetRequest"
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake, domain, or requested parent domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+    delete:
+      tags: [domain]
+      summary: Detach a domain
+      operationId: removeDomainParent
+      description: >-
+        Removes the current parent edge and returns the child snapshot. A top-level domain is unchanged. The backing tag is unchanged. Domain authorization is pending access-control integration.
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/domains/{domain}/backingTag:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/domain"
+    put:
+      tags: [domain]
+      summary: Set or remove the backing tag
+      operationId: setDomainBackingTag
+      description: >-
+        Binds an existing tag with an optional exact value, or removes the binding when backingTag is null. Members are not migrated; previous tag assignments remain unchanged. Domain authorization is pending access-control integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainBackingTagSetRequest"
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake, domain, or supplied backing tag does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/domains/{domain}/subdomains:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/domain"
+    get:
+      tags: [domain]
+      summary: List subdomains
+      operationId: listSubdomains
+      description: >-
+        List subdomains. Domain authorization and DRAFT visibility are pending access-control integration.
+      parameters:
+        - name: details
+          in: query
+          description: Return domain snapshots instead of names.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Successful domain operation.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DomainNameListResponse"
+                  - $ref: "#/components/schemas/DomainListResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is not in use.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/domains/{domain}/objects:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - name: domain
+        in: path
+        required: true
+        description: Domain name. Encode slashes as %2F in this path segment.
+        schema:
+          type: string
+    get:
+      tags: [domain]
+      summary: List recorded domain members
+      operationId: listDomainMembers
+      description: >-
+        Lists recorded leaf objects in the domain's scope, including subdomains, once each with
+        all applicable relations. Tagged catalogs and schemas expand to recorded leaves; an empty
+        result does not imply that unrecorded external objects are not members. Filters intersect.
+        No paging or counts are provided. Domain authorization, DRAFT visibility and member access
+        filtering are pending domain access-control integration.
+      parameters:
+        - name: domains
+          in: query
+          description: >-
+            Repeated domain names selecting the union of their scopes. Omit to select the whole
+            scope. Selecting the listed domain also selects its subdomains. Unknown names are
+            ignored; if all supplied names are unknown, the result is empty. Commas are literal
+            characters in names, not separators.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+        - name: types
+          in: query
+          description: Comma-separated leaf types, case-insensitive. Omit to include all supported types.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/MemberType"
+        - name: nameContains
+          in: query
+          description: Nonblank substring of the member's full name, matched case-insensitively.
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: The matching recorded members.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/DomainMemberListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake or domain does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is not in use.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/objects/{type}/{fullName}/domains:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - name: type
+        in: path
+        required: true
+        description: Leaf metadata object type, case-insensitive. Catalogs and schemas are not members.
+        schema:
+          $ref: "#/components/schemas/MemberType"
+      - name: fullName
+        in: path
+        required: true
+        description: Full name of the leaf metadata object, encoded as one path segment.
+        schema:
+          type: string
+    get:
+      tags: [domain]
+      summary: List domains containing a metadata object
+      operationId: listDomainsForMetadataObject
+      description: >-
+        Lists domains whose scopes contain the leaf object, including parents of directly matched
+        subdomains. Detailed responses carry every applicable relation without precedence.
+        Domain authorization, DRAFT visibility and member access filtering are pending domain
+        access-control integration. No paging or counts are provided.
+      parameters:
+        - name: details
+          in: query
+          description: Return domain snapshots with relations instead of names.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Domain names, or snapshots when details is true.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DomainNameListResponse"
+                  - $ref: "#/components/schemas/DomainListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "404":
+          description: The metalake or metadata object does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "409":
+          description: The metalake is not in use.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "#/components/responses/ServerErrorResponse"
+
+components:
+  responses:
+    BadRequestResponse:
+      description: Invalid JSON or domain request parameters.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+    ServerErrorResponse:
+      description: The server could not complete the domain operation.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+  parameters:
+    domain:
+      name: domain
+      in: path
+      required: true
+      description: Domain name. Encode slashes as %2F; reverse proxies must preserve this encoding.
+      schema:
+        type: string
+  schemas:
+    DomainNameListResponse:
+      allOf:
+        - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+        - type: object
+          required: [names]
+
+    MemberType:
+      type: string
+      description: A supported leaf domain member type.
+      enum: [TABLE, VIEW, FILESET, TOPIC, MODEL, SEMANTIC_MODEL]
+
+    DomainRelation:
+      type: object
+      description: One applicable membership relation, with no precedence over other relations.
+      required: [relation]
+      properties:
+        relation:
+          type: string
+          enum: [direct, inherited, via_subdomain]
+        source:
+          description: >-
+            Omitted for DIRECT; the nearest tagged catalog or schema for INHERITED;
+            the subdomain metadata object for VIA_SUBDOMAIN.
+          allOf:
+            - $ref: "#/components/schemas/RelationSource"
+
+    RelationSource:
+      type: object
+      required: [fullName, type]
+      properties:
+        fullName:
+          type: string
+        type:
+          type: string
+          enum: [catalog, schema, domain]
+
+    MemberObject:
+      type: object
+      description: A leaf metadata object serialized by the server.
+      required: [fullName, type]
+      properties:
+        fullName:
+          type: string
+        type:
+          type: string
+          enum: [table, view, fileset, topic, model, semantic_model]
+
+    DomainMember:
+      type: object
+      required: [object, relations]
+      properties:
+        object:
+          $ref: "#/components/schemas/MemberObject"
+        relations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DomainRelation"
+
+    Domain:
+      type: object
+      required: [name, properties, status, audit]
+      properties:
+        name:
+          type: string
+        comment:
+          type: string
+          nullable: true
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          enum: [draft, published]
+        parent:
+          type: string
+          nullable: true
+          description: Parent domain name, or null for a top-level domain.
+        backingTag:
+          type: object
+          nullable: true
+          required: [name]
+          description: Null when unbound or when the backing tag has been deleted.
+          properties:
+            name:
+              type: string
+            value:
+              type: string
+              nullable: true
+              description: Null matches any effective assignment of this tag, including valueless assignments.
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        relations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DomainRelation"
+
+    DomainMemberListResponse:
+      example:
+        code: 0
+        members:
+          - object:
+              fullName: cat.schema.table
+              type: table
+            relations:
+              - relation: direct
+              - relation: inherited
+                source:
+                  fullName: cat.schema
+                  type: schema
+              - relation: via_subdomain
+                source:
+                  fullName: Finance.US
+                  type: domain
+      type: object
+      required: [code, members]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainMember"
+
+    DomainListResponse:
+      example:
+        code: 0
+        domains:
+          - name: Finance
+            properties: {}
+            status: published
+            audit:
+              creator: user
+              createTime: "2026-10-01T00:00:00Z"
+            relations:
+              - relation: direct
+      type: object
+      required: [code, domains]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/Domain"
+
+    DomainResponse:
+      example:
+        code: 0
+        domain:
+          name: Finance
+          properties: {}
+          status: draft
+          audit:
+            creator: user
+            createTime: "2026-10-01T00:00:00Z"
+      type: object
+      required: [code, domain]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        domain:
+          $ref: "#/components/schemas/Domain"
+
+    DomainDropResponse:
+      type: object
+      required: [code, dropped]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        dropped:
+          type: boolean
+
+    BackingTag:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        value:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 256
+          description: Exact assignment value; null binds any effective assignment of the tag.
+
+    DomainCreateRequest:
+      type: object
+      required: [name, backingTag]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        comment:
+          type: string
+          nullable: true
+        properties:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        parent:
+          type: string
+          nullable: true
+          minLength: 1
+          description: Optional top-level parent. A subdomain is created atomically under it.
+        backingTag:
+          allOf:
+            - $ref: "#/components/schemas/BackingTag"
+            - type: object
+              properties:
+                create:
+                  type: boolean
+                  default: false
+                  description: True creates a new valueless tag; value must be null or omitted. False binds an existing tag.
+      example:
+        name: Finance
+        backingTag:
+          name: department
+          value: finance
+          create: false
+
+    DomainSetRequest:
+      example:
+        status: published
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [draft, published, DRAFT, PUBLISHED]
+
+    DomainParentSetRequest:
+      type: object
+      required: [parent]
+      properties:
+        parent:
+          type: string
+          minLength: 1
+
+    DomainBackingTagSetRequest:
+      type: object
+      required: [backingTag]
+      description: The backingTag field must be present. An explicit null removes the current binding; an omitted field is invalid.
+      properties:
+        backingTag:
+          type: object
+          nullable: true
+          required: [name]
+          properties:
+            name:
+              type: string
+              minLength: 1
+            value:
+              type: string
+              nullable: true
+              minLength: 1
+              maxLength: 256
+              description: Exact assignment value; null binds any effective assignment of the tag.
+
+    DomainUpdatesRequest:
+      type: object
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainUpdateRequest"
+
+    DomainUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameDomainRequest"
+        - $ref: "#/components/schemas/UpdateDomainCommentRequest"
+        - $ref: "#/components/schemas/SetDomainPropertyRequest"
+        - $ref: "#/components/schemas/RemoveDomainPropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameDomainRequest"
+          updateComment: "#/components/schemas/UpdateDomainCommentRequest"
+          setProperty: "#/components/schemas/SetDomainPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveDomainPropertyRequest"
+
+    RenameDomainRequest:
+      type: object
+      required: ["@type", newName]
+      properties:
+        "@type":
+          type: string
+          enum: [rename]
+        newName:
+          type: string
+          minLength: 1
+
+    UpdateDomainCommentRequest:
+      type: object
+      required: ["@type"]
+      properties:
+        "@type":
+          type: string
+          enum: [updateComment]
+        newComment:
+          type: string
+          nullable: true
+
+    SetDomainPropertyRequest:
+      type: object
+      required: ["@type", property, value]
+      properties:
+        "@type":
+          type: string
+          enum: [setProperty]
+        property:
+          type: string
+          minLength: 1
+        value:
+          type: string
+
+    RemoveDomainPropertyRequest:
+      type: object
+      required: ["@type", property]
+      properties:
+        "@type":
+          type: string
+          enum: [removeProperty]
+        property:
+          type: string
+          minLength: 1
