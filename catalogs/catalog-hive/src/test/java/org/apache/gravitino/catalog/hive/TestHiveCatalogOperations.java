@@ -46,11 +46,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -62,6 +64,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
@@ -77,7 +80,9 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -93,6 +98,68 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
+  @Test
+  void testDerivedSchemaMetadataAltersPreserveMarkerAndRejectColumnChanges() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+    CachedClientPool pool = mock(CachedClientPool.class);
+    HiveClient client = mock(HiveClient.class);
+    when(pool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(client);
+            });
+    op.clientPool = pool;
+    HiveTable derived =
+        HiveTable.builder()
+            .withName("csv")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[] {Column.of("value", Types.StringType.get())})
+            .withProperties(Maps.newHashMap())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    derived.setOriginalStorageColumns(
+        List.of(
+            Column.of("value", Types.UnparsedType.of("<derived from deserializer>"), "original")));
+    when(client.getTable(anyString(), anyString(), anyString())).thenReturn(derived);
+    ArgumentCaptor<HiveTable> altered = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(client)
+        .alterTable(anyString(), eq("db"), eq("csv"), altered.capture(), anyBoolean());
+
+    op.alterTable(
+        NameIdentifier.of("db", "csv"),
+        TableChange.setProperty("key", "value"),
+        TableChange.updateComment("updated"));
+    HiveTable metadataOnly = altered.getValue();
+    Assertions.assertEquals("value", metadataOnly.properties().get("key"));
+    Assertions.assertEquals("updated", metadataOnly.comment());
+    Assertions.assertEquals(
+        "<derived from deserializer>",
+        ((Types.UnparsedType) metadataOnly.originalStorageColumns().get(0).dataType())
+            .unparsedType());
+    op.alterTable(NameIdentifier.of("db", "csv"), TableChange.rename("renamed"));
+    Assertions.assertEquals("renamed", altered.getValue().name());
+    Assertions.assertEquals(
+        derived.originalStorageColumns(), altered.getValue().originalStorageColumns());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterTable(
+                    NameIdentifier.of("db", "csv"),
+                    TableChange.addColumn(
+                        new String[] {"added"},
+                        Types.StringType.get(),
+                        TableChange.ColumnPosition.defaultPos())));
+    Assertions.assertTrue(failure.getMessage().contains("SerDe-derived table"));
+    verify(client, times(2)).alterTable(anyString(), anyString(), anyString(), any(), anyBoolean());
+  }
+
   @Test
   void testPropertyMeta() {
     Map<String, PropertyEntry<?>> propertyEntryMap =
@@ -237,6 +304,79 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals(
         "Failed to run getAllDatabases in Hive Metastore: mock connection exception",
         exception.getMessage());
+  }
+
+  @Test
+  void testRejectNonHashDistributionBeforeMetastoreAccess() throws Exception {
+    for (Strategy strategy : new Strategy[] {Strategy.RANGE, Strategy.EVEN, Strategy.NONE}) {
+      try (HiveCatalogOperations op = new HiveCatalogOperations()) {
+        op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+        CachedClientPool pool = mock(CachedClientPool.class);
+        HiveClient client = mock(HiveClient.class);
+        when(client.getDatabase(anyString(), anyString()))
+            .thenReturn(HiveSchema.builder().withCatalogName("hive").withName("db").build());
+        when(pool.run(any()))
+            .thenAnswer(
+                invocation -> {
+                  ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+                  return action.run(client);
+                });
+        op.clientPool = pool;
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    op.createTable(
+                        NameIdentifier.of("db", "invalid_distribution"),
+                        new Column[] {Column.of("id", Types.IntegerType.get(), null)},
+                        null,
+                        Map.of("is_generic", "true"),
+                        new Transform[0],
+                        Distributions.fields(strategy, 4, new String[] {"id"}),
+                        new SortOrder[0],
+                        new Index[0]));
+        Assertions.assertTrue(error.getMessage().contains("HASH"));
+        verifyNoInteractions(pool, client);
+      }
+    }
+  }
+
+  @Test
+  void testHashAndStructuralNoneDistributionsRemainSupported() throws Exception {
+    try (HiveCatalogOperations op = new HiveCatalogOperations()) {
+      op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+      CachedClientPool pool = mock(CachedClientPool.class);
+      HiveClient client = mock(HiveClient.class);
+      when(client.getDatabase(anyString(), anyString()))
+          .thenReturn(HiveSchema.builder().withCatalogName("hive").withName("db").build());
+      when(pool.run(any()))
+          .thenAnswer(
+              invocation -> {
+                ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+                return action.run(client);
+              });
+      op.clientPool = pool;
+      for (Distribution distribution :
+          new Distribution[] {
+            Distributions.fields(Strategy.HASH, 4, new String[] {"id"}),
+            Distributions.NONE,
+            Distributions.of(Strategy.NONE, 0),
+            DistributionDTO.NONE
+          }) {
+        Assertions.assertDoesNotThrow(
+            () ->
+                op.createTable(
+                    NameIdentifier.of("db", "supported_distribution"),
+                    new Column[] {Column.of("id", Types.IntegerType.get(), null)},
+                    null,
+                    Map.of("is_generic", "true"),
+                    new Transform[0],
+                    distribution,
+                    new SortOrder[0],
+                    new Index[0]));
+      }
+      verify(client, times(4)).createTable(any());
+    }
   }
 
   @Test

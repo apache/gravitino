@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.web;
 
 import java.security.PrivilegedExceptionAction;
-import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -81,22 +80,6 @@ public final class IdpRESTUtils {
             resourceType, StringUtils.defaultString(name), op.name(), e.getMessage());
     LOG.warn(errorMsg, e);
     return toErrorResponse(errorMsg, e);
-  }
-
-  /**
-   * Returns a 400 response when {@code request} is null; otherwise {@code null}.
-   *
-   * @param request the deserialized request body, which may be null
-   * @return a bad-request response if {@code request} is null, otherwise {@code null}
-   */
-  @Nullable
-  public static Response rejectNullRequestBody(Object request) {
-    if (request != null) {
-      return null;
-    }
-    LOG.warn("Received IdP request with null request body");
-    return illegalArguments(
-        "Request body cannot be null", new IllegalArgumentException("Request body cannot be null"));
   }
 
   public static Response illegalArguments(String message, Throwable throwable) {

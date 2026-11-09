@@ -54,11 +54,13 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -70,14 +72,20 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -96,6 +104,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rel.Column;
@@ -105,6 +114,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.RaceTestUtils;
@@ -139,15 +149,27 @@ public class TestPolicyManager {
   private static EntityStore entityStore;
   private static PolicyManager policyManager;
   private static TagManager tagManager;
+  private static CatalogManager previousCatalogManager;
+
+  @Nullable private static IdGenerator previousIdGenerator;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
     IdGenerator idGenerator = new RandomIdGenerator();
+    previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
     Config config = mockConfig();
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
     policyManager = new PolicyManager(idGenerator, entityStore);
     tagManager = new TagManager(idGenerator, entityStore);
+    previousCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> backendCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, backendCatalog);
+    when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
@@ -289,12 +311,18 @@ public class TestPolicyManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
+  public static void tearDown() throws IOException, IllegalAccessException {
+    try {
+      if (entityStore != null) {
+        entityStore.close();
+        entityStore = null;
+      }
+      FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
     }
-    FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
   }
 
   @AfterEach
@@ -305,8 +333,36 @@ public class TestPolicyManager {
         .forEach(tagName -> tagManager.deleteTag(METALAKE, tagName));
   }
 
+  /** Internal policy bindings accept columns using the shared tag object types. */
   @Test
-  public void testCreateAndGetPolicy() {
+  public void testAddPolicyToColumn() throws IOException {
+    PolicyEntity policy =
+        createCustomPolicy(
+            METALAKE,
+            "column_binding_policy",
+            PolicyContents.custom(
+                ImmutableMap.of("rule", 1),
+                Collections.singleton(MetadataObject.Type.COLUMN),
+                null));
+    MetadataObject column =
+        MetadataObjects.parse(
+            CATALOG + "." + SCHEMA + "." + TABLE + "." + COLUMN, MetadataObject.Type.COLUMN);
+    long tagId =
+        policyManager.addPolicyToObject(METALAKE, policy.name(), column, policy.auditInfo());
+    List<TagEntity> tags =
+        entityStore
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                MetadataObjectUtil.toEntityIdent(METALAKE, column),
+                Entity.EntityType.COLUMN);
+    Assertions.assertEquals(1, tags.size());
+    Assertions.assertEquals(tagId, tags.get(0).id());
+    Assertions.assertTrue(HiddenPolicyTag.isReservedName(tags.get(0).name()));
+  }
+
+  @Test
+  public void testCreateAndGetPolicy() throws IOException {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
@@ -321,6 +377,26 @@ public class TestPolicyManager {
 
     PolicyEntity policy1 = policyManager.getPolicy(METALAKE, policyName);
     Assertions.assertEquals(policy, policy1);
+    TagEntity hidden =
+        entityStore.get(
+            NameIdentifierUtil.ofTag(METALAKE, HiddenPolicyTag.name(policy.id())),
+            Entity.EntityType.TAG,
+            TagEntity.class);
+    Assertions.assertEquals(policy.auditInfo(), hidden.auditInfo());
+    Assertions.assertTrue(HiddenPolicyTag.isReservedName(hidden.name()));
+    Assertions.assertEquals(0, hidden.valueConstraint().allowedValues().length);
+    Assertions.assertEquals(1, tagManager.listTags(METALAKE).length);
+    Assertions.assertEquals(
+        1, policyManager.listTagAssociationsForPolicy(METALAKE, policyName).length);
+    Assertions.assertEquals(
+        1,
+        entityStore
+            .relationOperations()
+            .batchListEntitiesByRelation(
+                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                Collections.singletonList(policy.nameIdentifier()),
+                Entity.EntityType.POLICY)
+            .size());
 
     // Create a policy in non-existent metalake
     Exception e =
