@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -298,6 +299,10 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
+            // Must follow the policy delete, which waits for an in-flight policy update to commit.
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyVersionMapper.class,
@@ -414,6 +419,10 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
+            // Must follow the policy delete, which waits for an in-flight policy update to commit.
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyRoleRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyVersionMapper.class,
