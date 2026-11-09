@@ -22,6 +22,7 @@ package org.apache.gravitino.dto.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.io.BaseEncoding;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -57,8 +58,26 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDTOConverters {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryLiteralBytesUseHex(String hex) {
+    LiteralDTO dto =
+        (LiteralDTO)
+            DTOConverters.toFunctionArg(
+                Literals.of(BaseEncoding.base16().lowerCase().decode(hex), Types.BinaryType.get()));
+    Assertions.assertEquals(Types.BinaryType.get(), dto.dataType());
+    Assertions.assertEquals("0x" + hex, dto.value());
+    Assertions.assertEquals("0x" + hex, ((Literal<?>) DTOConverters.fromFunctionArg(dto)).value());
+    Assertions.assertEquals(
+        "legacy",
+        ((LiteralDTO) DTOConverters.toFunctionArg(Literals.of("legacy", Types.BinaryType.get())))
+            .value());
+  }
 
   @Test
   void testIdentityPartitionDTOConvert() {

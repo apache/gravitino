@@ -55,6 +55,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -861,42 +862,72 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .build();
 
     return TreeLockUtils.doWithTreeLock(
-        metalakeIdent,
+        ident,
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, store);
-          // Write secrets before store.put / init: createBaseCatalog resolves URNs via
-          // toPlaintextProperties. Roll back on any create failure (same pattern as
-          // schema/fileset).
-          secretManager.writeSecrets(secretMaterials);
-          boolean entityStored = false;
+          // Keep close() from retiring resources between initialization and publication. The
+          // lock order remains tree lock, lifecycle lock, then the per-key cache operation.
+          lifecycleLock.readLock().lock();
           try {
+            checkOpen();
+            checkMetalake(metalakeIdent, store);
+            // Initialization resolves secret URNs, but must not publish the entity yet.
+            secretManager.writeSecrets(secretMaterials);
+            AtomicBoolean entityStored = new AtomicBoolean(false);
             try {
-              store.put(e, false /* overwrite */);
-            } catch (NoSuchEntityException e1) {
-              // The relational store locks and rechecks the parent metalake while inserting the
-              // catalog. A concurrent drop or rename can therefore make the metalake disappear
-              // after checkMetalake() succeeds but before this insert starts.
-              LOG.warn("Metalake {} does not exist", metalakeIdent, e1);
-              throw new NoSuchMetalakeException(e1, "Metalake %s does not exist", metalakeIdent);
-            } catch (EntityAlreadyExistsException e1) {
-              LOG.warn("Catalog {} already exists", ident, e1);
-              throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+              // Reject known duplicates before contacting the backend; store.put still arbitrates
+              // concurrent creates from other server instances.
+              if (store.exists(ident, EntityType.CATALOG)) {
+                throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+              }
+              CatalogWrapper wrapper = createCatalogWrapper(e, mergedConfig);
+              boolean published = false;
+              try {
+                Preconditions.checkState(
+                    wrapper.tryAcquire(), "A new catalog wrapper cannot be retired");
+                try (CatalogLease lease = new CatalogLease(wrapper)) {
+                  // Snapshot construction can also fail; finish it before making the row visible.
+                  Catalog info = toCatalogInfo(lease.wrapper());
+                  // Initializing outside compute keeps slow backend verification out of cache
+                  // locks. Serialize the short store/cache publication with acquireCatalogLease
+                  // so a listCatalogsInfo reader cannot build a second wrapper in between them.
+                  catalogCache
+                      .asMap()
+                      .compute(
+                          ident,
+                          (key, previous) -> {
+                            try {
+                              store.put(e, false /* overwrite */);
+                            } catch (NoSuchEntityException missing) {
+                              throw new NoSuchMetalakeException(
+                                  missing, "Metalake %s does not exist", metalakeIdent);
+                            } catch (EntityAlreadyExistsException duplicate) {
+                              throw new CatalogAlreadyExistsException(
+                                  duplicate, "Catalog %s already exists", ident);
+                            } catch (IOException ioe) {
+                              throw new RuntimeException("Failed to store catalog " + ident, ioe);
+                            }
+                            entityStored.set(true);
+                            return wrapper;
+                          });
+                  published = true;
+                  return info;
+                }
+              } finally {
+                if (!published) {
+                  wrapper.retire();
+                }
+              }
+            } catch (RuntimeException re) {
+              rollbackFailedCatalogCreate(ident, secretMaterials, entityStored.get());
+              throw re;
+            } catch (Exception ex) {
+              rollbackFailedCatalogCreate(ident, secretMaterials, entityStored.get());
+              LOG.error("Failed to create catalog {}", ident, ex);
+              throw new RuntimeException(ex);
             }
-            entityStored = true;
-            try (CatalogLease lease =
-                createAndCacheCatalogLease(ident, () -> createCatalogWrapper(e, mergedConfig))) {
-              return toCatalogInfo(lease.wrapper());
-            }
-
-          } catch (RuntimeException re) {
-            rollbackFailedCatalogCreate(ident, secretMaterials, entityStored);
-            throw re;
-
-          } catch (Exception ex) {
-            rollbackFailedCatalogCreate(ident, secretMaterials, entityStored);
-            LOG.error("Failed to create catalog {}", ident, ex);
-            throw new RuntimeException(ex);
+          } finally {
+            lifecycleLock.readLock().unlock();
           }
         });
   }
@@ -2300,7 +2331,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /**
    * Rolls back secrets written for a catalog create attempt and, when {@code store.put} succeeded,
-   * removes the catalog entity left behind by a failed init.
+   * removes the catalog entity left behind by a failed publication.
    */
   private void rollbackFailedCatalogCreate(
       NameIdentifier ident, List<SecretMaterial> secretMaterials, boolean entityStored) {

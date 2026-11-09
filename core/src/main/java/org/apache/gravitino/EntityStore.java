@@ -143,6 +143,10 @@ public interface EntityStore extends Closeable {
    * Store the entity into the underlying storage. According to the {@code overwritten} flag, it
    * will overwrite the existing entity or throw an {@link EntityAlreadyExistsException}.
    *
+   * <p>Relational schema storage also rejects conflicting active identities when overwriting: a
+   * different ID at the same name, or an active ID owned by another catalog, requires explicit
+   * reconciliation. Overwrite does not authorize cascading deletion of the previous schema.
+   *
    * <p>Note. The implementation should be transactional, and should be able to handle concurrent
    * store of entities.
    *
@@ -151,7 +155,7 @@ public interface EntityStore extends Closeable {
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
-   *     set to false
+   *     set to false, or relational schema storage detects conflicting active identities
    */
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;

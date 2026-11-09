@@ -22,6 +22,7 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
@@ -33,6 +34,25 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestExceptionHandlers {
+
+  @Test
+  void testBackendRefusedRequestReturnsBadRequest() {
+    BadRequestException failure =
+        new BadRequestException("cannot drop table t because other objects depend on it");
+    try (Response tableResponse =
+            ExceptionHandlers.handleTableException(OperationType.DROP, "t", "schema", failure);
+        Response schemaResponse =
+            ExceptionHandlers.handleSchemaException(
+                OperationType.CREATE, "schema", "catalog", failure)) {
+      for (Response response : List.of(tableResponse, schemaResponse)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = (ErrorResponse) response.getEntity();
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("other objects depend on it"));
+      }
+    }
+  }
 
   @Test
   void testConcurrentActiveJobReturnsConflict() {

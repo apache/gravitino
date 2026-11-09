@@ -77,11 +77,15 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -145,6 +149,7 @@ public class TestPolicyManager {
   private static EntityStore entityStore;
   private static PolicyManager policyManager;
   private static TagManager tagManager;
+  private static CatalogManager previousCatalogManager;
 
   @Nullable private static IdGenerator previousIdGenerator;
 
@@ -158,6 +163,13 @@ public class TestPolicyManager {
     entityStore.initialize(config);
     policyManager = new PolicyManager(idGenerator, entityStore);
     tagManager = new TagManager(idGenerator, entityStore);
+    previousCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> backendCatalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, backendCatalog);
+    when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
@@ -308,6 +320,8 @@ public class TestPolicyManager {
       FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
     } finally {
       FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
     }
   }
 

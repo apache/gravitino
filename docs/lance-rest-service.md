@@ -246,7 +246,8 @@ Access the service at `http://localhost:9101/lance`.
 The Lance REST service exposes `/lance/health/live`, `/lance/health/ready`, and
 `/lance/health` on its own port. Root aliases `/health/live`, `/health/ready`, `/health`,
 and `/health.html` are also available. Readiness checks whether the namespace wrapper
-is initialized.
+is initialized. The top-level `status` and each `checks[].status` use lowercase
+`up` or `down`, as on the main Gravitino server.
 
 After an observed `OutOfMemoryError`, all these endpoints return HTTP 503 with a
 `jvm` failure until restart, even if the wrapper remains initialized. See
@@ -364,7 +365,9 @@ a one-level namespace identifies a catalog, a two-level namespace identifies a s
 three-level table identifier identifies a table.
 
 Requests may set `X-Gravitino-Active-Roles` to `ALL` (also the default when omitted), `NONE`, or
-a comma-separated list of assigned role names. This selection reaches both operation checks
+a comma-separated list of assigned role names; see
+[Role Names Outside ASCII](./security/access-control.md#role-names-outside-ascii) for names with
+non-ASCII characters. This selection reaches both operation checks
 and listing filters. Malformed selections return `400`; selecting an unassigned role is forbidden.
 Ownership is independent of role selection, so `NONE` does not remove ownership privileges.
 
