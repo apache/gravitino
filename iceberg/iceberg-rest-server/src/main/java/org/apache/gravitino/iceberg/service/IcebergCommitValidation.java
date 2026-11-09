@@ -357,24 +357,11 @@ public final class IcebergCommitValidation implements UpdateRequirement {
   }
 
   /**
-   * An added schema must follow the Iceberg Table Spec schema-evolution rules
-   * (https://iceberg.apache.org/spec/#schema-evolution): a field id that exists in the current
-   * schema keeps its kind, may only change type by an allowed promotion, and cannot go from
-   * optional to required; a field id not in the current schema must be new (above last-column-id)
-   * or identical to the field that had the id before; and a new required field needs a default. The
-   * same rules are what Iceberg's {@code UpdateSchema} / {@code SchemaUpdate} enforce, and what the
-   * Gravitino API path applies.
-   *
-   * <p>Per that Table Spec section (and {@code SchemaUpdate}), these rules do <em>not</em> depend
-   * on whether the table has snapshots: incompatible evolution is rejected on empty tables unless
-   * {@code allowIncompatibleChanges()} is set. The Iceberg REST commit API likewise defines no
-   * {@code hasData} exemption. Dropping IRC's old {@code hasData} gate is therefore the
-   * Table-Spec-compatible behavior; empty-table clients that previously got 200 for illegal
-   * evolutions may now get 4xx.
-   *
-   * <p>A replace that removes {@code main} is not schema evolution under the Table Spec: it starts
-   * from no retained data, so only the field-id reuse rule applies and create-then-replace / staged
-   * create still succeed.
+   * An added schema must keep the data already written readable: a field id that exists in the
+   * current schema keeps its kind, may only change type by an allowed promotion and cannot go from
+   * optional to required, a field id not in the current schema must be new (above last-column-id)
+   * or identical to the field that had the id before, and a new required field needs a default. A
+   * replace (which removes main) starts from no data, so only the id rule applies to it.
    */
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
@@ -386,6 +373,7 @@ public final class IcebergCommitValidation implements UpdateRequirement {
                                 ((MetadataUpdate.RemoveSnapshotRef) u).name()))
             && (updated.currentSnapshot() == null
                 || base.snapshot(updated.currentSnapshot().snapshotId()) == null);
+    boolean hasData = !base.snapshots().isEmpty();
     Map<Integer, Types.NestedField> current = TypeUtil.indexById(base.schema().asStruct());
     for (MetadataUpdate update : updates) {
       if (!(update instanceof MetadataUpdate.AddSchema)) {
@@ -394,10 +382,9 @@ public final class IcebergCommitValidation implements UpdateRequirement {
       Schema schema = ((MetadataUpdate.AddSchema) update).schema();
       for (Types.NestedField field : TypeUtil.indexById(schema.asStruct()).values()) {
         Types.NestedField existing = current.get(field.fieldId());
-        // Table Spec schema evolution (no hasData exemption); same as UpdateSchema / Gravitino API.
         if (existing == null) {
-          checkNewField(base, field, !replacesTable);
-        } else if (!replacesTable) {
+          checkNewField(base, field, hasData && !replacesTable);
+        } else if (hasData && !replacesTable) {
           checkTypeChange(existing, field, updated.formatVersion());
           checkNullabilityChange(existing, field);
         }
@@ -422,7 +409,9 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     }
     if (checkRequired && field.isRequired() && field.initialDefault() == null) {
       throw new ValidationException(
-          "Invalid schema: required field %s has no initial default", field.name());
+          "Invalid schema: required field %s has no initial default, so existing rows cannot be"
+              + " read",
+          field.name());
     }
   }
 
@@ -467,9 +456,8 @@ public final class IcebergCommitValidation implements UpdateRequirement {
   }
 
   /**
-   * An optional field cannot become required: the same rule as Iceberg's {@code
-   * UpdateSchema#requireColumn}, which refuses the change unless incompatible changes are
-   * explicitly allowed.
+   * An optional field cannot become required once data exists: files already written may hold nulls
+   * for it, or lack it entirely, and readers then fail on them.
    */
   private static void checkNullabilityChange(Types.NestedField existing, Types.NestedField field) {
     if (existing.isOptional() && field.isRequired()) {
