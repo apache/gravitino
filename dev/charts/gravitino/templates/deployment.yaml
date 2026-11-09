@@ -236,6 +236,9 @@ spec:
         {{- toYaml .Values.tolerations | nindent 8 }}
       topologySpreadConstraints:
         {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       volumes:
         - name: gravitino-conf
           configMap:
