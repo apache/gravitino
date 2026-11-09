@@ -90,4 +90,12 @@ public class TestIcebergMaintenanceJob {
     assertFalse(
         IcebergMaintenanceJob.requiresSnapshotDriftCheck(MaintenanceType.REMOVE_ORPHAN_FILES));
   }
+
+  @Test
+  public void testReportsBeforeMetricsExceptOrphan() {
+    assertTrue(IcebergMaintenanceJob.reportsBeforeMetrics(MaintenanceType.REWRITE_DATA_FILES));
+    assertTrue(IcebergMaintenanceJob.reportsBeforeMetrics(MaintenanceType.REWRITE_MANIFESTS));
+    assertTrue(IcebergMaintenanceJob.reportsBeforeMetrics(MaintenanceType.EXPIRE_SNAPSHOTS));
+    assertFalse(IcebergMaintenanceJob.reportsBeforeMetrics(MaintenanceType.REMOVE_ORPHAN_FILES));
+  }
 }

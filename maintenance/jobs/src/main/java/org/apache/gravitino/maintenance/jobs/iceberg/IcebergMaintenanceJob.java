@@ -195,8 +195,8 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
       try (MaintenanceActionHttpClient client =
           MaintenanceActionHttpClient.fromUpdaterOptions(updaterOptions)) {
-        // Close every soft slot even if a later type/table never runs.
-        Set<String> closedSlots = new HashSet<>();
+        // Soft slots are opened by TMS for every (table, policy) before this job runs.
+        Set<String> releasedSlots = new HashSet<>();
         try {
           for (TargetTable table : tables) {
             for (int i = 0; i < types.size(); i++) {
@@ -208,7 +208,7 @@ public class IcebergMaintenanceJob implements BuiltInJob {
                 runMaintenanceForType(spark, client, type, table, policyId, actionId, argsByName);
               } finally {
                 releaseSoftSlot(client, actionId, table.tableId, policyId);
-                closedSlots.add(slot);
+                releasedSlots.add(slot);
               }
             }
           }
@@ -217,20 +217,16 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           LOG.error("TMS Iceberg maintenance failed for action_ids {}", actionIds, e);
           return 1;
         } finally {
-          for (TargetTable table : tables) {
-            for (int i = 0; i < policyIds.size(); i++) {
-              long policyId = policyIds.get(i);
-              long actionId = actionIds.get(i);
-              if (!closedSlots.contains(table.tableId + ":" + policyId)) {
-                releaseSoftSlot(client, actionId, table.tableId, policyId);
-              }
-            }
-          }
+          releaseUnreleasedSoftSlots(client, tables, policyIds, actionIds, releasedSlots);
         }
       }
     }
   }
 
+  /**
+   * Shared S0 → gate → procedure → S1 pipeline. Types without S0 (orphan cleanup) skip the before
+   * half and still report after-metrics.
+   */
   private static void runMaintenanceForType(
       SparkSession spark,
       MaintenanceActionHttpClient client,
@@ -240,52 +236,52 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       long actionId,
       Map<String, String> argsByName)
       throws Exception {
-    // Orphan cleanup: no S0 row (dashboard uses procedure outcomes only).
-    if (type == MaintenanceType.REMOVE_ORPHAN_FILES) {
-      AfterMetrics after =
-          executeMaintenanceProcedure(
-              spark, type, table.catalogName, table.tableIdentifier, argsByName, null);
-      reportAfterMetrics(client, actionId, table.tableId, policyId, after);
-      return;
+    BeforeMetrics before = null;
+    if (reportsBeforeMetrics(type)) {
+      before = collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier, type);
+      if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
+        LOG.info(
+            "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
+                + " (abandoned or unbound)",
+            type.wireName,
+            actionId,
+            table.tableId,
+            policyId);
+        return;
+      }
+      if (requiresSnapshotDriftCheck(type) && before.snapshotId != before.headSnapshotId) {
+        LOG.info(
+            "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
+                + " (sampled={} head={})",
+            type.wireName,
+            actionId,
+            table.tableId,
+            policyId,
+            before.snapshotId,
+            before.headSnapshotId);
+        return;
+      }
+      if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson)) {
+        LOG.info(
+            "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
+            type.wireName,
+            actionId,
+            table.tableId,
+            policyId);
+        return;
+      }
     }
 
-    BeforeMetrics before =
-        collectBeforeMetrics(spark, table.catalogName, table.tableIdentifier, type);
-    if (!reportBeforeMetricsOrStop(client, actionId, table.tableId, policyId, before)) {
-      LOG.info(
-          "TMS type {} stopped for action_id {} table {} policy {}: before-metrics failed"
-              + " (abandoned or unbound)",
-          type.wireName,
-          actionId,
-          table.tableId,
-          policyId);
-      return;
-    }
-    if (requiresSnapshotDriftCheck(type) && before.snapshotId != before.headSnapshotId) {
-      LOG.info(
-          "TMS type {} skipped for action_id {} table {} policy {}: snapshot drifted"
-              + " (sampled={} head={})",
-          type.wireName,
-          actionId,
-          table.tableId,
-          policyId,
-          before.snapshotId,
-          before.headSnapshotId);
-      return;
-    }
-    if (!MaintenanceTriggerGate.shouldMaintain(type, argsByName, before.metricsJson)) {
-      LOG.info(
-          "TMS type {} skipped for action_id {} table {} policy {}: trigger-expr skip",
-          type.wireName,
-          actionId,
-          table.tableId,
-          policyId);
-      return;
-    }
     AfterMetrics after =
         executeMaintenanceProcedure(
             spark, type, table.catalogName, table.tableIdentifier, argsByName, before);
     reportAfterMetrics(client, actionId, table.tableId, policyId, after);
+  }
+
+  /** Orphan cleanup reports procedure outcomes only (no S0 row). */
+  @VisibleForTesting
+  static boolean reportsBeforeMetrics(MaintenanceType type) {
+    return type != MaintenanceType.REMOVE_ORPHAN_FILES;
   }
 
   /**
@@ -401,108 +397,128 @@ public class IcebergMaintenanceJob implements BuiltInJob {
       throws Exception {
     switch (type) {
       case REWRITE_DATA_FILES:
-        {
-          String strategy = IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("strategy"));
-          if (strategy == null || strategy.isEmpty()) {
-            strategy = "binpack";
-          }
-          String sql =
-              IcebergRewriteDataFilesJob.buildProcedureCall(
-                  catalogName,
-                  tableIdentifier,
-                  strategy,
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("sort-order")),
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
-          LOG.info("Executing TMS rewrite_data_files: {}", sql);
-          spark.sql(sql).collect();
-          Map<String, Object> afterMetrics =
-              IcebergRewriteDataFilesJob.collectCompactionMetrics(
-                  spark, catalogName, tableIdentifier);
-          long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-          return new AfterMetrics(afterSnapshotId, metricsToJson(afterMetrics));
-        }
+        return executeCompaction(spark, catalogName, tableIdentifier, argsByName);
       case REWRITE_MANIFESTS:
-        {
-          IcebergRewriteManifestsJob.validateUseCaching(
-              IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")));
-          IcebergRewriteManifestsJob.validateSpecId(
-              IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
-          String sql =
-              IcebergRewriteManifestsJob.buildProcedureCall(
-                  catalogName,
-                  tableIdentifier,
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
-          LOG.info("Executing TMS rewrite_manifests: {}", sql);
-          List<Row> results = spark.sql(sql).collectAsList();
-          long rewritten = 0L;
-          if (!results.isEmpty()) {
-            Row result = results.get(0);
-            rewritten = ((Number) result.get(0)).longValue();
-            long added = ((Number) result.get(1)).longValue();
-            LOG.info("Rewrite manifests results: rewritten={}, added={}", rewritten, added);
-          }
-          long afterSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-          return new AfterMetrics(
-              afterSnapshotId,
-              metricsToJson(IcebergRewriteManifestsJob.manifestAfterMetrics(rewritten)));
-        }
+        return executeManifestRewrite(spark, catalogName, tableIdentifier, argsByName);
       case EXPIRE_SNAPSHOTS:
-        {
-          String retainLast =
-              IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("retain-last"));
-          IcebergExpireSnapshotsJob.validateRetainLast(retainLast);
-          boolean streamResults =
-              IcebergExpireSnapshotsJob.parseStreamResults(
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("stream-results")));
-          String sql =
-              IcebergExpireSnapshotsJob.buildProcedureCall(
-                  catalogName,
-                  tableIdentifier,
-                  IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
-                  retainLast,
-                  streamResults);
-          LOG.info("Executing TMS expire_snapshots: {}", sql);
-          Row[] results = (Row[]) spark.sql(sql).collect();
-          if (results.length > 0) {
-            LOG.info(
-                "Expire snapshots deleted data/manifest/manifest-list files: {}/{}/{}",
-                results[0].getLong(0),
-                results[0].getLong(1),
-                results[0].getLong(2));
-          }
-          IcebergExpireSnapshotsJob.ExpireInventory afterInventory =
-              IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
-          IcebergExpireSnapshotsJob.ExpireInventory beforeInventory =
-              before == null || before.expireInventory == null
-                  ? afterInventory
-                  : before.expireInventory;
-          Map<String, Object> afterMetrics =
-              IcebergExpireSnapshotsJob.expireAfterMetrics(beforeInventory, afterInventory);
-          long afterSnapshotId = currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier);
-          return new AfterMetrics(afterSnapshotId, metricsToJson(afterMetrics));
-        }
+        return executeExpireSnapshots(spark, catalogName, tableIdentifier, argsByName, before);
       case REMOVE_ORPHAN_FILES:
-        {
-          Map<String, String> orphanOpts = new HashMap<>();
-          orphanOpts.put("catalog", catalogName);
-          orphanOpts.put("table", tableIdentifier);
-          putIfPresent(orphanOpts, "older-than", argsByName.get("older-than"));
-          putIfPresent(orphanOpts, "location", argsByName.get("location"));
-          putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
-          IcebergRemoveOrphanFilesJob.OrphanCleanupResult orphan =
-              IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, orphanOpts);
-          long afterSnapshotId = currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier);
-          return new AfterMetrics(
-              afterSnapshotId,
-              metricsToJson(
-                  IcebergRemoveOrphanFilesJob.orphanAfterMetrics(
-                      orphan.filesRemoved(), orphan.bytesReclaimed())));
-        }
+        return executeOrphanCleanup(spark, catalogName, tableIdentifier, argsByName);
       default:
         throw new IllegalStateException("Unhandled maintenance type: " + type);
     }
+  }
+
+  private static AfterMetrics executeCompaction(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
+    String strategy = IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("strategy"));
+    if (strategy == null || strategy.isEmpty()) {
+      strategy = "binpack";
+    }
+    String sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            catalogName,
+            tableIdentifier,
+            strategy,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("sort-order")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
+    LOG.info("Executing TMS rewrite_data_files: {}", sql);
+    spark.sql(sql).collect();
+    Map<String, Object> afterMetrics =
+        IcebergRewriteDataFilesJob.collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    return new AfterMetrics(
+        currentSnapshotId(spark, catalogName, tableIdentifier), metricsToJson(afterMetrics));
+  }
+
+  private static AfterMetrics executeManifestRewrite(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName) {
+    IcebergRewriteManifestsJob.validateUseCaching(
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")));
+    IcebergRewriteManifestsJob.validateSpecId(
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+    String sql =
+        IcebergRewriteManifestsJob.buildProcedureCall(
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+    LOG.info("Executing TMS rewrite_manifests: {}", sql);
+    List<Row> results = spark.sql(sql).collectAsList();
+    long rewritten = 0L;
+    if (!results.isEmpty()) {
+      Row result = results.get(0);
+      rewritten = ((Number) result.get(0)).longValue();
+      long added = ((Number) result.get(1)).longValue();
+      LOG.info("Rewrite manifests results: rewritten={}, added={}", rewritten, added);
+    }
+    return new AfterMetrics(
+        currentSnapshotId(spark, catalogName, tableIdentifier),
+        metricsToJson(IcebergRewriteManifestsJob.manifestAfterMetrics(rewritten)));
+  }
+
+  private static AfterMetrics executeExpireSnapshots(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable BeforeMetrics before) {
+    String retainLast = IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("retain-last"));
+    IcebergExpireSnapshotsJob.validateRetainLast(retainLast);
+    boolean streamResults =
+        IcebergExpireSnapshotsJob.parseStreamResults(
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("stream-results")));
+    String sql =
+        IcebergExpireSnapshotsJob.buildProcedureCall(
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
+            retainLast,
+            streamResults);
+    LOG.info("Executing TMS expire_snapshots: {}", sql);
+    Row[] results = (Row[]) spark.sql(sql).collect();
+    if (results.length > 0) {
+      LOG.info(
+          "Expire snapshots deleted data/manifest/manifest-list files: {}/{}/{}",
+          results[0].getLong(0),
+          results[0].getLong(1),
+          results[0].getLong(2));
+    }
+    IcebergExpireSnapshotsJob.ExpireInventory afterInventory =
+        IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
+    IcebergExpireSnapshotsJob.ExpireInventory beforeInventory =
+        before == null || before.expireInventory == null ? afterInventory : before.expireInventory;
+    return new AfterMetrics(
+        currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
+        metricsToJson(
+            IcebergExpireSnapshotsJob.expireAfterMetrics(beforeInventory, afterInventory)));
+  }
+
+  private static AfterMetrics executeOrphanCleanup(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName)
+      throws Exception {
+    Map<String, String> orphanOpts = new HashMap<>();
+    orphanOpts.put("catalog", catalogName);
+    orphanOpts.put("table", tableIdentifier);
+    putIfPresent(orphanOpts, "older-than", argsByName.get("older-than"));
+    putIfPresent(orphanOpts, "location", argsByName.get("location"));
+    putIfPresent(orphanOpts, "dry-run", argsByName.get("dry-run"));
+    IcebergRemoveOrphanFilesJob.OrphanCleanupResult orphan =
+        IcebergRemoveOrphanFilesJob.executeWithMetrics(spark, orphanOpts);
+    return new AfterMetrics(
+        currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
+        metricsToJson(
+            IcebergRemoveOrphanFilesJob.orphanAfterMetrics(
+                orphan.filesRemoved(), orphan.bytesReclaimed())));
   }
 
   /**
@@ -511,30 +527,46 @@ public class IcebergMaintenanceJob implements BuiltInJob {
    */
   private static BeforeMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier, MaintenanceType type) {
-    long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload;
-    IcebergExpireSnapshotsJob.ExpireInventory expireInventory = null;
     switch (type) {
       case REWRITE_DATA_FILES:
-        payload =
-            IcebergRewriteDataFilesJob.collectCompactionMetrics(
-                spark, catalogName, tableIdentifier);
-        break;
+        return collectCompactionBeforeMetrics(spark, catalogName, tableIdentifier);
       case REWRITE_MANIFESTS:
-        payload =
-            IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
-                spark, catalogName, tableIdentifier);
-        break;
+        return collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
       case EXPIRE_SNAPSHOTS:
-        expireInventory =
-            IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
-        payload = IcebergExpireSnapshotsJob.expireBeforeMetrics(expireInventory.snapshotCount());
-        break;
+        return collectExpireBeforeMetrics(spark, catalogName, tableIdentifier);
       case REMOVE_ORPHAN_FILES:
         throw new IllegalStateException("Orphan cleanup must not sample before-metrics");
       default:
         throw new IllegalStateException("Unhandled maintenance type: " + type);
     }
+  }
+
+  private static BeforeMetrics collectCompactionBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload =
+        IcebergRewriteDataFilesJob.collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    return new BeforeMetrics(snapshotId, headSnapshotId, metricsToJson(payload), null);
+  }
+
+  private static BeforeMetrics collectManifestBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload =
+        IcebergRewriteManifestsJob.collectManifestBeforeMetrics(
+            spark, catalogName, tableIdentifier);
+    long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    return new BeforeMetrics(snapshotId, headSnapshotId, metricsToJson(payload), null);
+  }
+
+  private static BeforeMetrics collectExpireBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
+    IcebergExpireSnapshotsJob.ExpireInventory expireInventory =
+        IcebergExpireSnapshotsJob.collectExpireInventory(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload =
+        IcebergExpireSnapshotsJob.expireBeforeMetrics(expireInventory.snapshotCount());
     long headSnapshotId = currentSnapshotId(spark, catalogName, tableIdentifier);
     return new BeforeMetrics(snapshotId, headSnapshotId, metricsToJson(payload), expireInventory);
   }
@@ -582,6 +614,24 @@ public class IcebergMaintenanceJob implements BuiltInJob {
           tableId,
           policyId,
           e);
+    }
+  }
+
+  /** Releases soft slots that were never reached after a mid-job failure. */
+  private static void releaseUnreleasedSoftSlots(
+      MaintenanceActionHttpClient client,
+      List<TargetTable> tables,
+      List<Long> policyIds,
+      List<Long> actionIds,
+      Set<String> releasedSlots) {
+    for (TargetTable table : tables) {
+      for (int i = 0; i < policyIds.size(); i++) {
+        long policyId = policyIds.get(i);
+        String slot = table.tableId + ":" + policyId;
+        if (!releasedSlots.contains(slot)) {
+          releaseSoftSlot(client, actionIds.get(i), table.tableId, policyId);
+        }
+      }
     }
   }
 
