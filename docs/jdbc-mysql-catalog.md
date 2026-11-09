@@ -222,7 +222,7 @@ These properties can only be specified when creating a table; they cannot be cha
 | Property Name           | Description                                                                                                                                              | Default Value | Required | Reserved | Immutable |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
 | `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No       | No       | Yes       |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No       | No       | Yes       |
+| `auto-increment-offset` | The starting value of the auto-increment field when the table is created. Loading the table returns the next auto-increment value reported by the database, which can differ from the value specified at creation.                                                                                          | (none)        | No       | No       | Yes       |
 
 
 :::note
