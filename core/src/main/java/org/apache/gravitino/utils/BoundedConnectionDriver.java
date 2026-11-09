@@ -34,8 +34,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -80,9 +84,15 @@ public final class BoundedConnectionDriver implements Driver {
 
   private static final ExecutorService WORKERS = daemonPool(64, "jdbc-connect-timeout");
 
-  // One cancellation per abandoned attempt; with the shared workers this stays within their limit.
-  // If a cancellation is still rejected, the worker is not interrupted and a warning is logged.
+  // Blocking interrupt callbacks must never occupy the request or retry-dispatch threads.
   private static final ExecutorService CANCELLERS = daemonPool(64, "jdbc-connect-cancel");
+
+  private static final ScheduledExecutorService CANCELLATION_RETRIES =
+      Executors.newSingleThreadScheduledExecutor(daemonThreads("jdbc-connect-cancel-retry"));
+  // Bound retained caller contexts even if cancellation capacity never becomes available.
+  private static final Semaphore RETRY_SLOTS = new Semaphore(64);
+  private static final int MAX_CANCELLATION_RETRIES = 3;
+  private static final long FIRST_RETRY_DELAY_MS = 10;
 
   private static final long REJECTION_LOG_INTERVAL_NANOS = TimeUnit.MINUTES.toNanos(1);
   private static final AtomicLong LAST_REJECTION_LOG =
@@ -93,6 +103,8 @@ public final class BoundedConnectionDriver implements Driver {
   private final long timeoutMs;
   private final ExecutorService workers;
   private final ExecutorService cancellers;
+  private final ScheduledExecutorService cancellationRetries;
+  private final Semaphore retrySlots;
   private final AtomicInteger abandonedAttempts = new AtomicInteger();
 
   /**
@@ -112,6 +124,16 @@ public final class BoundedConnectionDriver implements Driver {
 
   BoundedConnectionDriver(
       Driver delegate, long timeoutMs, ExecutorService workers, ExecutorService cancellers) {
+    this(delegate, timeoutMs, workers, cancellers, CANCELLATION_RETRIES, RETRY_SLOTS);
+  }
+
+  BoundedConnectionDriver(
+      Driver delegate,
+      long timeoutMs,
+      ExecutorService workers,
+      ExecutorService cancellers,
+      ScheduledExecutorService cancellationRetries,
+      Semaphore retrySlots) {
     if (timeoutMs <= 0) {
       throw new IllegalArgumentException("JDBC connect timeout must be positive");
     }
@@ -119,6 +141,8 @@ public final class BoundedConnectionDriver implements Driver {
     this.timeoutMs = timeoutMs;
     this.workers = workers;
     this.cancellers = cancellers;
+    this.cancellationRetries = cancellationRetries;
+    this.retrySlots = retrySlots;
   }
 
   /**
@@ -247,21 +271,20 @@ public final class BoundedConnectionDriver implements Driver {
 
   private static ExecutorService daemonPool(int maxThreads, String name) {
     return new ThreadPoolExecutor(
-        0,
-        maxThreads,
-        60,
-        TimeUnit.SECONDS,
-        new SynchronousQueue<>(),
-        task ->
-            AccessController.doPrivileged(
-                (PrivilegedAction<Thread>)
-                    () -> {
-                      Thread thread = new Thread(task, name);
-                      thread.setDaemon(true);
-                      thread.setContextClassLoader(BoundedConnectionDriver.class.getClassLoader());
-                      return thread;
-                    },
-                WORKER_CONTEXT));
+        0, maxThreads, 60, TimeUnit.SECONDS, new SynchronousQueue<>(), daemonThreads(name));
+  }
+
+  private static ThreadFactory daemonThreads(String name) {
+    return task ->
+        AccessController.doPrivileged(
+            (PrivilegedAction<Thread>)
+                () -> {
+                  Thread thread = new Thread(task, name);
+                  thread.setDaemon(true);
+                  thread.setContextClassLoader(BoundedConnectionDriver.class.getClassLoader());
+                  return thread;
+                },
+            WORKER_CONTEXT);
   }
 
   private final class Attempt {
@@ -272,7 +295,7 @@ public final class BoundedConnectionDriver implements Driver {
     private boolean abandoned;
     private boolean finished;
     @Nullable private Thread worker;
-    private boolean connecting;
+    private volatile boolean connecting;
     private boolean cancelling;
 
     synchronized void accept() {
@@ -292,33 +315,98 @@ public final class BoundedConnectionDriver implements Driver {
               + "still connecting",
           driverName(),
           timeoutMs);
+      // Thread.interrupt may synchronously run a driver's blocking channel-close callback, so
+      // it must not run on this request thread, which would defeat the connection deadline.
+      Runnable cancellation =
+          () ->
+              AccessController.doPrivileged(
+                  (PrivilegedAction<Void>)
+                      () -> {
+                        Thread current = Thread.currentThread();
+                        ClassLoader previous = current.getContextClassLoader();
+                        try {
+                          // An interrupt can execute driver code, so it needs the same caller
+                          // context as connect and late connection cleanup, including on retry.
+                          current.setContextClassLoader(context);
+                          cancel();
+                        } finally {
+                          current.setContextClassLoader(previous);
+                        }
+                        return null;
+                      },
+                  callerContext);
       try {
-        // Thread.interrupt may synchronously run a driver's blocking channel-close callback, so
-        // it must not run on this request thread, which would defeat the connection deadline.
-        cancellers.execute(
-            () ->
-                AccessController.doPrivileged(
-                    (PrivilegedAction<Void>)
-                        () -> {
-                          Thread current = Thread.currentThread();
-                          ClassLoader previous = current.getContextClassLoader();
-                          try {
-                            // An interrupt can execute driver code, so it needs the same caller
-                            // context as connect and late connection cleanup.
-                            current.setContextClassLoader(context);
-                            cancel();
-                          } finally {
-                            current.setContextClassLoader(previous);
-                          }
-                          return null;
-                        },
-                    callerContext));
+        cancellers.execute(cancellation);
       } catch (RejectedExecutionException e) {
-        LOG.warn(
-            "Could not schedule interruption of an abandoned {} connection attempt; it remains "
-                + "quarantined until the driver returns",
-            driverName(),
-            e);
+        if (!connecting) {
+          return;
+        }
+        if (!retrySlots.tryAcquire()) {
+          logCancellationRejection(e);
+          return;
+        }
+        boolean scheduled = false;
+        try {
+          cancellationRetries.schedule(
+              new CancellationRetry(cancellation), FIRST_RETRY_DELAY_MS, TimeUnit.MILLISECONDS);
+          scheduled = true;
+        } catch (RejectedExecutionException rejected) {
+          logCancellationRejection(rejected);
+        } finally {
+          if (!scheduled) {
+            retrySlots.release();
+          }
+        }
+      }
+    }
+
+    private void logCancellationRejection(RejectedExecutionException failure) {
+      LOG.warn(
+          "Could not schedule interruption of an abandoned {} connection attempt after bounded "
+              + "retry admission or execution failed; it remains quarantined until the driver "
+              + "and cleanup return. If they never return, restart the server",
+          driverName(),
+          failure);
+    }
+
+    /** Retries admission only: driver callbacks always run on the cancellation pool. */
+    private final class CancellationRetry implements Runnable {
+      private final Runnable cancellation;
+      private int retries;
+
+      private CancellationRetry(Runnable cancellation) {
+        this.cancellation = cancellation;
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      public void run() {
+        boolean rescheduled = false;
+        try {
+          // The volatile check avoids retaining obsolete attempts. cancel() still fences the
+          // actual interrupt under the attempt lock, including after an accepted retry is delayed.
+          if (!connecting) {
+            return;
+          }
+          retries++;
+          try {
+            cancellers.execute(cancellation);
+          } catch (RejectedExecutionException e) {
+            if (retries == MAX_CANCELLATION_RETRIES) {
+              logCancellationRejection(e);
+            } else {
+              cancellationRetries.schedule(
+                  this, FIRST_RETRY_DELAY_MS << retries, TimeUnit.MILLISECONDS);
+              rescheduled = true;
+            }
+          }
+        } catch (RejectedExecutionException e) {
+          logCancellationRejection(e);
+        } finally {
+          if (!rescheduled) {
+            retrySlots.release();
+          }
+        }
       }
     }
 
