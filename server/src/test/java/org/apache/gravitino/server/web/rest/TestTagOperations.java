@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -91,8 +90,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -327,7 +324,6 @@ public class TestTagOperations extends BaseOperationsTest {
   public void testAddPolicyForTagAlreadyAssociated() {
     String tagName = "tag1";
     String policyName = "policy1";
-    mockTagValueConstraint(TagValueConstraint.anyValue());
     doThrow(new PolicyAlreadyAssociatedException("mock error"))
         .when(tagManager)
         .addPolicyForTag(
@@ -356,24 +352,25 @@ public class TestTagOperations extends BaseOperationsTest {
   @ParameterizedTest
   @ValueSource(strings = {"zzz", "A"})
   void testAddPolicyForTagInvalidValue(String value) {
-    mockTagValueConstraint(TagValueConstraint.ofAllowedValues("a", "b"));
+    String message = "Tag tag1 value " + value + " is not in allowed values [a, b]";
+    doThrow(new IllegalArgumentException(message))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of(value));
     try (Response response = addPolicyForTag(TagValueSelector.of(value))) {
       Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
       ErrorResponse error = response.readEntity(ErrorResponse.class);
       Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
       Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
-      Assertions.assertTrue(
-          error
-              .getMessage()
-              .contains("Tag tag1 value " + value + " is not in allowed values [a, b]"));
+      Assertions.assertTrue(error.getMessage().contains(message));
     }
-    Mockito.verify(tagManager, Mockito.never())
-        .addPolicyForTag(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), any());
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
   }
 
   @Test
   void testAddPolicyForTagWithoutAllowedValues() {
-    mockTagValueConstraint(TagValueConstraint.noValue());
+    doThrow(new IllegalArgumentException("Tag tag1 does not allow assignment values"))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
     try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
       Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
       ErrorResponse error = response.readEntity(ErrorResponse.class);
@@ -382,15 +379,13 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertTrue(
           error.getMessage().contains("Tag tag1 does not allow assignment values"));
     }
-    Mockito.verify(tagManager, Mockito.never())
-        .addPolicyForTag(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), any());
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
   }
 
   @ParameterizedTest
-  @MethodSource("validPolicyTagSelectors")
-  void testAddPolicyForTagValidSelector(
-      TagValueConstraint constraint, PolicyAssociationSelector selector) {
-    mockTagValueConstraint(constraint);
+  @ValueSource(strings = {"a", "b", "engineering"})
+  void testAddPolicyForTagValidSelector(String value) {
+    PolicyAssociationSelector selector = TagValueSelector.of(value);
     try (Response response = addPolicyForTag(selector)) {
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       PolicyTagAssociationResponse association =
@@ -405,14 +400,13 @@ public class TestTagOperations extends BaseOperationsTest {
   void testAddPolicyForTagMissingTag() {
     doThrow(new NoSuchTagException("Tag tag1 does not exist"))
         .when(tagManager)
-        .getTag(metalake, "tag1");
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
     try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
       Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
       ErrorResponse error = response.readEntity(ErrorResponse.class);
       Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), error.getType());
     }
-    Mockito.verify(tagManager, Mockito.never())
-        .addPolicyForTag(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), any());
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
   }
 
   @Test
@@ -1481,21 +1475,6 @@ public class TestTagOperations extends BaseOperationsTest {
 
   private String tagPath(String metalake) {
     return "/metalakes/" + metalake + "/tags";
-  }
-
-  private static Stream<Arguments> validPolicyTagSelectors() {
-    return Stream.of(
-        Arguments.of(TagValueConstraint.ofAllowedValues("a", "b"), TagValueSelector.of("a")),
-        Arguments.of(TagValueConstraint.ofAllowedValues("a", "b"), TagValueSelector.of("b")),
-        Arguments.of(TagValueConstraint.anyValue(), TagValueSelector.of("engineering")),
-        Arguments.of(TagValueConstraint.noValue(), AllValuesSelector.get()),
-        Arguments.of(TagValueConstraint.ofAllowedValues("a", "b"), AllValuesSelector.get()));
-  }
-
-  private void mockTagValueConstraint(TagValueConstraint constraint) {
-    Tag tag = mock(Tag.class);
-    when(tag.valueConstraint()).thenReturn(constraint);
-    when(tagManager.getTag(metalake, "tag1")).thenReturn(tag);
   }
 
   private Response addPolicyForTag(PolicyAssociationSelector selector) {
