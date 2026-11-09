@@ -192,8 +192,6 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public void enablePolicy(String metalake, String policyName) throws NoSuchPolicyException {
-    NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
-    checkMetalake(metalakeIdent, entityStore);
     if (!policyEnabled(metalake, policyName)) {
       requireNoConflictBeforeEnable(metalake, policyName);
     }
