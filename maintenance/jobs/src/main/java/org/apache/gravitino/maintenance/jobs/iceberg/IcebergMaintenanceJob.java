@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -202,7 +203,10 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     String sparkConfJson =
         IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spark-conf"));
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
-      IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson).forEach(sparkBuilder::config);
+      Map<String, String> sparkConfigs =
+          new HashMap<>(IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson));
+      ensureIcebergCatalogImpl(sparkConfigs);
+      sparkConfigs.forEach(sparkBuilder::config);
     }
 
     try (SparkSession spark = sparkBuilder.getOrCreate()) {
@@ -492,6 +496,36 @@ public class IcebergMaintenanceJob implements BuiltInJob {
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Invalid updater-options JSON: " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Ensures {@code spark.sql.catalog.<name>} points at Iceberg {@code SparkCatalog} whenever nested
+   * catalog connection keys are present. Needed because TMS schedule {@code spark_conf} may only
+   * carry {@code .type}/{@code .uri}/{@code .warehouse}.
+   */
+  private static void ensureIcebergCatalogImpl(Map<String, String> sparkConfigs) {
+    String prefix = "spark.sql.catalog.";
+    Set<String> catalogs = new HashSet<>();
+    for (String key : sparkConfigs.keySet()) {
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+      String rest = key.substring(prefix.length());
+      int dot = rest.indexOf('.');
+      if (dot <= 0) {
+        continue;
+      }
+      String prop = rest.substring(dot + 1);
+      if ("type".equals(prop) || "uri".equals(prop) || "warehouse".equals(prop)) {
+        catalogs.add(rest.substring(0, dot));
+      }
+    }
+    for (String catalog : catalogs) {
+      sparkConfigs.putIfAbsent(prefix + catalog, "org.apache.iceberg.spark.SparkCatalog");
+      sparkConfigs.putIfAbsent("spark.sql.defaultCatalog", catalog);
+    }
+    sparkConfigs.putIfAbsent(
+        "spark.sql.extensions", IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS);
   }
 
   private static List<String> templateArguments() {

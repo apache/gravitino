@@ -309,6 +309,10 @@ public final class IcebergJobUtils {
   public static Table loadIcebergTable(
       SparkSession spark, String catalogName, String tableIdentifier) {
     try {
+      // Force CatalogManager to load the named catalog first. Spark3Util.catalogAndIdentifier
+      // swallows load failures and falls back to the session catalog (spark_catalog), which then
+      // fails with REQUIRES_SINGLE_PART_NAMESPACE and hides the real REST/config error.
+      spark.sessionState().catalogManager().catalog(catalogName);
       return Spark3Util.loadIcebergTable(
           spark, String.format("%s.%s", catalogName, tableIdentifier));
     } catch (RuntimeException e) {
