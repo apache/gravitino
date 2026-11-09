@@ -171,10 +171,14 @@ could return different results:
   `weekofyear()`. The source can compute them differently.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
   PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
-- Aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
+- Value-dependent aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 
-NULL checks (`IS NULL` and `IS NOT NULL`) on the column itself are pushed down normally.
+NULL checks (`IS NULL` and `IS NOT NULL`) and non-distinct `count(column)` on the column itself
+can be pushed down when its type does not contain an external type. External types remain in
+Spark: for example, PostgreSQL composite NULL checks inspect row fields, while Spark reads a
+non-null composite as a string. `count(DISTINCT string_column)` stays in Spark because it
+depends on collation.
 For PostgreSQL and MySQL, a simple positive string equality or `IN` filter can also be sent
 to the source as a prefilter, while Spark rechecks it. This reduces rows transferred to Spark
 without trusting the source collation to produce an exact match. These prefilters require

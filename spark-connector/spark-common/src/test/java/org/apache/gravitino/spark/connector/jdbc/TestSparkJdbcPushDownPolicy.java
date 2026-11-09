@@ -39,6 +39,7 @@ import org.apache.spark.sql.connector.expressions.SortDirection;
 import org.apache.spark.sql.connector.expressions.SortOrder;
 import org.apache.spark.sql.connector.expressions.aggregate.AggregateFunc;
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation;
+import org.apache.spark.sql.connector.expressions.aggregate.Count;
 import org.apache.spark.sql.connector.expressions.aggregate.CountStar;
 import org.apache.spark.sql.connector.expressions.aggregate.Max;
 import org.apache.spark.sql.connector.expressions.filter.And;
@@ -233,6 +234,59 @@ public class TestSparkJdbcPushDownPolicy {
     Predicate[] residual = builder.pushPredicates(new Predicate[] {prefilter, numeric});
     Assertions.assertEquals(List.of(prefilter, numeric), Arrays.asList(residual));
     Assertions.assertEquals(0, builder.pushedPredicates().length);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testNullChecksAndCountsUseOnlyNullPreservingColumns() {
+    SparkJdbcPushDownPolicy policy = policy();
+    for (String name : new String[] {"s", "v", "b", "u", "tags", "ts", "tz", "id"}) {
+      Assertions.assertTrue(policy.canPush(predicate("IS_NULL", col(name))), name);
+      Assertions.assertTrue(policy.canPush(predicate("IS_NOT_NULL", col(name))), name);
+      Assertions.assertTrue(policy.canPushAggregate(new Count(col(name), false)), name);
+    }
+    Assertions.assertFalse(policy.canPushAggregate(new Count(col("s"), true)));
+    Assertions.assertFalse(policy.canPushAggregate(new Count(col("tags"), true)));
+    Assertions.assertFalse(
+        policy.canPushAggregate(new Count(new Cast(col("s"), DataTypes.IntegerType), false)));
+    Assertions.assertTrue(policy.canPushAggregate(new Count(col("id"), true)));
+    for (boolean externalFirst : new boolean[] {true, false}) {
+      Column externalColumn = column("VALUE", Types.ExternalType.of("pair"));
+      Column stringColumn = column("value", Types.StringType.get());
+      Column[] columns =
+          externalFirst
+              ? new Column[] {externalColumn, stringColumn}
+              : new Column[] {stringColumn, externalColumn};
+      StructType schema =
+          new StructType().add("VALUE", DataTypes.StringType).add("value", DataTypes.StringType);
+      SparkJdbcPushDownPolicy collision =
+          new SparkJdbcPushDownPolicy(columns, schema, schema, DIALECT, URL);
+      Assertions.assertFalse(collision.canPush(predicate("IS_NULL", col("VALUE"))));
+      Assertions.assertFalse(collision.canPushAggregate(new Count(col("VALUE"), false)));
+    }
+    Type external = Types.ExternalType.of("pair");
+    for (Type type :
+        new Type[] {
+          external,
+          Types.ListType.nullable(external),
+          Types.MapType.of(external, Types.StringType.get(), true),
+          Types.MapType.of(Types.StringType.get(), external, true),
+          Types.StructType.of(Types.StructType.Field.of("p", external, true, null)),
+          Types.ListType.nullable(
+              Types.StructType.of(Types.StructType.Field.of("p", external, true, null)))
+        }) {
+      StructType schema =
+          new StructType().add("value", new SparkJdbcTypeConverter().toSparkType(type));
+      SparkJdbcPushDownPolicy externalPolicy =
+          new SparkJdbcPushDownPolicy(
+              new Column[] {column("value", type)}, schema, schema, DIALECT, URL);
+      Assertions.assertFalse(
+          externalPolicy.canPush(predicate("IS_NULL", col("value"))), type.simpleString());
+      Assertions.assertFalse(
+          externalPolicy.canPush(predicate("IS_NOT_NULL", col("value"))), type.simpleString());
+      Assertions.assertFalse(
+          externalPolicy.canPushAggregate(new Count(col("value"), false)), type.simpleString());
+    }
   }
 
   private static Predicate predicate(String name, Expression... children) {

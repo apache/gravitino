@@ -68,9 +68,14 @@ public class TestSparkJdbcStringPushDown {
       Table metadata = mock(Table.class);
       when(metadata.columns())
           .thenReturn(
-              new Column[] {
-                Column.of("id", Types.IntegerType.get()), Column.of("s", Types.StringType.get())
-              });
+              identifier.name().equals("composites")
+                  ? new Column[] {
+                    Column.of("id", Types.IntegerType.get()),
+                    Column.of("p", Types.ExternalType.of("pair"))
+                  }
+                  : new Column[] {
+                    Column.of("id", Types.IntegerType.get()), Column.of("s", Types.StringType.get())
+                  });
       return new SparkJdbcTable(
           identifier,
           metadata,
@@ -120,6 +125,12 @@ public class TestSparkJdbcStringPushDown {
                     ? "text COLLATE \"en-US-x-icu\""
                     : "varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")
                 + ")");
+        if (postgres) {
+          statement.execute("CREATE TYPE pair AS (x int, y int)");
+          statement.execute("CREATE TABLE composites(id int, p pair)");
+          statement.execute(
+              "INSERT INTO composites VALUES (1, ROW(1,NULL)), (2, ROW(NULL,NULL)), (3, ROW(1,2)), (4, NULL)");
+        }
         try (PreparedStatement insert =
             connection.prepareStatement("INSERT INTO strings VALUES (?, ?)")) {
           String[] values = {"v500", "a", "A", "a ", null, "C:\\temp", "abc\\", "O'Reilly"};
@@ -147,6 +158,9 @@ public class TestSparkJdbcStringPushDown {
           assertNonBinaryCollationIsNotPrefiltered(url);
         }
         String table = "strings." + (postgres ? "public" : "test") + ".strings";
+        if (postgres) {
+          assertCompositeNullChecksStayInSpark(spark);
+        }
         assertPrefilter(spark, table, "s = 'V500'", List.of());
         assertPrefilter(spark, table, "s = 'a'", List.of(2));
         assertPrefilter(spark, table, "s IN ('a', 'v500')", List.of(1, 2));
@@ -164,6 +178,15 @@ public class TestSparkJdbcStringPushDown {
         Assertions.assertEquals(
             7L,
             spark.sql("SELECT count(*) FROM " + table + " WHERE s IS NOT NULL").head().getLong(0));
+        String columnCount = "SELECT count(s) FROM " + table;
+        String columnCountPlan = plan(spark, columnCount);
+        Assertions.assertTrue(
+            columnCountPlan.contains("PushedAggregates: [COUNT(s)]"), columnCountPlan);
+        Assertions.assertEquals(7L, spark.sql(columnCount).head().getLong(0));
+        String distinctCount = "SELECT count(DISTINCT s) FROM " + table;
+        String distinctPlan = plan(spark, distinctCount);
+        Assertions.assertFalse(distinctPlan.contains("PushedAggregates: [COUNT"), distinctPlan);
+        Assertions.assertEquals(7L, spark.sql(distinctCount).head().getLong(0));
         String limited = "SELECT id FROM " + table + " WHERE s = 'a' LIMIT 1";
         Assertions.assertFalse(plan(spark, limited).contains("PushedLimit"));
         Assertions.assertEquals(2, spark.sql(limited).head().getInt(0));
@@ -172,6 +195,35 @@ public class TestSparkJdbcStringPushDown {
         Assertions.assertEquals(1L, spark.sql(count).head().getLong(0));
       }
     }
+  }
+
+  private static void assertCompositeNullChecksStayInSpark(SparkSession spark) {
+    String table = "strings.public.composites";
+    for (String predicate : new String[] {"p IS NULL", "p IS NOT NULL", "p = '(1,)'"}) {
+      String sql = "SELECT id FROM " + table + " WHERE " + predicate + " ORDER BY id";
+      String actualPlan = plan(spark, sql);
+      Assertions.assertTrue(actualPlan.contains("Filter "), actualPlan);
+      String pushed = actualPlan.substring(actualPlan.indexOf("PushedFilters:"));
+      Assertions.assertFalse(
+          pushed.contains("p IS NULL") || pushed.contains("p IS NOT NULL"), pushed);
+      List<Integer> expected =
+          predicate.equals("p IS NULL")
+              ? List.of(4)
+              : predicate.equals("p IS NOT NULL") ? List.of(1, 2, 3) : List.of(1);
+      Assertions.assertEquals(
+          expected,
+          spark.sql(sql).collectAsList().stream()
+              .map(row -> row.getInt(0))
+              .collect(Collectors.toList()));
+    }
+    String count = "SELECT count(*) FROM " + table + " WHERE p IS NOT NULL";
+    String countPlan = plan(spark, count);
+    Assertions.assertFalse(countPlan.contains("PushedAggregates: [COUNT"), countPlan);
+    Assertions.assertEquals(3L, spark.sql(count).head().getLong(0));
+    String columnCount = "SELECT count(p) FROM " + table;
+    String columnCountPlan = plan(spark, columnCount);
+    Assertions.assertFalse(columnCountPlan.contains("PushedAggregates: [COUNT"), columnCountPlan);
+    Assertions.assertEquals(3L, spark.sql(columnCount).head().getLong(0));
   }
 
   private static void assertNonBinaryCollationIsNotPrefiltered(String url) {

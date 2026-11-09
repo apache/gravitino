@@ -32,6 +32,7 @@ import org.apache.spark.sql.connector.expressions.Expression;
 import org.apache.spark.sql.connector.expressions.Extract;
 import org.apache.spark.sql.connector.expressions.Literal;
 import org.apache.spark.sql.connector.expressions.NamedReference;
+import org.apache.spark.sql.connector.expressions.aggregate.Count;
 import org.apache.spark.sql.connector.expressions.filter.Predicate;
 import org.apache.spark.sql.jdbc.JdbcDialect;
 import org.apache.spark.sql.types.ArrayType;
@@ -60,11 +61,12 @@ import org.apache.spark.sql.types.VarcharType;
  *   <li>{@code TIMESTAMP_NTZ} literals the dialect cannot write in SQL.
  * </ul>
  *
- * <p>Null checks on a column itself are exact. Simple positive PostgreSQL/MySQL string predicates
- * can prefilter rows while Spark rechecks them; see {@link #canPrefilter(Predicate)}.
+ * <p>Null checks and non-distinct counts on a column itself are exact unless its type contains an
+ * external type, whose source NULL semantics may differ. Simple positive PostgreSQL/MySQL string
+ * predicates can prefilter rows while Spark rechecks them; see {@link #canPrefilter(Predicate)}.
  *
- * <p>Aggregates also stay in Spark for timestamp columns whose reader type differs from the type
- * Spark sees, because the reader types the pushed aggregate result.
+ * <p>Value-dependent aggregates also stay in Spark for timestamp columns whose reader type differs
+ * from the type Spark sees, because the reader types the pushed aggregate result.
  */
 class SparkJdbcPushDownPolicy {
 
@@ -72,7 +74,7 @@ class SparkJdbcPushDownPolicy {
       ImmutableSet.of("YEAR", "QUARTER", "MONTH", "DAY", "HOUR", "MINUTE");
 
   private final Set<String> sensitiveColumns;
-  private final Set<String> columns;
+  private final Set<String> nullPreservingColumns;
   private final Set<String> stringColumns;
   private final boolean stringPrefilterSupported;
   private final Set<String> readerTypeMismatchColumns;
@@ -86,16 +88,21 @@ class SparkJdbcPushDownPolicy {
       JdbcDialect dialect,
       String jdbcUrl) {
     this.sensitiveColumns = new HashSet<>();
-    this.columns = new HashSet<>();
+    this.nullPreservingColumns = new HashSet<>();
     this.stringColumns = new HashSet<>();
     String url = jdbcUrl.toLowerCase(Locale.ROOT);
     // These sources can return extra collation matches, which Spark removes with a residual.
     // Other JDBC sources retain their existing conservative policy until validated separately.
     this.stringPrefilterSupported =
         url.startsWith("jdbc:postgresql:") || url.startsWith("jdbc:mysql:");
+    Set<String> externalColumns = new HashSet<>();
     for (Column column : columns) {
-      this.columns.add(normalize(column.name()));
       Type type = column.dataType();
+      if (containsExternal(type)) {
+        externalColumns.add(normalize(column.name()));
+      } else {
+        nullPreservingColumns.add(normalize(column.name()));
+      }
       if ((type instanceof Types.StringType
               || type instanceof Types.VarCharType
               || type instanceof Types.FixedCharType)
@@ -106,6 +113,8 @@ class SparkJdbcPushDownPolicy {
         sensitiveColumns.add(normalize(column.name()));
       }
     }
+    // Case-insensitive matching must not let a safe column mask a same-spelling external one.
+    nullPreservingColumns.removeAll(externalColumns);
     this.readerTypeMismatchColumns = new HashSet<>();
     this.zonedTimestampColumns = new HashSet<>();
     for (StructField field : sparkSchema.fields()) {
@@ -139,8 +148,9 @@ class SparkJdbcPushDownPolicy {
       Expression[] children = predicate.children();
       if (("IS_NULL".equals(predicate.name()) || "IS_NOT_NULL".equals(predicate.name()))
           && children.length == 1
-          && isColumn(children[0], columns)) {
-        // Nullness of the column itself is unchanged by string collation or literal compilation.
+          && isColumn(children[0], nullPreservingColumns)) {
+        // External values may be read as strings but have different source NULL semantics:
+        // PostgreSQL composite IS NULL/IS NOT NULL also examines the fields of the row.
         return true;
       }
     }
@@ -185,6 +195,13 @@ class SparkJdbcPushDownPolicy {
    * @return true if pushing it keeps Spark results and result types
    */
   boolean canPushAggregate(Expression expression) {
+    if (expression instanceof Count) {
+      Count count = (Count) expression;
+      // A non-distinct count only uses nullness, not collation or the reader's value type.
+      if (!count.isDistinct() && isColumn(count.column(), nullPreservingColumns)) {
+        return true;
+      }
+    }
     if (expression instanceof NamedReference
         && readerTypeMismatchColumns.contains(columnName((NamedReference) expression))) {
       return false;
@@ -251,6 +268,25 @@ class SparkJdbcPushDownPolicy {
       }
     }
     return false;
+  }
+
+  private static boolean containsExternal(Type type) {
+    if (type instanceof Types.ListType) {
+      return containsExternal(((Types.ListType) type).elementType());
+    }
+    if (type instanceof Types.MapType) {
+      return containsExternal(((Types.MapType) type).keyType())
+          || containsExternal(((Types.MapType) type).valueType());
+    }
+    if (type instanceof Types.StructType) {
+      for (Types.StructType.Field field : ((Types.StructType) type).fields()) {
+        if (containsExternal(field.type())) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return type instanceof Types.ExternalType;
   }
 
   private static boolean isSensitive(Type type) {
