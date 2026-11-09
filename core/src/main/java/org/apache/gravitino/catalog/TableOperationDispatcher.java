@@ -46,6 +46,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -608,7 +609,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     .withNamespace(current.namespace())
                     .withComment(current.comment())
                     .withProperties(current.properties())
-                    .withColumns(current.columns())
+                    .withColumns(fillMissingColumnCreationAudit(current.columns(), audit))
                     .withPartitioning(current.partitioning())
                     .withDistribution(current.distribution())
                     .withSortOrders(current.sortOrders())
@@ -619,6 +620,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenProperties(entityCombinedTable.hiddenProperties())
         .withImported(entityCombinedTable.imported());
+  }
+
+  private static List<ColumnEntity> fillMissingColumnCreationAudit(
+      List<ColumnEntity> columns, AuditInfo tableAudit) {
+    return columns.stream()
+        .map(
+            column -> {
+              Audit audit = column.auditInfo();
+              if (audit.creator() != null) {
+                return column;
+              }
+              return ColumnEntity.builder()
+                  .withId(column.id())
+                  .withName(column.name())
+                  .withPosition(column.position())
+                  .withDataType(column.dataType())
+                  .withComment(column.comment())
+                  .withNullable(column.nullable())
+                  .withAutoIncrement(column.autoIncrement())
+                  .withDefaultValue(column.defaultValue())
+                  .withAuditInfo(
+                      AuditInfo.builder()
+                          .withCreator(tableAudit.creator())
+                          .withCreateTime(
+                              audit.createTime() == null
+                                  ? tableAudit.createTime()
+                                  : audit.createTime())
+                          .withLastModifier(audit.lastModifier())
+                          .withLastModifiedTime(audit.lastModifiedTime())
+                          .build())
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   private EntityCombinedTable importTableFromCatalog(

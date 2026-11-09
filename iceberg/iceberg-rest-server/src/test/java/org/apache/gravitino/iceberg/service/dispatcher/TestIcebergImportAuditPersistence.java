@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -58,6 +59,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.ViewEntity;
@@ -151,9 +153,156 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
       new IcebergTableHookDispatcher(
               backendDispatcher, mock(IcebergNamespaceOperationDispatcher.class))
           .createTable(f.context, namespace, request);
+      TableEntity stored = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
+      Assertions.assertEquals("alice", stored.auditInfo().creator());
       Assertions.assertEquals(
-          "alice",
-          f.store.get(table, Entity.EntityType.TABLE, TableEntity.class).auditInfo().creator());
+          stored.auditInfo().creator(), stored.columns().get(0).auditInfo().creator());
+      Assertions.assertEquals(
+          stored.auditInfo().createTime(), stored.columns().get(0).auditInfo().createTime());
+    }
+  }
+
+  @TestTemplate
+  void testTableAuditRecoveryPreservesColumnFields() throws Exception {
+    try (Fixture f = new Fixture()) {
+      NameIdentifier schema = f.ident("column_audit_schema");
+      f.schemas.createSchema(schema, "", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier table = NameIdentifier.of(METALAKE, CATALOG, schema.name(), "table");
+      Column[] columns = {
+        Column.of(
+            "missing",
+            Types.StringType.get(),
+            "comment",
+            false,
+            false,
+            Column.DEFAULT_VALUE_NOT_SET),
+        Column.of("modified", Types.StringType.get()),
+        Column.of("owned", Types.StringType.get())
+      };
+      f.source.createTable(
+          table,
+          columns,
+          "",
+          Map.of(),
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          Indexes.EMPTY_INDEXES);
+      FieldUtils.writeField(f.source.loadTable(table), "auditInfo", AuditInfo.EMPTY, true);
+      f.tables.loadTable(table);
+      AuditInfo modified =
+          AuditInfo.builder()
+              .withCreateTime(Instant.EPOCH.plusSeconds(1))
+              .withLastModifier("modifier")
+              .withLastModifiedTime(Instant.EPOCH.plusSeconds(2))
+              .build();
+      AuditInfo owned =
+          AuditInfo.builder()
+              .withCreator("bob")
+              .withCreateTime(Instant.EPOCH.plusSeconds(3))
+              .withLastModifier("editor")
+              .withLastModifiedTime(Instant.EPOCH.plusSeconds(4))
+              .build();
+      TableEntity before =
+          f.store.update(
+              table,
+              TableEntity.class,
+              Entity.EntityType.TABLE,
+              current ->
+                  TableEntity.builder()
+                      .withId(current.id())
+                      .withName(current.name())
+                      .withNamespace(current.namespace())
+                      .withComment(current.comment())
+                      .withProperties(current.properties())
+                      .withAuditInfo(current.auditInfo())
+                      .withColumns(
+                          Arrays.asList(
+                              current.columns().get(0),
+                              ColumnEntity.toColumnEntity(
+                                  columns[1], 1, current.columns().get(1).id(), modified),
+                              ColumnEntity.toColumnEntity(
+                                  columns[2], 2, current.columns().get(2).id(), owned)))
+                      .build());
+      f.tables.importTable(table, ALICE);
+      TableEntity stored = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
+      Assertions.assertEquals("alice", stored.auditInfo().creator());
+      Assertions.assertEquals("alice", stored.columns().get(0).auditInfo().creator());
+      Assertions.assertEquals(Instant.EPOCH, stored.columns().get(0).auditInfo().createTime());
+      Assertions.assertEquals("alice", stored.columns().get(1).auditInfo().creator());
+      Assertions.assertEquals(
+          modified.createTime(), stored.columns().get(1).auditInfo().createTime());
+      Assertions.assertEquals(
+          modified.lastModifier(), stored.columns().get(1).auditInfo().lastModifier());
+      Assertions.assertEquals(
+          modified.lastModifiedTime(), stored.columns().get(1).auditInfo().lastModifiedTime());
+      Assertions.assertEquals(before.columns().get(2), stored.columns().get(2));
+      for (int i = 0; i < columns.length; i++) {
+        ColumnEntity expected = before.columns().get(i);
+        ColumnEntity actual = stored.columns().get(i);
+        Assertions.assertEquals(expected.id(), actual.id());
+        Assertions.assertEquals(expected.name(), actual.name());
+        Assertions.assertEquals(expected.position(), actual.position());
+        Assertions.assertEquals(expected.dataType(), actual.dataType());
+        Assertions.assertEquals(expected.comment(), actual.comment());
+        Assertions.assertEquals(expected.nullable(), actual.nullable());
+        Assertions.assertEquals(expected.autoIncrement(), actual.autoIncrement());
+        Assertions.assertEquals(expected.defaultValue(), actual.defaultValue());
+      }
+    }
+  }
+
+  @TestTemplate
+  void testTableImportReturnsRecreatedEntityWithoutOldAudit() throws Exception {
+    try (Fixture f = new Fixture()) {
+      NameIdentifier schema = f.ident("recreated_table_schema");
+      f.schemas.createSchema(schema, "", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier table = NameIdentifier.of(METALAKE, CATALOG, schema.name(), "table");
+      f.source.createTable(
+          table,
+          new Column[] {Column.of("col", Types.StringType.get())},
+          "",
+          Map.of(),
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          Indexes.EMPTY_INDEXES);
+      FieldUtils.writeField(f.source.loadTable(table), "auditInfo", AuditInfo.EMPTY, true);
+      f.tables.loadTable(table);
+      TableEntity observed = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
+      AtomicBoolean replaced = new AtomicBoolean();
+      doAnswer(
+              call -> {
+                if (replaced.compareAndSet(false, true)) {
+                  f.store.delete(table, Entity.EntityType.TABLE);
+                  TableEntity recreated =
+                      TableEntity.builder()
+                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withName(observed.name())
+                          .withNamespace(observed.namespace())
+                          .withColumns(
+                              Arrays.asList(
+                                  ColumnEntity.toColumnEntity(
+                                      Column.of("col", Types.StringType.get()),
+                                      0,
+                                      RandomIdGenerator.INSTANCE.nextId(),
+                                      AuditInfo.EMPTY)))
+                          .withAuditInfo(AuditInfo.EMPTY)
+                          .build();
+                  f.store.put(recreated, false);
+                }
+                return call.callRealMethod();
+              })
+          .when(f.store)
+          .update(eq(table), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+      Assertions.assertNull(f.tables.importTable(table, ALICE).auditInfo().creator());
+      TableEntity stored = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
+      Assertions.assertTrue(replaced.get());
+      Assertions.assertNotEquals(observed.id(), stored.id());
+      Assertions.assertNull(stored.auditInfo().creator());
+      Assertions.assertNull(stored.auditInfo().createTime());
+      Assertions.assertNull(stored.columns().get(0).auditInfo().creator());
+      Assertions.assertNull(f.tables.loadTable(table).auditInfo().creator());
     }
   }
 

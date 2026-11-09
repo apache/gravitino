@@ -91,15 +91,18 @@ public abstract class OperationDispatcher {
 
   /**
    * Fills missing creation fields when another node imported the same object first. The cold import
-   * already carries these fields in its initial write and needs no additional update.
+   * already carries these fields in its initial write and needs no additional update. Ordinary
+   * loads pass an empty requested audit, leaving an unknown source creator unknown. If a concurrent
+   * update wins, return the current registration without applying the old audit.
    *
    * @param entity the imported registration, or null for a managed object
    * @param type the entity class
    * @param reported the audit reported by the source catalog
-   * @param requested the fallback creation audit
+   * @param requested the creation audit supplied by the create operation, or empty for ordinary
+   *     loads
    * @param withAudit copies the current entity with the new audit
    * @param <E> the auditable entity type
-   * @return the current registration with its missing creation fields filled
+   * @return the current registration, with missing creation fields filled if it still matches
    */
   @Nullable
   protected <E extends Entity & HasIdentifier & Auditable> E fillMissingCreationAudit(
@@ -141,6 +144,10 @@ public abstract class OperationDispatcher {
                     .build();
             return withAudit.apply(current, filled);
           });
+    } catch (OptimisticLockException e) {
+      // Audit recovery must not fail a read or attribute a replacement to the old create request.
+      // Do not retry with the requested audit: it belongs to the entity originally observed.
+      return getEntity(entity.nameIdentifier(), entity.type(), type);
     } catch (IOException e) {
       throw new RuntimeException(
           "Failed to import creation audit for " + entity.nameIdentifier(), e);

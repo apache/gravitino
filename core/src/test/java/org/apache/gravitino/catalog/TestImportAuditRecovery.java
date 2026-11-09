@@ -67,8 +67,28 @@ public class TestImportAuditRecovery {
   @Test
   void testRecreatedNameIsNotAttributedToOldCreate() throws Exception {
     SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
-    currentAtUpdate(observed, schema(2L, AuditInfo.EMPTY));
-    Assertions.assertThrows(OptimisticLockException.class, () -> fill(observed, ALICE));
+    SchemaEntity recreated = schema(2L, AuditInfo.EMPTY);
+    currentAtUpdate(observed, recreated);
+    when(store.get(observed.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class))
+        .thenReturn(recreated);
+    Assertions.assertSame(recreated, fill(observed, ALICE));
+    Assertions.assertNull(recreated.auditInfo().creator());
+    Assertions.assertNull(recreated.auditInfo().createTime());
+  }
+
+  @Test
+  void testOptimisticConflictReturnsCurrentAuditWithoutRetry() throws Exception {
+    SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
+    SchemaEntity current = schema(1L, AuditInfo.builder().withCreator("bob").build());
+    when(store.update(
+            eq(observed.nameIdentifier()),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA),
+            any()))
+        .thenThrow(new OptimisticLockException("concurrent update"));
+    when(store.get(observed.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class))
+        .thenReturn(current);
+    Assertions.assertSame(current, fill(observed, ALICE));
   }
 
   @Test

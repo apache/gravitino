@@ -205,6 +205,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         "modified".equals(scenario) ? Instant.EPOCH : null,
         imported.auditInfo().lastModifiedTime());
     Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
+    for (ColumnEntity column : imported.columns()) {
+      Assertions.assertEquals(expectedCreator, column.auditInfo().creator());
+      Assertions.assertEquals(expectedTime, column.auditInfo().createTime());
+    }
     if ("raced".equals(scenario)) {
       verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
       verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
