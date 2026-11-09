@@ -264,6 +264,22 @@ class TestRegisterTableAuthzHandler {
   }
 
   @Test
+  void testMissingTableNameIsBadRequest() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    RegisterTableRequest nullName = mock(RegisterTableRequest.class);
+    when(nullName.name()).thenReturn(null);
+    when(nullName.metadataLocation()).thenReturn(META_LOC);
+    MethodInvocation nullNameInvocation = registerInvocationWithRequest(nullName);
+    assertBadRequest(interceptor.invoke(nullNameInvocation));
+    verify(nullNameInvocation, never()).proceed();
+
+    MethodInvocation emptyNameInvocation = registerInvocation(false, "", META_LOC);
+    assertBadRequest(interceptor.invoke(emptyNameInvocation));
+    verify(emptyNameInvocation, never()).proceed();
+  }
+
+  @Test
   void testUnreadableMetadataLocationIsBadRequestNotAuthzInternalError() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
     when(catalogWrapper.loadTableMetadataFromLocation(any()))

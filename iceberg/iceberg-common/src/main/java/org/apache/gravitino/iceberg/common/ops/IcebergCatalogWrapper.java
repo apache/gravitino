@@ -351,6 +351,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
     validateTableLocation(metadataLocation);
+    requireMetadataFileName(metadataLocation);
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
       try {
         return TableMetadataParser.read(fileIO, metadataLocation);
@@ -358,19 +359,17 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         // Request-supplied location missing: client error. 404 is for missing namespace/table.
         LOG.info("Metadata location does not exist: {}", metadataLocation, e);
         throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
-      } catch (IllegalArgumentException e) {
-        // Directory / non-metadata path from TableMetadataParser. Catch only around read().
-        LOG.info("Metadata location is not a valid metadata file: {}", metadataLocation, e);
-        throw new BadRequestException(
-            "Metadata location %s is not a valid metadata file", metadataLocation);
       } catch (RuntimeIOException e) {
-        // Unsupported scheme via cause type (not message text). Other IO stays 5xx.
-        if (e.getCause() instanceof UnsupportedFileSystemException) {
-          LOG.info(
-              "Cannot read metadata location with unsupported scheme: {}", metadataLocation, e);
-          throw new BadRequestException(
-              "Cannot read metadata location %s: unsupported or unreadable scheme",
-              metadataLocation);
+        // Unsupported scheme via cause type (not message text). Walk the chain in case FileIO
+        // wraps UnsupportedFileSystemException deeper than getCause(). Other IO stays 5xx.
+        for (Throwable t = e; t != null; t = t.getCause()) {
+          if (t instanceof UnsupportedFileSystemException) {
+            LOG.info(
+                "Cannot read metadata location with unsupported scheme: {}", metadataLocation, e);
+            throw new BadRequestException(
+                "Cannot read metadata location %s: unsupported or unreadable scheme",
+                metadataLocation);
+          }
         }
         throw e;
       }
@@ -753,6 +752,26 @@ public class IcebergCatalogWrapper implements AutoCloseable {
                   "Namespace property '%s' exceeds the JDBC catalog limit of %s characters",
                   key,
                   MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH));
+    }
+  }
+
+  /**
+   * Same gate as Iceberg {@code TableMetadataParser.read} → {@code Codec.fromFileName}: reject
+   * directory / non-metadata paths before reading. Do not catch {@link IllegalArgumentException}
+   * around {@code read()} — corrupt content / {@code fromJson} validation must not be mislabeled as
+   * a bad metadata-location.
+   */
+  private static void requireMetadataFileName(String metadataLocation) {
+    if (metadataLocation == null) {
+      throw new BadRequestException(
+          "Metadata location %s is not a valid metadata file", metadataLocation);
+    }
+    try {
+      TableMetadataParser.Codec.fromFileName(metadataLocation);
+    } catch (IllegalArgumentException e) {
+      LOG.info("Metadata location is not a valid metadata file: {}", metadataLocation, e);
+      throw new BadRequestException(
+          "Metadata location %s is not a valid metadata file", metadataLocation);
     }
   }
 }

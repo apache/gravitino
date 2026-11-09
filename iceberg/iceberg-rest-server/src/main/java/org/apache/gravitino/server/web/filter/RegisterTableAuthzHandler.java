@@ -94,6 +94,7 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     NameIdentifier schemaIdent = nameIdentifierMap.get(EntityType.SCHEMA);
     if (request != null
         && request.name() != null
+        && !request.name().isEmpty()
         && metalakeIdent != null
         && catalogIdent != null
         && schemaIdent != null) {
@@ -109,6 +110,9 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
     RegisterTableRequest request = registerTableRequest();
     if (request == null) {
       throw new BadRequestException("Invalid request: a RegisterTableRequest body is required");
+    }
+    if (request.name() == null || request.name().isEmpty()) {
+      throw new BadRequestException("Invalid request: table name is required");
     }
 
     NameIdentifier metalakeIdent = nameIdentifierMap.get(EntityType.METALAKE);

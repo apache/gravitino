@@ -52,6 +52,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -466,6 +467,20 @@ public class TestIcebergCatalogWrapper {
               BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
       Assertions.assertTrue(
           e.getMessage().contains("is not a valid metadata file"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromCorruptContentIsNotBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path metadataFile = warehouseDir.resolve("v1.metadata.json");
+      Files.writeString(metadataFile, "{not-valid-table-metadata", StandardCharsets.UTF_8);
+      String location = metadataFile.toUri().toString();
+      // Codec.fromFileName accepts *.metadata.json; corrupt JSON must not become BadRequest.
+      Assertions.assertThrows(
+          RuntimeIOException.class, () -> wrapper.loadTableMetadataFromLocation(location));
     }
   }
 
