@@ -24,15 +24,19 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,7 +101,30 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
-  void testLanceUsesHadoopUserForDiscoveryAndCatalogs() {
+  void testLanceReusesSparkContextUser() {
+    SparkConf sparkConf = new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
+    SparkContext context = mock(SparkContext.class);
+    when(context.conf()).thenReturn(sparkConf);
+    when(context.sparkUser()).thenReturn("etuser");
+    GravitinoLakehouseRESTDiscoveryDriverPlugin plugin =
+        new GravitinoLakehouseRESTDiscoveryDriverPlugin() {
+          @Override
+          void initialize(
+              SparkConf conf, Map<String, String> providers, @Nullable String sparkUser) {
+            super.initialize(conf, providerClasses("lance", LanceAuthProvider.class), sparkUser);
+          }
+        };
+
+    plugin.init(context, null);
+
+    assertEquals("Basic ZXR1c2VyOnVudXNlZA==", LanceAuthProvider.discoveryAuthorization);
+    assertEquals(
+        LanceAuthProvider.discoveryAuthorization,
+        sparkConf.get(CATALOG_PREFIX + "catalog_a.headers.Authorization"));
+  }
+
+  @Test
+  void testLanceUsesSparkUserForDiscoveryAndCatalogs() {
     SparkConf sparkConf = new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
 
     driver().initialize(sparkConf, providerClasses("lance", LanceAuthProvider.class), "etuser");
@@ -109,7 +136,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
-  void testLanceUsesHadoopUserWithExplicitSimpleAuthentication() {
+  void testLanceUsesSparkUserWithExplicitSimpleAuthentication() {
     SparkConf sparkConf =
         new SparkConf(false)
             .set("spark.sql.gravitino.lanceREST.uri", "rest-uri")
@@ -176,7 +203,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
-  void testLanceWithoutHadoopUserDoesNotGenerateAuthorization() {
+  void testLanceWithoutSparkUserDoesNotGenerateAuthorization() {
     for (String userName : Arrays.asList(null, "", "  ")) {
       SparkConf sparkConf =
           new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
@@ -189,7 +216,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
-  void testHadoopUserDoesNotChangeOtherFormats() {
+  void testSparkUserDoesNotChangeOtherFormats() {
     SparkConf sparkConf = baseConf();
 
     driver().initialize(sparkConf, providerClasses("fake", FakeProvider.class), "etuser");
@@ -198,7 +225,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   @Test
-  void testLanceEncodesHadoopUserAsUtf8() {
+  void testLanceEncodesSparkUserAsUtf8() {
     SparkConf sparkConf = new SparkConf(false).set("spark.sql.gravitino.lanceREST.uri", "rest-uri");
 
     driver()

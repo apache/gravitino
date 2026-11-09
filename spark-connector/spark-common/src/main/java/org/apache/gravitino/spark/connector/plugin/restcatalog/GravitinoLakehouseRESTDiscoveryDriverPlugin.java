@@ -78,7 +78,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
-    initialize(sc.conf());
+    initialize(sc.conf(), BuiltinRESTCatalogProviders.providerClassNames(), sc.sparkUser());
     return Collections.emptyMap();
   }
 
@@ -89,14 +89,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf, Map<String, String> providerClassNames) {
-    initialize(sparkConf, providerClassNames, System.getenv("HADOOP_USER_NAME"));
+    initialize(sparkConf, providerClassNames, null);
   }
 
   @VisibleForTesting
   void initialize(
-      SparkConf sparkConf,
-      Map<String, String> providerClassNames,
-      @Nullable String hadoopUserName) {
+      SparkConf sparkConf, Map<String, String> providerClassNames, @Nullable String sparkUser) {
     validatePluginOrder(sparkConf);
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
@@ -122,12 +120,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
               && AuthProperties.isSimple(
                   userConf.get(
                       GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE))
-              && StringUtils.isNotBlank(hadoopUserName)
+              && StringUtils.isNotBlank(sparkUser)
               && globalProperties.keySet().stream()
                   .noneMatch("headers.Authorization"::equalsIgnoreCase)) {
             String credentials =
                 Base64.getEncoder()
-                    .encodeToString((hadoopUserName + ":unused").getBytes(StandardCharsets.UTF_8));
+                    .encodeToString((sparkUser + ":unused").getBytes(StandardCharsets.UTF_8));
             globalProperties.put("headers.Authorization", "Basic " + credentials);
           }
           List<String> discoveredCatalogs = listCatalogs(provider, format, uri, globalProperties);
