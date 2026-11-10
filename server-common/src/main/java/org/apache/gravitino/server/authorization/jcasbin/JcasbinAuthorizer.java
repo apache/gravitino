@@ -61,8 +61,12 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
@@ -356,6 +360,35 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean canAccessDomain(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext requestContext) {
+    if (object == null || object.type() != MetadataObject.Type.DOMAIN) {
+      return false;
+    }
+    DomainEntity domain;
+    try {
+      domain =
+          GravitinoEnv.getInstance()
+              .internalDomainDispatcher()
+              .getDomain(metalake, object.fullName());
+    } catch (NoSuchDomainException e) {
+      return false;
+    }
+    return DomainAuthzHelper.allowed(
+        this,
+        principal,
+        metalake,
+        DomainAuthzHelper.scopes(metalake, domain),
+        domain.status() == Domain.Status.DRAFT
+            ? Privilege.Name.MANAGE_DOMAIN
+            : Privilege.Name.USE_DOMAIN,
+        requestContext);
+  }
+
+  @Override
   public boolean deny(
       Principal principal,
       String metalake,
@@ -646,7 +679,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               currentPrincipal, metalake, metadataObject, metalakeObject, requestContext)) {
         return true;
       }
-    } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
+    } while ((metadataObject = DomainAuthzHelper.parent(metalake, metadataObject)) != null);
     return false;
   }
 
@@ -741,7 +774,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
     List<MetadataObject> chain = new ArrayList<>();
-    for (MetadataObject obj = targetObject; obj != null; obj = MetadataObjects.parent(obj)) {
+    for (MetadataObject obj = targetObject;
+        obj != null;
+        obj = DomainAuthzHelper.parent(metalake, obj)) {
       chain.add(obj);
     }
     chain.add(metalakeObject);

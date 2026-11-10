@@ -177,7 +177,11 @@ public interface Privilege {
     /** The privilege to discover a semantic model and load its definition. */
     USE_SEMANTIC_MODEL(0L, 1L << 40),
     /** The privilege to rename a semantic model or alter its definition and metadata. */
-    MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 41),
+    /** The privilege to manage domains, including draft domains. */
+    MANAGE_DOMAIN(0L, 1L << 42),
+    /** The privilege to discover published domains and browse their members. */
+    USE_DOMAIN(0L, 1L << 43);
 
     private final long highBits;
     private final long lowBits;

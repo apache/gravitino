@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -53,6 +54,7 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
@@ -453,6 +455,9 @@ public class DomainMetaService {
 
             DomainPO newDomainPO = DomainPO.updateDomainPO(lockedDomainPO, updatedDomainEntity);
             updateDomainWithVersion(identifier, mapper, lockedDomainPO, newDomainPO);
+            // Domains bypass the entity cache, but peers still cache authorization name-to-ID
+            // mappings.
+            EntityChangeLogWriter.append(identifier, Entity.EntityType.DOMAIN, OperateType.ALTER);
             storedDomain[0] =
                 DomainPO.fromDomainPO(
                     mapper.selectDomainMetaById(lockedDomainPO.domainId()), identifier.namespace());
@@ -473,17 +478,28 @@ public class DomainMetaService {
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NonEmptyEntityException If the domain has sub-domains.
    */
+  public boolean deleteDomain(NameIdentifier identifier) {
+    return deleteDomain(identifier, domain -> {});
+  }
+
+  /**
+   * Deletes a domain with authorization checked under its row lock.
+   *
+   * @param identifier The domain identifier.
+   * @param check The check against the current domain and parent.
+   * @return Whether the domain was deleted.
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteDomain")
-  public boolean deleteDomain(NameIdentifier identifier) {
+  public boolean deleteDomain(NameIdentifier identifier, Consumer<DomainEntity> check) {
     DomainPO domainPO;
     try {
       domainPO = getDomainPOByMetalakeAndName(identifier.namespace().level(0), identifier.name());
     } catch (NoSuchEntityException e) {
       return false;
     }
-    return deleteDomain(identifier, domainPO);
+    return deleteDomain(identifier, domainPO, check);
   }
 
   /**
@@ -550,6 +566,11 @@ public class DomainMetaService {
    */
   @VisibleForTesting
   boolean deleteDomain(NameIdentifier identifier, DomainPO domainPO) {
+    return deleteDomain(identifier, domainPO, domain -> {});
+  }
+
+  private boolean deleteDomain(
+      NameIdentifier identifier, DomainPO domainPO, Consumer<DomainEntity> check) {
     long domainId = domainPO.domainId();
 
     // The metalake lock comes first. Dropping the metalake soft-deletes the privileges before the
@@ -565,8 +586,12 @@ public class DomainMetaService {
           () -> lockMetalakeForDomainWrite(identifier.namespace().level(0), domainPO.metalakeId()),
           () -> {
             DomainPO lockedDomainPO = lockAndGetDomainPO(identifier, domainPO);
+            check.accept(
+                DomainRelService.getInstance()
+                    .toEntityWithParent(lockedDomainPO, identifier.namespace()));
             DomainRelService.getInstance().checkDomainHasNoSubDomains(identifier, domainId);
             deleteDomainWithVersion(identifier, lockedDomainPO);
+            EntityChangeLogWriter.append(identifier, Entity.EntityType.DOMAIN, OperateType.DROP);
           },
           () ->
               SessionUtils.doWithoutCommit(

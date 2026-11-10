@@ -57,6 +57,7 @@ import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.hook.DomainHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
@@ -242,7 +243,11 @@ class TestGravitinoEnvMetadataComponents {
       env.initializeFullComponents(config);
 
       assertInstanceOf(DomainManager.class, env.internalDomainDispatcher());
-      assertSame(env.internalDomainDispatcher(), env.domainDispatcher());
+      assertDispatcherChain(
+          env.domainDispatcher(), DomainHookDispatcher.class, DomainManager.class);
+      assertSame(
+          env.internalDomainDispatcher(),
+          FieldUtils.readField(env.domainDispatcher(), "dispatcher", true));
 
       assertDispatcherChain(
           env.filesetDispatcher(),

@@ -195,6 +195,15 @@ public class TestNameIdentifierUtil {
         () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
   }
 
+  /** Verifies that domain names remain atomic even when they contain dots. */
+  @Test
+  public void testDottedDomainMetadataObjectName() {
+    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance.Trading.v1");
+    Assertions.assertEquals(
+        MetadataObjects.of(null, "Finance.Trading.v1", MetadataObject.Type.DOMAIN),
+        NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
+  }
+
   @Test
   public void testRejectDottedMetadataObjectName() {
     NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");

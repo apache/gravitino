@@ -247,6 +247,58 @@ public class TestDomainManager {
     }
   }
 
+  /** Verifies reserved names cannot be persisted through creation or renaming. */
+  @Test
+  public void testReservedDomainNamesAreRejectedBeforeWrite() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "*", null, null, TagValue.noValue("reserved-tag"), true));
+    Assertions.assertEquals(0, domainManager.listDomains(METALAKE).length);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.rename("*")));
+    Assertions.assertEquals("Finance", domainManager.getDomain(METALAKE, "Finance").name());
+    Assertions.assertArrayEquals(new String[] {"Finance"}, domainManager.listDomains(METALAKE));
+  }
+
+  /**
+   * Verifies invalid new backing-tag names leave neither a domain nor a tag in storage.
+   *
+   * @param tagName The invalid backing-tag name.
+   * @throws IOException If checking storage fails.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"finance.v1", "*"})
+  public void testInvalidNewBackingTagNamesAreRejectedBeforeWrite(String tagName)
+      throws IOException {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "Rejected", null, null, TagValue.noValue(tagName), true));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofDomain(METALAKE, "Rejected"), Entity.EntityType.DOMAIN));
+    Assertions.assertFalse(
+        entityStore.exists(NameIdentifierUtil.ofTag(METALAKE, tagName), Entity.EntityType.TAG));
+
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("finance"), true);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance", "Rejected", null, null, TagValue.noValue(tagName), true));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofDomain(METALAKE, "Rejected"), Entity.EntityType.DOMAIN));
+    Assertions.assertFalse(
+        entityStore.exists(NameIdentifierUtil.ofTag(METALAKE, tagName), Entity.EntityType.TAG));
+    Assertions.assertArrayEquals(new String[] {"Finance"}, domainManager.listDomains(METALAKE));
+  }
+
   /** Verifies membership lookups against live stored tags and object lifecycles. */
   @Test
   public void testMembershipQueriesWithStoredInheritanceAndLifecycle() throws IOException {
