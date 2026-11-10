@@ -22,6 +22,8 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 
 import com.google.common.io.BaseEncoding;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -45,6 +47,14 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertEquals(
         "decode('" + hex + "', 'hex')",
         converter.fromGravitino(Literals.of("0x" + hex, Types.BinaryType.get())));
+  }
+
+  @Test
+  void testUnprefixedBinaryDefaultKeepsProviderInterpretation() {
+    // Shared DTO decoder must not reject unprefixed binary strings; PostgreSQL quotes them.
+    LiteralDTO dto =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("AB").build();
+    Assertions.assertEquals("'AB'", converter.fromGravitino(DTOConverters.fromFunctionArg(dto)));
   }
 
   @Test
