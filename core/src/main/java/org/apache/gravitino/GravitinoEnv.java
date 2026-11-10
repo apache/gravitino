@@ -67,6 +67,7 @@ import org.apache.gravitino.domain.DomainManager;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
+import org.apache.gravitino.hook.DomainHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.JobHookDispatcher;
@@ -1221,8 +1222,8 @@ public class GravitinoEnv {
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(internalPolicyDispatcher);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
 
-    // Domain hooks and events are added with domain authorization and auditing.
-    this.domainDispatcher = internalDomainDispatcher;
+    // Domain audit events are added separately from lifecycle hooks.
+    this.domainDispatcher = new DomainHookDispatcher(internalDomainDispatcher);
   }
 
   private static final class MetadataOperations {

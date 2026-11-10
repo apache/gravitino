@@ -18,7 +18,7 @@
 ---
 
 paths:
-  # Domain authorization and DRAFT visibility are pending access-control integration.
+  # Domain visibility and member access follow the current caller permissions.
   /metalakes/{metalake}/domains:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -27,7 +27,7 @@ paths:
       summary: List domains
       operationId: listDomains
       description: >-
-        List domains. Domain authorization and DRAFT visibility are pending access-control integration.
+        List domains. Published domains require USE_DOMAIN; drafts require MANAGE_DOMAIN or inherited ownership. Hidden drafts return 404 and are omitted from lists.
       parameters:
         - name: details
           in: query
@@ -44,6 +44,12 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/DomainNameListResponse"
                   - $ref: "#/components/schemas/DomainListResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: The metalake does not exist.
           content:
@@ -63,7 +69,7 @@ paths:
       summary: Create a domain
       operationId: createDomain
       description: >-
-        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Domain authorization is pending access-control integration.
+        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Requires MANAGE_DOMAIN on the metalake and, when specified, the parent. A new tag additionally requires CREATE_TAG on the metalake; an existing tag requires ownership of that tag or the metalake. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -79,8 +85,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake, requested parent domain, or existing backing tag to bind does not exist.
+          description: The metalake, requested parent domain, or existing backing tag to bind does not exist, or the requested parent is a hidden draft.
           content:
             application/json:
               schema:
@@ -103,7 +115,7 @@ paths:
       summary: Get a domain
       operationId: getDomain
       description: >-
-        Get a domain. Domain authorization and DRAFT visibility are pending access-control integration.
+        Get a domain. MANAGE_DOMAIN includes USE_DOMAIN. Owners of the domain, its current parent or the metalake bypass privilege denies. Published domains require USE_DOMAIN; drafts require MANAGE_DOMAIN or inherited ownership. Hidden drafts return 404 and are omitted from lists.
       responses:
         "200":
           description: Successful domain operation.
@@ -111,8 +123,14 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/DomainResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or domain does not exist.
+          description: The metalake or domain does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -130,7 +148,7 @@ paths:
       summary: Alter a domain
       operationId: alterDomain
       description: >-
-        Alter a domain. Domain authorization and DRAFT visibility are pending access-control integration.
+        Alter a domain. Requires MANAGE_DOMAIN or ownership of the domain, its current parent, or the metalake.
       requestBody:
         required: true
         content:
@@ -146,8 +164,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or domain does not exist.
+          description: The metalake or domain does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -165,7 +189,7 @@ paths:
       summary: Publish or unpublish a domain
       operationId: setDomainStatus
       description: >-
-        Sets the domain status and returns its snapshot. Publishing requires a published parent; unpublishing requires no published subdomains. Setting the current status is a no-op. Domain authorization is pending access-control integration.
+        Sets the domain status and returns its snapshot. Publishing requires a published parent; unpublishing requires no published subdomains. Setting the current status is a no-op. Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -181,8 +205,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or domain does not exist.
+          description: The metalake or domain does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -203,8 +233,10 @@ paths:
         Deletes only the domain and its parent edge. The backing tag, its assignments and member
         metadata objects remain unchanged; member objects do not prevent deletion. Deletion does
         not cascade to subdomains: a domain with subdomains fails with HTTP 409,
-        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent.
-        Domain authorization is pending access-control integration.
+        NonEmptyDomainException and error code 1005. Returns dropped=false if the domain is absent
+        or is a draft hidden from the caller; a hidden draft is not deleted.
+        Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake.
+        Other permission failures return 403.
       responses:
         "200":
           description: Successful domain operation.
@@ -212,8 +244,14 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/DomainDropResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake does not exist. An absent domain returns HTTP 200 with dropped=false.
+          description: The metalake does not exist. An absent domain or hidden draft returns HTTP 200 with dropped=false.
           content:
             application/json:
               schema:
@@ -236,7 +274,7 @@ paths:
       summary: Attach or move a domain
       operationId: setDomainParent
       description: >-
-        Attaches the child addressed by this path under a top-level parent, replacing its current parent. The backing tag is unchanged. Domain authorization is pending access-control integration.
+        Attaches the child addressed by this path under a top-level parent, replacing its current parent. The backing tag is unchanged. Requires MANAGE_DOMAIN on both the domain and the new parent, inherited from their current scopes. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -252,8 +290,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake, domain, or requested parent domain does not exist.
+          description: The metalake, domain, or requested parent domain does not exist, or the domain or requested parent is a hidden draft.
           content:
             application/json:
               schema:
@@ -271,7 +315,7 @@ paths:
       summary: Detach a domain
       operationId: removeDomainParent
       description: >-
-        Removes the current parent edge and returns the child snapshot. A top-level domain is unchanged. The backing tag is unchanged. Domain authorization is pending access-control integration.
+        Removes the current parent edge and returns the child snapshot. A top-level domain is unchanged. The backing tag is unchanged. Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake. Hidden drafts return 404; other permission failures return 403.
       responses:
         "200":
           description: Successful domain operation.
@@ -281,8 +325,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or domain does not exist.
+          description: The metalake or domain does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -305,7 +355,7 @@ paths:
       summary: Set or remove the backing tag
       operationId: setDomainBackingTag
       description: >-
-        Binds an existing tag with an optional exact value, or removes the binding when backingTag is null. Members are not migrated; previous tag assignments remain unchanged. Domain authorization is pending access-control integration.
+        Binds an existing tag with an optional exact value, or removes the binding when backingTag is null. Members are not migrated; previous tag assignments remain unchanged. Requires MANAGE_DOMAIN on the domain, inherited from its current parent or the metalake. Binding a tag additionally requires ownership of that tag or the metalake; removing a binding needs no tag privilege. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -321,8 +371,14 @@ paths:
                 $ref: "#/components/schemas/DomainResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake, domain, or supplied backing tag does not exist.
+          description: The metalake, domain, or supplied backing tag does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -345,7 +401,7 @@ paths:
       summary: List subdomains
       operationId: listSubdomains
       description: >-
-        List subdomains. Domain authorization and DRAFT visibility are pending access-control integration.
+        List subdomains. Published domains require USE_DOMAIN; drafts require MANAGE_DOMAIN or inherited ownership. Hidden drafts return 404 and are omitted from lists.
       parameters:
         - name: details
           in: query
@@ -362,8 +418,14 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/DomainNameListResponse"
                   - $ref: "#/components/schemas/DomainListResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or domain does not exist.
+          description: The metalake or domain does not exist, or the requested domain is a hidden draft.
           content:
             application/json:
               schema:
@@ -394,8 +456,7 @@ paths:
         Lists recorded leaf objects in the domain's scope, including subdomains, once each with
         all applicable relations. Tagged catalogs and schemas expand to recorded leaves; an empty
         result does not imply that unrecorded external objects are not members. Filters intersect.
-        No paging or counts are provided. Domain authorization, DRAFT visibility and member access
-        filtering are pending domain access-control integration.
+        No paging or counts are provided. Only visible domains and objects accessible to the caller are returned. Hidden drafts return 404, and hidden subdomain relations are omitted. No tag privilege is required.
       parameters:
         - name: domains
           in: query
@@ -435,6 +496,12 @@ paths:
                 $ref: "#/components/schemas/DomainMemberListResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: The metalake or domain does not exist.
           content:
@@ -472,8 +539,7 @@ paths:
       description: >-
         Lists domains whose scopes contain the leaf object, including parents of directly matched
         subdomains. Detailed responses carry every applicable relation without precedence.
-        Domain authorization, DRAFT visibility and member access filtering are pending domain
-        access-control integration. No paging or counts are provided.
+        Only visible domains and accessible objects are returned; hidden subdomains contribute no roll-up relations. No tag privilege is required. No paging or counts are provided.
       parameters:
         - name: details
           in: query
@@ -492,6 +558,12 @@ paths:
                   - $ref: "#/components/schemas/DomainListResponse"
         "400":
           $ref: "#/components/responses/BadRequestResponse"
+        "403":
+          description: The caller lacks the required domain, object or backing-tag permission.
+          content:
+            application/json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: The metalake or metadata object does not exist.
           content:

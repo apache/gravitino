@@ -115,7 +115,8 @@ public class Privileges {
           MetadataObject.Type.FILESET,
           MetadataObject.Type.MODEL,
           MetadataObject.Type.FUNCTION,
-          MetadataObject.Type.SEMANTIC_MODEL);
+          MetadataObject.Type.SEMANTIC_MODEL,
+          MetadataObject.Type.DOMAIN);
 
   /**
    * Returns the Privilege with allow condition from the string representation.
@@ -255,6 +256,10 @@ public class Privileges {
         return UseSemanticModel.allow();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.allow();
+      case MANAGE_DOMAIN:
+        return ManageDomain.allow();
+      case USE_DOMAIN:
+        return UseDomain.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -399,6 +404,10 @@ public class Privileges {
         return UseSemanticModel.deny();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.deny();
+      case MANAGE_DOMAIN:
+        return ManageDomain.deny();
+      case USE_DOMAIN:
+        return UseDomain.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -1830,6 +1839,68 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return SEMANTIC_MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to manage domains. */
+  public static class ManageDomain extends GenericPrivilege<ManageDomain> {
+
+    private static final ManageDomain ALLOW_INSTANCE =
+        new ManageDomain(Condition.ALLOW, Name.MANAGE_DOMAIN);
+    private static final ManageDomain DENY_INSTANCE =
+        new ManageDomain(Condition.DENY, Name.MANAGE_DOMAIN);
+
+    private ManageDomain(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static ManageDomain allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static ManageDomain deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
+    }
+  }
+
+  /** The privilege to use published domains. */
+  public static class UseDomain extends GenericPrivilege<UseDomain> {
+
+    private static final UseDomain ALLOW_INSTANCE = new UseDomain(Condition.ALLOW, Name.USE_DOMAIN);
+    private static final UseDomain DENY_INSTANCE = new UseDomain(Condition.DENY, Name.USE_DOMAIN);
+
+    private UseDomain(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The allowed privilege.
+     */
+    public static UseDomain allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The denied privilege.
+     */
+    public static UseDomain deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.DOMAIN;
     }
   }
 }

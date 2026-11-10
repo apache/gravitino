@@ -32,6 +32,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.domain.DomainDispatcher;
@@ -41,6 +42,9 @@ import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.DomainAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,8 +80,10 @@ public class MetadataObjectDomainOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-object-domains." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-domains", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listDomains(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
       @QueryParam("details") @DefaultValue("false") boolean details) {
@@ -93,9 +99,8 @@ public class MetadataObjectDomainOperations {
                   "Type " + objectType + " cannot be a domain member");
             }
             MetadataObject object = MetadataObjects.parse(fullName, objectType);
-            // Domain visibility and member authorization will be added with domain access control.
             DomainEntity[] domains =
-                domainDispatcher.listDomainsForMetadataObject(metalake, object);
+                DomainAuthzHelper.listDomainsForMetadataObject(domainDispatcher, metalake, object);
             if (!details) {
               return Utils.ok(
                   new NameListResponse(
