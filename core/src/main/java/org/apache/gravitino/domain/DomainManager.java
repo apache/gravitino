@@ -480,6 +480,10 @@ public class DomainManager implements DomainDispatcher {
         "The new backing tag %s of domain %s cannot have a value",
         backingTag.name(),
         name);
+    if (createBackingTag) {
+      NameIdentifierUtil.toMetadataObject(
+          NameIdentifierUtil.ofTag(metalake, backingTag.name()), Entity.EntityType.TAG);
+    }
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
     DomainEntity domain =
         DomainEntity.builder()
