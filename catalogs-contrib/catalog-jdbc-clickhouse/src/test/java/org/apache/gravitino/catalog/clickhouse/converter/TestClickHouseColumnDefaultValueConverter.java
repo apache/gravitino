@@ -19,6 +19,9 @@
 package org.apache.gravitino.catalog.clickhouse.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -54,6 +57,18 @@ public class TestClickHouseColumnDefaultValueConverter {
         Literals.stringLiteral("a'b"), CONVERTER.toGravitino(stringType, "'a''b'", false, true));
     Assertions.assertEquals(
         Literals.stringLiteral("a\\b"), CONVERTER.toGravitino(stringType, "'a\\\\b'", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("a\n\t\r\0\b\f\u0007\u000Bz"),
+        CONVERTER.toGravitino(stringType, "'a\\n\\t\\r\\0\\b\\f\\a\\v\\x7a'", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("xg1"), CONVERTER.toGravitino(stringType, "'\\xg1'", false, true));
+  }
+
+  @Test
+  void testUnparsedDefaultKeepsServerText() {
+    JdbcTypeConverter.JdbcTypeBean intType = new JdbcTypeConverter.JdbcTypeBean("Int32");
+    Assertions.assertEquals(
+        UnparsedExpression.of("a\\'b"), CONVERTER.toGravitino(intType, "'a\\'b'", false, true));
   }
 
   @Test
@@ -69,6 +84,28 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertAccepted(Types.DateType.get(), "1970-01-01");
     assertAccepted(Types.DateType.get(), "2149-06-06");
     assertAccepted(Types.UUIDType.get(), "61f0c404-5cb3-11e7-907b-a6006ad3dba0");
+    assertAccepted(Types.DecimalType.of(3, 2), "9.994");
+    assertAccepted(Types.DecimalType.of(3, 2), "-9.99");
+    // Callers may wrap the value in single quotes.
+    assertAccepted(Types.DateType.get(), "'2024-01-01'");
+    assertAccepted(Types.UUIDType.get(), "'61f0c404-5cb3-11e7-907b-a6006ad3dba0'");
+    assertAccepted(Types.IntegerType.get(), "'5'");
+  }
+
+  @Test
+  void testNonLiteralDefaultValuesSkipValidation() {
+    Assertions.assertDoesNotThrow(
+        () -> CONVERTER.checkDefaultValue(Types.IntegerType.get(), Literals.NULL));
+    Assertions.assertDoesNotThrow(
+        () -> CONVERTER.checkDefaultValue(Types.DateType.get(), FunctionExpression.of("today")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            CONVERTER.checkDefaultValue(
+                Types.TimestampType.withoutTimeZone(), Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP));
+    Assertions.assertDoesNotThrow(
+        () ->
+            CONVERTER.checkDefaultValue(
+                Types.UUIDType.get(), UnparsedExpression.of("generateUUIDv4()")));
   }
 
   @Test
@@ -83,6 +120,8 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertRejected(Types.LongType.get(), "9223372036854775808");
     assertRejected(Types.IntegerType.get(), "abc");
     assertRejected(Types.DecimalType.of(3, 2), "99.999");
+    assertRejected(Types.DecimalType.of(3, 2), "9.995");
+    assertRejected(Types.DateType.get(), "'2150-01-01'");
     assertRejected(Types.DateType.get(), "1969-12-31");
     assertRejected(Types.DateType.get(), "2150-01-01");
     assertRejected(Types.DateType.get(), "2024-13-01");
@@ -90,13 +129,14 @@ public class TestClickHouseColumnDefaultValueConverter {
   }
 
   private static void assertAccepted(Type type, String value) {
-    Assertions.assertDoesNotThrow(() -> CONVERTER.fromGravitino(type, Literals.of(value, type)));
+    Assertions.assertDoesNotThrow(
+        () -> CONVERTER.checkDefaultValue(type, Literals.of(value, type)));
   }
 
   private static void assertRejected(Type type, String value) {
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> CONVERTER.fromGravitino(type, Literals.of(value, type)),
+        () -> CONVERTER.checkDefaultValue(type, Literals.of(value, type)),
         "Expected rejection of " + value + " for " + type.simpleString());
   }
 }

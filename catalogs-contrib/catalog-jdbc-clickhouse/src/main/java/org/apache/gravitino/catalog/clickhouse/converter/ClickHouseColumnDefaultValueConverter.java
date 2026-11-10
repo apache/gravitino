@@ -55,19 +55,24 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
           "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
   /**
-   * Converts a Gravitino default value to a ClickHouse DEFAULT expression after checking that a
-   * literal value fits the column type. ClickHouse does not validate DEFAULT literals when the
-   * table is created, so an invalid value would otherwise be accepted and only fail on insert.
+   * Checks that a literal default value fits the column type. ClickHouse does not validate DEFAULT
+   * literals when a table is created or altered, so an invalid value would otherwise be accepted
+   * and only fail on insert. Non-literal and NULL defaults are not checked.
    *
    * @param columnType the Gravitino type of the column
    * @param defaultValue the default value of the column
-   * @return the ClickHouse DEFAULT expression
+   * @throws IllegalArgumentException if the literal value is not valid for the column type
    */
-  public String fromGravitino(Type columnType, Expression defaultValue) {
-    if (defaultValue instanceof Literal<?> literal && literal.value() != null) {
-      checkLiteralFitsType(columnType, literal.value().toString());
+  public void checkDefaultValue(Type columnType, Expression defaultValue) {
+    if (!(defaultValue instanceof Literal<?> literal) || literal.value() == null) {
+      return;
     }
-    return fromGravitino(defaultValue);
+    String value = literal.value().toString();
+    // Validate the same value that fromGravitino writes, which drops caller-supplied quotes.
+    if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
+      value = ClickHouseClusterUtils.unescapeSingleQuotes(value.substring(1, value.length() - 1));
+    }
+    checkLiteralFitsType(columnType, value);
   }
 
   public String fromGravitino(Expression defaultValue) {
@@ -148,13 +153,15 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
     }
 
     // need exclude begin and end "'"
-    String reallyValue =
+    boolean quoted =
         columnDefaultValue.length() >= 2
-                && columnDefaultValue.startsWith("'")
-                && columnDefaultValue.endsWith("'")
-            ? unescapeStringLiteral(
-                columnDefaultValue.substring(1, columnDefaultValue.length() - 1))
+            && columnDefaultValue.startsWith("'")
+            && columnDefaultValue.endsWith("'");
+    String rawValue =
+        quoted
+            ? columnDefaultValue.substring(1, columnDefaultValue.length() - 1)
             : columnDefaultValue;
+    String reallyValue = quoted ? unescapeStringLiteral(rawValue) : rawValue;
 
     try {
       switch (realType) {
@@ -198,10 +205,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         case ClickHouseTypeConverter.FIXEDSTRING:
           return Literals.of(reallyValue, Types.FixedCharType.of(type.getColumnSize()));
         default:
-          return UnparsedExpression.of(reallyValue);
+          return UnparsedExpression.of(rawValue);
       }
     } catch (Exception ex) {
-      return UnparsedExpression.of(reallyValue);
+      return UnparsedExpression.of(rawValue);
     }
   }
 
@@ -288,6 +295,28 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
           case '0':
             result.append('\0');
             break;
+          case 'b':
+            result.append('\b');
+            break;
+          case 'f':
+            result.append('\f');
+            break;
+          case 'a':
+            result.append('\u0007');
+            break;
+          case 'v':
+            result.append('\u000B');
+            break;
+          case 'x':
+            if (i + 2 < text.length()
+                && isHexDigit(text.charAt(i + 1))
+                && isHexDigit(text.charAt(i + 2))) {
+              result.append((char) Integer.parseInt(text.substring(i + 1, i + 3), 16));
+              i += 2;
+            } else {
+              result.append(next);
+            }
+            break;
           default:
             result.append(next);
         }
@@ -299,5 +328,9 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       }
     }
     return result.toString();
+  }
+
+  private static boolean isHexDigit(char c) {
+    return Character.digit(c, 16) >= 0;
   }
 }

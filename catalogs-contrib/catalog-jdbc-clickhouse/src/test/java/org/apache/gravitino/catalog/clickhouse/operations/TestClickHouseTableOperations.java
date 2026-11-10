@@ -2638,6 +2638,79 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         .build();
   }
 
+  @Test
+  public void testAlterTableDefaultValueValidation() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("c1")
+            .withType(Types.IntegerType.get())
+            .withDefaultValue(Literals.of("300", Types.IntegerType.get()))
+            .build();
+    // A default that does not fit its type can exist when the table was created outside Gravitino.
+    JdbcColumn c2 =
+        JdbcColumn.builder()
+            .withName("c2")
+            .withType(Types.ByteType.get())
+            .withDefaultValue(Literals.of("200", Types.ByteType.get()))
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("tbl")
+            .withColumns(new JdbcColumn[] {c1, c2})
+            .withTableOperation(null)
+            .build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"c1"}, Literals.of("2147483648", Types.IntegerType.get()))
+                }));
+
+    IllegalArgumentException typeChange =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildAlterSql(
+                    "db",
+                    "tbl",
+                    new TableChange[] {
+                      TableChange.updateColumnType(new String[] {"c1"}, Types.ByteType.get())
+                    }));
+    Assertions.assertTrue(
+        typeChange.getMessage().contains("existing default value of column c1"),
+        typeChange.getMessage());
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnType(new String[] {"c1"}, Types.LongType.get())
+                }));
+
+    // Changes that keep the existing default do not validate it again.
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnComment(new String[] {"c2"}, "new comment")
+                }));
+  }
+
   private static JdbcTable buildStubTableWithNullDefault() {
     JdbcColumn c1 = JdbcColumn.builder().withName("c1").withType(Types.IntegerType.get()).build();
     JdbcColumn c2 = JdbcColumn.builder().withName("c2").withType(Types.StringType.get()).build();
