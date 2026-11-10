@@ -55,7 +55,6 @@ import {
   ColumnTypeForUnsigned,
   ColumnTypeSupportAutoIncrement,
   ColumnWithParamType,
-  ColumnWithPrecisionType,
   UnsupportColumnType,
   autoIncrementInfoMap,
   defaultValueSupported,
@@ -501,12 +500,9 @@ export default function CreateTableDialog({ ...props }) {
         }
       }
       if (provider) {
-        let columnTypes = [
-          ...ColumnType,
-          ...ColumnWithParamType,
-          ...ColumnWithPrecisionType,
-          ...ColumnSpesicalType
-        ].filter(item => !UnsupportColumnType[provider]?.includes(item))
+        let columnTypes = [...ColumnType, ...ColumnWithParamType, ...ColumnSpesicalType].filter(
+          item => !UnsupportColumnType[provider]?.includes(item)
+        )
 
         if (['jdbc-mysql', 'jdbc-clickhouse'].includes(provider)) {
           columnTypes = [...columnTypes, ...ColumnTypeForUnsigned]

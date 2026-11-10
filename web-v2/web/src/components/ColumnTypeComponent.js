@@ -35,7 +35,7 @@ export default function ColumnTypeComponent({ ...props }) {
   const [paramL, setParamL] = useState('')
   const [paramP, setParamP] = useState('')
   const [paramS, setParamS] = useState('')
-  const [paramPrecision, setParamPrecision] = useState('')
+  const [paramPrecision, setParamPrecision] = useState(undefined)
   const [open, setOpen] = useState(false)
   const [isEditSpecialColumnType, setIsEditSpecialColumnType] = useState(false)
   const currentType = Form.useWatch([...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'], form)
@@ -60,7 +60,7 @@ export default function ColumnTypeComponent({ ...props }) {
     setErrorMsg('')
     const value = currentType?.replace(/\([^)]*\)/g, '').toLowerCase()
     if (ColumnWithPrecisionType.includes(value)) {
-      setParamPrecision(extractNumbersInParentheses(currentType))
+      setParamPrecision(extractNumbersInParentheses(currentType) || null)
     }
     setIsShowParamsInput(!isShowParamsInput)
   }
@@ -69,7 +69,7 @@ export default function ColumnTypeComponent({ ...props }) {
     setParamL('')
     setParamP('')
     setParamS('')
-    setParamPrecision('')
+    setParamPrecision(undefined)
     setErrorMsg('')
     if (value && ColumnSpesicalType.includes(value)) {
       setOpen(true)
@@ -103,9 +103,6 @@ export default function ColumnTypeComponent({ ...props }) {
         setParamP(currentTypeParam1)
         setParamS(currentTypeParam2)
       }
-      if (currentTypeParam && ColumnWithPrecisionType.includes(value) && !paramPrecision) {
-        setParamPrecision(currentPrecision)
-      }
       if (ColumnWithParamType.includes(value)) {
         form.setFieldValue(
           [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
@@ -138,11 +135,21 @@ export default function ColumnTypeComponent({ ...props }) {
         }
       }
       if (ColumnWithPrecisionType.includes(value)) {
+        const precision = paramPrecision === undefined ? currentPrecision : paramPrecision
+
+        const invalidPrecision =
+          precision !== '' && precision !== null && precision !== undefined && !Number.isInteger(Number(precision))
+
         form.setFieldValue(
           [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
           capitalizeFirstLetter(value) +
-            (paramPrecision || currentPrecision ? `(${paramPrecision || currentPrecision})` : '')
+            (!invalidPrecision && precision !== '' && precision !== null && precision !== undefined
+              ? `(${precision})`
+              : '')
         )
+        if (invalidPrecision) {
+          setErrorMsg('Precision must be an integer')
+        }
       }
     }
   })
@@ -245,8 +252,9 @@ export default function ColumnTypeComponent({ ...props }) {
                 controls={false}
                 min={0}
                 max={12}
+                precision={0}
                 placeholder='P'
-                value={paramPrecision}
+                value={paramPrecision === undefined ? extractNumbersInParentheses(currentType) || null : paramPrecision}
                 onChange={onChangeParamPrecision}
                 className='w-10 border-none focus-within:shadow-none'
               />
