@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.policy;
 
+import static org.apache.gravitino.tag.TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.sql.Connection;
@@ -72,9 +74,9 @@ public final class PolicyBindingMigration {
 
   /**
    * Converts and verifies each policy's bindings before retiring its legacy rows in one
-   * transaction. A failure rolls back that policy; rerunning resumes from the remaining active
-   * legacy rows. Orphaned bindings are retained, with their policy and binding counts logged in the
-   * completion summary.
+   * transaction. A failure rolls back that policy and is reported after the remaining policies are
+   * processed. Rerunning resumes from the active legacy rows. Missing owners and objects are logged
+   * and skipped without retiring their bindings.
    *
    * @return The number of migrated bindings.
    * @throws SQLException If a binding cannot be converted or verified.
@@ -84,20 +86,23 @@ public final class PolicyBindingMigration {
     long migrated = 0;
     long skippedPolicies = 0;
     long skippedBindings = 0;
+    long skippedObjectBindings = 0;
+    long failedPolicies = 0;
+    SQLException firstFailure = null;
     for (long policyId : pendingPolicies()) {
       try {
+        long bindings =
+            count(
+                "SELECT COUNT(*) FROM policy_relation_meta WHERE policy_id = ? AND deleted_at = 0",
+                policyId);
         PolicyEntity policy = loadPolicy(policyId);
         if (policy == null) {
-          long orphanBindings =
-              count(
-                  "SELECT COUNT(*) FROM policy_relation_meta WHERE policy_id = ? AND deleted_at = 0",
-                  policyId);
           skippedPolicies++;
-          skippedBindings += orphanBindings;
+          skippedBindings += bindings;
           LOG.warn(
               "Skipping {} legacy bindings for policy_id={}: policy or metalake is missing or deleted;"
                   + " bindings remain active",
-              orphanBindings,
+              bindings,
               policyId);
           continue;
         }
@@ -107,20 +112,31 @@ public final class PolicyBindingMigration {
         try (PreparedStatement statement =
             prepare(
                 "UPDATE policy_relation_meta SET deleted_at = ?, last_version = current_version + 1,"
-                    + " current_version = current_version + 1 WHERE policy_id = ? AND deleted_at = 0",
+                    + " current_version = current_version + 1 WHERE policy_id = ? AND deleted_at = 0"
+                    + " AND EXISTS (SELECT 1 FROM tag_relation_meta r WHERE r.tag_id = ?"
+                    + " AND r.metadata_object_id = policy_relation_meta.metadata_object_id"
+                    + " AND r.metadata_object_type = policy_relation_meta.metadata_object_type"
+                    + " AND r.deleted_at = 0 AND r.tag_value = '')",
                 System.currentTimeMillis(),
-                policyId)) {
+                policyId,
+                tag.id())) {
           if (statement.executeUpdate() != converted) {
             throw new SQLException("Legacy bindings changed for policy " + policyId);
           }
         }
         connection.commit();
         migrated += converted;
+        skippedObjectBindings += bindings - converted;
         LOG.info("Migrated {} bindings for policy {}", converted, policyId);
       } catch (IOException | SQLException | RuntimeException e) {
         connection.rollback();
-        throw new SQLException(
-            "Cannot migrate policy " + policyId + "; legacy bindings remain active", e);
+        failedPolicies++;
+        LOG.error("Failed to migrate policy_id={}; legacy bindings remain active", policyId, e);
+        if (firstFailure == null) {
+          firstFailure =
+              new SQLException(
+                  "Cannot migrate policy " + policyId + "; legacy bindings remain active", e);
+        }
       } finally {
         // Balance this temporary reference; the caller still owns the thread-bound session.
         SqlSessions.getSqlSession().clearCache();
@@ -128,11 +144,16 @@ public final class PolicyBindingMigration {
       }
     }
     LOG.info(
-        "Migration complete: migrated_bindings={}, skipped_orphan_policies={}, skipped_orphan_bindings={};"
-            + " skipped bindings remain active",
+        "Migration complete: migrated_bindings={}, skipped_orphan_policies={}, skipped_orphan_bindings={},"
+            + " skipped_missing_object_bindings={}, failed_policies={}; skipped bindings remain active",
         migrated,
         skippedPolicies,
-        skippedBindings);
+        skippedBindings,
+        skippedObjectBindings,
+        failedPolicies);
+    if (firstFailure != null) {
+      throw firstFailure;
+    }
     return migrated;
   }
 
@@ -210,6 +231,10 @@ public final class PolicyBindingMigration {
       while (rows.next()) {
         long objectId = rows.getLong(1);
         MetadataObject.Type type = MetadataObject.Type.valueOf(rows.getString(2));
+        Preconditions.checkArgument(
+            SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(type),
+            "Unsupported policy binding object type: %s",
+            type);
         List<MetadataObject> objects =
             MetadataObjectService.fromGenericEntities(
                 Collections.singletonList(
@@ -217,8 +242,14 @@ public final class PolicyBindingMigration {
                         .withId(objectId)
                         .withEntityType(MetadataObjectUtil.toEntityType(type))
                         .build()));
-        if (objects.size() != 1) {
-          throw new SQLException("Missing metadata object " + objectId + " of type " + type);
+        if (objects.isEmpty()) {
+          LOG.warn(
+              "Skipping legacy binding for policy_id={}, metadata_object_id={}, metadata_object_type={}:"
+                  + " target is missing or deleted; binding remains active",
+              policy.id(),
+              objectId,
+              type);
+          continue;
         }
         policyManager.addPolicyToObject(
             policy.namespace().level(0),

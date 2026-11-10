@@ -202,15 +202,87 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(1, activeCount("tag_relation_meta"));
   }
 
-  /** A missing object rolls back every replacement for its policy. */
+  /** Missing objects remain active while valid bindings migrate and retry stays safe. */
   @TestTemplate
-  public void testMissingObjectBlocksAllWrites() throws Exception {
+  public void testMissingObjectIsSkipped() throws Exception {
     insertBinding(2, policy.id(), Long.MAX_VALUE, "TABLE");
     connection.commit();
-    assertThrows(
-        SQLException.class, () -> new PolicyBindingMigration(connection, entityStore).migrate());
-    assertEquals(0, count("tag_meta"));
-    assertEquals(2, activeLegacyBindings());
+    PolicyBindingMigration migration = new PolicyBindingMigration(connection, entityStore);
+    assertEquals(1, migration.migrate());
+    assertEquals(1, count("tag_relation_meta"));
+    assertEquals(1, activeLegacyBindings());
+    assertEquals(
+        1,
+        queryCount("SELECT COUNT(*) FROM policy_relation_meta WHERE id = 1 AND deleted_at <> 0"));
+    assertEquals(
+        1, queryCount("SELECT COUNT(*) FROM policy_relation_meta WHERE id = 2 AND deleted_at = 0"));
+    assertEquals(0, migration.migrate());
+    assertEquals(1, activeLegacyBindings());
+  }
+
+  /** Soft-deleted objects are skipped without retiring the dangling legacy binding. */
+  @TestTemplate
+  public void testDeletedObjectIsSkipped() throws Exception {
+    CatalogEntity deleted = createAndInsertCatalog("migration_test", "deleted_catalog");
+    insertBinding(2, policy.id(), deleted.id(), "CATALOG");
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "UPDATE catalog_meta SET deleted_at = 1 WHERE catalog_id = ?")) {
+      statement.setLong(1, deleted.id());
+      statement.executeUpdate();
+    }
+    connection.commit();
+    assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
+    assertEquals(1, activeLegacyBindings());
+    assertEquals(1, count("tag_relation_meta"));
+  }
+
+  /** Failures preserve their policy's bindings while later policies still commit. */
+  @TestTemplate
+  public void testFailedPolicyDoesNotBlockLaterPolicies() throws Exception {
+    PolicyEntity bad = createPolicy(21L, policy.namespace(), "bad_policy", AUDIT_INFO);
+    PolicyEntity later = createPolicy(22L, policy.namespace(), "later_policy", AUDIT_INFO);
+    backend.insert(bad, false);
+    backend.insert(later, false);
+    removeAutomaticallyCreatedTag(bad.id());
+    removeAutomaticallyCreatedTag(later.id());
+    insertBinding(2, bad.id(), catalog.id(), "INVALID");
+    insertBinding(3, later.id(), catalog.id(), "CATALOG");
+    connection.commit();
+    SQLException failure =
+        assertThrows(
+            SQLException.class,
+            () -> new PolicyBindingMigration(connection, entityStore).migrate());
+    assertTrue(failure.getMessage().contains("policy 21"));
+    assertEquals(1, activeLegacyBindings());
+    assertEquals(2, count("tag_meta"));
+    assertEquals(2, count("policy_tag_relation_meta"));
+    assertEquals(2, count("tag_relation_meta"));
+    assertEquals(
+        1,
+        queryCount("SELECT COUNT(*) FROM policy_relation_meta WHERE id = 3 AND deleted_at <> 0"));
+    try (Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "UPDATE policy_relation_meta SET metadata_object_type = 'CATALOG' WHERE id = 2");
+    }
+    connection.commit();
+    assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
+    assertEquals(0, activeLegacyBindings());
+    assertEquals(3, count("tag_relation_meta"));
+  }
+
+  /** Verification counts legacy rows, so duplicate rows can reuse one idempotent assignment. */
+  @TestTemplate
+  public void testDuplicateLegacyBindings() throws Exception {
+    insertBinding(2, policy.id(), catalog.id(), "CATALOG");
+    insertBinding(3, policy.id(), catalog.id(), "CATALOG");
+    connection.commit();
+    PolicyBindingMigration migration = new PolicyBindingMigration(connection, entityStore);
+    assertEquals(3, migration.migrate());
+    assertEquals(0, activeLegacyBindings());
+    assertEquals(1, count("tag_relation_meta"));
+    assertEquals(3, count("policy_relation_meta"));
+    assertEquals(0, migration.migrate());
   }
 
   /** Rejects references to a live object in another metalake. */
@@ -263,13 +335,13 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
       assertEquals(1, migration.migrate());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=1, skipped_orphan_policies=0, skipped_orphan_bindings=0;"
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0;"
                   + " skipped bindings remain active"));
       messages.clear();
       assertEquals(0, migration.migrate());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=0, skipped_orphan_policies=0, skipped_orphan_bindings=0;"
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0;"
                   + " skipped bindings remain active"));
 
       insertBinding(2, 18L, catalog.id(), "CATALOG");
@@ -286,7 +358,7 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
       assertEquals(3, activeLegacyBindings());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=1, skipped_orphan_policies=2, skipped_orphan_bindings=3;"
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0;"
                   + " skipped bindings remain active"));
       assertTrue(
           messages.contains(
@@ -297,8 +369,22 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
       assertEquals(3, activeLegacyBindings());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3;"
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0;"
                   + " skipped bindings remain active"));
+      insertBinding(7, policy.id(), Long.MAX_VALUE, "TABLE");
+      connection.commit();
+      messages.clear();
+      assertEquals(0, migration.migrate());
+      assertEquals(4, activeLegacyBindings());
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3,"
+                  + " skipped_missing_object_bindings=1, failed_policies=0; skipped bindings remain active"));
+      assertTrue(
+          messages.contains(
+              "Skipping legacy binding for policy_id=20, metadata_object_id="
+                  + Long.MAX_VALUE
+                  + ", metadata_object_type=TABLE: target is missing or deleted; binding remains active"));
     } finally {
       config.removeLogger(loggerName);
       context.updateLoggers();

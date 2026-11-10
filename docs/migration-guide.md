@@ -118,16 +118,18 @@ store. H2, MySQL, and PostgreSQL are supported; use the same JDBC driver as the 
    assignments with their audit information, verify the replacements, then soft-delete the legacy
    rows. A missing or incorrect policy-to-tag relation fails verification and leaves the legacy
    bindings active. No tables, columns, or indexes are added.
-   Bindings whose policy or metalake is missing or deleted are logged and left untouched; they
-   do not prevent later live policies from migrating. The final summary reports migrated bindings,
-   skipped orphan policies, and skipped orphan bindings. A successful run with skipped bindings
-   does not mean the legacy table is drained; review the logged policy IDs before completing the upgrade.
-3. If a policy fails or the command is interrupted, keep all servers and policy consumers stopped.
-   Fix any reported failure and rerun the same command: completed policies remain committed, while
+   Bindings whose policy, metalake, or target object is missing or deleted are logged and left
+   active. Other valid bindings still migrate. The final summary reports migrated bindings,
+   skipped owners and bindings, missing-object bindings, and failed policies. A run with skipped
+   bindings does not mean the legacy table is drained; review the logged IDs before completing the upgrade.
+3. If a policy fails, its changes roll back and other policies are still attempted. Any failed
+   policy makes the command exit unsuccessfully after printing the summary. Keep all servers and
+   policy consumers stopped on failure or interruption. Fix the reported cause and rerun the same
+   command: completed policies remain committed, while
    the unfinished policy rolls back and is retried from its active legacy rows. A partially migrated
    database is only an offline intermediate state, not a deployment to start serving requests.
    Restore the backup only when abandoning or rolling back the upgrade.
-   A `Hidden tag name collision` error identifies the policy and tag and stops the run. If an
+   A `Hidden tag name collision` error identifies the policy and tag and rolls back that policy. If an
    existing user tag occupies `gravitino_hidden_{policyId}`, restore the pre-upgrade backup, run
    the old server version, and rename that user tag to a name outside `gravitino_hidden_` through
    the tag API. Stop the old servers, take a fresh backup, and repeat the upgrade and migration.
