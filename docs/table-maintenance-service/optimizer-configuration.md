@@ -199,6 +199,9 @@ gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
 gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
 gravitino.optimizer.recommender.jobSubmitter = gravitino-job-submitter
 gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler
+gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
+gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
 gravitino.optimizer.jobSubmitterConfig.catalog_name = rest_catalog
 gravitino.optimizer.jobSubmitterConfig.spark_master = local[2]
 gravitino.optimizer.jobSubmitterConfig.spark_executor_instances = 1
@@ -242,19 +245,13 @@ Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf
 the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
 redacts them in DRY-RUN / SUBMIT output).
 
-For manifest rewrite policies, the mapping
-`gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className` is optional. When
-omitted or blank, the recommender uses the built-in
-`org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler`.
-An explicit class name overrides that default. An omitted policy `spec_id` uses Iceberg's
-current default spec from table metadata; see [Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md).
-
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 
-The policy-driven path needs the same keys. Its compaction adapter only derives the table, the
-where clause and the rewrite options from the policy, so `catalog_name`, `catalog_type`,
-`catalog_uri` and `warehouse_location` must come from `gravitino.optimizer.jobSubmitterConfig.`.
-Missing ones are reported when the job is submitted, instead of failing later inside Spark.
+The policy-driven path needs the same catalog Spark keys. Strategy adapters derive
+task-specific fields (table identifier, where clause, retention options, and so on) from the
+policy, so `catalog_name`, `catalog_type`, `catalog_uri`, and `warehouse_location` must come from
+`gravitino.optimizer.jobSubmitterConfig.`. Missing ones are reported when the job is submitted,
+instead of failing later inside Spark.
 
 ## Job Submission Configuration
 
@@ -301,15 +298,50 @@ to the **Gravitino catalog name** (for example `rest_catalog` or `catalog_iceber
 `s3://` or other object-store URI — that URI form yields `NoSuchWarehouse`. For non-REST backends
 that expect a storage root, use the warehouse URI those backends document.
 
-Direct `runJob` for `builtin-iceberg-rewrite-data-files` must include `strategy`, `sort_order`, and
+## Compaction (rewrite data files)
+
+Submit `builtin-iceberg-rewrite-data-files` through `POST /api/metalakes/{metalake}/jobs/runs` or
+through `submit-strategy-jobs`. Direct `runJob` must include `strategy`, `sort_order`, and
 `where_clause` in `jobConf` even when empty (`""` is accepted). Omitting them returns HTTP 400.
-Policy-driven `submit-strategy-jobs` fills these through the compaction adapter. See
-[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+Policy-driven submits fill these through the compaction adapter.
 
-### Rewrite Manifests Job
+| Key                | Meaning                                           | Default   |
+| ------------------ | ------------------------------------------------- | --------- |
+| `catalog_name`     | Iceberg catalog registered in Spark               | Required  |
+| `table_identifier` | Table identifier, for example `db.t1`             | Required  |
+| `where_clause`     | Filter predicate; `""` rewrites the whole table   | Required  |
+| `strategy`         | `binpack` or `sort`                               | `binpack` |
+| `sort_order`       | Sort order when using `sort`; empty for `binpack` | empty     |
+| `options`          | JSON map of Iceberg rewrite options               | empty     |
+| `spark_conf`       | JSON string containing additional Spark settings  | None      |
 
-Submit `builtin-iceberg-rewrite-manifests` directly through
-`POST /api/metalakes/{metalake}/jobs/runs`. Its `jobConf` uses these job-specific keys:
+Include the shared Spark and catalog template settings. Register the handler (optional when using
+the Recommender default):
+
+```properties
+gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+```
+
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "iceberg_compaction_default",
+  "policyType": "system_iceberg_compaction",
+  "enabled": true,
+  "content": {}
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema, or catalog.
+Threshold fields (`minDataFileMse`, `minDeleteFileNumber`, `rewriteStrategy`, and related options)
+are documented in [Iceberg Compaction Policy](../iceberg-compaction-policy.md). Use
+`submit-strategy-jobs --strategy-name iceberg_compaction_default`. Submission and verification
+examples are under [Rewrite Data Files](./optimizer-cli-reference.md#rewrite-data-files).
+
+## Rewrite Manifests
+
+Submit `builtin-iceberg-rewrite-manifests` through `POST /api/metalakes/{metalake}/jobs/runs`.
 
 | Key                | Meaning                                               | Default                                       |
 | ------------------ | ----------------------------------------------------- | --------------------------------------------- |
@@ -319,86 +351,45 @@ Submit `builtin-iceberg-rewrite-manifests` directly through
 | `use_caching`      | `true` or `false` to control caching during rewriting | Installed Iceberg default (`false` in 1.11.0) |
 | `spark_conf`       | JSON string containing additional Spark settings      | None                                          |
 
-Include the Spark and catalog template settings shown in the
-[submission example](./optimizer-cli-reference.md#submitting-the-job), and make the matching
-Iceberg Spark runtime available as described above. For this job, omitted, blank, or
-unresolved optional argument placeholders are treated as absent. Required catalog/table
-arguments cannot be blank or unresolved. `spec_id` must be a non-negative integer identifying
-an existing spec; it does not repartition data or migrate manifests between specs.
+`spec_id` must be a non-negative integer identifying an existing spec; it does not repartition data
+or migrate manifests between specs. Omitted, blank, or unresolved optional placeholders are treated
+as absent. Include the shared Spark and catalog template settings.
 
-This job currently supports direct submission. Policy -> Strategy -> Adapter integration
-for automatic manifest maintenance will follow separately.
-
-## Running Against a Local Filesystem
-
-On a machine with no HDFS, Spark still defaults to `hdfs://localhost:9000` and fails. Set the default filesystem explicitly, in `spark_conf` for job submissions and in the CLI `spark_conf` value:
+Register the handler (optional; the Recommender defaults this class when unset):
 
 ```properties
-spark.hadoop.fs.defaultFS=file:///
+gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler
 ```
 
-## Checking Your Configuration
+Policy content and per-spec thresholds are documented in
+[Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md). Policy -> Strategy ->
+Adapter automatic selection is a follow-up; `submit-strategy-jobs` does not select this job
+automatically yet. Direct submission and verification examples are under
+[Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests).
 
-Four things are worth confirming before assuming a configuration problem is a code problem.
+## Snapshot Expiration
 
-- `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the job template list.
-- The policy is associated with a tag assigned to the target table or one of its ancestors.
-- `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing.
-- The rewrite log shows `Rewritten data files: N` with `N` greater than zero when enough small
-  files exist (`min-input-files`, default 5). A successful job with `N = 0` is usually a data
-  shape issue, not a failed submit.
+Submit `builtin-iceberg-expire-snapshots` with the shared Spark and catalog keys plus:
 
-## Related
+| Key                | Meaning                                          | Default       |
+| ------------------ | ------------------------------------------------ | ------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark              | Required      |
+| `table_identifier` | Table identifier, for example `db.t1`            | Required      |
+| `older_than`       | Expire snapshots older than this timestamp       | Five days ago |
+| `retain_last`      | Minimum number of recent snapshots to keep       | `1`           |
+| `stream_results`   | Stream intermediate delete results when present  | Disabled      |
+| `spark_conf`       | JSON string containing additional Spark settings | None          |
 
-- [Service](./service.md) for the in-process service, `timeTrigger`, and the cron path
-- [Table Maintenance Service](./optimizer.md) for the CLI walkthrough
-- [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
-- [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
-- [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
-
-## Orphan File Cleanup Job Configuration
-
-Submit `builtin-iceberg-remove-orphan-files` with the same Spark and catalog
-settings described above. Its job-specific `jobConf` keys are:
-
-| Key                | Meaning                                                                               | Default                          |
-| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
-| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
-| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
-| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old | Three days ago (Iceberg default) |
-| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
-| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
-| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
-
-For direct template submission, supply `older_than: ""` and `location: ""` to
-use the defaults, `dry_run: "false"` (or `"true"` to preview), and
-`spark_conf: "{}"` when no overrides are needed.
-
-Keep the three-day default unless your workload needs a longer retention window.
-The 24-hour minimum also applies to dry runs; passing the current timestamp is
-not supported. For a secured Iceberg REST catalog, supply its authentication
-settings explicitly in `spark_conf`, as described above.
-
-See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for a
-complete submission example. For policy-driven submission, configure the handler
-and policy below. Periodic scheduling remains separate.
-
-### Snapshot expiration policy integration
-
-Register the handler alongside the existing optimizer providers (optional; the
-Recommender also defaults this class when the property is unset):
+Register the handler (optional; the Recommender defaults this class when unset):
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-snapshot-expiration.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationStrategyHandler
 ```
 
-The built-in job adapter is registered automatically. Keep the same Spark and
-catalog submission configuration as for direct expire-snapshots runs, including
-`catalog_name` and `spark_conf`. The adapter supplies `table_identifier` and
-`stream_results`. For `older_than` / `retain_last`, values equal to Iceberg's
-procedure defaults (`olderThanDays=5`, `retainLast=1`) are omitted so the job
-template placeholders stay empty and Iceberg table `history.expire.*`
-properties remain authoritative; non-default values are emitted explicitly.
+The built-in job adapter is registered automatically. It supplies `table_identifier` and
+`stream_results`. For `older_than` / `retain_last`, values equal to Iceberg's procedure defaults
+(`olderThanDays=5`, `retainLast=1`) are omitted so template placeholders stay empty and Iceberg
+table `history.expire.*` properties remain authoritative; non-default values are emitted explicitly.
 
 Create a policy through `POST /api/metalakes/{metalake}/policies`:
 
@@ -415,34 +406,38 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
 }
 ```
 
-Associate the policy with a tag and attach that tag to the target table, schema,
-or catalog, following the [policy setup walkthrough](./optimizer.md).
-`olderThanDays` defaults to 5 (Iceberg's expire default) and must be between 1 and 36500.
-`retainLast` defaults to 1. `streamResults` defaults to false.
+Associate the policy with a tag and attach that tag to the target table, schema, or catalog.
+`olderThanDays` defaults to 5 and must be between 1 and 36500. `retainLast` defaults to 1.
+`streamResults` defaults to false. When `olderThanDays` is not 5, the adapter subtracts it from the
+current instant and emits `older_than` as an explicit UTC timestamp ending in `Z`. Each optimizer
+invocation may submit expire when the policy is attached; this does not install a periodic
+scheduler. See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots).
 
-When `olderThanDays` is not the Iceberg default of 5, the adapter subtracts it
-from the current instant and emits `older_than` as an explicit UTC timestamp
-ending in `Z`. Each optimizer invocation may submit expire when the policy is
-attached (`trigger-expr` is `true`). This does not install a periodic
-scheduler, cooldown, or last-run tracking—same as orphan cleanup. Operators
-must control how often `submit-strategy-jobs` (or an external cron) runs.
+## Orphan Cleanup
 
-### Orphan cleanup policy integration
+Submit `builtin-iceberg-remove-orphan-files` with the shared Spark and catalog keys plus:
 
-Register the handler alongside the existing optimizer providers (optional; the
-Recommender also defaults this class when the property is unset):
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp; explicit values must be at least 24 hours old                              | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
+
+For direct template submission, supply `older_than: ""` and `location: ""` to use the defaults,
+`dry_run: "false"` (or `"true"` to preview), and `spark_conf: "{}"` when no overrides are needed.
+Keep the three-day default unless your workload needs a longer retention window. The 24-hour
+minimum also applies to dry runs.
+
+Register the handler (optional; the Recommender defaults this class when unset):
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-orphan-file-removal.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalStrategyHandler
 ```
 
-The built-in job adapter is registered automatically. Keep the same Spark and
-catalog submission configuration as for direct orphan cleanup, including
-`catalog_name` (the catalog alias configured in Spark) and `spark_conf`.
-The adapter supplies `table_identifier`, `older_than`, `location`, and `dry_run`.
-These policy-derived values override shared submission defaults.
-
-Create a policy through `POST /api/metalakes/{metalake}/policies`:
+The adapter supplies `table_identifier`, `older_than`, `location`, and `dry_run`. Create a policy:
 
 ```json
 {
@@ -459,36 +454,44 @@ Create a policy through `POST /api/metalakes/{metalake}/policies`:
 ```
 
 Optional TMS peer fields on content (`timeTrigger`, `commitTrigger`, `minIntervalMs`, `jobOptions`,
-`updaterOptions`) are shared with compaction and other maintenance policy types. `commitTrigger` is
-not allowed for orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for
-peer-field semantics.
+`updaterOptions`) are shared with other maintenance policy types. `commitTrigger` is not allowed for
+orphan cleanup. See [Iceberg compaction policy](../iceberg-compaction-policy.md) for peer-field
+semantics. `olderThanDays` defaults to 3 (1–36500). The adapter always emits `older_than` as an
+explicit UTC timestamp ending in `Z`.
 
-Associate the policy with a tag and attach that tag to the target table, schema,
-or catalog, following the [policy setup walkthrough](./optimizer.md).
-`olderThanDays` defaults to 3 and must be between 1 and 36500 inclusive (approximately 100 years). This bound rejects impractical retention values before a policy is stored. `dryRun` defaults to false.
+The strategy operates on the whole table and does not need table or partition statistics. Every
+explicit `submit-strategy-jobs` invocation for an enabled, selected orphan policy submits a Spark
+job (no metric gate). Start with `dryRun: true`. Use
+`submit-strategy-jobs --strategy-name orphan_cleanup`. See
+[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files).
 
-The policy adapter subtracts `olderThanDays` from the current instant and always
-emits `older_than` as an explicit UTC timestamp ending in `Z`. Policy retention
-is therefore independent of `spark.sql.session.timeZone`. For direct job
-submission, timestamps without an offset use the Spark session time zone.
+## Running Against a Local Filesystem
 
-Optional `location` must not have leading or trailing whitespace and must be the
-table's storage root or a descendant; submission requires the table's `location` metadata to validate a custom path. The Spark job
-rechecks containment and filesystem symlinks with its own credentials before
-listing or deleting files.
+On a machine with no HDFS, Spark still defaults to `hdfs://localhost:9000` and fails. Set the default filesystem explicitly, in `spark_conf` for job submissions and in the CLI `spark_conf` value:
 
-The strategy operates on the whole table, including partitioned tables, and does
-not need table or partition statistics. Each explicit optimizer invocation makes
-an enabled, selected cleanup policy eligible with score 1. This does not install
-a periodic scheduler, cooldown, or last-run tracking. Because the trigger is always
-true and the score is always 1, every explicit `submit-strategy-jobs` invocation
-for an enabled, selected orphan policy submits a Spark cleanup job. Unlike
-threshold-based compaction, there is no metric gate to suppress repeated runs.
-Operators must control the invocation rate through external scheduling. Start
-with `dryRun: true` to inspect candidates; dry-run jobs still consume Spark
-resources and also need rate limiting.
+```properties
+spark.hadoop.fs.defaultFS=file:///
+```
 
-Use `submit-strategy-jobs --strategy-name orphan_cleanup` with the target
-identifiers. The CLI `--dry-run` previews recommendations without submitting jobs;
-the policy's `dryRun: true` submits a Spark job that lists candidates without
-deleting them. Start with that policy setting to inspect candidates.
+## Checking Your Configuration
+
+Confirm these before assuming a configuration problem is a code problem.
+
+- The built-in templates you need appear in the job template list (`update-stats`, rewrite data
+  files, rewrite manifests, expire snapshots, remove orphan files).
+- For policy-driven runs, the policy is associated with a tag assigned to the target table or one of
+  its ancestors.
+- `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing when the policy should fire.
+- Compaction: rewrite log shows `Rewritten data files: N` with `N > 0` when enough small files exist
+  (`min-input-files`, default 5). `N = 0` is usually a data-shape issue.
+- Manifest rewrite: log shows rewritten/added manifest counts (both zero can be a successful no-op).
+- Snapshot expiry: log shows deleted data/manifest/manifest-list counts.
+- Orphan cleanup: dry-run log lists candidate paths before you switch `dry_run` to `false`.
+
+## Related
+
+- [Service](./service.md) for the in-process service, `timeTrigger`, and the cron path
+- [Table Maintenance Service](./optimizer.md) for the CLI walkthrough
+- [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
+- [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
+- [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers

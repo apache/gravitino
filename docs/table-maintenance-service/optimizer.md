@@ -326,7 +326,7 @@ partition spec. It leaves data files and other specs' manifests unchanged.
 
 **Verify:** `output.log` rewritten/added manifest counts (both zero can be a successful no-op).
 See [Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests) and
-[configuration](./optimizer-configuration.md#rewrite-manifests-job).
+[configuration](./optimizer-configuration.md#rewrite-manifests).
 
 ### Snapshot expiry
 
@@ -338,7 +338,7 @@ Compaction and other rewrites create snapshots; without expiry, metadata accumul
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-expire-snapshots`,
   plus `catalog_name`, `table_identifier`, and the shared Spark/catalog `jobConf` keys.
 - Policy handler wiring:
-  [Snapshot expiration policy integration](./optimizer-configuration.md#snapshot-expiration-policy-integration).
+  [Snapshot expiration](./optimizer-configuration.md#snapshot-expiration).
 
 **Notes**
 
@@ -354,7 +354,7 @@ See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots).
 **Submit**
 
 - Policy path: `system_iceberg_orphan_file_removal` and the handler in
-  [Orphan cleanup policy integration](./optimizer-configuration.md#orphan-cleanup-policy-integration).
+  [Orphan cleanup](./optimizer-configuration.md#orphan-cleanup).
   Each explicit optimizer invocation evaluates the enabled policy at table level; it does not
   require partition statistics or configure a periodic schedule.
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-remove-orphan-files`.
@@ -367,7 +367,7 @@ See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots).
 
 **Verify:** candidate or deleted paths in `output.log`.
 See [Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) and
-[Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration).
+[Configuration](./optimizer-configuration.md#orphan-cleanup).
 
 ## Related
 
