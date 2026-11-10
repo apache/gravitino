@@ -59,6 +59,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
@@ -94,6 +96,10 @@ class RelationalCatalog extends BaseSchemaCatalog
         SupportsSecrets {
 
   public static final String PRIVILEGES = "privileges";
+
+  static final String PAGE_SIZE = "pageSize";
+
+  static final String PAGE_TOKEN = "pageToken";
 
   private final SemanticModelCatalogOperations semanticModelOperations;
 
@@ -208,6 +214,41 @@ class RelationalCatalog extends BaseSchemaCatalog
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * List one page of the tables under the given Schema namespace, in ascending order of table name.
+   *
+   * @param namespace The namespace to list the tables under it. This namespace should have 1 level,
+   *     which is the schema name;
+   * @param pageRequest The page to read.
+   * @return The page of {@link NameIdentifier} of the tables under the given namespace.
+   * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
+   */
+  @Override
+  public Page<NameIdentifier> listTables(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkTableNamespace(namespace);
+    Preconditions.checkArgument(pageRequest != null, "pageRequest must not be null");
+
+    Namespace fullNamespace = getEntityFullNamespace(namespace);
+    Map<String, String> queryParams = Maps.newHashMap();
+    queryParams.put(PAGE_SIZE, String.valueOf(pageRequest.pageSize()));
+    pageRequest.pageToken().ifPresent(token -> queryParams.put(PAGE_TOKEN, token));
+    EntityListResponse resp =
+        restClient.get(
+            formatTableRequestPath(fullNamespace),
+            queryParams,
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+
+    List<NameIdentifier> idents =
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .collect(Collectors.toList());
+    return Page.of(idents, resp.nextPageToken());
   }
 
   /**

@@ -273,6 +273,68 @@ class TestRelationalCatalog(unittest.TestCase):
             self.assertEqual(len(tables), 1)
             self.assertEqual(tables[0], self.table_identifier)
 
+    def test_list_tables_page(self):
+        def ident(name):
+            return NameIdentifier.of(
+                self.metalake_name, self.catalog_name, self.schema_name, name
+            )
+
+        page1_body = EntityListResponse(0, [ident("t1"), ident("t2")], "token-1")
+        page2_body = EntityListResponse(0, [ident("t3")])
+        self.assertIn('"nextPageToken": "token-1"', page1_body.to_json())
+        self.assertNotIn("nextPageToken", page2_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=[
+                self._get_mock_http_resp(page1_body.to_json()),
+                self._get_mock_http_resp(page2_body.to_json()),
+            ],
+        ) as mock_get:
+            namespace = Namespace.of(self.schema_name)
+            page1 = self.catalog.list_tables_page(namespace, page_size=2)
+            self.assertEqual(
+                [
+                    NameIdentifier.of(self.schema_name, "t1"),
+                    NameIdentifier.of(self.schema_name, "t2"),
+                ],
+                page1.items,
+            )
+            self.assertEqual("token-1", page1.next_page_token)
+            self.assertEqual(
+                {"pageSize": "2"}, mock_get.call_args_list[0].kwargs["params"]
+            )
+
+            page2 = self.catalog.list_tables_page(
+                namespace, page_size=2, page_token=page1.next_page_token
+            )
+            self.assertEqual([NameIdentifier.of(self.schema_name, "t3")], page2.items)
+            self.assertIsNone(page2.next_page_token)
+            self.assertEqual(
+                {"pageSize": "2", "pageToken": "token-1"},
+                mock_get.call_args_list[1].kwargs["params"],
+            )
+
+    def test_list_tables_page_rejects_invalid_input(self):
+        namespace = Namespace.of(self.schema_name)
+        for bad_size in (0, -1, True, "2"):
+            with self.assertRaises(IllegalArgumentException):
+                self.catalog.list_tables_page(namespace, page_size=bad_size)
+        with self.assertRaises(IllegalArgumentException):
+            self.catalog.list_tables_page(namespace, page_size=2, page_token="")
+
+    def test_unpaged_list_response_ignores_page_token_field(self):
+        body = (
+            '{"code": 0, "identifiers": [{"namespace": ["m", "c", "s"], "name": "t1"}],'
+            ' "nextPageToken": "abc"}'
+        )
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=self._get_mock_http_resp(body),
+        ):
+            tables = self.catalog.list_tables(namespace=Namespace.of(self.schema_name))
+            self.assertEqual([NameIdentifier.of("s", "t1")], tables)
+
     def test_load_table_not_exists(self):
         with patch(
             "gravitino.utils.http_client.HTTPClient.get",

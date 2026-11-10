@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.responses;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -31,12 +32,16 @@ import org.apache.gravitino.json.JsonUtils.NameIdentifierSerializer;
 /** Represents a response containing a list of catalogs. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class EntityListResponse extends BaseResponse {
+public class EntityListResponse extends BaseResponse implements PaginatedResponse {
 
   @JsonSerialize(contentUsing = NameIdentifierSerializer.class)
   @JsonDeserialize(contentUsing = NameIdentifierDeserializer.class)
   @JsonProperty("identifiers")
   private final NameIdentifier[] idents;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @JsonProperty("nextPageToken")
+  private final String nextPageToken;
 
   /**
    * Constructor for EntityListResponse.
@@ -44,14 +49,26 @@ public class EntityListResponse extends BaseResponse {
    * @param idents The array of entity identifiers.
    */
   public EntityListResponse(NameIdentifier[] idents) {
+    this(idents, null);
+  }
+
+  /**
+   * Constructor for EntityListResponse holding one page of identifiers.
+   *
+   * @param idents The array of entity identifiers in the page.
+   * @param nextPageToken The token for the next page, or null when no further entry remains.
+   */
+  public EntityListResponse(NameIdentifier[] idents, String nextPageToken) {
     super(0);
     this.idents = idents;
+    this.nextPageToken = nextPageToken;
   }
 
   /** Default constructor for EntityListResponse. (Used for Jackson deserialization.) */
   public EntityListResponse() {
     super();
     this.idents = null;
+    this.nextPageToken = null;
   }
 
   /**
@@ -61,6 +78,11 @@ public class EntityListResponse extends BaseResponse {
    */
   public NameIdentifier[] identifiers() {
     return idents;
+  }
+
+  @Override
+  public String nextPageToken() {
+    return nextPageToken;
   }
 
   /**

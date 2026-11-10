@@ -16,7 +16,7 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 from dataclasses_json import config
 
@@ -30,9 +30,19 @@ class EntityListResponse(BaseResponse):
     """Represents a response containing a list of catalogs."""
 
     _idents: List[NameIdentifier] = field(metadata=config(field_name="identifiers"))
+    _next_page_token: Optional[str] = field(
+        default=None,
+        metadata=config(
+            field_name="nextPageToken", exclude=lambda value: value is None
+        ),
+    )
 
     def identifiers(self) -> List[NameIdentifier]:
         return self._idents
+
+    def next_page_token(self) -> Optional[str]:
+        """Returns the token for the next page, or None when no further entry remains."""
+        return self._next_page_token
 
     def validate(self):
         """Validates the response data.

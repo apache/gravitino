@@ -29,6 +29,8 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -52,6 +54,21 @@ public interface TableCatalog {
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException;
+
+  /**
+   * List one page of the tables in a namespace, in ascending order of table name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param namespace A namespace.
+   * @param pageRequest The page to read.
+   * @return The page of table identifiers.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  default Page<NameIdentifier> listTables(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged table listing is not supported");
+  }
 
   /**
    * Load table metadata by {@link NameIdentifier} from the catalog.

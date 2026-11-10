@@ -19,6 +19,7 @@ from typing import Final, Optional, overload
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
+from gravitino.api.pagination import Page, page_params
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
@@ -298,6 +299,30 @@ class RelationalCatalog(
             NameIdentifier.of(ident.namespace().level(2), ident.name())
             for ident in entity_list_resp.identifiers()
         ]
+
+    def list_tables_page(
+        self,
+        namespace: Namespace,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[NameIdentifier]:
+        self._check_table_namespace(namespace)
+        params = page_params(page_size, page_token)
+        full_namespace = self._get_entity_full_namespace(namespace)
+        resp = self.rest_client.get(
+            self._format_table_request_path(full_namespace),
+            params=params,
+            error_handler=TABLE_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+        return Page(
+            items=[
+                NameIdentifier.of(ident.namespace().level(2), ident.name())
+                for ident in entity_list_resp.identifiers()
+            ],
+            next_page_token=entity_list_resp.next_page_token(),
+        )
 
     @overload
     def load_table(self, identifier: NameIdentifier) -> Table: ...

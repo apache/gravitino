@@ -461,10 +461,12 @@ public class TestGravitinoInterceptionService {
                 return null;
               });
       Method method =
-          TableOperations.class.getMethod("listTables", String.class, String.class, String.class);
+          TableOperations.class.getMethod(
+              "listTables", String.class, String.class, String.class, Integer.class, String.class);
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);
-      when(invocation.getArguments()).thenReturn(new Object[] {"metalake", "catalog", "schema"});
+      when(invocation.getArguments())
+          .thenReturn(new Object[] {"metalake", "catalog", "schema", null, null});
       when(invocation.proceed())
           .thenAnswer(unused -> AuthorizationRequestScope.getOrCreate("metalake"));
       MethodInterceptor interceptor =

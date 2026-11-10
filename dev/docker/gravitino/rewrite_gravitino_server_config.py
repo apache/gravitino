@@ -29,6 +29,7 @@ env_map = {
     "GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE": "server.webserver.requestHeaderSize",
     "GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE": "server.webserver.responseHeaderSize",
     "GRAVITINO_SERVER_BULK_MAX_ITEMS": "server.bulk.maxItems",
+    "GRAVITINO_SERVER_LIST_MAX_PAGE_SIZE": "server.list.maxPageSize",
     "GRAVITINO_SERVER_WEBSERVER_INCLUDE_ERROR_STACK_TRACE": "server.webserver.includeErrorStackTrace",
     "GRAVITINO_ENTITY_STORE": "entity.store",
     "GRAVITINO_ENTITY_STORE_RELATIONAL": "entity.store.relational",
