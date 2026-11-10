@@ -29,6 +29,8 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -115,6 +117,11 @@ class GenericTopic
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -122,6 +129,11 @@ class GenericTopic
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override
@@ -150,6 +162,11 @@ class GenericTopic
   }
 
   @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicies(pageRequest);
+  }
+
+  @Override
   public PolicyList<String> listPoliciesWithVisibility() {
     return objectPolicyOperations.listPoliciesWithVisibility();
   }
@@ -160,6 +177,11 @@ class GenericTopic
   }
 
   @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicyInfos(pageRequest);
+  }
+
+  @Override
   public PolicyList<Policy> listPolicyInfosWithVisibility() {
     return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
@@ -167,6 +189,11 @@ class GenericTopic
   @Override
   public String[] listBindingRoleNames() {
     return objectRoleOperations.listBindingRoleNames();
+  }
+
+  @Override
+  public Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    return objectRoleOperations.listBindingRoleNames(pageRequest);
   }
 
   @Override

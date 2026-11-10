@@ -28,6 +28,8 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -122,6 +124,11 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
     return objectTagOperations.listTags();
   }
 
+  @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public TagList<String> listTagsWithVisibility() {
@@ -132,6 +139,11 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   /** {@inheritDoc} */
@@ -164,6 +176,11 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
     return objectPolicyOperations.listPolicies();
   }
 
+  @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicies(pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public PolicyList<String> listPoliciesWithVisibility() {
@@ -174,6 +191,11 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicyInfos(pageRequest);
   }
 
   /** {@inheritDoc} */

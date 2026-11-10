@@ -44,6 +44,8 @@ import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -102,6 +104,29 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listTopics(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkTopicNamespace(namespace);
+
+    Namespace fullNamespace = getTopicFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatTopicRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.topicErrorHandler());
+
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
   }
 
   /**

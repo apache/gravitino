@@ -31,6 +31,8 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FilesetChange.RenameFileset;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -272,5 +274,18 @@ public interface FilesetCatalog {
   default String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, NoSuchLocationNameException {
     throw new UnsupportedOperationException("getFileLocation is not supported");
+  }
+
+  /**
+   * List one page of the filesets in a namespace, in ascending order of name.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listFilesets(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

@@ -138,16 +138,31 @@ class RelationalCatalog extends BaseSchemaCatalog
     return semanticModelOperations.listSemanticModels(namespace);
   }
 
+  @Override
+  public Page<NameIdentifier> listSemanticModels(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listSemanticModels(namespace, pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public NameIdentifier[] listMetrics(Namespace namespace) {
     return semanticModelOperations.listMetrics(namespace);
   }
 
+  @Override
+  public Page<NameIdentifier> listMetrics(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listMetrics(namespace, pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public SemanticModelMetric[] listMetricInfos(Namespace namespace) {
     return semanticModelOperations.listMetricInfos(namespace);
+  }
+
+  @Override
+  public Page<SemanticModelMetric> listMetricInfos(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listMetricInfos(namespace, pageRequest);
   }
 
   /** {@inheritDoc} */
@@ -468,6 +483,28 @@ class RelationalCatalog extends BaseSchemaCatalog
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listViews(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkViewNamespace(namespace);
+
+    Namespace fullNamespace = getEntityFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatViewRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.viewErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
   }
 
   /**

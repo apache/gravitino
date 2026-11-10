@@ -24,6 +24,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -65,6 +67,11 @@ public class GenericColumn implements Column, SupportsTags {
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -72,6 +79,11 @@ public class GenericColumn implements Column, SupportsTags {
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override

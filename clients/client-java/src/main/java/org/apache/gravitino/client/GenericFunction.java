@@ -30,6 +30,8 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagList;
@@ -93,6 +95,11 @@ class GenericFunction implements Function, SupportsTags {
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -100,6 +107,11 @@ class GenericFunction implements Function, SupportsTags {
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override

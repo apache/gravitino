@@ -22,8 +22,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.NameIdentifier;
@@ -56,11 +58,14 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -1129,5 +1134,27 @@ public class TestGenericModelCatalog extends TestBase {
     Assertions.assertArrayEquals(expect.aliases(), result.aliases());
     Assertions.assertEquals(expect.comment(), result.comment());
     Assertions.assertEquals(expect.properties(), result.properties());
+  }
+
+  @Test
+  public void testListModelVersionsPaged() throws JsonProcessingException {
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1"))
+                + "/versions");
+    buildMockResource(
+        Method.GET,
+        modelVersionPath,
+        ImmutableMap.of("pageSize", "2"),
+        null,
+        new ModelVersionListResponse(new int[] {1, 2}).withNextPageToken("t1"),
+        HttpStatus.SC_OK);
+    Page<Integer> page =
+        catalog
+            .asModelCatalog()
+            .listModelVersions(NameIdentifier.of("schema1", "model1"), PageRequest.ofSize(2));
+    Assertions.assertEquals(Arrays.asList(1, 2), page.items());
+    Assertions.assertEquals(Optional.of("t1"), page.nextPageToken());
   }
 }

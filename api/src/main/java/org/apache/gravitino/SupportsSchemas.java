@@ -27,6 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -192,4 +194,29 @@ public interface SupportsSchemas {
    *     cannot safely cascade within the schema.
    */
   boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException;
+
+  /**
+   * List one page of the schema names, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listSchemas(PageRequest pageRequest) throws NoSuchCatalogException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the names of the schemas under a parent schema, in ascending order.
+   *
+   * @param parentSchema The parent schema.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listSchemas(String parentSchema, PageRequest pageRequest)
+      throws NoSuchCatalogException, NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

@@ -19,6 +19,8 @@
 package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Interface for policy operations on a metadata object.
@@ -63,5 +65,29 @@ public interface SupportsPolicies {
    */
   default PolicyList<Policy> listPolicyInfosWithVisibility() {
     return new PolicyList<>(listPolicyInfos(), false);
+  }
+
+  /**
+   * List one page of the names of the policies associated with the object, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listPolicies(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the policies associated with the object, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

@@ -57,6 +57,8 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 
 class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
@@ -94,6 +96,28 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     return Arrays.stream(resp.identifiers())
         .map(id -> NameIdentifier.of(id.namespace().level(2), id.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listModels(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkModelNamespace(namespace);
+
+    Namespace modelFullNs = modelFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatModelRequestPath(modelFullNs),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(id -> NameIdentifier.of(id.namespace().level(2), id.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
   }
 
   @Override
@@ -166,6 +190,24 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   }
 
   @Override
+  public Page<Integer> listModelVersions(NameIdentifier ident, PageRequest pageRequest)
+      throws NoSuchModelException {
+    checkModelNameIdentifier(ident);
+
+    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
+    ModelVersionListResponse resp =
+        restClient.get(
+            formatModelVersionRequestPath(modelFullIdent) + "/versions",
+            PageParams.of(pageRequest),
+            ModelVersionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+    resp.validate();
+
+    return PageParams.page(Arrays.stream(resp.getVersions()).boxed().toArray(Integer[]::new), resp);
+  }
+
+  @Override
   public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     checkModelNameIdentifier(ident);
 
@@ -182,6 +224,28 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     return Arrays.stream(resp.getVersions())
         .map(v -> new GenericModelVersion(v))
         .toArray(ModelVersion[]::new);
+  }
+
+  @Override
+  public Page<ModelVersion> listModelVersionInfos(NameIdentifier ident, PageRequest pageRequest)
+      throws NoSuchModelException {
+    checkModelNameIdentifier(ident);
+
+    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
+    ModelVersionInfoListResponse resp =
+        restClient.get(
+            formatModelVersionRequestPath(modelFullIdent) + "/versions",
+            PageParams.with(ImmutableMap.of("details", "true"), pageRequest),
+            ModelVersionInfoListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.getVersions())
+            .map(v -> new GenericModelVersion(v))
+            .toArray(ModelVersion[]::new),
+        resp);
   }
 
   @Override

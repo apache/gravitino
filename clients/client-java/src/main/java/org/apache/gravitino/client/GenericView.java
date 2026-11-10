@@ -28,6 +28,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.rel.ViewDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
@@ -126,6 +128,11 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -133,6 +140,11 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override

@@ -64,6 +64,8 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -142,6 +144,62 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public String[] listCatalogs() throws NoSuchMetalakeException {
     return getMetalake().listCatalogs();
+  }
+
+  @Override
+  public Page<String> listCatalogs(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listCatalogs(pageRequest);
+  }
+
+  @Override
+  public Page<Catalog> listCatalogsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listCatalogsInfo(pageRequest);
+  }
+
+  @Override
+  public Page<String> listTags(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listTags(pageRequest);
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listTagsInfo(pageRequest);
+  }
+
+  @Override
+  public Page<String> listPolicyNamesForTag(String tagName, PageRequest pageRequest) {
+    return getMetalake().listPolicyNamesForTag(tagName, pageRequest);
+  }
+
+  @Override
+  public Page<JobTemplate> listJobTemplates(PageRequest pageRequest) {
+    return getMetalake().listJobTemplates(pageRequest);
+  }
+
+  @Override
+  public Page<JobHandle> listJobs(String jobTemplateName, PageRequest pageRequest)
+      throws NoSuchJobTemplateException {
+    return getMetalake().listJobs(jobTemplateName, pageRequest);
+  }
+
+  @Override
+  public Page<JobHandle> listJobs(PageRequest pageRequest) {
+    return getMetalake().listJobs(pageRequest);
+  }
+
+  @Override
+  public Page<String> listPolicies(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listPolicies(pageRequest);
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) throws NoSuchMetalakeException {
+    return getMetalake().listPolicyInfos(pageRequest);
+  }
+
+  @Override
+  public Page<String> listTagNamesForPolicy(String policyName, PageRequest pageRequest) {
+    return getMetalake().listTagNamesForPolicy(policyName, pageRequest);
   }
 
   @Override

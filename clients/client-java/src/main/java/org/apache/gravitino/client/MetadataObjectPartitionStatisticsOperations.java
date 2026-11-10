@@ -34,6 +34,8 @@ import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
@@ -94,6 +96,38 @@ class MetadataObjectPartitionStatisticsOperations implements SupportsPartitionSt
     response.validate();
 
     return Lists.newArrayList(response.getPartitionStatistics());
+  }
+
+  @Override
+  public Page<PartitionStatistics> listPartitionStatistics(
+      PartitionRange range, PageRequest pageRequest) {
+    Map<String, String> queryParams = Maps.newHashMap();
+    range.lowerPartitionName().ifPresent(from -> queryParams.put(FROM, from));
+    range
+        .lowerBoundType()
+        .ifPresent(
+            boundType ->
+                queryParams.put(
+                    FROM_INCLUSIVE, String.valueOf(boundType == PartitionRange.BoundType.CLOSED)));
+
+    range.upperPartitionName().ifPresent(to -> queryParams.put(TO, to));
+    range
+        .upperBoundType()
+        .ifPresent(
+            boundType ->
+                queryParams.put(
+                    TO_INCLUSIVE, String.valueOf(boundType == PartitionRange.BoundType.CLOSED)));
+
+    PartitionStatisticsListResponse response =
+        restClient.get(
+            statisticsRequestPath,
+            PageParams.with(queryParams, pageRequest),
+            PartitionStatisticsListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.statisticsErrorHandler());
+    response.validate();
+
+    return PageParams.page(Lists.newArrayList(response.getPartitionStatistics()), response);
   }
 
   @Override

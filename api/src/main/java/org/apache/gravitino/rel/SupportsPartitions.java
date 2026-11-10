@@ -21,6 +21,8 @@ package org.apache.gravitino.rel;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
@@ -120,5 +122,29 @@ public interface SupportsPartitions {
    */
   default boolean purgePartition(String partitionName) throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Partition purging is not supported");
+  }
+
+  /**
+   * List one page of the partition names of the table, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listPartitionNames(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the partitions of the table, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Partition> listPartitions(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

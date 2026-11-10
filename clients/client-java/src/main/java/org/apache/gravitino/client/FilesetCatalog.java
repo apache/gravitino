@@ -50,6 +50,8 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
@@ -105,6 +107,28 @@ class FilesetCatalog extends BaseSchemaCatalog
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listFilesets(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkFilesetNamespace(namespace);
+
+    Namespace fullNamespace = getFilesetFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatFilesetRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.filesetErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
   }
 
   /**

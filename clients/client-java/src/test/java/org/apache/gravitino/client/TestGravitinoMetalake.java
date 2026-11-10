@@ -28,7 +28,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -78,6 +80,8 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -1328,5 +1332,72 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.POST, "/api/metalakes", req, resp, HttpStatus.SC_OK);
 
     return client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+  }
+
+  @Test
+  public void testPagedNameListings() throws JsonProcessingException {
+    String base = "/api/metalakes/" + metalakeName;
+    assertNameWalk(
+        base + "/catalogs",
+        new EntityListResponse(
+            new NameIdentifier[] {
+              NameIdentifier.of(metalakeName, "a"), NameIdentifier.of(metalakeName, "b")
+            },
+            "t1"),
+        new EntityListResponse(new NameIdentifier[] {NameIdentifier.of(metalakeName, "c")}),
+        gravitinoClient::listCatalogs);
+    assertNameWalk(
+        base + "/tags", names("t1", "a", "b"), names(null, "c"), gravitinoClient::listTags);
+    assertNameWalk(
+        base + "/policies", names("t1", "a", "b"), names(null, "c"), gravitinoClient::listPolicies);
+    assertNameWalk(
+        base + "/tags/tag1/policies",
+        names("t1", "a", "b"),
+        names(null, "c"),
+        request -> gravitinoClient.listPolicyNamesForTag("tag1", request));
+    assertNameWalk(
+        base + "/policies/policy1/tags",
+        names("t1", "a", "b"),
+        names(null, "c"),
+        request -> gravitinoClient.listTagNamesForPolicy("policy1", request));
+    MetalakeDTO metalakeDTO =
+        MetalakeDTO.builder()
+            .withName(metalakeName)
+            .withComment("comment")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    buildMockResource(Method.GET, base, null, new MetalakeResponse(metalakeDTO), HttpStatus.SC_OK);
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    assertNameWalk(
+        base + "/users/", names("t1", "a", "b"), names(null, "c"), metalake::listUserNames);
+    assertNameWalk(
+        base + "/groups/", names("t1", "a", "b"), names(null, "c"), metalake::listGroupNames);
+    assertNameWalk(
+        base + "/roles/", names("t1", "a", "b"), names(null, "c"), metalake::listRoleNames);
+  }
+
+  private static NameListResponse names(String nextPageToken, String... names) {
+    return new NameListResponse(names).withNextPageToken(nextPageToken);
+  }
+
+  private static void assertNameWalk(
+      String path, Object firstPage, Object secondPage, Function<PageRequest, Page<String>> call)
+      throws JsonProcessingException {
+    buildMockResource(
+        Method.GET, path, ImmutableMap.of("pageSize", "2"), null, firstPage, HttpStatus.SC_OK);
+    buildMockResource(
+        Method.GET,
+        path,
+        ImmutableMap.of("pageSize", "2", "pageToken", "t1"),
+        null,
+        secondPage,
+        HttpStatus.SC_OK);
+    Page<String> first = call.apply(PageRequest.ofSize(2));
+    Assertions.assertEquals(Arrays.asList("a", "b"), first.items(), path);
+    Assertions.assertEquals(Optional.of("t1"), first.nextPageToken(), path);
+    Page<String> second = call.apply(PageRequest.ofSize(2).withToken("t1"));
+    Assertions.assertEquals(Collections.singletonList("c"), second.items(), path);
+    Assertions.assertFalse(second.nextPageToken().isPresent(), path);
   }
 }

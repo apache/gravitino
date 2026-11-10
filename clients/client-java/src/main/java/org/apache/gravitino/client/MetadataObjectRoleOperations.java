@@ -23,6 +23,8 @@ import java.util.Locale;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 
 class MetadataObjectRoleOperations implements SupportsRoles {
@@ -53,5 +55,19 @@ class MetadataObjectRoleOperations implements SupportsRoles {
     resp.validate();
 
     return resp.getNames();
+  }
+
+  @Override
+  public Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    NameListResponse resp =
+        restClient.get(
+            roleRequestPath,
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return PageParams.page(resp.getNames(), resp);
   }
 }

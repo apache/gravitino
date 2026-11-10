@@ -26,6 +26,8 @@ import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * The ViewCatalog interface defines the public API for managing views in a schema. If the catalog
@@ -134,5 +136,18 @@ public interface ViewCatalog {
    */
   default boolean dropView(NameIdentifier ident) {
     throw new UnsupportedOperationException("dropView is not supported");
+  }
+
+  /**
+   * List one page of the views in a namespace, in ascending order of name.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listViews(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

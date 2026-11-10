@@ -25,6 +25,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyTagAssociation;
@@ -177,5 +179,41 @@ public interface TagOperations {
    */
   default void removePolicyFromTag(String tagName, String policyName) {
     throw new UnsupportedOperationException("Removing a policy from a tag is not supported");
+  }
+
+  /**
+   * List one page of the tag names, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listTags(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the tags with their details, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Tag> listTagsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the names of the policies associated with a tag, in ascending order.
+   *
+   * @param tagName The tag name.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listPolicyNamesForTag(String tagName, PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

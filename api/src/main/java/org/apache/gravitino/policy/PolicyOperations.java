@@ -22,6 +22,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * The interface of the policy operations. The policy operations are used to manage policies under a
@@ -122,5 +124,41 @@ public interface PolicyOperations {
   default PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
     throw new UnsupportedOperationException(
         "Listing tag associations for a policy is not supported");
+  }
+
+  /**
+   * List one page of the policy names, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listPolicies(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the policies with their details, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Policy> listPolicyInfos(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the names of the tags associated with a policy, in ascending order.
+   *
+   * @param policyName The policy name.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listTagNamesForPolicy(String policyName, PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

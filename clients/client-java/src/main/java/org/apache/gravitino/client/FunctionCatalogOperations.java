@@ -43,6 +43,8 @@ import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -87,6 +89,28 @@ class FunctionCatalogOperations implements FunctionCatalog {
         .toArray(NameIdentifier[]::new);
   }
 
+  @Override
+  public Page<NameIdentifier> listFunctions(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkFunctionNamespace(namespace);
+
+    Namespace fullNamespace = getFunctionFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatFunctionRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.functionErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
+  }
+
   /**
    * List the functions with details in a schema namespace from the catalog.
    *
@@ -113,6 +137,30 @@ class FunctionCatalogOperations implements FunctionCatalog {
     return Arrays.stream(resp.getFunctions())
         .map(function -> new GenericFunction(function, restClient, fullNamespace))
         .toArray(Function[]::new);
+  }
+
+  @Override
+  public Page<Function> listFunctionInfos(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkFunctionNamespace(namespace);
+
+    Namespace fullNamespace = getFunctionFullNamespace(namespace);
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    FunctionListResponse resp =
+        restClient.get(
+            formatFunctionRequestPath(fullNamespace),
+            PageParams.with(params, pageRequest),
+            FunctionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.functionErrorHandler());
+    resp.validate();
+    return PageParams.page(
+        Arrays.stream(resp.getFunctions())
+            .map(function -> new GenericFunction(function, restClient, fullNamespace))
+            .toArray(Function[]::new),
+        resp);
   }
 
   /**

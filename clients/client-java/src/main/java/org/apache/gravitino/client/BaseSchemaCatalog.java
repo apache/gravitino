@@ -53,6 +53,8 @@ import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -172,6 +174,19 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     Preconditions.checkArgument(
         StringUtils.isNotBlank(parentSchema), "parentSchema must not be null or blank");
     return doListSchemas(Collections.singletonMap("parentSchema", parentSchema));
+  }
+
+  @Override
+  public Page<String> listSchemas(PageRequest pageRequest) throws NoSuchCatalogException {
+    return doListSchemas(Collections.emptyMap(), pageRequest);
+  }
+
+  @Override
+  public Page<String> listSchemas(String parentSchema, PageRequest pageRequest)
+      throws NoSuchCatalogException, NoSuchSchemaException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(parentSchema), "parentSchema must not be null or blank");
+    return doListSchemas(Collections.singletonMap("parentSchema", parentSchema), pageRequest);
   }
 
   /**
@@ -320,6 +335,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -327,6 +347,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override
@@ -355,6 +380,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicies(pageRequest);
+  }
+
+  @Override
   public PolicyList<String> listPoliciesWithVisibility() {
     return objectPolicyOperations.listPoliciesWithVisibility();
   }
@@ -365,6 +395,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicyInfos(pageRequest);
+  }
+
+  @Override
   public PolicyList<Policy> listPolicyInfosWithVisibility() {
     return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
@@ -372,6 +407,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public String[] listBindingRoleNames() {
     return objectRoleOperations.listBindingRoleNames();
+  }
+
+  @Override
+  public Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    return objectRoleOperations.listBindingRoleNames(pageRequest);
   }
 
   /**
@@ -413,8 +453,19 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public Page<NameIdentifier> listFunctions(Namespace namespace, PageRequest pageRequest) {
+    return functionOperations.listFunctions(namespace, pageRequest);
+  }
+
+  @Override
   public Function[] listFunctionInfos(Namespace namespace) throws NoSuchSchemaException {
     return functionOperations.listFunctionInfos(namespace);
+  }
+
+  @Override
+  public Page<Function> listFunctionInfos(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    return functionOperations.listFunctionInfos(namespace, pageRequest);
   }
 
   @Override
@@ -454,5 +505,19 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     resp.validate();
 
     return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
+  }
+
+  private Page<String> doListSchemas(Map<String, String> queryParams, PageRequest pageRequest) {
+    EntityListResponse resp =
+        restClient.get(
+            formatSchemaRequestPath(schemaNamespace()),
+            PageParams.with(queryParams, pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new), resp);
   }
 }

@@ -32,6 +32,8 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
@@ -84,6 +86,20 @@ class MetadataObjectTagOperations implements SupportsTags {
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    TagNameListResponse resp =
+        restClient.get(
+            tagRequestPath,
+            PageParams.of(pageRequest),
+            TagNameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+
+    resp.validate();
+    return PageParams.page(resp.getNames(), resp);
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return listTagsInfoWithVisibility().tags();
   }
@@ -104,6 +120,24 @@ class MetadataObjectTagOperations implements SupportsTags {
             .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
             .toArray(Tag[]::new);
     return new TagList<>(tags, resp.hasInaccessibleTags());
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    MetadataObjectTagListResponse resp =
+        restClient.get(
+            tagRequestPath,
+            PageParams.with(ImmutableMap.of("details", "true"), pageRequest),
+            MetadataObjectTagListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+
+    resp.validate();
+    Tag[] tags =
+        Arrays.stream(resp.getTags())
+            .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
+            .toArray(Tag[]::new);
+    return PageParams.page(tags, resp);
   }
 
   @Override

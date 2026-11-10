@@ -41,6 +41,8 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
@@ -87,6 +89,28 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
         .toArray(NameIdentifier[]::new);
   }
 
+  @Override
+  public Page<NameIdentifier> listSemanticModels(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkSemanticModelNamespace(namespace);
+
+    Namespace fullNamespace = getSemanticModelFullNamespace(namespace);
+    EntityListResponse response =
+        restClient.get(
+            formatSemanticModelRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+
+    return PageParams.page(
+        Arrays.stream(response.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        response);
+  }
+
   /** {@inheritDoc} */
   @Override
   public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
@@ -102,6 +126,27 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
     return Arrays.stream(response.identifiers())
         .map(ident -> NameIdentifier.of(relativeMetricNamespace(ident.namespace()), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listMetrics(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkSemanticModelNamespace(namespace);
+    EntityListResponse response =
+        restClient.get(
+            formatMetricRequestPath(getSemanticModelFullNamespace(namespace)),
+            PageParams.with(Collections.singletonMap("details", "false"), pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+    return PageParams.page(
+        Arrays.stream(response.identifiers())
+            .map(
+                ident ->
+                    NameIdentifier.of(relativeMetricNamespace(ident.namespace()), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        response);
   }
 
   /** {@inheritDoc} */
@@ -122,6 +167,28 @@ class SemanticModelCatalogOperations implements SemanticModelCatalog {
                 new GenericSemanticModelMetric(
                     relativeMetricNamespace(info.namespace()), info.metric()))
         .toArray(SemanticModelMetric[]::new);
+  }
+
+  @Override
+  public Page<SemanticModelMetric> listMetricInfos(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkSemanticModelNamespace(namespace);
+    MetricInfoListResponse response =
+        restClient.get(
+            formatMetricRequestPath(getSemanticModelFullNamespace(namespace)),
+            PageParams.with(Collections.singletonMap("details", "true"), pageRequest),
+            MetricInfoListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.semanticModelErrorHandler());
+    response.validate();
+    return PageParams.page(
+        Arrays.stream(response.getMetrics())
+            .map(
+                info ->
+                    new GenericSemanticModelMetric(
+                        relativeMetricNamespace(info.namespace()), info.metric()))
+            .toArray(SemanticModelMetric[]::new),
+        response);
   }
 
   /** {@inheritDoc} */

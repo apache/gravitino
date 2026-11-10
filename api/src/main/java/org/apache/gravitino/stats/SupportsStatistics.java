@@ -24,6 +24,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * SupportsStatistics provides methods to list and update statistics. A table, a partition or a
@@ -74,4 +76,16 @@ public interface SupportsStatistics {
    *     modified or replaced
    */
   boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException;
+
+  /**
+   * List one page of the statistics of the object, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Statistic> listStatistics(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

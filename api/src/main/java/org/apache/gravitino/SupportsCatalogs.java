@@ -27,6 +27,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 
@@ -295,5 +297,29 @@ public interface SupportsCatalogs {
     throw new UnsupportedOperationException(
         String.format(
             "Catalog %s does not support connection testing with proposed changes", catalogName));
+  }
+
+  /**
+   * List one page of the catalog names, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listCatalogs(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the catalogs with their details, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Catalog> listCatalogsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }
