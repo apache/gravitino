@@ -32,12 +32,12 @@ Maintenance runs as four steps. Each is a separate command, so you can stop afte
 and the dry run on Evaluate shows what would be submitted before anything runs. Direct
 `POST .../jobs/runs` submissions skip Evaluate and go straight to a chosen job template.
 
-| Step     | What you run                                      | What it produces                                    |
-| -------- | ------------------------------------------------- | --------------------------------------------------- |
+| Step     | What you run                                      | What it produces                                        |
+| -------- | ------------------------------------------------- | ------------------------------------------------------- |
 | Collect  | `update-statistics`, `append-metrics`             | Statistics on the table, metrics in the JDBC repository |
-| Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted           |
-| Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs |
-| Observe  | `monitor-metrics`, `list-table-metrics`           | Before and after metrics, and job staging logs      |
+| Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted               |
+| Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs     |
+| Observe  | `monitor-metrics`, `list-table-metrics`           | Before and after metrics, and job staging logs          |
 
 ## Execution Modes
 
