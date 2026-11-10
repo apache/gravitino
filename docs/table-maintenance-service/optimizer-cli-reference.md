@@ -18,7 +18,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 ## Command Quick Reference
 
 | Command (`--type`)        | Required options                   | Optional options                                                  | Purpose                                                 |
-|---------------------------|------------------------------------|-------------------------------------------------------------------|---------------------------------------------------------|
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- |
 | `submit-strategy-jobs`    | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit`                                            | Recommend and optionally submit jobs                    |
 | `update-statistics`       | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and persist statistics                        |
 | `append-metrics`          | `--calculator-name`                | `--identifiers`, `--statistics-payload`, `--file-path`            | Calculate and append metrics                            |
@@ -30,7 +30,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 ## Option Field Meanings
 
 | Option                 | Meaning                                                                                              | Used by                                           |
-|------------------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | `--identifiers`        | Comma-separated identifiers. See [Identifier Rules](#identifier-rules) for command-specific formats. | All commands                                      |
 | `--strategy-name`      | Policy name to evaluate, for example `iceberg_compaction_default`.                                   | `submit-strategy-jobs`                            |
 | `--dry-run`            | Preview mode. Prints recommendations or job configs without submitting jobs.                         | `submit-strategy-jobs`, `submit-update-stats-job` |
@@ -243,7 +243,7 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 The following Iceberg job templates ship with the service. A full maintenance pass collects statistics, compacts data files, expires the snapshot history that compaction just created, consolidates manifests, and removes old orphan files.
 
 | Job template                            | What it does                             |
-|-----------------------------------------|------------------------------------------|
+| --------------------------------------- | ---------------------------------------- |
 | `builtin-iceberg-update-stats`          | Collects file statistics and metrics     |
 | `builtin-iceberg-rewrite-data-files`    | Compacts small data files                |
 | `builtin-iceberg-expire-snapshots`      | Removes old snapshot metadata            |
@@ -274,7 +274,7 @@ missing keys. An empty string is a value, not an omission: it overrides the defa
 "not set" to these jobs.
 
 | Job template                          | Required keys                                                                           | Optional keys and defaults                                                                                                                                                 |
-|---------------------------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Every Iceberg job                     | `catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location` | `spark_master` (empty), `spark_executor_instances` (`1`), `spark_executor_cores` (`1`), `spark_executor_memory` (`1g`), `spark_driver_memory` (`1g`), `spark_conf` (empty) |
 | `builtin-iceberg-update-stats`        | —                                                                                       | `update_mode` (`all`), `updater_options` (empty)                                                                                                                           |
 | `builtin-iceberg-rewrite-data-files`  | `where_clause` (pass `""` to rewrite the whole table)                                   | `strategy` (`binpack`), `sort_order` (empty), `options` (empty)                                                                                                            |
@@ -304,7 +304,7 @@ Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-
 statistics, including for partitioned tables:
 
 | Statistic                          | Object entry for each decimal spec ID |
-|------------------------------------|---------------------------------------|
+| ---------------------------------- | ------------------------------------- |
 | `custom-manifest-number-by-spec`   | Long manifest count                   |
 | `custom-avg-manifest-size-by-spec` | Double average manifest size in bytes |
 
@@ -421,19 +421,19 @@ For the policy that drives it, including threshold tuning, see [Iceberg Compacti
 
 The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
 
-| Property    | Value                                                                       |
-|-------------|-----------------------------------------------------------------------------|
-| Name        | `builtin-iceberg-expire-snapshots`                                          |
-| Type        | Spark                                                                       |
-| Version     | `v1`                                                                        |
-| Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob`   |
+| Property   | Value                                                                     |
+| ---------- | ------------------------------------------------------------------------- |
+| Name       | `builtin-iceberg-expire-snapshots`                                        |
+| Type       | Spark                                                                     |
+| Version    | `v1`                                                                      |
+| Main class | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob` |
 
 ## Parameters
 
 `catalog_name` and `table_identifier` are required. The rest are optional.
 
 | Key                | Description                                                      | Default       |
-|--------------------|------------------------------------------------------------------|---------------|
+| ------------------ | ---------------------------------------------------------------- | ------------- |
 | `catalog_name`     | Iceberg catalog name as registered in Spark                      | Required      |
 | `table_identifier` | Fully qualified table name, such as `db.sample`                  | Required      |
 | `older_than`       | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp | Five days ago |
@@ -505,24 +505,24 @@ This complements `builtin-iceberg-rewrite-data-files`: that job improves the dat
 
 The job calls Iceberg's `rewrite_manifests` stored procedure through Spark SQL.
 
-| Property      | Value                                                                          |
-| ------------- | ------------------------------------------------------------------------------ |
-| Name          | `builtin-iceberg-rewrite-manifests`                                            |
-| Type          | Spark                                                                          |
-| Version       | `v1`                                                                           |
-| Main class    | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob`     |
+| Property   | Value                                                                      |
+| ---------- | -------------------------------------------------------------------------- |
+| Name       | `builtin-iceberg-rewrite-manifests`                                        |
+| Type       | Spark                                                                      |
+| Version    | `v1`                                                                       |
+| Main class | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob` |
 
 ### Parameters
 
 `catalog_name` and `table_identifier` are required. For this job, omitted or blank optional argument values use the defaults below; unresolved optional template placeholders are also treated as absent.
 
-| Key                  | Description                                                              | Default                             |
-| -------------------- | ------------------------------------------------------------------------ | ----------------------------------- |
-| `catalog_name`       | Iceberg catalog name as registered in Spark                              | Required                            |
-| `table_identifier`   | Fully qualified table name, such as `db.sample`                          | Required                            |
-| `use_caching`        | Caches table metadata in Spark while rewriting; `true` or `false`        | Installed Iceberg version's default |
-| `spec_id`            | Existing partition spec whose manifests to rewrite; non-negative integer | The table's current spec            |
-| `spark_conf`         | JSON map of Spark configuration                                          | None                                |
+| Key                | Description                                                              | Default                             |
+| ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
+| `catalog_name`     | Iceberg catalog name as registered in Spark                              | Required                            |
+| `table_identifier` | Fully qualified table name, such as `db.sample`                          | Required                            |
+| `use_caching`      | Caches table metadata in Spark while rewriting; `true` or `false`        | Installed Iceberg version's default |
+| `spec_id`          | Existing partition spec whose manifests to rewrite; non-negative integer | The table's current spec            |
+| `spark_conf`       | JSON map of Spark configuration                                          | None                                |
 
 Leave `use_caching` unset to use the installed Iceberg version's default (`false` in Iceberg 1.11.0). Set it explicitly when consistent behavior across versions is required.
 
