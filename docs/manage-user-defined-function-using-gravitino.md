@@ -106,7 +106,8 @@ function = functions.register_function(
 
 ### Register a Python Function
 
-A Python implementation names a handler entrypoint, and can carry inline code and the packages the
+A Python implementation must name a non-blank `handler` entrypoint. Inline code in `codeBlock` is
+optional and does not replace the handler. The implementation can also carry the resources the
 runtime needs.
 
 <Tabs groupId='language' queryString>
@@ -275,14 +276,19 @@ identifiers = functions.list_functions(Namespace.of("public"))
 
 ### Alter a Function
 
-Changes are applied as a list in one request.
+Changes are applied as a list in one request. A definition is identified by its parameter list,
+and an implementation within a definition by its runtime.
 
-| Change             | JSON                                                         | Java                                             |
-|--------------------|--------------------------------------------------------------|--------------------------------------------------|
-| Rename             | `{"@type":"rename","newName":"add_one_v2"}`                  | `FunctionChange.rename("add_one_v2")`            |
-| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`       | `FunctionChange.updateComment("new_comment")`    |
-| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FunctionChange.setProperty("key1", "value1")`   |
-| Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `FunctionChange.removeProperty("key1")`          |
+| Change                    | JSON `@type`       | Other JSON fields                         | Java                                                        |
+|---------------------------|--------------------|-------------------------------------------|-------------------------------------------------------------|
+| Update the comment        | `updateComment`    | `newComment`                              | `FunctionChange.updateComment(newComment)`                  |
+| Add a definition          | `addDefinition`    | `definition`                              | `FunctionChange.addDefinition(definition)`                  |
+| Remove a definition       | `removeDefinition` | `parameters`                              | `FunctionChange.removeDefinition(parameters)`               |
+| Add an implementation     | `addImpl`          | `parameters`, `implementation`            | `FunctionChange.addImpl(parameters, implementation)`        |
+| Replace an implementation | `updateImpl`       | `parameters`, `runtime`, `implementation` | `FunctionChange.updateImpl(parameters, runtime, implementation)` |
+| Remove an implementation  | `removeImpl`       | `parameters`, `runtime`                   | `FunctionChange.removeImpl(parameters, runtime)`            |
+
+`newComment` must not be null or blank; a function's comment cannot be cleared with `updateComment`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -291,7 +297,16 @@ Changes are applied as a list in one request.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": [
-    {"@type": "updateComment", "newComment": "Adds one, reviewed"}
+    {"@type": "updateComment", "newComment": "Adds one, reviewed"},
+    {
+      "@type": "addImpl",
+      "parameters": [{"name": "x", "dataType": "integer"}],
+      "implementation": {
+        "language": "JAVA",
+        "runtime": "SPARK",
+        "className": "com.example.AddOneFunction"
+      }
+    }
   ]
 }' http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/public/functions/add_one
 ```
@@ -300,9 +315,14 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
+FunctionParam[] parameters = new FunctionParam[] {FunctionParams.of("x", Types.IntegerType.get())};
+
 Function function = functions.alterFunction(
     NameIdentifier.of("public", "add_one"),
-    FunctionChange.updateComment("Adds one, reviewed"));
+    FunctionChange.updateComment("Adds one, reviewed"),
+    FunctionChange.addImpl(
+        parameters,
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.AddOneFunction")));
 ```
 
 </TabItem>
