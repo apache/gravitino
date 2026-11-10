@@ -521,6 +521,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Map<String, Path> filesetPaths =
         calculateFilesetPaths(
             schemaIdent.name(), ident.name(), storageLocations, schemaPaths, properties);
+    filesetPaths
+        .keySet()
+        .forEach(
+            locationName ->
+                EntityFieldLimits.checkMaxLength(
+                    locationName,
+                    EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+                    "storage location name",
+                    Entity.EntityType.FILESET));
     properties = setDefaultLocationIfAbsent(properties, filesetPaths);
 
     ImmutableMap.Builder<String, Path> filesetPathsBuilder = ImmutableMap.builder();
