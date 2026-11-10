@@ -119,7 +119,7 @@ final class IcebergBackend implements AutoCloseable {
       this.wrapper =
           authenticationConfig.isKerberosAuth()
                   && rawWrapper.getCatalog() instanceof SupportsKerberos
-              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
+              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy()
               : rawWrapper;
       this.helper = new IcebergCatalogWrapperHelper(wrapper.getCatalog());
       this.views = new IcebergViewCatalogOperations(wrapper);

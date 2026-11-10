@@ -23,6 +23,8 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import com.google.common.io.BaseEncoding;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -94,6 +96,22 @@ public class TestJdbcColumnDefaultValueConverter {
     Assertions.assertEquals("'0x4142'", converter.fromGravitino(Literals.stringLiteral("0x4142")));
     Assertions.assertEquals(
         "X'00ff'", converter.fromGravitino(Literals.of("0x00FF", Types.BinaryType.get())));
+  }
+
+  @Test
+  void testSharedDtoBinaryDecodeStillRendersJdbcSql() {
+    // Shared DTOConverters decodes 0x-prefixed binary for every catalog (#14609 / Iceberg load).
+    // JDBC must still emit dialect binary SQL for that path, and keep unprefixed strings as
+    // provider-specific quoted literals (e.g. PostgreSQL DEFAULT 'AB').
+    Expression fromHex =
+        DTOConverters.fromFunctionArg(
+            LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0x4142").build());
+    Assertions.assertEquals("X'4142'", converter.fromGravitino(fromHex));
+
+    Expression fromUnprefixed =
+        DTOConverters.fromFunctionArg(
+            LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("AB").build());
+    Assertions.assertEquals("'AB'", converter.fromGravitino(fromUnprefixed));
   }
 
   @ParameterizedTest

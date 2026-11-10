@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -566,16 +567,10 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       TableChange.UpdateColumnPosition updateColumnPosition =
           (TableChange.UpdateColumnPosition) change;
-      if (updateColumnPosition.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyExistingColumnName(afterPosition.getColumn(), capabilities);
-        String afterFieldName =
-            applyCaseSensitiveOnName(
-                Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        return TableChange.updateColumnPosition(
-            fieldName, TableChange.ColumnPosition.after(afterFieldName));
-      }
-      return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
+      return TableChange.updateColumnPosition(
+          fieldName,
+          normalizeColumnPosition(
+              updateColumnPosition.getPosition(), capabilities, fieldName.length == 1));
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return TableChange.updateColumnType(
@@ -588,28 +583,45 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.AddColumn addColumn, Capability capabilities) {
-    Column appliedColumn =
-        applyCapabilities(
-            Column.of(
-                addColumn.fieldName()[0],
-                addColumn.getDataType(),
-                addColumn.getComment(),
-                addColumn.isNullable(),
-                addColumn.isAutoIncrement(),
-                addColumn.getDefaultValue()),
-            capabilities);
+    Column column =
+        Column.of(
+            addColumn.fieldName()[0],
+            addColumn.getDataType(),
+            addColumn.getComment(),
+            addColumn.isNullable(),
+            addColumn.isAutoIncrement(),
+            addColumn.getDefaultValue());
+    applyColumnNotNull(column, capabilities);
+    applyColumnDefaultValue(column, capabilities);
 
-    String[] standardizeFieldName =
-        Arrays.copyOf(addColumn.fieldName(), addColumn.fieldName().length);
-    standardizeFieldName[0] = appliedColumn.name();
+    boolean topLevel = addColumn.fieldName().length == 1;
+    if (topLevel) {
+      applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
+    } else {
+      // For a nested addition the first component names an existing parent column.
+      applyExistingColumnName(addColumn.fieldName()[0], capabilities);
+    }
     return TableChange.addColumn(
-        standardizeFieldName,
-        appliedColumn.dataType(),
-        appliedColumn.comment(),
-        addColumn.getPosition(),
-        appliedColumn.nullable(),
-        appliedColumn.autoIncrement(),
-        appliedColumn.defaultValue());
+        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        column.dataType(),
+        column.comment(),
+        normalizeColumnPosition(addColumn.getPosition(), capabilities, topLevel),
+        column.nullable(),
+        column.autoIncrement(),
+        column.defaultValue());
+  }
+
+  private static TableChange.ColumnPosition normalizeColumnPosition(
+      TableChange.ColumnPosition position, Capability capabilities, boolean topLevel) {
+    // Nested siblings follow the connector's own field rules rather than top-level name rules.
+    if (position instanceof TableChange.After && topLevel) {
+      // AFTER identifies an existing sibling; it does not introduce a new column name.
+      String afterColumn = ((TableChange.After) position).getColumn();
+      applyExistingColumnName(afterColumn, capabilities);
+      return TableChange.ColumnPosition.after(
+          applyCaseSensitiveOnName(Capability.Scope.COLUMN, afterColumn, capabilities));
+    }
+    return position;
   }
 
   private static TableChange applyCapabilities(
@@ -657,7 +669,8 @@ public class CapabilityHelpers {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        column.defaultValue());
+        column.defaultValue(),
+        column.initialDefaultValue());
   }
 
   static String applyCapabilitiesOnName(
@@ -705,6 +718,7 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue());
   }
 
   private static void applyColumnDefaultValue(
@@ -712,6 +726,23 @@ public class CapabilityHelpers {
     Preconditions.checkArgument(
         capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+  }
+
+  /**
+   * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
+   * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
+   * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
+   * catalog can write initial defaults, require unset ({@code null} or {@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
+   */
+  private static void applyColumnInitialDefaultValue(
+      String columnName, Expression initialDefaultValue) {
+    Preconditions.checkArgument(
+        initialDefaultValue == null || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        "Column initial default value is read-only for now: catalogs may return it on load "
+            + "(e.g. Iceberg v3), but setting it on create/add-column is not supported by any "
+            + "catalog capability yet. Illegal column: "
+            + columnName);
   }
 
   private static void applyNameSpecification(

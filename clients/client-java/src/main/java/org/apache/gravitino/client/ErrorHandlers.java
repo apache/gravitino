@@ -1532,6 +1532,9 @@ public class ErrorHandlers {
           throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
+          if (NoSuchMetadataObjectException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
+          }
           if (NoSuchMetalakeException.class.getSimpleName().equals(errorResponse.getType())) {
             throw new NoSuchMetalakeException(errorMessage);
           } else if (NoSuchCatalogException.class.getSimpleName().equals(errorResponse.getType())) {

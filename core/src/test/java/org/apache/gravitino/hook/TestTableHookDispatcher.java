@@ -41,6 +41,8 @@ import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -199,6 +201,47 @@ public class TestTableHookDispatcher {
                     new Index[0]));
 
     assertEquals("Set owner failed", thrown.getMessage());
+  }
+
+  @Test
+  public void testCreateTableSucceedsWhenTableDroppedBeforeOwnerSet() throws Exception {
+    OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new NoSuchMetadataObjectException("The table is gone"))
+        .when(ownerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Table createdTable = Mockito.mock(Table.class);
+    Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(createdTable);
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> ownerDispatcher);
+
+    assertSame(createdTable, createTable(hook));
+  }
+
+  @Test
+  public void testCreateTableThrowsWhenOwnerNotFound() throws Exception {
+    OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new NotFoundException("The owner is missing"))
+        .when(ownerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(Mockito.mock(Table.class));
+    TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> ownerDispatcher);
+
+    assertThrows(NotFoundException.class, () -> createTable(hook));
+  }
+
+  private static Table createTable(TableHookDispatcher hook) {
+    return hook.createTable(
+        NameIdentifier.of(METALAKE, CATALOG, "schema", "table"),
+        new Column[0],
+        "comment",
+        ImmutableMap.of(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
   }
 
   @Test
