@@ -624,8 +624,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             entityCombinedTable.tableFromCatalog().auditInfo(),
             importAudit,
             (current, audit) ->
-                current.toBuilder()
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withProperties(current.properties())
                     .withColumns(fillMissingColumnCreationAudit(current.columns(), audit))
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
                     .withAuditInfo(audit)
                     .build());
 

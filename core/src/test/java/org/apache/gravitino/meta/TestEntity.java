@@ -24,9 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Field;
@@ -40,8 +38,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
-import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
@@ -178,18 +174,7 @@ public class TestEntity {
         TableEntity.builder()
             .withId(tableId)
             .withName(tableName)
-            .withNamespace(Namespace.of(metalakeName, catalogName, schemaName))
             .withAuditInfo(auditInfo)
-            .withColumns(
-                List.of(
-                    ColumnEntity.builder()
-                        .withId(1L)
-                        .withName("col1")
-                        .withPosition(0)
-                        .withDataType(Types.StringType.get())
-                        .withAuditInfo(auditInfo)
-                        .build()))
-            .withPartitioning(new Transform[] {Transforms.identity("col1")})
             .withSortOrders(sortOrders)
             .withProperties(tableProperties)
             .withComment(comment)
@@ -206,22 +191,6 @@ public class TestEntity {
     Assertions.assertEquals(sortOrders, fields.get(TableEntity.SORT_ORDERS));
     Assertions.assertEquals(indexes, fields.get(TableEntity.INDEXES));
     Assertions.assertEquals(distribution, fields.get(TableEntity.DISTRIBUTION));
-
-    TableEntity copy = testTable.toBuilder().build();
-    Assertions.assertNotSame(testTable, copy);
-    Assertions.assertEquals(testTable.fields(), copy.fields());
-    Assertions.assertEquals(testTable.namespace(), copy.namespace());
-
-    AuditInfo updatedAudit = AuditInfo.builder().withCreator("updated").build();
-    TableEntity updated =
-        testTable.toBuilder().withAuditInfo(updatedAudit).withColumns(List.of()).build();
-    Map<Field, Object> expectedFields = new HashMap<>(testTable.fields());
-    expectedFields.put(TableEntity.AUDIT_INFO, updatedAudit);
-    expectedFields.put(TableEntity.COLUMNS, List.of());
-    Assertions.assertEquals(expectedFields, updated.fields());
-    Assertions.assertEquals(testTable.namespace(), updated.namespace());
-    Assertions.assertSame(auditInfo, testTable.auditInfo());
-    Assertions.assertEquals(1, testTable.columns().size());
   }
 
   @Test

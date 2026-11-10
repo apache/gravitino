@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -30,11 +29,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -45,12 +39,10 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.CatalogManager;
-import org.apache.gravitino.catalog.EntityCombinedSchema;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
@@ -59,7 +51,6 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
-import org.apache.gravitino.lock.TreeLock;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -321,59 +312,6 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testSchemaAuditRecoveryToleratesConcurrentRenameAndDrop() throws Exception {
-    try (Fixture f = new Fixture()) {
-      for (boolean rename : new boolean[] {false, true}) {
-        String name = rename ? "renamed_during_audit" : "dropped_during_audit";
-        NameIdentifier original = f.ident(name);
-        NameIdentifier renamed = f.ident(name + "_new");
-        f.createSourceSchema(name, AuditInfo.EMPTY);
-        f.schemas.loadSchema(original);
-        SchemaEntity observed = f.store.get(original, Entity.EntityType.SCHEMA, SchemaEntity.class);
-        doAnswer(
-                call -> {
-                  // Another node changes the source and registration after this load's snapshot,
-                  // without participating in its tree lock, before audit recovery reads the row.
-                  f.source.dropSchema(original, false);
-                  if (rename) {
-                    f.createSourceSchema(renamed.name(), AuditInfo.EMPTY);
-                    backend.update(
-                        original,
-                        Entity.EntityType.SCHEMA,
-                        (SchemaEntity current) ->
-                            SchemaEntity.builder()
-                                .withId(current.id())
-                                .withName(renamed.name())
-                                .withNamespace(current.namespace())
-                                .withComment(current.comment())
-                                .withProperties(current.properties())
-                                .withAuditInfo(current.auditInfo())
-                                .build());
-                  } else {
-                    f.store.delete(original, Entity.EntityType.SCHEMA);
-                  }
-                  return call.callRealMethod();
-                })
-            .when(f.store)
-            .update(eq(original), eq(SchemaEntity.class), eq(Entity.EntityType.SCHEMA), any());
-
-        EntityCombinedSchema loaded =
-            (EntityCombinedSchema) f.schemas.importSchema(original, ALICE);
-        Assertions.assertEquals(original.name(), loaded.name());
-        Assertions.assertFalse(loaded.imported());
-        Assertions.assertNull(loaded.schemaEntity());
-        Assertions.assertNull(loaded.auditInfo().creator());
-        Assertions.assertFalse(f.store.exists(original, Entity.EntityType.SCHEMA));
-        if (rename) {
-          SchemaEntity moved = f.store.get(renamed, Entity.EntityType.SCHEMA, SchemaEntity.class);
-          Assertions.assertEquals(observed.id(), moved.id());
-          Assertions.assertEquals(AuditInfo.EMPTY, moved.auditInfo());
-        }
-      }
-    }
-  }
-
-  @TestTemplate
   void testViewHookFillsAuditAfterOrdinaryLoad() throws Exception {
     try (Fixture f = new Fixture()) {
       NameIdentifier schema = f.ident("view_schema");
@@ -457,63 +395,6 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
         if (parentExists) {
           Assertions.assertEquals(
               knownAudit ? Instant.EPOCH : null, parentEntity.auditInfo().createTime());
-        }
-      }
-    }
-  }
-
-  @TestTemplate
-  void testOverlappingViewImportsKeepCreator() throws Exception {
-    try (Fixture f = new Fixture()) {
-      f.schemas.createSchema(f.ident("overlap"), "", Map.of("k1", "v1", "k2", "v2"));
-      // Separate servers have separate tree locks; only the real store coordinates these writes.
-      LockManager locks = mock(LockManager.class);
-      when(locks.createTreeLock(any())).thenAnswer(call -> mock(TreeLock.class));
-      f.install("lockManager", locks);
-      for (boolean sourceId : new boolean[] {false, true}) {
-        for (boolean emptyFirst : new boolean[] {false, true}) {
-          NameIdentifier ident =
-              NameIdentifier.of(
-                  METALAKE, CATALOG, "overlap", "view_" + sourceId + "_" + emptyFirst);
-          Map<String, String> properties =
-              sourceId
-                  ? Map.of(
-                      StringIdentifier.ID_KEY,
-                      StringIdentifier.fromId(RandomIdGenerator.INSTANCE.nextId()).toString())
-                  : Map.of();
-          f.source.views.put(ident, sourceView(ident.name(), properties));
-          CountDownLatch pendingInsert = new CountDownLatch(1);
-          CountDownLatch winnerCommitted = new CountDownLatch(1);
-          doAnswer(
-                  call -> {
-                    ViewEntity incoming = call.getArgument(0);
-                    if ((incoming.auditInfo().creator() == null) == emptyFirst) {
-                      pendingInsert.countDown();
-                      Assertions.assertTrue(winnerCommitted.await(10, TimeUnit.SECONDS));
-                    }
-                    return call.callRealMethod();
-                  })
-              .when(f.store)
-              .put(any(ViewEntity.class), anyBoolean());
-          ExecutorService executor = Executors.newSingleThreadExecutor();
-          try {
-            Future<View> loser =
-                executor.submit(
-                    () -> f.views.importView(ident, emptyFirst ? AuditInfo.EMPTY : ALICE));
-            Assertions.assertTrue(pendingInsert.await(10, TimeUnit.SECONDS));
-            f.views.importView(ident, emptyFirst ? ALICE : AuditInfo.EMPTY);
-            long winnerId = f.store.get(ident, Entity.EntityType.VIEW, ViewEntity.class).id();
-            winnerCommitted.countDown();
-            Assertions.assertEquals("alice", loser.get(10, TimeUnit.SECONDS).auditInfo().creator());
-            ViewEntity stored = f.store.get(ident, Entity.EntityType.VIEW, ViewEntity.class);
-            Assertions.assertEquals(winnerId, stored.id());
-            Assertions.assertEquals("alice", stored.auditInfo().creator());
-            Assertions.assertEquals(Instant.EPOCH, stored.auditInfo().createTime());
-          } finally {
-            winnerCommitted.countDown();
-            executor.shutdownNow();
-            Assertions.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
-          }
         }
       }
     }

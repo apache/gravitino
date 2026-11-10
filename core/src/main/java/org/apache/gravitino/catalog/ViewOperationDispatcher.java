@@ -543,20 +543,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
-      try {
-        entityCombinedView =
-            TreeLockUtils.doWithTreeLock(
-                schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
-      } catch (EntityAlreadyExistsException e) {
-        entityCombinedView =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-        if (!entityCombinedView.imported()) {
-          throw new UnsupportedOperationException(
-              "View managed by multiple catalogs. This may cause unexpected issues such as "
-                  + "privilege conflicts. To resolve: Remove all catalogs managing this view, "
-                  + "then recreate one catalog to ensure single-catalog management.");
-        }
-      }
+      entityCombinedView =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
     }
 
     ViewEntity entity =
@@ -598,7 +587,13 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     long uid;
     if (stringId != null) {
-      // Keep the source identity, but never overwrite a concurrently imported registration.
+      // If the entity in the store doesn't match the external system, we use the data
+      // of external system to correct it.
+      LOG.warn(
+          "The View uid {} existed but still need to be imported, this could happen "
+              + "when View is renamed by external systems not controlled by Gravitino. In this "
+              + "case, we need to overwrite the stored entity to keep the consistency.",
+          stringId);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -633,9 +628,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withAuditInfo(audit)
             .build();
     try {
-      store.put(viewEntity, false /* overwrite */);
+      store.put(viewEntity, true /* overwrite */);
     } catch (EntityAlreadyExistsException e) {
-      throw e;
+      LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
+      throw new UnsupportedOperationException(
+          "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+              + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
     } catch (OptimisticLockException e) {
       // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;

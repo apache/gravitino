@@ -244,7 +244,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
       verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
     } else {
-      verify(entityStore).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).put(any(ViewEntity.class), eq(true));
       verify(entityStore, never()).update(any(), any(), any(), any());
     }
 

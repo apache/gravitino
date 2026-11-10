@@ -687,9 +687,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
 
-    // This repairs the registration for the source snapshot already read, rather than making
-    // the load linearizable. Store identity/version checks guard concurrent rename/drop; a missing
-    // registration is returned as not imported, without retrying the old audit on a replacement.
     SchemaEntity entity =
         fillMissingCreationAudit(
             schema.schemaEntity(),

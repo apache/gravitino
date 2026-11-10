@@ -42,7 +42,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
@@ -172,9 +171,6 @@ public class SchemaMetaService {
         String[] parts = schemaName.split(Pattern.quote(logicalSep), -1);
         for (int nSeg = 1; nSeg < parts.length; nSeg++) {
           String ancestorLogical = String.join(logicalSep, Arrays.copyOf(parts, nSeg));
-          // For every catalog, creating a registration does not imply that this request created
-          // the external ancestor. Keep its audit unknown rather than attributing the leaf's
-          // audit to it; callers that know the ancestor's audit import that namespace explicitly.
           SchemaEntity ancestor =
               SchemaEntity.builder()
                   .withId(nextIdForNestedAncestor())
@@ -182,7 +178,7 @@ public class SchemaMetaService {
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
                   .withProperties(Collections.emptyMap())
-                  .withAuditInfo(AuditInfo.EMPTY)
+                  .withAuditInfo(schemaEntity.auditInfo())
                   .build();
           rowsToInsert.add(ancestor);
         }

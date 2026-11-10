@@ -92,8 +92,8 @@ public abstract class OperationDispatcher {
   /**
    * Fills missing creation fields when another node imported the same object first. The cold import
    * already carries these fields in its initial write and needs no additional update. Ordinary
-   * loads pass an empty requested audit, leaving an unknown source creator unknown. If a concurrent
-   * update wins, return the current registration without applying the old audit.
+   * loads pass an empty requested audit, leaving an unknown source creator unknown. Retry once
+   * after a concurrent update if the original registration still has no creator.
    *
    * @param entity the imported registration, or null for a managed object
    * @param type the entity class
@@ -116,48 +116,56 @@ public abstract class OperationDispatcher {
     if (entity == null || entity.auditInfo().creator() != null || requested.creator() == null) {
       return entity;
     }
-    try {
-      return store.update(
-          entity.nameIdentifier(),
-          type,
-          entity.type(),
-          current -> {
-            // Recheck inside the store's optimistic update, including identity: the name may
-            // have been dropped and recreated since the source snapshot was read.
-            if (!current.id().equals(entity.id())) {
-              throw new OptimisticLockException("Entity identity changed during audit import");
-            }
-            Audit audit = current.auditInfo();
-            if (audit.creator() != null) {
-              return current;
-            }
-            AuditInfo filled =
-                AuditInfo.builder()
-                    .withCreator(
-                        reported.creator() == null ? requested.creator() : reported.creator())
-                    .withCreateTime(
-                        audit.createTime() != null
-                            ? audit.createTime()
-                            : reported.createTime() != null
-                                ? reported.createTime()
-                                : requested.createTime())
-                    .withLastModifier(audit.lastModifier())
-                    .withLastModifiedTime(audit.lastModifiedTime())
-                    .build();
-            return withAudit.apply(current, filled);
-          });
-    } catch (NoSuchEntityException e) {
-      // A rename or drop can remove the observed registration before the store read or CAS.
-      // Return the source snapshot without a registration; never resurrect it with the old audit.
-      return null;
-    } catch (OptimisticLockException e) {
-      // Audit recovery must not fail a read or attribute a replacement to the old create request.
-      // Do not retry with the requested audit: it belongs to the entity originally observed.
-      return getEntity(entity.nameIdentifier(), entity.type(), type);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "Failed to import creation audit for " + entity.nameIdentifier(), e);
+    E latest = entity;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return store.update(
+            entity.nameIdentifier(),
+            type,
+            entity.type(),
+            current -> {
+              // Recheck inside the store's optimistic update, including identity: the name may
+              // have been dropped and recreated since the source snapshot was read.
+              if (!current.id().equals(entity.id())) {
+                throw new OptimisticLockException("Entity identity changed during audit import");
+              }
+              Audit audit = current.auditInfo();
+              if (audit.creator() != null) {
+                return current;
+              }
+              AuditInfo filled =
+                  AuditInfo.builder()
+                      .withCreator(
+                          reported.creator() == null ? requested.creator() : reported.creator())
+                      .withCreateTime(
+                          audit.createTime() != null
+                              ? audit.createTime()
+                              : reported.createTime() != null
+                                  ? reported.createTime()
+                                  : requested.createTime())
+                      .withLastModifier(audit.lastModifier())
+                      .withLastModifiedTime(audit.lastModifiedTime())
+                      .build();
+              return withAudit.apply(current, filled);
+            });
+      } catch (NoSuchEntityException e) {
+        // A rename or drop can remove the observed registration before the store read or CAS.
+        // Return the source snapshot without a registration; never resurrect it with the old audit.
+        return null;
+      } catch (OptimisticLockException e) {
+        latest = getEntity(entity.nameIdentifier(), entity.type(), type);
+        if (latest == null
+            || !latest.id().equals(entity.id())
+            || latest.auditInfo().creator() != null) {
+          return latest;
+        }
+        // The updater rechecks the original ID before applying the audit on the retry.
+      } catch (IOException e) {
+        throw new RuntimeException(
+            "Failed to import creation audit for " + entity.nameIdentifier(), e);
+      }
     }
+    return latest;
   }
 
   protected <R, E extends Throwable> R doWithTable(
