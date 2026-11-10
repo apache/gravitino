@@ -24,13 +24,13 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /**

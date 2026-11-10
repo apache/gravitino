@@ -54,6 +54,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -237,6 +238,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    validateTableLocation(request.metadataLocation());
     try {
       return CatalogHandlers.registerTable(getCatalog(), namespace, request);
     } catch (NotFoundException e) {
@@ -262,6 +264,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     validateTableDefinition(request);
+    validateTableLocation(request.location());
     Catalog loadedCatalog = getCatalog();
     LoadTableResponse loadTableResponse;
     try {
@@ -340,6 +343,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    * @throws BadRequestException if no metadata file exists at the location
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
+    validateTableLocation(metadataLocation);
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
       return TableMetadataParser.read(fileIO, metadataLocation);
     } catch (NotFoundException e) {
@@ -429,6 +433,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    for (MetadataUpdate update : updateTableRequest.updates()) {
+      if (update instanceof MetadataUpdate.SetLocation) {
+        validateTableLocation(((MetadataUpdate.SetLocation) update).location());
+      }
+    }
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
     LoadTableResponse loadTableResponse;
@@ -686,6 +695,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       } catch (IllegalStateException | IllegalArgumentException e) {
         throw new BadRequestException("%s", e.getMessage());
       }
+    }
+  }
+
+  private void validateTableLocation(@Nullable String location) {
+    if (location == null || !S3FileIO.class.getName().equals(fileIOImpl())) {
+      return;
+    }
+    String[] parts = location.split("://", 2);
+    if (parts.length != 2
+        || !Set.of("s3", "s3a", "s3n").contains(parts[0])
+        || parts[1].split("/", 2)[0].isBlank()) {
+      throw new BadRequestException(
+          "Invalid table location '%s': this catalog requires an S3 location", location);
     }
   }
 

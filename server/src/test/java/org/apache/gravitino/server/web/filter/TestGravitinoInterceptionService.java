@@ -54,13 +54,17 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
+import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
+import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -94,6 +98,8 @@ import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.server.web.rest.OwnerOperations;
+import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
@@ -764,6 +770,69 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  /** Verifies that permission and owner paths validate metadata before authorization. */
+  @Test
+  public void testInvalidPermissionMetadataReturnsBadRequest() throws Throwable {
+    for (Method method : permissionMutationMethods()) {
+      for (String fullName : new String[] {"catalog.schema", "a.b.c.d.e", "catalog..table", " "}) {
+        for (String type : new String[] {"nosuchtype", "table"}) {
+          MethodInvocation invocation = permissionMutationInvocation(method, type, fullName);
+          Response response =
+              (Response)
+                  new GravitinoInterceptionService()
+                      .getMethodInterceptors(method)
+                      .get(0)
+                      .invoke(invocation);
+          assertEquals(400, response.getStatus(), method.getName() + ": " + type + "/" + fullName);
+          ErrorResponse error = (ErrorResponse) response.getEntity();
+          assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+          Assertions.assertFalse(error.getMessage().contains("Authorization failed"));
+          verify(invocation, never()).proceed();
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testValidPermissionMetadataPreservesAuthorization(boolean allowed) throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providers =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtils = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> environments = mockStatic(GravitinoEnv.class)) {
+      principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(new UserPrincipal("tester"));
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      providers.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.hasSetOwnerPermission(any(), any(), any(), any())).thenReturn(allowed);
+      when(authorizer.hasMetadataPrivilegePermission(any(), any(), any(), any()))
+          .thenReturn(allowed);
+      GravitinoEnv env = mock(GravitinoEnv.class);
+      environments.when(GravitinoEnv::getInstance).thenReturn(env);
+      when(env.eventBus()).thenReturn(mock(EventBus.class));
+      for (Method method : permissionMutationMethods()) {
+        MethodInvocation invocation =
+            permissionMutationInvocation(method, "table", "catalog.schema.table");
+        when(invocation.proceed()).thenReturn(Utils.ok("success"));
+        Response response =
+            (Response)
+                new GravitinoInterceptionService()
+                    .getMethodInterceptors(method)
+                    .get(0)
+                    .invoke(invocation);
+        assertEquals(allowed ? 200 : 403, response.getStatus(), method.getName());
+        if (allowed) {
+          verify(invocation).proceed();
+        } else {
+          verify(invocation, never()).proceed();
+        }
+      }
+    }
+  }
+
   /**
    * When the authorization executor returns {@code false}, {@code buildNoAuthResponse} is called
    * with {@code emitEvent=true}. Verify that:
@@ -1384,6 +1453,47 @@ public class TestGravitinoInterceptionService {
         @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake) {
       return Utils.ok("success");
     }
+  }
+
+  private Method[] permissionMutationMethods() throws NoSuchMethodException {
+    return new Method[] {
+      PermissionOperations.class.getMethod(
+          "grantPrivilegeToRole",
+          String.class,
+          String.class,
+          String.class,
+          String.class,
+          PrivilegeGrantRequest.class),
+      PermissionOperations.class.getMethod(
+          "revokePrivilegeFromRole",
+          String.class,
+          String.class,
+          String.class,
+          String.class,
+          PrivilegeRevokeRequest.class),
+      OwnerOperations.class.getMethod(
+          "setOwnerForObject", String.class, String.class, String.class, OwnerSetRequest.class)
+    };
+  }
+
+  private MethodInvocation permissionMutationInvocation(Method method, String type, String fullName)
+      throws IOException {
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    boolean owner = method.getDeclaringClass() == OwnerOperations.class;
+    Object request =
+        owner
+            ? new OwnerSetRequest("admin", Owner.Type.USER)
+            : JsonUtils.objectMapper()
+                .readValue(
+                    "{\"privileges\":[{\"name\":\"SELECT_TABLE\",\"condition\":\"ALLOW\"}]}",
+                    method.getParameterTypes()[method.getParameterCount() - 1]);
+    when(invocation.getArguments())
+        .thenReturn(
+            owner
+                ? new Object[] {"metalake", type, fullName, request}
+                : new Object[] {"metalake", "role", type, fullName, request});
+    return invocation;
   }
 
   private Response invokeTestExistingConnection(

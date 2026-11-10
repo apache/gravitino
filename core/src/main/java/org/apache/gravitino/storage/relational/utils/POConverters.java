@@ -1178,7 +1178,8 @@ public class POConverters {
                 .withUserId(userEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(userEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1283,7 +1284,8 @@ public class POConverters {
                 .withGroupId(groupEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(groupEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1789,6 +1791,21 @@ public class POConverters {
                     .withDeletedAt(DEFAULT_DELETED_AT)
                     .build())
         .collect(Collectors.toList());
+  }
+
+  private static AuditInfo roleAssignmentAudit(AuditInfo principalAudit) {
+    // New relations are created by the principal mutation, rather than its original creation.
+    // Initial assignments on principal creation have no modification audit yet.
+    return AuditInfo.builder()
+        .withCreator(
+            principalAudit.lastModifier() != null
+                ? principalAudit.lastModifier()
+                : principalAudit.creator())
+        .withCreateTime(
+            principalAudit.lastModifiedTime() != null
+                ? principalAudit.lastModifiedTime()
+                : principalAudit.createTime())
+        .build();
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {
