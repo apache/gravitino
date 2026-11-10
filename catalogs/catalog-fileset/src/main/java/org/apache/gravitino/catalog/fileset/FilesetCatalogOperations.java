@@ -1470,8 +1470,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           try {
             return getFileSystem(path, conf);
           } catch (IOException e) {
+            // Don't include conf: it can hold plaintext credentials.
             throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+                e, "Failed to get FileSystem for fileset: path: %s", path);
           }
         });
   }

@@ -3395,6 +3395,29 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testGetFileSystemWithCacheFailureDoesNotExposeConf() throws Exception {
+    FilesetCatalogOperations mockOps = Mockito.mock(FilesetCatalogOperations.class);
+    mockOps.fileSystemCache = Caffeine.newBuilder().build();
+    FieldUtils.writeField(mockOps, "fileSystemProvidersMap", ImmutableMap.of(), true);
+    IOException cause = new IOException("gcs-service-account-file not found");
+    when(mockOps.getFileSystem(any(), any())).thenThrow(cause);
+    when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
+
+    Path path = new Path("gs://example-bucket/path");
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "s3-access-key-id", "DUMMY_ACCESS_KEY", "s3-secret-access-key", "DUMMY_SECRET");
+    GravitinoRuntimeException e =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> mockOps.getFileSystemWithCache(path, conf));
+
+    Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("DUMMY_ACCESS_KEY"), e.getMessage());
+    Assertions.assertFalse(e.getMessage().contains("DUMMY_SECRET"), e.getMessage());
+    Assertions.assertSame(cause, e.getCause());
+  }
+
+  @Test
   public void testCreateSchemaWithDifferentUser() throws Exception {
     // Create schema with user "alice"
     UserPrincipal principal = new UserPrincipal("alice");
