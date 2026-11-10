@@ -117,6 +117,16 @@ public class TestUtils {
   }
 
   @Test
+  public void testServiceUnavailable() {
+    Response response = Utils.serviceUnavailable("Service unavailable");
+    assertNotNull(response);
+    assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("Service unavailable", errorResponse.getMessage());
+  }
+
+  @Test
   public void testInternalError() {
     Response response = Utils.internalError("Internal error");
     assertNotNull(response);

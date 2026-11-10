@@ -32,10 +32,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -63,7 +65,6 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 /** Table operations for StarRocks. */
 public class StarRocksTableOperations extends JdbcTableOperations {
 
-  private static final String BACK_QUOTE = "`";
   private static final String AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
 
@@ -105,18 +106,14 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     }
 
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder.append(String.format("CREATE TABLE `%s` ( \n", tableName));
+    sqlBuilder.append(String.format("CREATE TABLE %s ( \n", quote(tableName)));
     // Add columns
     sqlBuilder.append(
         Arrays.stream(columns)
             .map(
                 column -> {
                   StringBuilder columnsSql = new StringBuilder();
-                  columnsSql
-                      .append(SPACE)
-                      .append(BACK_QUOTE)
-                      .append(column.name())
-                      .append(BACK_QUOTE);
+                  columnsSql.append(SPACE).append(quote(column.name()));
                   appendColumnDefinition(column, columnsSql);
                   return columnsSql.toString();
                 })
@@ -153,7 +150,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(deleteColumnFieldDefinition(deleteColumn, lazyLoadTable));
+        String deleteColSql = deleteColumnFieldDefinition(deleteColumn, lazyLoadTable);
+        if (StringUtils.isNotEmpty(deleteColSql)) {
+          alterSql.add(deleteColSql);
+        }
       } else if (change instanceof TableChange.RemoveProperty) {
         throw new IllegalArgumentException("Remove property is not supported yet.");
       } else if (change instanceof TableChange.RenameColumn) {
@@ -175,7 +175,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
-        String newComment = updateComment.getNewComment();
+        String newComment = StringUtils.defaultString(updateComment.getNewComment());
         if (StringIdentifier.fromComment(newComment) == null) {
           lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
           StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
@@ -210,7 +210,11 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       }
     }
 
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    // An empty ALTER TABLE statement is treated as OPTIMIZE by StarRocks, so skip it.
+    if (alterSql.isEmpty()) {
+      return "";
+    }
+    String result = "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
@@ -224,7 +228,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
 
-    String showCreateTableSQL = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSQL = String.format("SHOW CREATE TABLE %s", quote(tableName));
 
     StringBuilder createTableSqlSb = new StringBuilder();
     try (Statement statement = connection.createStatement();
@@ -247,18 +251,30 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   @Override
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
       throws SQLException {
-    String sql = String.format("SHOW INDEX FROM `%s` FROM `%s`", tableName, databaseName);
+    String sql = String.format("SHOW INDEX FROM %s FROM %s", quote(tableName), quote(databaseName));
 
     // get Indexes from SQL
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
+      // SHOW INDEX lists only secondary indexes, one row per single-column index; table keys are
+      // not included.
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        String starRocksIndexType = resultSet.getString("Index_type");
+        Index.IndexType indexType = mapStarRocksIndexType(starRocksIndexType);
+        if (indexType == null) {
+          LOG.warn(
+              "Skip StarRocks index '{}' on table {}.{} with unsupported type '{}'",
+              indexName,
+              databaseName,
+              tableName,
+              starRocksIndexType);
+          continue;
+        }
+        indexes.add(Indexes.of(indexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
@@ -269,7 +285,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   @Override
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSql = String.format("SHOW CREATE TABLE %s", quote(tableName));
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       StringBuilder createTableSql = new StringBuilder();
@@ -286,7 +302,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   protected void correctJdbcTableFields(
       Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
       throws SQLException {
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSql = String.format("SHOW CREATE TABLE %s", quote(tableName));
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       StringBuilder createTableSql = new StringBuilder();
@@ -300,7 +316,21 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("ALTER TABLE `%s` RENAME `%s`", oldTableName, newTableName);
+    return String.format("ALTER TABLE %s RENAME %s", quote(oldTableName), quote(newTableName));
+  }
+
+  /**
+   * Quotes an identifier using StarRocks-specific restrictions, including for inherited SQL
+   * builders.
+   *
+   * @param identifier the unquoted identifier
+   * @return the backtick-quoted identifier
+   * @throws IllegalArgumentException if the identifier contains a backtick
+   */
+  @Override
+  protected String quoteIdentifier(String identifier) {
+    // Also protect inherited SQL generation, especially DROP TABLE.
+    return quote(identifier);
   }
 
   @Override
@@ -313,7 +343,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   protected Distribution getDistributionInfo(
       Connection connection, String databaseName, String tableName) throws SQLException {
 
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSql = String.format("SHOW CREATE TABLE %s", quote(tableName));
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       result.next();
@@ -385,7 +415,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
     String partitionDefinition =
-        String.format(" PARTITION BY RANGE(`%s`)", rangePartition.fieldName()[0]);
+        String.format(" PARTITION BY RANGE(%s)", quote(rangePartition.fieldName()[0]));
     partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
 
     // Assign range partitions
@@ -412,7 +442,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       Preconditions.checkArgument(
           columnNames.contains(filedName[0]), "The partition field must be one of the columns");
 
-      partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
+      partitionColumnsBuilder.add(quote(filedName[0]));
     }
     String partitionColumns =
         partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
@@ -452,7 +482,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
       sqlBuilder.append(
           Arrays.stream(distribution.expressions())
-              .map(column -> BACK_QUOTE + column.toString() + BACK_QUOTE)
+              .map(column -> quote(column.toString()))
               .collect(Collectors.joining(", ")));
       sqlBuilder.append(")");
     } else if (distribution.strategy() == Strategy.EVEN) {
@@ -492,8 +522,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .withDefaultValue(addColumn.getDefaultValue())
             .withAutoIncrement(false)
             .build();
-    StringBuilder columnDefinition =
-        new StringBuilder("ADD COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
+    StringBuilder columnDefinition = new StringBuilder("ADD COLUMN ").append(quote(col));
     appendColumnDefinition(column, columnDefinition);
 
     // Append position if available
@@ -501,11 +530,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition
-          .append("AFTER ")
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append("AFTER ").append(quote(afterPosition.getColumn()));
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing
     } else {
@@ -529,7 +554,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+    return "DROP COLUMN " + quote(col);
   }
 
   private String renameColumnDefinition(
@@ -546,7 +571,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try {
       getJdbcColumnFromTable(jdbcTable, renameColumn.getNewName());
     } catch (NoSuchColumnException ex) {
-      return String.format("RENAME COLUMN %s TO %s", oldColName, renameColumn.getNewName());
+      return "RENAME COLUMN "
+          + quoteIdentifier(oldColName)
+          + " TO "
+          + quoteIdentifier(renameColumn.getNewName());
     }
     throw new IllegalArgumentException("Column already exists: " + renameColumn.getNewName());
   }
@@ -555,14 +583,16 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     try {
       load(jdbcTable.databaseName(), renameTable.getNewName());
     } catch (NoSuchTableException ex) {
-      return "RENAME " + renameTable.getNewName();
+      return "RENAME " + quote(renameTable.getNewName());
     }
     throw new IllegalArgumentException("Table already exists: " + renameTable.getNewName());
   }
 
   private String generateTableProperties(TableChange.SetProperty setProperty) {
     return String.format(
-        "set ( \"%s\" = \"%s\" )", setProperty.getProperty(), setProperty.getValue());
+        "set ( \"%s\" = \"%s\" )",
+        escapeSqlLiteral(setProperty.getProperty(), '"'),
+        escapeSqlLiteral(setProperty.getValue(), '"'));
   }
 
   private String updateColumnPositionFieldDefinition(
@@ -573,22 +603,18 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("MODIFY COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
+    columnDefinition.append("MODIFY COLUMN ").append(quote(col));
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition
-          .append("AFTER ")
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append("AFTER ").append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append("AFTER ").append(s));
+          .ifPresent(s -> columnDefinition.append("AFTER ").append(quote(s)));
     }
     return columnDefinition.toString();
   }
@@ -600,7 +626,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + BACK_QUOTE + col + BACK_QUOTE);
+    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + quote(col));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -611,5 +637,36 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
+  }
+
+  /**
+   * Maps the {@code Index_type} value of StarRocks {@code SHOW INDEX} to a Gravitino index type.
+   * The value may carry index properties, e.g. {@code GIN("parser" = "english")}; only the type
+   * name is used and the properties are not kept, since StarRocks indexes cannot be created or
+   * altered through Gravitino.
+   *
+   * @param indexType the {@code Index_type} value returned by StarRocks
+   * @return the Gravitino index type, or null if the type has no Gravitino equivalent
+   */
+  @Nullable
+  private static Index.IndexType mapStarRocksIndexType(@Nullable String indexType) {
+    if (indexType == null) {
+      return null;
+    }
+    String typeName = StringUtils.substringBefore(indexType, "(").trim();
+    switch (typeName.toUpperCase(Locale.ROOT)) {
+      case "BITMAP":
+        return Index.IndexType.BITMAP;
+      case "GIN":
+        return Index.IndexType.INVERTED;
+      case "VECTOR":
+        return Index.IndexType.VECTOR;
+      default:
+        return null;
+    }
+  }
+
+  private static String quote(String identifier) {
+    return StarRocksUtils.quoteIdentifier(identifier);
   }
 }

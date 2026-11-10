@@ -35,6 +35,7 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.junit.jupiter.api.Test;
 
 /** Tests the Core Semantic Model dispatcher contract. */
@@ -59,7 +60,8 @@ public class TestSemanticModelDispatcher {
                 NameIdentifier.class,
                 String.class,
                 SemanticModelDefinition.class,
-                Map.class)
+                Map.class,
+                SemanticModelSourceUpdate.class)
             .isDefault());
   }
 

@@ -27,8 +27,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
@@ -126,13 +126,15 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     IcebergColumnFieldValidator.validateUpdate(updateTableRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .updateTable(tableIdentifier, updateTableRequest);
+        .updateTable(
+            tableIdentifier,
+            IcebergOwnerPropertyGuard.protect(updateTableRequest, context.userName()));
   }
 
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
-    IcebergCatalogWrapper wrapper =
+    CatalogWrapperForREST wrapper =
         icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
     if (!purgeRequested) {
       wrapper.dropTable(tableIdentifier);
@@ -140,7 +142,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     }
 
     // Async cleanup is opt-in per request and only wired in auxiliary mode; otherwise purge inline.
-    if (!context.asyncPurge()) {
+    if (!context.asyncPurge() || !wrapper.supportsAsyncPurge()) {
       wrapper.purgeTable(tableIdentifier);
       return;
     }

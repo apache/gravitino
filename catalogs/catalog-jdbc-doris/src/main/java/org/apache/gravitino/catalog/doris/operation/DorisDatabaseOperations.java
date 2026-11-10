@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.doris.utils.DorisUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
@@ -40,6 +42,9 @@ import org.apache.gravitino.meta.AuditInfo;
 /** Database operations for Apache Doris. */
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   public static final String COMMENT_KEY = "comment";
+
+  private static final Pattern DATABASE_PROPERTY_PATTERN =
+      Pattern.compile("\"(.*?)\"\\s*=\\s*\"(.*)\"\\s*,?");
 
   @Override
   public String generateCreateDatabaseSql(
@@ -130,7 +135,17 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
       throw new NoSuchTableException("Database %s does not exist.", databaseName);
     }
 
-    return DorisUtils.extractPropertiesFromSql(createDatabaseSql);
+    // SHOW CREATE DATABASE uses PrintableMap to wrap raw metadata in quotes without escaping it.
+    // Capture through the last quote on each property line and preserve the contents verbatim;
+    // SQL-literal unescaping would corrupt doubled quotes and backslashes.
+    Map<String, String> properties = new HashMap<>();
+    for (String line : createDatabaseSql.split("\n")) {
+      Matcher matcher = DATABASE_PROPERTY_PATTERN.matcher(line.trim());
+      if (matcher.matches()) {
+        properties.put(matcher.group(1), matcher.group(2));
+      }
+    }
+    return properties;
   }
 
   @Override

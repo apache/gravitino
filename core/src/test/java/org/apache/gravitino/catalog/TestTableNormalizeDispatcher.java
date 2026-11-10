@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,10 +32,13 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.SupportsTableNameResolution;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -50,9 +54,12 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -69,6 +76,172 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
             TestTableOperationDispatcher.schemaOperationDispatcher, catalogManager);
+  }
+
+  @Test
+  void testAlterChangesAreNormalizedOnlyOnceBeforeReachingCatalog() throws Exception {
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(wrapper.capabilities()).thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(wrapper.doWithCatalog(Mockito.any())).thenReturn(true);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogManager.CatalogWrapper, Object> operation =
+                  invocation.getArgument(1);
+              return operation.apply(wrapper);
+            })
+        .when(manager)
+        .doWithCatalogWrapper(Mockito.any(), Mockito.any());
+    TableCatalog tables = Mockito.mock(TableCatalog.class);
+    IllegalArgumentException stop =
+        new IllegalArgumentException("Stop after observing provider changes");
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<TableCatalog, Object> operation = invocation.getArgument(0);
+              return operation.apply(tables);
+            })
+        .when(wrapper)
+        .doWithTableOps(Mockito.any());
+    Mockito.when(tables.alterTable(Mockito.any(), Mockito.<TableChange[]>any())).thenThrow(stop);
+    TableNormalizeDispatcher dispatcher =
+        new TableNormalizeDispatcher(
+            new TableOperationDispatcher(manager, entityStore, idGenerator, secretManager),
+            manager);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableChange[] requests = {
+      TableChange.renameColumn(new String[] {"\"MixedOld\""}, "\"MixedNew\""),
+      TableChange.addColumn(new String[] {"\"Added Col\""}, Types.IntegerType.get()),
+      TableChange.rename("\"RenamedTable\"")
+    };
+    Assertions.assertSame(
+        stop,
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> dispatcher.alterTable(ident, requests)));
+    ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+    Mockito.verify(tables).alterTable(Mockito.any(), captor.capture());
+    TableChange[] actual = captor.getValue();
+    Assertions.assertEquals("MixedOld", ((TableChange.RenameColumn) actual[0]).fieldName()[0]);
+    Assertions.assertEquals("MixedNew", ((TableChange.RenameColumn) actual[0]).getNewName());
+    Assertions.assertEquals("Added Col", ((TableChange.AddColumn) actual[1]).fieldName()[0]);
+    Assertions.assertEquals("RenamedTable", ((TableChange.RenameTable) actual[2]).getNewName());
+  }
+
+  @Test
+  void testDeletionCanUseProviderValidatedNativeNamesWithoutRelaxingCreation() throws Exception {
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            return CapabilityResult.SUPPORTED;
+          }
+        };
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(delegate, manager);
+    NameIdentifier nativeIdent =
+        NameIdentifier.of("metalake", "catalog", "native schema", "native\"table");
+    dispatcher.dropTable(nativeIdent);
+    dispatcher.purgeTable(nativeIdent);
+    Mockito.verify(delegate).dropTable(nativeIdent);
+    Mockito.verify(delegate).purgeTable(nativeIdent);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTable(
+                nativeIdent,
+                new Column[0],
+                null,
+                Map.of(),
+                new Transform[0],
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]));
+  }
+
+  @Test
+  void testNestedAfterSiblingsAreNotValidatedAsTopLevelNames() throws Exception {
+    TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(downstream, manager);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    TableChange.AddColumn change =
+        (TableChange.AddColumn)
+            TableChange.addColumn(
+                new String[] {"parent", "newField"},
+                Types.StringType.get(),
+                TableChange.ColumnPosition.after("Existing Field"));
+
+    dispatcher.alterTable(ident, change);
+
+    ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+    Mockito.verify(downstream).alterTable(Mockito.eq(ident), captor.capture());
+    TableChange.AddColumn applied = (TableChange.AddColumn) captor.getValue()[0];
+    Assertions.assertArrayEquals(new String[] {"parent", "newField"}, applied.fieldName());
+    Assertions.assertEquals(
+        "Existing Field", ((TableChange.After) applied.getPosition()).getColumn());
+    Assertions.assertEquals(
+        "Existing Field", ((TableChange.After) change.getPosition()).getColumn());
+
+    // A nested position change keeps its sibling for the connector's own field rules too.
+    TableChange position =
+        TableChange.updateColumnPosition(
+            new String[] {"parent", "field"}, TableChange.ColumnPosition.after("Existing Field"));
+    dispatcher.alterTable(ident, position);
+    Mockito.verify(downstream, Mockito.times(2)).alterTable(Mockito.eq(ident), captor.capture());
+    TableChange.UpdateColumnPosition appliedPosition =
+        (TableChange.UpdateColumnPosition) captor.getValue()[0];
+    Assertions.assertArrayEquals(new String[] {"parent", "field"}, appliedPosition.fieldName());
+    Assertions.assertEquals(
+        "Existing Field", ((TableChange.After) appliedPosition.getPosition()).getColumn());
+  }
+
+  @Test
+  void testExistingColumnReferencesRequireCatalogOptIn() throws Exception {
+    TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(downstream, manager);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    String unsafe = "c`, DROP COLUMN victim -- ";
+    TableChange[] changes = {
+      TableChange.deleteColumn(new String[] {unsafe}, false),
+      TableChange.updateColumnComment(new String[] {unsafe}, "comment"),
+      TableChange.renameColumn(new String[] {unsafe}, "renamed"),
+      TableChange.updateColumnPosition(
+          new String[] {"c"}, TableChange.ColumnPosition.after(unsafe)),
+      TableChange.addColumn(
+          new String[] {"added"}, Types.StringType.get(), TableChange.ColumnPosition.after(unsafe))
+    };
+    for (TableChange change : changes) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> dispatcher.alterTable(ident, change));
+    }
+    Mockito.verifyNoInteractions(downstream);
+  }
+
+  @Test
+  void testDeletionKeepsDefaultNameRestrictions() throws Exception {
+    TableDispatcher delegate = Mockito.mock(TableDispatcher.class);
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    TableNormalizeDispatcher dispatcher = new TableNormalizeDispatcher(delegate, manager);
+    NameIdentifier invalid = NameIdentifier.of("metalake", "catalog", "schema", "native\"table");
+    Assertions.assertThrows(IllegalArgumentException.class, () -> dispatcher.dropTable(invalid));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> dispatcher.purgeTable(invalid));
+    Mockito.verifyNoInteractions(delegate);
   }
 
   @Test
@@ -276,6 +449,175 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         ArgumentCaptor.forClass(NameIdentifier.class);
     Mockito.verify(mockDispatcher).loadTable(loadedIdentCaptor.capture());
     Assertions.assertEquals("My Table", loadedIdentCaptor.getValue().name());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Table-Name", "My Table", "tablé_x", "1lead", "col\"name", "col\\name"})
+  void testExistingNamesBypassCreateSpecification(String name) throws Exception {
+    for (boolean foldCase : new boolean[] {false, true}) {
+      Namespace ns = Namespace.of(metalake, catalog, "schema");
+      NameIdentifier requested = NameIdentifier.of(ns, name);
+      NameIdentifier normalized =
+          NameIdentifier.of(
+              foldCase ? Namespace.of(metalake, catalog, "SCHEMA") : ns,
+              foldCase ? name.toUpperCase(Locale.ROOT) : name);
+      TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+      TableNormalizeDispatcher dispatcher = newNameRestrictedDispatcher(downstream, foldCase);
+      Mockito.when(downstream.dropTable(normalized)).thenReturn(true);
+      Mockito.when(downstream.purgeTable(normalized)).thenReturn(true);
+
+      dispatcher.loadTable(requested);
+      dispatcher.alterTable(requested, TableChange.updateComment("new comment"));
+      Assertions.assertTrue(dispatcher.dropTable(requested));
+      Assertions.assertTrue(dispatcher.purgeTable(requested));
+      dispatcher.tableExists(requested);
+      assertDispatchedName(downstream, normalized.name());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Col-Name", "My Column", "col\"name", "col\\name"})
+  void testExistingColumnReferencesBypassCreateSpecification(String name) {
+    for (boolean foldCase : new boolean[] {false, true}) {
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "table");
+      TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+      TableNormalizeDispatcher dispatcher = newNameRestrictedDispatcher(downstream, foldCase);
+      String[] field = {name};
+      TableChange[] changes = {
+        TableChange.updateColumnComment(field, "comment"),
+        TableChange.updateColumnType(field, Types.StringType.get()),
+        TableChange.updateColumnNullability(field, false),
+        TableChange.updateColumnDefaultValue(field, Literals.stringLiteral("default")),
+        TableChange.updateColumnAutoIncrement(field, false),
+        TableChange.deleteColumn(field, true),
+        TableChange.renameColumn(field, "newName"),
+        TableChange.updateColumnPosition(field, TableChange.ColumnPosition.after(name)),
+        TableChange.addColumn(
+            new String[] {"newColumn"},
+            Types.StringType.get(),
+            TableChange.ColumnPosition.after(name)),
+        TableChange.addColumn(new String[] {name, "nestedField"}, Types.StringType.get()),
+        TableChange.renameColumn(new String[] {name, "nestedField"}, "renamedField")
+      };
+      dispatcher.alterTable(ident, changes);
+      ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+      Mockito.verify(downstream).alterTable(Mockito.any(), captor.capture());
+      TableChange[] applied = captor.getValue();
+      Assertions.assertEquals(changes.length, applied.length);
+      String expected = foldCase ? name.toUpperCase(Locale.ROOT) : name;
+      for (int i = 0; i < applied.length; i++) {
+        String expectedRoot = i == 8 ? (foldCase ? "NEWCOLUMN" : "newColumn") : expected;
+        Assertions.assertEquals(
+            expectedRoot, ((TableChange.ColumnChange) applied[i]).fieldName()[0]);
+      }
+      Assertions.assertEquals(
+          foldCase ? "NEWNAME" : "newName", ((TableChange.RenameColumn) applied[6]).getNewName());
+      Assertions.assertEquals(
+          expected,
+          ((TableChange.After) ((TableChange.UpdateColumnPosition) applied[7]).getPosition())
+              .getColumn());
+      Assertions.assertEquals(
+          expected,
+          ((TableChange.After) ((TableChange.AddColumn) applied[8]).getPosition()).getColumn());
+      Assertions.assertArrayEquals(
+          new String[] {expected, "nestedField"}, ((TableChange.AddColumn) applied[9]).fieldName());
+      Assertions.assertArrayEquals(
+          new String[] {expected, "nestedField"},
+          ((TableChange.RenameColumn) applied[10]).fieldName());
+      Assertions.assertEquals(
+          "renamedField", ((TableChange.RenameColumn) applied[10]).getNewName());
+      // Normalization must not mutate a caller's reusable change object.
+      Assertions.assertArrayEquals(
+          new String[] {name}, ((TableChange.ColumnChange) changes[0]).fieldName());
+    }
+  }
+
+  @Test
+  void testNestedColumnPositionPreservesSiblingCase() {
+    TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+    TableNormalizeDispatcher dispatcher = newNameRestrictedDispatcher(downstream, true);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "table");
+    dispatcher.alterTable(
+        ident,
+        TableChange.addColumn(
+            new String[] {"parent name", "newField"},
+            Types.StringType.get(),
+            TableChange.ColumnPosition.after("ExistingField")),
+        TableChange.updateColumnPosition(
+            new String[] {"parent name", "field"},
+            TableChange.ColumnPosition.after("ExistingField")));
+    ArgumentCaptor<TableChange[]> captor = ArgumentCaptor.forClass(TableChange[].class);
+    Mockito.verify(downstream).alterTable(Mockito.any(), captor.capture());
+    TableChange[] changes = captor.getValue();
+    Assertions.assertEquals(
+        "ExistingField",
+        ((TableChange.After) ((TableChange.AddColumn) changes[0]).getPosition()).getColumn());
+    Assertions.assertEquals(
+        "ExistingField",
+        ((TableChange.After) ((TableChange.UpdateColumnPosition) changes[1]).getPosition())
+            .getColumn());
+  }
+
+  @Test
+  void testNewNamesStillRequireCreateSpecification() {
+    TableDispatcher downstream = Mockito.mock(TableDispatcher.class);
+    TableNormalizeDispatcher dispatcher = newNameRestrictedDispatcher(downstream, false);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "table");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTable(
+                NameIdentifier.of(ident.namespace(), "new-table"),
+                new Column[0],
+                null,
+                ImmutableMap.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTable(
+                ident,
+                new Column[] {Column.of("new-column", Types.StringType.get())},
+                null,
+                ImmutableMap.of()));
+    TableChange[] invalid = {
+      TableChange.rename("new-table"),
+      TableChange.rename("newTable", "new-schema"),
+      TableChange.addColumn(new String[] {"new-column"}, Types.StringType.get()),
+      TableChange.renameColumn(new String[] {"old-column"}, "new-column")
+    };
+    for (TableChange change : invalid) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> dispatcher.alterTable(ident, change));
+    }
+    Mockito.verifyNoInteractions(downstream);
+  }
+
+  private TableNormalizeDispatcher newNameRestrictedDispatcher(
+      TableDispatcher downstream, boolean foldCase) {
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+            return CapabilityResult.SUPPORTED;
+          }
+
+          @Override
+          public CapabilityResult specificationOnName(Scope scope, String name) {
+            return name.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")
+                ? CapabilityResult.SUPPORTED
+                : CapabilityResult.unsupported("Illegal name: " + name);
+          }
+
+          @Override
+          public String normalizeName(Scope scope, String name) {
+            return foldCase ? name.toUpperCase(Locale.ROOT) : name;
+          }
+        };
+    CatalogManager manager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.capability()).thenReturn(capability);
+    CatalogTestUtils.mockDoWithCatalog(manager, baseCatalog);
+    return new TableNormalizeDispatcher(downstream, manager);
   }
 
   private void assertTableCaseInsensitive(

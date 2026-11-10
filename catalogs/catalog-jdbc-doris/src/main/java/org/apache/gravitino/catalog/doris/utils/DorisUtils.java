@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -85,7 +86,9 @@ public final class DorisUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
+    // Escape alternatives exclude the closing delimiter, so no backtracking is needed.
+    final String sProperties =
+        "\"((?:\\\\.|\"\"|[^\"\\\\])*+)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*+)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
@@ -98,8 +101,8 @@ public final class DorisUtils {
         if (matcherProperties.find()) {
           // generatePropertiesSql escapes keys and values for double-quoted literals, and SHOW
           // CREATE echoes them escaped; unescape both so callers observe the original text.
-          final String key = unescapeSqlLiteral(matcherProperties.group(1).trim(), '"');
-          String value = unescapeSqlLiteral(matcherProperties.group(2).trim(), '"');
+          final String key = unescapeSqlLiteral(matcherProperties.group(1), '"');
+          String value = unescapeSqlLiteral(matcherProperties.group(2), '"');
           properties.put(key, value);
         }
       }
@@ -148,16 +151,16 @@ public final class DorisUtils {
    * @return The partition sql fragment.
    */
   public static String generatePartitionSqlFragment(Partition partition) {
-    String partitionSqlFragment = "PARTITION `%s` VALUES %s";
+    String partitionSqlFragment = "PARTITION %s VALUES %s";
     if (partition instanceof RangePartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          JdbcConnectorUtils.quoteIdentifier(partition.name(), '`'),
           generateRangePartitionValues((RangePartition) partition));
     } else if (partition instanceof ListPartition) {
       return String.format(
           partitionSqlFragment,
-          partition.name(),
+          JdbcConnectorUtils.quoteIdentifier(partition.name(), '`'),
           generateListPartitionSqlValues((ListPartition) partition));
     } else {
       throw new IllegalArgumentException("Unsupported partition type of Doris");

@@ -51,6 +51,8 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 
 ## Sources for supplements
 
+- ANTLR runtime 4.13.2: [BSD-3-Clause LICENSE](https://github.com/antlr/antlr4/blob/4.13.2/LICENSE.txt);
+  the binary runtime JAR omits this text.
 - Aliyun OSS 3.10.2/3.13.0: the exact Maven Central source JARs contain the same
   BSD-2-Clause header in `com/aliyun/oss/common/utils/IniEditor.java`.
 - Google API Client 1.24.1: its exact Maven Central source JAR contains a separate
@@ -94,9 +96,10 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   Its native libraries include [Snappy 1.1.10](https://github.com/google/snappy/blob/1.1.10/COPYING)
   and [Bitshuffle 0.3.4](https://github.com/kiyo-masui/bitshuffle/blob/0.3.4/LICENSE),
   as recorded by the tagged Makefile and VERSION file.
-- Netty 4.1.109/110/118: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
+- Netty 4.1.109/110/118/140: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
   and [companion license texts](https://github.com/netty/netty/tree/netty-4.1.118.Final/license).
-  The selected companions match across these versions. They cover embedded
+  The NOTICE and companion texts are identical in 4.1.118 and 4.1.140 (compared file by file),
+  and the selected companions match across these versions. They cover embedded
   SLF4J/Harmony/JCTools in common, Webbit and Hoehrmann UTF-8 validation in HTTP,
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver.
@@ -108,7 +111,7 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 ## Copied-source provenance
 
 Root `LICENSE` records copied-source paths; root `NOTICE` and the module mappings
-identify applicable notices. The Glue provider in `catalog-common` derives from
+identify applicable notices. The Glue provider in `bundles/aws` derives from
 [Doris's provider](https://github.com/apache/doris/blob/16da8a23b84985049be65b38f69d3e88fe477dbb/fe/fe-core/src/main/java/org/apache/doris/datasource/iceberg/s3tables/CustomAwsCredentialsProvider.java),
 with provenance recorded in [the original attribution](https://github.com/apache/gravitino/commit/d81dd65d1c9159dbb67d5ff18bac62c24e9ba39c).
 The Ranger reference classes use the attribution from [Ranger 2.4.0](https://github.com/apache/ranger/blob/release-ranger-2.4.0/NOTICE.txt).

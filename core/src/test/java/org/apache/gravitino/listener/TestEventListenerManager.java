@@ -19,22 +19,30 @@
 
 package org.apache.gravitino.listener;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.EventListenerPlugin.Mode;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +64,60 @@ public class TestEventListenerManager {
 
     protected DummyPreEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
+    }
+  }
+
+  /** Records the threads that deliver post events, optionally blocking until released. */
+  static class ThreadRecordingEventListener implements EventListenerPlugin {
+    private final Mode mode;
+    private final CountDownLatch release;
+    private final List<String> postEventThreads = new CopyOnWriteArrayList<>();
+    private final AtomicBoolean started = new AtomicBoolean(false);
+    private final AtomicInteger receivedEvents = new AtomicInteger(0);
+
+    ThreadRecordingEventListener(Mode mode) {
+      this(mode, new CountDownLatch(0));
+    }
+
+    ThreadRecordingEventListener(Mode mode, CountDownLatch release) {
+      this.mode = mode;
+      this.release = release;
+    }
+
+    @Override
+    public void init(Map<String, String> properties) {}
+
+    @Override
+    public void start() {
+      started.set(true);
+    }
+
+    @Override
+    public void stop() {}
+
+    @Override
+    public void onPostEvent(Event event) {
+      receivedEvents.incrementAndGet();
+      try {
+        release.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+      postEventThreads.add(Thread.currentThread().getName());
+    }
+
+    @Override
+    public Mode mode() {
+      return mode;
+    }
+
+    List<String> awaitPostEventThreads() {
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .pollInterval(10, TimeUnit.MILLISECONDS)
+          .until(() -> !postEventThreads.isEmpty());
+      return postEventThreads;
     }
   }
 
@@ -268,6 +330,150 @@ public class TestEventListenerManager {
     Assertions.assertTrue(transformedEvent.isPresent());
     Assertions.assertTrue(transformedEvent.get() instanceof CountingPreEvent);
     Assertions.assertEquals(2, ((CountingPreEvent) transformedEvent.get()).count());
+  }
+
+  @Test
+  void testAddEventListenerHonorsMode() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(new HashMap<>());
+
+    ThreadRecordingEventListener syncListener = new ThreadRecordingEventListener(Mode.SYNC);
+    ThreadRecordingEventListener isolatedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_ISOLATED);
+    ThreadRecordingEventListener sharedListener1 =
+        new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
+    ThreadRecordingEventListener sharedListener2 =
+        new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
+    eventListenerManager.addEventListener("sync", syncListener);
+    eventListenerManager.addEventListener("isolated", isolatedListener);
+    eventListenerManager.addEventListener("shared1", sharedListener1);
+    eventListenerManager.addEventListener("shared2", sharedListener2);
+    eventListenerManager.start();
+    EventBus eventBus = eventListenerManager.createEventBus();
+    try {
+      List<EventListenerPlugin> listeners = eventBus.getEventListeners();
+      Assertions.assertEquals(3, listeners.size());
+      Assertions.assertEquals(
+          1, listeners.stream().filter(EventListenerPluginWrapper.class::isInstance).count());
+      Set<Integer> queueSizes =
+          listeners.stream()
+              .filter(AsyncQueueListener.class::isInstance)
+              .map(listener -> ((AsyncQueueListener) listener).getEventListeners().size())
+              .collect(Collectors.toSet());
+      Assertions.assertEquals(ImmutableSet.of(1, 2), queueSizes);
+
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+
+      Assertions.assertEquals(
+          ImmutableList.of(Thread.currentThread().getName()), syncListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-isolated"),
+          isolatedListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"),
+          sharedListener1.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"),
+          sharedListener2.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
+  }
+
+  @Test
+  void testAddEventListenerAfterStart() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(createAsyncEventListenerConfig("async1", "async2"));
+    eventListenerManager.start();
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    ThreadRecordingEventListener isolatedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_ISOLATED);
+    ThreadRecordingEventListener sharedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
+    try {
+      eventListenerManager.addEventListener("isolated", isolatedListener);
+      eventListenerManager.addEventListener("shared", sharedListener);
+      Assertions.assertTrue(isolatedListener.started.get());
+      Assertions.assertTrue(sharedListener.started.get());
+
+      // The shared listener joins the queue created for the configured shared listeners.
+      Assertions.assertEquals(2, eventBus.getEventListeners().size());
+
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-isolated"),
+          isolatedListener.awaitPostEventThreads());
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"), sharedListener.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
+  }
+
+  @Test
+  void testFirstSharedListenerAddedAfterStart() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(new HashMap<>());
+    eventListenerManager.start();
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    ThreadRecordingEventListener sharedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_SHARED);
+    try {
+      // No shared queue exists yet, so registering the listener creates and starts one.
+      eventListenerManager.addEventListener("shared", sharedListener);
+      Assertions.assertTrue(sharedListener.started.get());
+      Assertions.assertEquals(1, eventBus.getEventListeners().size());
+      Assertions.assertTrue(eventBus.getEventListeners().get(0) instanceof AsyncQueueListener);
+
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      Assertions.assertEquals(
+          ImmutableList.of("async-queue-listener-default"), sharedListener.awaitPostEventThreads());
+    } finally {
+      eventListenerManager.stop();
+    }
+  }
+
+  @Test
+  void testInitTwiceFails() {
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(createSyncEventListenerConfig("sync1", "sync2"));
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> eventListenerManager.init(createSyncEventListenerConfig("sync1", "sync2")));
+  }
+
+  @Test
+  void testHighWatermarkIncludesListenerAddedAfterEventBusCreated() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY, "10");
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(properties);
+    eventListenerManager.start();
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    CountDownLatch release = new CountDownLatch(1);
+    ThreadRecordingEventListener blockedListener =
+        new ThreadRecordingEventListener(Mode.ASYNC_ISOLATED, release);
+    eventListenerManager.addEventListener("blocked", blockedListener);
+    Assertions.assertFalse(eventBus.isHighWatermark());
+
+    try {
+      // Block the dispatcher thread on the first event, then fill the queue.
+      eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .until(() -> blockedListener.receivedEvents.get() == 1);
+      for (int i = 0; i < 10; i++) {
+        eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+      }
+      Assertions.assertTrue(eventBus.isHighWatermark());
+    } finally {
+      release.countDown();
+      eventListenerManager.stop();
+    }
   }
 
   private Map<String, String> createIsolatedAsyncEventListenerConfig(String async1, String async2) {
