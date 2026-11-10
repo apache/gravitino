@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -51,6 +52,22 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   public FilesetOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     super(catalogManager, store, idGenerator);
+  }
+
+  /**
+   * Checks whether a fileset exists in a catalog that supports filesets.
+   *
+   * @param ident the fileset identifier
+   * @return whether the fileset exists
+   */
+  @Override
+  public boolean filesetExists(NameIdentifier ident) {
+    boolean supportsFilesets =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof FilesetCatalog),
+            RuntimeException.class);
+    return supportsFilesets && FilesetDispatcher.super.filesetExists(ident);
   }
 
   /**
