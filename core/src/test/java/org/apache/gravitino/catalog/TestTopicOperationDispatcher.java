@@ -42,6 +42,7 @@ import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -283,6 +284,29 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     } finally {
       reset(entityStore);
     }
+  }
+
+  @Test
+  public void testImportTopicRejectsOversizedName() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_import_topic_long_name");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    // Create the topic directly in the catalog, as if it was created externally. A Kafka topic name
+    // can be longer than the topic_name column of the entity store.
+    NameIdentifier topicIdent =
+        NameIdentifier.of(topicNs, "t".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    ((TestCatalogOperations) testCatalog.ops()).createTopic(topicIdent, "comment", null, props);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(
+        "The name of the topic must not exceed 128 characters", exception.getMessage());
+    Assertions.assertFalse(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
   }
 
   @Test
