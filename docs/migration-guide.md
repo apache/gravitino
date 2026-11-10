@@ -119,12 +119,21 @@ store. H2, MySQL, and PostgreSQL are supported; use the same JDBC driver as the 
    rows. A missing or incorrect policy-to-tag relation fails verification and leaves the legacy
    bindings active. No tables, columns, or indexes are added.
    Bindings whose policy or metalake is missing or deleted are logged and left untouched; they
-   do not prevent later live policies from migrating.
+   do not prevent later live policies from migrating. The final summary reports migrated bindings,
+   skipped orphan policies, and skipped orphan bindings. A successful run with skipped bindings
+   does not mean the legacy table is drained; review the logged policy IDs before completing the upgrade.
 3. If a policy fails or the command is interrupted, keep all servers and policy consumers stopped.
    Fix any reported failure and rerun the same command: completed policies remain committed, while
    the unfinished policy rolls back and is retried from its active legacy rows. A partially migrated
    database is only an offline intermediate state, not a deployment to start serving requests.
    Restore the backup only when abandoning or rolling back the upgrade.
+   A `Hidden tag name collision` error identifies the policy and tag and stops the run. If an
+   existing user tag occupies `gravitino_hidden_{policyId}`, restore the pre-upgrade backup, run
+   the old server version, and rename that user tag to a name outside `gravitino_hidden_` through
+   the tag API. Stop the old servers, take a fresh backup, and repeat the upgrade and migration.
+   Renaming preserves the tag's assignments. If the conflicting tag is a damaged server-managed
+   tag, restore a known-good backup and investigate the corruption before retrying. Do not delete
+   legacy bindings or overwrite the conflicting tag to force migration to finish.
 4. Start the server and compare resolved policy names and `inherited` values on representative
    objects and descendants. Check disabled policies and existing business tag associations before
    resuming consumers.

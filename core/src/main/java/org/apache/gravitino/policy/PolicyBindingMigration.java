@@ -73,7 +73,8 @@ public final class PolicyBindingMigration {
   /**
    * Converts and verifies each policy's bindings before retiring its legacy rows in one
    * transaction. A failure rolls back that policy; rerunning resumes from the remaining active
-   * legacy rows.
+   * legacy rows. Orphaned bindings are retained, with their policy and binding counts logged in the
+   * completion summary.
    *
    * @return The number of migrated bindings.
    * @throws SQLException If a binding cannot be converted or verified.
@@ -81,12 +82,22 @@ public final class PolicyBindingMigration {
   public long migrate() throws SQLException {
     Preconditions.checkState(!connection.getAutoCommit(), "Migration requires a transaction");
     long migrated = 0;
+    long skippedPolicies = 0;
+    long skippedBindings = 0;
     for (long policyId : pendingPolicies()) {
       try {
         PolicyEntity policy = loadPolicy(policyId);
         if (policy == null) {
+          long orphanBindings =
+              count(
+                  "SELECT COUNT(*) FROM policy_relation_meta WHERE policy_id = ? AND deleted_at = 0",
+                  policyId);
+          skippedPolicies++;
+          skippedBindings += orphanBindings;
           LOG.warn(
-              "Skipping legacy bindings for policy_id={}: policy or metalake is missing or deleted",
+              "Skipping {} legacy bindings for policy_id={}: policy or metalake is missing or deleted;"
+                  + " bindings remain active",
+              orphanBindings,
               policyId);
           continue;
         }
@@ -116,6 +127,12 @@ public final class PolicyBindingMigration {
         SqlSessions.closeSqlSession();
       }
     }
+    LOG.info(
+        "Migration complete: migrated_bindings={}, skipped_orphan_policies={}, skipped_orphan_bindings={};"
+            + " skipped bindings remain active",
+        migrated,
+        skippedPolicies,
+        skippedBindings);
     return migrated;
   }
 
@@ -158,7 +175,8 @@ public final class PolicyBindingMigration {
       TagEntity tag = entityStore.get(identifier, Entity.EntityType.TAG, TagEntity.class);
       if (!HiddenPolicyTag.create(policy, tag.id()).properties().equals(tag.properties())
           || tag.valueConstraint().type() != TagValueConstraint.Type.NO_VALUE) {
-        throw new SQLException("Hidden tag name collision for policy " + policy.id());
+        throw new SQLException(
+            "Hidden tag name collision for policy " + policy.id() + ": " + identifier);
       }
       return tag;
     } catch (NoSuchEntityException e) {

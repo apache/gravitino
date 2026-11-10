@@ -32,7 +32,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
@@ -49,6 +51,13 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -157,22 +166,40 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(2, count("tag_meta"));
   }
 
-  /** Refuses a collision before changing any legacy row. */
+  /**
+   * Reports a collision without changing legacy rows, and permits retry after a user tag rename.
+   */
   @TestTemplate
   public void testReservedNameCollision() throws Exception {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "INSERT INTO tag_meta (tag_id, tag_name, metalake_id, audit_info)"
-                + " SELECT 100, ?, metalake_id, '{}' FROM policy_meta WHERE policy_id = ?")) {
-      statement.setString(1, HiddenPolicyTag.name(policy.id()));
-      statement.setLong(2, policy.id());
-      statement.executeUpdate();
-    }
+    entityStore.put(
+        TagEntity.builder()
+            .withId(100L)
+            .withName(HiddenPolicyTag.name(policy.id()))
+            .withNamespace(policy.namespace())
+            .withAuditInfo(AUDIT_INFO)
+            .build(),
+        false);
     connection.commit();
-    assertThrows(
-        SQLException.class, () -> new PolicyBindingMigration(connection, entityStore).migrate());
+    SQLException failure =
+        assertThrows(
+            SQLException.class,
+            () -> new PolicyBindingMigration(connection, entityStore).migrate());
+    assertTrue(
+        failure.getCause().getMessage().contains("Hidden tag name collision for policy 20"),
+        () -> failure.getCause().toString());
+    assertTrue(failure.getCause().getMessage().contains(HiddenPolicyTag.name(policy.id())));
     assertEquals(1, activeLegacyBindings());
     assertEquals(0, count("tag_relation_meta"));
+    // Model the user tag rename performed on the old version before retrying the upgrade.
+    try (Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "UPDATE tag_meta SET tag_name = 'renamed_user_tag' WHERE tag_id = 100");
+    }
+    connection.commit();
+    assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
+    assertEquals(0, activeLegacyBindings());
+    assertEquals(2, activeCount("tag_meta"));
+    assertEquals(1, activeCount("tag_relation_meta"));
   }
 
   /** A missing object rolls back every replacement for its policy. */
@@ -209,6 +236,74 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(1, activeLegacyBindings());
     assertEquals(0, migration.migrate());
     assertEquals(1, activeLegacyBindings());
+  }
+
+  /** The summary distinguishes retained orphan policies and bindings from migrated bindings. */
+  @TestTemplate
+  public void testOrphanSummaryAndRepeatExecution() throws Exception {
+    LoggerContext context =
+        (LoggerContext) LogManager.getContext(PolicyBindingMigration.class.getClassLoader(), false);
+    Configuration config = context.getConfiguration();
+    List<String> messages = new ArrayList<>();
+    AbstractAppender appender =
+        new AbstractAppender("migrationSummaryCapture", null, null, true, null) {
+          @Override
+          public void append(LogEvent event) {
+            messages.add(event.getMessage().getFormattedMessage());
+          }
+        };
+    appender.start();
+    String loggerName = PolicyBindingMigration.class.getName();
+    LoggerConfig logger = new LoggerConfig(loggerName, Level.INFO, false);
+    logger.addAppender(appender, Level.INFO, null);
+    config.addLogger(loggerName, logger);
+    context.updateLoggers();
+    try {
+      PolicyBindingMigration migration = new PolicyBindingMigration(connection, entityStore);
+      assertEquals(1, migration.migrate());
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=0, skipped_orphan_bindings=0;"
+                  + " skipped bindings remain active"));
+      messages.clear();
+      assertEquals(0, migration.migrate());
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=0, skipped_orphan_bindings=0;"
+                  + " skipped bindings remain active"));
+
+      insertBinding(2, 18L, catalog.id(), "CATALOG");
+      insertBinding(3, 18L, catalog.id(), "CATALOG");
+      insertBinding(4, 19L, catalog.id(), "CATALOG");
+      insertBinding(5, 17L, catalog.id(), "CATALOG");
+      insertBinding(6, policy.id(), catalog.id(), "CATALOG");
+      try (Statement statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE policy_relation_meta SET deleted_at = 1 WHERE id = 5");
+      }
+      connection.commit();
+      messages.clear();
+      assertEquals(1, migration.migrate());
+      assertEquals(3, activeLegacyBindings());
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=2, skipped_orphan_bindings=3;"
+                  + " skipped bindings remain active"));
+      assertTrue(
+          messages.contains(
+              "Skipping 2 legacy bindings for policy_id=18: policy or metalake is missing or deleted;"
+                  + " bindings remain active"));
+      messages.clear();
+      assertEquals(0, migration.migrate());
+      assertEquals(3, activeLegacyBindings());
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3;"
+                  + " skipped bindings remain active"));
+    } finally {
+      config.removeLogger(loggerName);
+      context.updateLoggers();
+      appender.stop();
+    }
   }
 
   /** A soft-deleted policy's orphaned bindings must not abort the run. */
