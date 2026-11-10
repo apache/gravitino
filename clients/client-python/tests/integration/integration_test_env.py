@@ -47,9 +47,18 @@ def get_gravitino_server_version(**kwargs):
         return False
 
 
-def check_gravitino_server_status(**kwargs) -> bool:
+def check_gravitino_server_status(
+    max_attempts: int = 30, interval_secs: float = 1.0, **kwargs
+) -> bool:
+    """Poll until the Gravitino server answers /api/version, or give up.
+
+    ``gravitino.sh restart`` returns as soon as the JVM process is up; Jetty can
+    still take several seconds before port 8090 accepts connections. Five
+    one-second polls are not enough under CI load (PythonIT has timed out when
+    Jetty became ready milliseconds after the last attempt).
+    """
     gravitino_server_running = False
-    for i in range(5):
+    for i in range(max_attempts):
         logger.info("Monitoring Gravitino server status. Attempt %s", i + 1)
         if get_gravitino_server_version(**kwargs):
             logger.debug("Gravitino Server is running")
@@ -57,7 +66,7 @@ def check_gravitino_server_status(**kwargs) -> bool:
             break
         else:
             logger.debug("Gravitino Server is not running")
-            time.sleep(1)
+            time.sleep(interval_secs)
     return gravitino_server_running
 
 
@@ -136,9 +145,10 @@ class IntegrationTestEnv(unittest.TestCase):
             logger.info("stderr: %s", result.stderr)
 
         gravitino_server_running = True
-        for i in range(5):
+        for i in range(30):
             logger.debug("Monitoring Gravitino server status. Attempt %s", i + 1)
-            if check_gravitino_server_status():
+            # Single probe: the nested startup poll must not run here.
+            if get_gravitino_server_version():
                 logger.debug("Gravitino server still running")
                 time.sleep(1)
             else:
@@ -161,17 +171,24 @@ class IntegrationTestEnv(unittest.TestCase):
                 "project root directory."
             )
 
+        env_vars = os.environ.copy()
+        env_vars["HADOOP_USER_NAME"] = "anonymous"
+        # Stop the server before removing data so it cannot recreate files during cleanup.
+        subprocess.run(
+            [gravitino_startup_script, "stop"],
+            env=env_vars,
+            check=True,
+        )
+
         # remove data dir under gravitino_home
         data_dir = os.path.join(gravitino_home, "data")
         if os.path.exists(data_dir):
             logger.info("Remove Gravitino data directory: %s", data_dir)
             shutil.rmtree(data_dir)
 
-        # Restart Gravitino Server
-        env_vars = os.environ.copy()
-        env_vars["HADOOP_USER_NAME"] = "anonymous"
+        # Start Gravitino Server
         result = subprocess.run(
-            [gravitino_startup_script, "restart"],
+            [gravitino_startup_script, "start"],
             env=env_vars,
             capture_output=True,
             text=True,
@@ -181,6 +198,7 @@ class IntegrationTestEnv(unittest.TestCase):
             logger.info("stdout: %s", result.stdout)
         if result.stderr:
             logger.info("stderr: %s", result.stderr)
+        result.check_returncode()
 
         success = check_gravitino_server_status()
         if success:
