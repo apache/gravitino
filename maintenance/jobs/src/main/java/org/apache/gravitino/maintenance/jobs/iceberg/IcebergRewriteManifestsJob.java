@@ -264,8 +264,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
   public TableSnapshotMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
-    return TableSnapshotMetrics.of(snapshotId, payload);
+    Map<String, Object> metrics = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+    return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
   @Override
@@ -296,10 +296,10 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
           rewritten,
           ((Number) result.get(1)).longValue());
     }
-    Map<String, Object> payload = new HashMap<>();
-    payload.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier), payload);
+        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier), metrics);
   }
 
   private static void printUsage() {

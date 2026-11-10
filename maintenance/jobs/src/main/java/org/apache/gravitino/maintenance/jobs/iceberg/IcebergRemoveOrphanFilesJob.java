@@ -269,11 +269,11 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("location")),
             parseDryRun(IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("dry-run"))));
-    Map<String, Object> payload = new HashMap<>();
-    payload.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, orphan.filesRemoved());
-    payload.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, orphan.bytesReclaimed());
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, orphan.filesRemoved());
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, orphan.bytesReclaimed());
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), payload);
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), metrics);
   }
 
   static String buildProcedureCall(

@@ -217,10 +217,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
       SparkSession spark, String catalogName, String tableIdentifier) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put(
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(
         IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, preExpireData.snapshotCount());
-    return TableSnapshotMetrics.of(snapshotId, payload);
+    return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
   @Override
@@ -254,15 +254,15 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     PreExpireData after = collectTableData(spark, catalogName, tableIdentifier);
     PreExpireData beforeData = preExpireData == null ? after : preExpireData;
     preExpireData = null;
-    Map<String, Object> payload = new HashMap<>();
-    payload.put(
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(
         IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC,
         snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()));
-    payload.put(
+    metrics.put(
         IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC,
         bytesReclaimed(beforeData.fileSizesByPath(), after.fileSizesByPath()));
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), payload);
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), metrics);
   }
 
   /**
