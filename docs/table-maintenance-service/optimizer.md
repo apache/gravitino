@@ -101,21 +101,14 @@ plus Iceberg REST on object storage), also set:
 
 2. **REST `warehouse_location`** — for Iceberg REST catalogs this must be the **Gravitino catalog name** (for example `catalog_iceberg_s3`), not an `s3://...` URI. An object-store URI yields `NoSuchWarehouse`. Leave it empty only for local filesystem demos.
 
-3. **Object-store data plane** — Spark needs Iceberg vended credentials (and IRC `rest.auth.*`
-   matching your REST catalog auth mode) inside `spark_conf`, for example:
-
-```json
-{
-  "spark.sql.catalog.rest_catalog.header.X-Iceberg-Access-Delegation": "vended-credentials",
-  "spark.sql.catalog.rest_catalog.rest.auth.type": "basic",
-  "spark.sql.catalog.rest_catalog.rest.auth.basic.username": "admin",
-  "spark.sql.catalog.rest_catalog.rest.auth.basic.password": "YourSecureIrcPassword"
-}
-```
-
-Without vended credentials, inserts and rewrites fail on the cloud credential chain. See
-[Configuration](./optimizer-configuration.md) and
-[Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+3. **Object-store data plane** — Spark must reach table storage through Iceberg REST. On object
+   storage that usually means enabling Iceberg vended credentials
+   (`spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials`) and
+   configuring IRC `rest.auth.*` for your catalog's auth mode in `spark_conf` (or the matching
+   `gravitino.maintenance.ircAuth.*` cluster settings for the in-process service). Do not copy
+   local `file:///` samples as-is. See
+   [Configuration](./optimizer-configuration.md) (IRC / `spark-conf` auth) and
+   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 
 ### Compaction
 
