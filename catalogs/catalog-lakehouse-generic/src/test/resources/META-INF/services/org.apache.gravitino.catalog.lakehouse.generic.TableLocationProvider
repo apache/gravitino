@@ -18,3 +18,4 @@
 #
 org.apache.gravitino.catalog.lakehouse.generic.FakeTableLocationProvider
 org.apache.gravitino.catalog.lakehouse.generic.BrokenTableLocationProvider
+org.apache.gravitino.catalog.lakehouse.generic.FakeSchemaLocationProvider
