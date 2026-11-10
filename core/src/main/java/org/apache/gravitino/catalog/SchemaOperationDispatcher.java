@@ -704,7 +704,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     .build());
     return EntityCombinedSchema.of(schema.schema(), entity)
         .withHiddenProperties(schema.hiddenProperties())
-        .withImported(schema.imported());
+        .withImported(schema.imported() && (schema.schemaEntity() == null || entity != null));
   }
 
   private EntityCombinedSchema importSchemaFromCatalog(

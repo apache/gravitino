@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -155,14 +156,13 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   /**
-   * The first import writes creator information without a separate store update.
+   * Imports write creation audit once and recover safely after competing imports or deletion.
    *
-   * @param scenario whether the catalog supplies a creator, supplies modification information, or
-   *     the caller performs an ordinary load
+   * @param scenario the source audit and competing-import ordering to exercise
    */
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
-  public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced", "deleted"})
+  public void testImportCreationAudit(String scenario) throws Exception {
     Instant importTime = Instant.EPOCH.plusSeconds(60);
     AuditInfo importAudit =
         AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
@@ -196,14 +196,39 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(identifier, VIEW);
     clearInvocations(entityStore);
 
-    if ("raced".equals(scenario)) {
+    if ("raced".equals(scenario) || "deleted".equals(scenario)) {
       viewOperationDispatcher.loadView(identifier);
       clearInvocations(entityStore);
+    }
+    if ("deleted".equals(scenario)) {
+      doAnswer(
+              call -> {
+                entityStore.delete(identifier, VIEW);
+                throw new OptimisticLockException("Registration deleted during audit recovery");
+              })
+          .when(entityStore)
+          .update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
     }
     View loaded =
         "load".equals(scenario)
             ? viewOperationDispatcher.loadView(identifier)
             : viewOperationDispatcher.importView(identifier, importAudit);
+
+    if ("deleted".equals(scenario)) {
+      EntityCombinedView combined = (EntityCombinedView) loaded;
+      Assertions.assertFalse(combined.imported());
+      Assertions.assertNull(combined.viewEntity());
+      Assertions.assertNull(loaded.auditInfo().creator());
+      Assertions.assertEquals(identifier.name(), loaded.name());
+      Assertions.assertEquals(props, loaded.properties());
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+      reset(entityStore);
+      viewOperationDispatcher.loadView(identifier);
+      Assertions.assertNull(
+          entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+      return;
+    }
 
     ViewEntity imported = entityStore.get(identifier, VIEW, ViewEntity.class);
     Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());

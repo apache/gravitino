@@ -176,6 +176,28 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     return columns;
   }
 
+  /**
+   * Creates a builder initialized with all fields of this table. Collections, arrays and their
+   * elements are shared with this table; replacing a field on the builder leaves this table
+   * unchanged.
+   *
+   * @return a builder containing this table's fields
+   */
+  public Builder toBuilder() {
+    return builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withAuditInfo(auditInfo)
+        .withColumns(columns)
+        .withProperties(properties)
+        .withPartitioning(partitioning)
+        .withSortOrders(sortOrders)
+        .withDistribution(distribution)
+        .withIndexes(indexes)
+        .withComment(comment);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

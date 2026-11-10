@@ -102,7 +102,9 @@ public abstract class OperationDispatcher {
    *     loads
    * @param withAudit copies the current entity with the new audit
    * @param <E> the auditable entity type
-   * @return the current registration, with missing creation fields filled if it still matches
+   * @return the current registration, with missing creation fields filled if it still matches, or
+   *     null if the registration disappeared after a conflict; callers then return the source
+   *     snapshot as not imported
    */
   @Nullable
   protected <E extends Entity & HasIdentifier & Auditable> E fillMissingCreationAudit(

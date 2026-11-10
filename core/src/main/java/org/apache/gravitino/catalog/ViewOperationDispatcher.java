@@ -580,7 +580,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                     .build());
     return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), entity)
         .withHiddenProperties(entityCombinedView.hiddenProperties())
-        .withImported(entityCombinedView.imported());
+        .withImported(
+            entityCombinedView.imported()
+                && (entityCombinedView.viewEntity() == null || entity != null));
   }
 
   private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)

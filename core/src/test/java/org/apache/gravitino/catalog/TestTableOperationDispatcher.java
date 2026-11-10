@@ -141,14 +141,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   /**
-   * The first import writes creator information without a separate store update.
+   * Imports write creation audit once and recover safely after competing imports or deletion.
    *
-   * @param scenario whether the catalog supplies a creator, supplies modification information, or
-   *     the caller performs an ordinary load
+   * @param scenario the source audit and competing-import ordering to exercise
    */
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced"})
-  public void testImportIncludesCreatorInInitialWrite(String scenario) throws Exception {
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced", "deleted"})
+  public void testImportCreationAudit(String scenario) throws Exception {
     Instant importTime = Instant.EPOCH.plusSeconds(60);
     AuditInfo importAudit =
         AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
@@ -187,14 +186,39 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(identifier, TABLE);
     clearInvocations(entityStore);
 
-    if ("raced".equals(scenario)) {
+    if ("raced".equals(scenario) || "deleted".equals(scenario)) {
       tableOperationDispatcher.loadTable(identifier);
       clearInvocations(entityStore);
+    }
+    if ("deleted".equals(scenario)) {
+      doAnswer(
+              call -> {
+                entityStore.delete(identifier, TABLE);
+                throw new OptimisticLockException("Registration deleted during audit recovery");
+              })
+          .when(entityStore)
+          .update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
     }
     Table loaded =
         "load".equals(scenario)
             ? tableOperationDispatcher.loadTable(identifier)
             : tableOperationDispatcher.importTable(identifier, importAudit);
+
+    if ("deleted".equals(scenario)) {
+      EntityCombinedTable combined = (EntityCombinedTable) loaded;
+      Assertions.assertFalse(combined.imported());
+      Assertions.assertNull(combined.tableFromGravitino());
+      Assertions.assertNull(loaded.auditInfo().creator());
+      Assertions.assertEquals(identifier.name(), loaded.name());
+      Assertions.assertEquals("col", loaded.columns()[0].name());
+      verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+      reset(entityStore);
+      tableOperationDispatcher.loadTable(identifier);
+      Assertions.assertNull(
+          entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+      return;
+    }
 
     TableEntity imported = entityStore.get(identifier, TABLE, TableEntity.class);
     Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
