@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -380,13 +381,17 @@ public class ModelMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      ModelMetaMapper.class,
-                      mapper ->
-                          mapper.updateModelMeta(
-                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
+          () -> {
+            if (isRenamed) {
+              failIfModelNameTaken(oldModelPO, newEntity);
+            }
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    ModelMetaMapper.class,
+                    mapper ->
+                        mapper.updateModelMeta(
+                            POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO)));
+          },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -409,6 +414,26 @@ public class ModelMetaService {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
+    }
+  }
+
+  /**
+   * Fails a rename whose new name is already taken, before the UPDATE runs. On PostgreSQL the
+   * UPDATE waits on the unique index entry of the row that holds the name, so two renames that swap
+   * names would wait for each other and deadlock.
+   */
+  private void failIfModelNameTaken(ModelPO oldModelPO, ModelEntity newEntity) {
+    Long existingId =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.selectModelIdBySchemaIdAndModelName(
+                    oldModelPO.getSchemaId(), newEntity.name()));
+    // The model's own row matches when the rename only changes case on a case-insensitive store.
+    if (existingId != null && !Objects.equals(existingId, oldModelPO.getModelId())) {
+      throw new EntityAlreadyExistsException(
+          "The %s entity: %s already exists.",
+          Entity.EntityType.MODEL.name(), newEntity.nameIdentifier());
     }
   }
 
