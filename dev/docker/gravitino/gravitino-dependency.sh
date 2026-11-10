@@ -22,7 +22,6 @@ gravitino_dir="$(dirname "${BASH_SOURCE-$0}")"
 gravitino_dir="$(cd "${gravitino_dir}">/dev/null; pwd)"
 gravitino_home="$(cd "${gravitino_dir}/../../..">/dev/null; pwd)"
 gravitino_package_dir="${gravitino_dir}/packages/gravitino"
-gravitino_staging_dir="${gravitino_package_dir}/staging"
 gravitino_iceberg_rest_dir="${gravitino_package_dir}/iceberg-rest-server/libs/"
 
 # Function to download and distribute GCS connector
@@ -48,43 +47,46 @@ download_gcs_connector() {
   rm "${temp_file}"
 }
 
-# Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
-
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
-${gravitino_home}/gradlew compileDistribution -x test
+${gravitino_home}/gradlew compileDistribution \
+  :bundles:aliyun-bundle:shadowJar \
+  :bundles:aws-bundle:shadowJar \
+  :bundles:gcp-bundle:shadowJar \
+  :bundles:azure-bundle:shadowJar \
+  :bundles:iceberg-gcp-bundle:shadowJar \
+  :bundles:iceberg-aws-bundle:shadowJar \
+  :bundles:iceberg-azure-bundle:shadowJar \
+  :bundles:iceberg-aliyun-bundle:shadowJar \
+  -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
 rm -rf "${gravitino_dir}/packages"
 mkdir -p "${gravitino_dir}/packages"
 
 cp -r "${gravitino_home}/distribution/package" "${gravitino_package_dir}"
-mkdir -p "${gravitino_staging_dir}"
 
 echo "Start to download the jar package"
 
+jdbc_driver_dir="${gravitino_dir}/packages/gravitino/jdbc-drivers"
+mkdir -p "${jdbc_driver_dir}"
+
 mysql_driver="mysql-connector-java-8.0.27.jar"
-wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${gravitino_staging_dir}/${mysql_driver}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-mysql/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-doris/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/jdbc-starrocks/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/libs/"
+wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_driver" -O "${jdbc_driver_dir}/${mysql_driver}"
 
-
-pg_driver="postgresql-42.7.0.jar"
-wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging_dir}/${pg_driver}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
-cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/libs/"
+pg_driver="postgresql-42.7.14.jar"
+wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${jdbc_driver_dir}/${pg_driver}"
 
 echo "Finish downloading"
 
+# Copy the Docker entrypoint and its helper script into the docker/ subdirectory so they
+# are clearly separated from user-facing scripts in bin/.
+mkdir -p "${gravitino_dir}/packages/gravitino/docker"
+cp "${gravitino_dir}/docker-entrypoint.sh" "${gravitino_dir}/packages/gravitino/docker/"
+cp "${gravitino_dir}/rewrite_gravitino_server_config.py" "${gravitino_dir}/packages/gravitino/docker/"
+
+# Copy the deprecated stub into bin/ for one-release backward compatibility.
 mkdir -p "${gravitino_dir}/packages/gravitino/bin"
-cp "${gravitino_dir}/rewrite_gravitino_server_config.py" "${gravitino_dir}/packages/gravitino/bin/"
 cp "${gravitino_dir}/start-gravitino.sh" "${gravitino_dir}/packages/gravitino/bin/"
 
 fileset_lib_dir="${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
@@ -95,17 +97,14 @@ find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-bundl
 find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 
-# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg REST server libs
-find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+iceberg_bundle_dir="${gravitino_package_dir}/iceberg-bundles"
+
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg bundles directory
+mkdir -p "${iceberg_bundle_dir}"
+find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${iceberg_bundle_dir}" \;
+
 
 download_gcs_connector
-
-# Keeping the container running at all times
-cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
-
-# Keeping a process running in the background
-tail -f /dev/null
-EOF

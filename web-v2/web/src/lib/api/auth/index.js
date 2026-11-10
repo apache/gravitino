@@ -26,6 +26,12 @@ export const getAuthConfigsApi = () => {
   })
 }
 
+export const getAuthMeApi = () => {
+  return defHttp.get({
+    url: '/api/authn/me'
+  })
+}
+
 export const loginApi = (url, params) => {
   return defHttp.post(
     {
@@ -33,6 +39,20 @@ export const loginApi = (url, params) => {
       data: params,
       headers: {
         'Content-Type': ContentTypeEnum.FORM_URLENCODED
+      }
+    },
+    { withToken: false }
+  )
+}
+
+export const basicLoginApi = basicToken => {
+  return defHttp.get(
+    {
+      url: '/api/version',
+      headers: {
+        Authorization: basicToken,
+        Accept: 'application/vnd.gravitino.v1+json',
+        'Content-Type': 'application/json'
       }
     },
     { withToken: false }

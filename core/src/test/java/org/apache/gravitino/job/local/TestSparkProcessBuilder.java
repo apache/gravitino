@@ -19,9 +19,18 @@
 
 package org.apache.gravitino.job.local;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -139,5 +148,170 @@ public class TestSparkProcessBuilder {
     Assertions.assertTrue(command4.contains("/path/to/spark-demo.jar"));
     Assertions.assertTrue(command4.contains("arg1"));
     Assertions.assertTrue(command4.contains("arg2"));
+  }
+
+  @Test
+  public void testGenerateSparkSubmitCommandSkipsBlankConfigs() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.master", "",
+                    "spark.jars", " ",
+                    "spark.executor.memory", "2g"))
+            .build();
+
+    List<String> command =
+        SparkProcessBuilder.generateSparkSubmitCommand("/path/to/spark-submit", template);
+
+    Assertions.assertEquals(1, Collections.frequency(command, "--conf"));
+    int idxConf = command.indexOf("--conf");
+    Assertions.assertEquals("spark.executor.memory=2g", command.get(idxConf + 1));
+    Assertions.assertTrue(command.stream().noneMatch(arg -> arg.startsWith("spark.master")));
+    Assertions.assertTrue(command.stream().noneMatch(arg -> arg.startsWith("spark.jars")));
+  }
+
+  @Test
+  public void testResolveSparkSubmit() throws IOException {
+    File validSparkHome = Files.createTempDirectory("gravitino-test-spark-home").toFile();
+    File invalidSparkHome = Files.createTempDirectory("gravitino-test-no-spark-home").toFile();
+    try {
+      File sparkSubmit = new File(validSparkHome, "bin/spark-submit");
+      FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\n", "UTF-8");
+      Assertions.assertTrue(sparkSubmit.setExecutable(true));
+      String validPath = validSparkHome.getAbsolutePath();
+      String invalidPath = invalidSparkHome.getAbsolutePath();
+
+      // Neither the configuration nor the environment variable is set.
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), null));
+      Assertions.assertEquals(
+          "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
+              + " be set for Spark jobs",
+          e.getMessage());
+
+      // Falls back to the environment variable when the configuration is not set.
+      Assertions.assertEquals(
+          sparkSubmit.getAbsolutePath(),
+          SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), validPath));
+
+      // The configuration takes precedence over the environment variable.
+      Assertions.assertEquals(
+          sparkSubmit.getAbsolutePath(),
+          SparkProcessBuilder.resolveSparkSubmit(
+              ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, validPath), invalidPath));
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  SparkProcessBuilder.resolveSparkSubmit(
+                      ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, invalidPath), validPath));
+      Assertions.assertEquals(
+          "spark-submit is not found or not executable: " + invalidPath + "/bin/spark-submit",
+          e.getMessage());
+
+      // A directory at bin/spark-submit is not a valid executable, even if it is searchable.
+      File sparkSubmitDir = new File(invalidSparkHome, "bin/spark-submit");
+      Assertions.assertTrue(sparkSubmitDir.mkdirs());
+      Assertions.assertTrue(sparkSubmitDir.setExecutable(true));
+      e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> SparkProcessBuilder.resolveSparkSubmit(Collections.emptyMap(), invalidPath));
+      Assertions.assertEquals(
+          "spark-submit is not found or not executable: " + invalidPath + "/bin/spark-submit",
+          e.getMessage());
+    } finally {
+      FileUtils.deleteDirectory(validSparkHome);
+      FileUtils.deleteDirectory(invalidSparkHome);
+    }
+  }
+
+  @Test
+  public void testResolveSparkSubmitWithRelativeSparkHome() throws IOException {
+    // Created under the current working directory, so it is referenced by a relative path.
+    File relativeSparkHome =
+        Files.createTempDirectory(Paths.get(""), "gravitino-test-relative-spark-home").toFile();
+    try {
+      Assertions.assertFalse(relativeSparkHome.isAbsolute());
+      File sparkSubmit = new File(relativeSparkHome, "bin/spark-submit");
+      FileUtils.writeStringToFile(sparkSubmit, "#!/bin/sh\n", "UTF-8");
+      Assertions.assertTrue(sparkSubmit.setExecutable(true));
+
+      // The Spark process runs in the job staging directory, so the resolved path must be
+      // absolute rather than relative to the server working directory.
+      String resolved =
+          SparkProcessBuilder.resolveSparkSubmit(
+              ImmutableMap.of(LocalJobExecutorConfigs.SPARK_HOME, relativeSparkHome.getPath()),
+              null);
+      Assertions.assertTrue(new File(resolved).isAbsolute());
+      Assertions.assertEquals(sparkSubmit.getAbsolutePath(), resolved);
+    } finally {
+      FileUtils.deleteDirectory(relativeSparkHome);
+    }
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoOutputWithoutValue() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(ImmutableMap.of("key1", "value1", "key2", "value2"))
+            .build();
+    Map<String, String> environments = template.environments();
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertEquals("key1, key2", environmentKeys);
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoWithEmptyMap() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(ImmutableMap.of())
+            .build();
+    Map<String, String> environments = template.environments();
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertTrue(StringUtils.isBlank(environmentKeys));
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoWithNullMap() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(null)
+            .build();
+    Map<String, String> environments = template.environments();
+    Assertions.assertNotNull(environments);
+    Assertions.assertTrue(environments.isEmpty());
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertTrue(StringUtils.isBlank(environmentKeys));
   }
 }

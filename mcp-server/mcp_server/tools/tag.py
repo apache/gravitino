@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_tag_tool(mcp: FastMCP):
-    @mcp.tool(tags={"tag"}, enabled=False)
+    @mcp.tool(tags={"tag"})
     async def create_tag(
         ctx: Context, name: str, comment: str, properties: dict
     ) -> str:
@@ -120,8 +120,9 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().list_of_tags()
 
-    # Disable the alter_tag tool by default as it can be destructive.
-    @mcp.tool(tags={"tag"}, enabled=False)
+    # alter_tag is destructive; it is exposed and access is enforced by Gravitino
+    # authorization rather than by hiding the tool.
+    @mcp.tool(tags={"tag"})
     async def alter_tag(ctx: Context, name: str, updates: list) -> str:
         """
         Alter an existing tag within the specified metalake.
@@ -173,9 +174,10 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().alter_tag(name, updates)
 
-    # Disable the delete_tag tool by default as it can be destructive.
-    @mcp.tool(tags={"tag"}, enabled=False)
-    async def delete_tag(ctx: Context, name: str) -> None:
+    # delete_tag is destructive; it is exposed and access is enforced by Gravitino
+    # authorization rather than by hiding the tool.
+    @mcp.tool(tags={"tag"})
+    async def delete_tag(ctx: Context, name: str) -> str:
         """
         Delete a tag by its name.
 
@@ -185,10 +187,7 @@ def load_tag_tool(mcp: FastMCP):
             name (str): Name of the tag to delete
 
         Returns:
-            None
-
-        Raises:
-            Exception: If the deletion fails, an exception is raised with an error message.
+            str: JSON-formatted string indicating whether the tag was deleted.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().delete_tag(name)

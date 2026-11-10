@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -43,7 +44,10 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -52,15 +56,17 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
@@ -75,6 +81,9 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestPolicyOperations extends BaseOperationsTest {
@@ -199,6 +208,68 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testRemovedPolicyObjectsEndpoint() {
+    Response response =
+        target(policyPath(metalake))
+            .path("policy1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testTagAssociationsForPolicy() {
+    String policyName = "policy1";
+    String tagName = "tag1";
+    TagEntity tag = mock(TagEntity.class);
+    when(tag.name()).thenReturn(tagName);
+    when(tag.properties()).thenReturn(ImmutableMap.of());
+    when(tag.assignment()).thenReturn(Optional.empty());
+    when(tag.auditInfo()).thenReturn(testAuditInfo1);
+    RelationalEntity<TagEntity> association =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            NameIdentifier.of(metalake, policyName),
+            org.apache.gravitino.Entity.EntityType.POLICY,
+            tag);
+    TagEntity hidden = mock(TagEntity.class);
+    when(hidden.name()).thenReturn("gravitino_hidden_123");
+    RelationalEntity<TagEntity> hiddenAssociation =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            NameIdentifier.of(metalake, policyName),
+            org.apache.gravitino.Entity.EntityType.POLICY,
+            hidden);
+    when(policyManager.listTagAssociationsForPolicy(metalake, policyName))
+        .thenReturn(new RelationalEntity<?>[] {association, hiddenAssociation});
+
+    Response response =
+        target(policyPath(metalake) + "/" + policyName + "/tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertArrayEquals(
+        new String[] {tagName}, response.readEntity(NameListResponse.class).getNames());
+
+    Response detailsResponse =
+        target(policyPath(metalake) + "/" + policyName + "/tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+    TagForPolicyAssociationListResponse details =
+        detailsResponse.readEntity(TagForPolicyAssociationListResponse.class);
+    details.validate();
+    Assertions.assertEquals(1, details.getAssociations().length);
+    Assertions.assertSame(
+        AllValuesSelector.get(), details.getAssociations()[0].getSelector().toSelector());
+  }
+
+  @Test
   public void testListPolicyInfos() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =
@@ -265,6 +336,17 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreatePolicyWithNullRequest() {
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreatePolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     PolicyContent content =
@@ -299,6 +381,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Policy respPolicy = policyResp.getPolicy();
     Assertions.assertEquals(policy1.name(), respPolicy.name());
     Assertions.assertEquals(policy1.comment(), respPolicy.comment());
+    Assertions.assertEquals("custom", respPolicy.policyType());
     Assertions.assertEquals(Optional.empty(), respPolicy.inherited());
 
     // Test throw PolicyAlreadyExistsException
@@ -335,6 +418,249 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "spec_id,1.5",
+    "manifest_count_critical,500.5",
+    "manifest_count_warning,100.5",
+    "avg_manifest_size_threshold_bytes,4096.5",
+    "use_caching,0",
+    "use_caching,1"
+  })
+  public void testCreateManifestPolicyRejectsInvalidFieldTypes(String field, String value) {
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("rewrite")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS)
+            .withEnabled(true)
+            .withContent(PolicyContents.icebergRewriteManifests())
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
+        .thenReturn(policy);
+    String json =
+        "{\"name\":\"rewrite\",\"policyType\":\"system_iceberg_rewrite_manifests\","
+            + "\"enabled\":true,\"content\":{\""
+            + field
+            + "\":"
+            + value
+            + "}}";
+    try (Response response =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(policyManager);
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionType() {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            1000L,
+            1L,
+            ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
+    PolicyEntity policy1 =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy1);
+
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "system_iceberg_compaction", null, true, toDTO(content));
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionTypeDefaults() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction-default")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction-default",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy);
+
+    PolicyContentDTO.IcebergCompactionContentDTO minimalContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder().build();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction-default", "system_iceberg_compaction", null, true, minimalContent);
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionEnumTypeRejected() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  public void testCreatePolicyUnknownTypeNamedInError() {
+    assertCreatePolicyTypeNamedInError(
+        "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"enabled\":true,\"content\":{}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+    assertCreatePolicyTypeNamedInError(
+        "{\"name\":\"p_bogus\",\"comment\":\"\",\"policyType\":\"system_iceberg_bogus\","
+            + "\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
+        "Unknown built-in policy type: system_iceberg_bogus");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testCreatePolicyMissingTypeNamedInError(String content) {
+    assertCreatePolicyTypeNamedInError(
+        "{\"name\":\"p\",\"content\":" + content + "}",
+        "\\\"policyType\\\" is required and cannot be empty");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SYSTEM_ICEBERG_COMPACTION", "System_Iceberg_Compaction"})
+  public void testCreatePolicyAcceptsMisCasedKnownType(String policyType) {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("p_upper")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
+        .thenAnswer(
+            invocation -> {
+              Assertions.assertEquals(
+                  Policy.BuiltInType.ICEBERG_COMPACTION, invocation.getArgument(2));
+              return policy;
+            });
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(
+                Entity.entity(
+                    "{\"name\":\"p_upper\",\"comment\":\"\",\"policyType\":\""
+                        + policyType
+                        + "\",\"enabled\":true,\"content\":{\"maxPartitionNum\":5}}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
+  }
+
+  private void assertCreatePolicyTypeNamedInError(String body, String expectedMessage) {
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String msg = resp.readEntity(String.class);
+    Assertions.assertTrue(msg.contains(expectedMessage), msg);
+    Assertions.assertFalse(msg.contains("supportedObjectTypes"), msg);
+    Assertions.assertFalse(msg.contains("Malformed json request"), msg);
+  }
+
+  @Test
+  public void testCreatePolicyRejectsDottedName() {
+    PolicyContent content =
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    PolicyCreateRequest request =
+        new PolicyCreateRequest("a.b", "custom", null, false, toDTO(content));
+
+    try (Response response =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(policyManager, Mockito.never())
+        .createPolicy(any(), any(), any(), any(), anyBoolean(), any());
+  }
+
+  @Test
+  public void testRenamePolicyRejectsDottedName() {
+    PolicyUpdatesRequest request =
+        new PolicyUpdatesRequest(
+            Collections.singletonList(new PolicyUpdateRequest.RenamePolicyRequest("a.b")));
+
+    try (Response response =
+        target(policyPath(metalake) + "/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(policyManager, Mockito.never()).alterPolicy(any(), any(), any());
   }
 
   @Test
@@ -405,6 +731,113 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testAlterPolicyWithNullRequest() {
+    Response resp =
+        target(policyPath(metalake))
+            .path("policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenamePolicyToExistingName() {
+    PolicyAlreadyExistsException exception =
+        new PolicyAlreadyExistsException("Policy existing already exists");
+    doThrow(exception).when(policyManager).alterPolicy(any(), any(), any(PolicyChange.class));
+    PolicyUpdatesRequest request =
+        new PolicyUpdatesRequest(
+            Collections.singletonList(new PolicyUpdateRequest.RenamePolicyRequest("existing")));
+    try (Response response =
+        target(policyPath(metalake) + "/policy1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(PolicyAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"SYSTEM_ICEBERG_COMPACTION", "System_Iceberg_Compaction"})
+  public void testAlterPolicyContentAcceptsMisCasedKnownType(String policyType) {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("p_upper")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.alterPolicy(any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              PolicyChange.UpdateContent change = invocation.getArgument(2);
+              Assertions.assertEquals(
+                  Policy.BuiltInType.ICEBERG_COMPACTION.policyType(), change.getPolicyType());
+              return policy;
+            });
+
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_upper")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\","
+                        + "\"policyType\":\""
+                        + policyType
+                        + "\",\"newContent\":{\"maxPartitionNum\":5}}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), resp.getStatus(), resp.readEntity(String.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"{}", "{\"customRules\":{},\"supportedObjectTypes\":[\"TABLE\"]}", "null"})
+  public void testAlterPolicyContentMissingTypeNamedInError(String content) {
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_missing")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\",\"newContent\":" + content + "}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String msg = resp.readEntity(String.class);
+    Assertions.assertTrue(msg.contains("\\\"policyType\\\" must not be null"), msg);
+  }
+
+  @Test
+  public void testAlterPolicyContentUnknownTypeNamedInError() {
+    Response resp =
+        target(policyPath(metalake))
+            .path("p_bogus")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(
+                Entity.entity(
+                    "{\"updates\":[{\"@type\":\"updateContent\","
+                        + "\"policyType\":\"system_iceberg_bogus\","
+                        + "\"newContent\":{\"maxPartitionNum\":5}}]}",
+                    MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    String msg = resp.readEntity(String.class);
+    Assertions.assertTrue(msg.contains("Unknown built-in policy type: system_iceberg_bogus"), msg);
   }
 
   @Test
@@ -552,6 +985,19 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testSetPolicyWithNullRequest() {
+    Response resp =
+        target(policyPath(metalake))
+            .path("policy1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testDeletePolicy() {
     when(policyManager.deletePolicy(metalake, "policy1")).thenReturn(true);
 
@@ -599,80 +1045,6 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
-  }
-
-  @Test
-  public void testListMetadataObjectForPolicy() {
-    MetadataObject[] objects =
-        new MetadataObject[] {
-          MetadataObjects.parse("object1", MetadataObject.Type.CATALOG),
-          MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA),
-          MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE),
-        };
-
-    when(policyManager.listMetadataObjectsForPolicy(metalake, "policy1")).thenReturn(objects);
-
-    Response response =
-        target(policyPath(metalake))
-            .path("policy1")
-            .path("objects")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
-
-    MetadataObjectListResponse objectListResponse =
-        response.readEntity(MetadataObjectListResponse.class);
-    Assertions.assertEquals(0, objectListResponse.getCode());
-
-    MetadataObject[] respObjects = objectListResponse.getMetadataObjects();
-    Assertions.assertEquals(objects.length, respObjects.length);
-
-    for (int i = 0; i < objects.length; i++) {
-      Assertions.assertEquals(objects[i].type(), respObjects[i].type());
-      Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
-    }
-
-    // Test throw NoSuchPolicyException
-    doThrow(new NoSuchPolicyException("mock error"))
-        .when(policyManager)
-        .listMetadataObjectsForPolicy(metalake, "policy1");
-
-    Response response1 =
-        target(policyPath(metalake))
-            .path("policy1")
-            .path("objects")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response1.getStatus());
-
-    ErrorResponse errorResponse = response1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchPolicyException.class.getSimpleName(), errorResponse.getType());
-
-    // Test throw RuntimeException
-    doThrow(new RuntimeException("mock error"))
-        .when(policyManager)
-        .listMetadataObjectsForPolicy(any(), any());
-
-    Response response2 =
-        target(policyPath(metalake))
-            .path("policy1")
-            .path("objects")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response2.getStatus());
-
-    ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
   private String policyPath(String metalake) {

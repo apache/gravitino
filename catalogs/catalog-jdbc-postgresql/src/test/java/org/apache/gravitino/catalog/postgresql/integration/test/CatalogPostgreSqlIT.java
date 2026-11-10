@@ -48,6 +48,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -79,11 +80,15 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -131,7 +136,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     clearTableAndSchema();
     String[] schemaNames = catalog.asSchemas().listSchemas();
     for (String schemaName : schemaNames) {
-      catalog.asSchemas().dropSchema(schemaName, true);
+      clearTableAndSchema(schemaName);
     }
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
@@ -147,6 +152,12 @@ public class CatalogPostgreSqlIT extends BaseIT {
   }
 
   private void clearTableAndSchema() {
+    clearTableAndSchema(schemaName);
+  }
+
+  private void clearTableAndSchema(String schemaName) {
+    // PostgreSQL schema drops are restrictive even when cascade is requested. Remove the test
+    // tables explicitly before dropping each schema, including schemas created outside the fixture.
     NameIdentifier[] nameIdentifiers =
         catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -184,6 +195,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     return loadCatalog;
+  }
+
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
   }
 
   private void createSchema(String schemaName) {
@@ -273,7 +289,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
   @Test
   void testCreateTableWithArrayType() {
     String tableName = GravitinoITUtils.genRandomName("postgresql_it_array_table");
-    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), false), "col_4_comment");
+    Column col = Column.of("array", Types.ListType.of(IntegerType.get(), true), "col_4_comment");
     Column[] columns = new Column[] {col};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -761,7 +777,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Indexes.unique("u3_key", new String[][] {{"col_5"}, {"col_4"}}),
           Indexes.unique("u4_key", new String[][] {{"col_2"}, {"col_4"}, {"col_3"}}),
           Indexes.unique("u5_key", new String[][] {{"col_5"}, {"col_3"}, {"col_2"}}),
-          Indexes.unique("u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}),
+          Indexes.unique(
+              "u6_key", new String[][] {{"col_1"}, {"col_3"}, {"col_2"}, {"col_4"}}, Map.of()),
         };
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -822,7 +839,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
             "Index does not support complex fields in PostgreSQL"));
 
     Index[] primaryIndex2 =
-        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}}, Map.of())};
     illegalArgumentException =
         assertThrows(
             IllegalArgumentException.class,
@@ -874,8 +891,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
         Distributions.NONE,
         new SortOrder[0],
         new Index[] {
-          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}, Map.of()),
+          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}, Map.of()),
         });
     table = tableCatalog.loadTable(tableIdent);
 
@@ -1077,12 +1094,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
           break;
         case "varchar200_col_2":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_DATE"), column.defaultValue());
+          // An expression default must not be mistaken for a string literal of the same text.
+          Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "varchar200_col_3":
-          Assertions.assertEquals(
-              Literals.varcharLiteral(200, "CURRENT_TIMESTAMP"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
@@ -1114,12 +1130,15 @@ public class CatalogPostgreSqlIT extends BaseIT {
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         case "uuid":
+          Assertions.assertEquals(Types.UUIDType.get(), column.dataType());
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
         case "character_col_1":
         case "jsonb":
           Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
           break;
         case "character_col_3":
-          Assertions.assertEquals(Literals.stringLiteral("''::bpchar"), column.defaultValue());
+          Assertions.assertEquals(Literals.stringLiteral(""), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());
@@ -1137,7 +1156,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
 
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
 
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, t1_name);
     tableCatalog.createTable(
@@ -1152,7 +1171,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t2_name = "t212";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     columns = new Column[] {t2_col};
     tableIdentifier = NameIdentifier.of(schemaName, t2_name);
     tableCatalog.createTable(
@@ -1167,7 +1186,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t3_name = "t_12";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     columns = new Column[] {t3_col};
     tableIdentifier = NameIdentifier.of(schemaName, t3_name);
     tableCatalog.createTable(
@@ -1182,7 +1201,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t4_name = "_1__";
     Column t4_col = Column.of(t4_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{t4_name}}, Map.of())};
     columns = new Column[] {t4_col};
     tableIdentifier = NameIdentifier.of(schemaName, t4_name);
     tableCatalog.createTable(
@@ -1249,7 +1268,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     String t1_name = table_name + "`; DROP TABLE important_table; -- ";
     Column t1_col = Column.of(t1_name, Types.LongType.get(), "id", false, false, null);
     Column[] columns = {t1_col};
-    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}})};
+    Index[] t1_indexes = {Indexes.unique("u1_key", new String[][] {{t1_name}}, Map.of())};
     NameIdentifier tableIdentifier =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t1_name);
 
@@ -1274,7 +1293,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String t2_name = table_name + "`; SLEEP(10); -- ";
     Column t2_col = Column.of(t2_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}})};
+    Index[] t2_indexes = {Indexes.unique("u2_key", new String[][] {{t2_name}}, Map.of())};
     Column[] columns2 = new Column[] {t2_col};
     NameIdentifier tableIdentifier2 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t2_name);
@@ -1301,7 +1320,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     String t3_name =
         table_name + "`; UPDATE Users SET password = 'newpassword' WHERE username = 'admin'; -- ";
     Column t3_col = Column.of(t3_name, Types.LongType.get(), "id", false, false, null);
-    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}})};
+    Index[] t3_indexes = {Indexes.unique("u3_key", new String[][] {{t3_name}}, Map.of())};
     Column[] columns3 = new Column[] {t3_col};
     NameIdentifier tableIdentifier3 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, t3_name);
@@ -1327,7 +1346,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String invalidInput = StringUtils.repeat("a", 64);
     Column t4_col = Column.of(invalidInput, Types.LongType.get(), "id", false, false, null);
-    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}})};
+    Index[] t4_indexes = {Indexes.unique("u4_key", new String[][] {{invalidInput}}, Map.of())};
     Column[] columns4 = new Column[] {t4_col};
     NameIdentifier tableIdentifier4 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput);
@@ -1353,7 +1372,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     String invalidInput2 = RandomNameUtils.genRandomName("$test_db");
     Column t5_col = Column.of(invalidInput2, Types.LongType.get(), "id", false, false, null);
-    Index[] t5_indexes = {Indexes.unique("u5_key", new String[][] {{invalidInput2}})};
+    Index[] t5_indexes = {Indexes.unique("u5_key", new String[][] {{invalidInput2}}, Map.of())};
     Column[] columns5 = new Column[] {t5_col};
     NameIdentifier tableIdentifier5 =
         NameIdentifier.of(metalakeName, catalogName, schemaName, invalidInput2);
@@ -1562,7 +1581,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Column col3 = Column.of("col_3", Types.VarCharType.of(255), "config", false, false, null);
     Column[] newColumns = new Column[] {col1, col2, col3};
 
-    Index[] indexes = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}})};
+    Index[] indexes =
+        new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2"}, {"col_3"}}, Map.of())};
 
     String[] schemas = {"db_", "db_1", "db_2", "db12"};
     SupportsSchemas schemaSupport = catalog.asSchemas();
@@ -1620,6 +1640,102 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
     Assertions.assertEquals(Types.ExternalType.of("bit"), loadedTable.columns()[0].dataType());
+  }
+
+  @Test
+  void testNumericScaleOutsidePrecision() {
+    Assumptions.assumeTrue(
+        postgreImageName == PGImageName.VERSION_15 || postgreImageName == PGImageName.VERSION_16);
+    String tableName = GravitinoITUtils.genRandomName("test_numeric_scale");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (negative numeric(2,-3), fractional numeric(3,5));",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(2,-3)"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(3,5)"), loadedTable.columns()[1].dataType());
+  }
+
+  @Test
+  void testWideNumericTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_wide_numeric_type");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (wide numeric(39,0), supported numeric(38,0));",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(
+        Types.ExternalType.of("numeric(39,0)"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(38, 0), loadedTable.columns()[1].dataType());
+  }
+
+  @Test
+  void testUnconstrainedNumericAndArrayTypeConverter() {
+    String tableName = GravitinoITUtils.genRandomName("test_numeric_array_type");
+    postgreSqlService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s (numeric_col numeric, numeric_col_2 numeric(10,2), array_col integer[]);",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    // An unconstrained numeric holds values whose precision and scale vary per row
+    Assertions.assertEquals(Types.ExternalType.of("numeric"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), loadedTable.columns()[1].dataType());
+    // PostgreSQL array elements are always nullable
+    Assertions.assertEquals(
+        Types.ListType.of(Types.IntegerType.get(), true), loadedTable.columns()[2].dataType());
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(booleans = {false, true})
+  void testDeleteConstraintBackedIndexes(Boolean ifExists) {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("test_delete_indexes"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        ident,
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null, false, false, null),
+          Column.of("code", Types.IntegerType.get(), null, false, false, null)
+        },
+        null,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.primary("delete_pk", new String[][] {{"id"}}),
+          Indexes.unique("delete_uk", new String[][] {{"code"}})
+        });
+
+    TableUpdateRequest.DeleteTableIndexRequest primary =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_pk", ifExists);
+    TableUpdateRequest.DeleteTableIndexRequest unique =
+        new TableUpdateRequest.DeleteTableIndexRequest("delete_uk", ifExists);
+    Table updated = tableCatalog.alterTable(ident, primary.tableChange());
+    Assertions.assertEquals(1, updated.index().length);
+    Assertions.assertEquals("delete_uk", updated.index()[0].name());
+
+    updated = tableCatalog.alterTable(ident, unique.tableChange());
+    Assertions.assertEquals(0, updated.index().length);
+    Assertions.assertEquals(0, tableCatalog.loadTable(ident).index().length);
+
+    // IF EXISTS applies to the constraint, including after both indexes have been removed.
+    tableCatalog.alterTable(
+        ident,
+        TableChange.deleteIndex("delete_pk", true),
+        TableChange.deleteIndex("delete_uk", true));
+    RuntimeException missing =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> tableCatalog.alterTable(ident, TableChange.deleteIndex("delete_pk", false)));
+    Assertions.assertTrue(missing.getMessage().contains("delete_pk"), missing.getMessage());
   }
 
   @Test

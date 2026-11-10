@@ -29,7 +29,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,31 +40,59 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
+import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+/**
+ * Base class for tests that run against a real relational backend. Write each test as a
+ * {@code @TestTemplate}: {@link BackendTestExtension} runs it once per backend and sets {@link
+ * #backend} and {@link #backendType} before it. A plain {@code @Test} gets neither, nor a reset.
+ *
+ * <p>The class shares one database; before each test, and before the test's own
+ * {@code @BeforeEach}, the tables written to are emptied ({@link ResetStrategy#DELETE_ROWS}). Use
+ * {@link DatabaseFixture} on the class or a method to choose another {@link ResetStrategy}. The
+ * backend is not built yet in {@code @BeforeAll}.
+ */
+@CoreBackend.All
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExtendWith({
   BackendTestExtension.class,
@@ -87,59 +114,12 @@ public abstract class TestJDBCBackend {
     this.backendType = backendType;
   }
 
-  @BeforeEach
-  public void init() throws SQLException {
-    truncateAllTables();
-  }
-
-  private void truncateAllTables() throws SQLException {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          if ("postgresql".equalsIgnoreCase(backendType)) {
-            truncateAllTablesForPostgreSQL(connection);
-          } else {
-            String query = "SHOW TABLES";
-            List<String> tableList = new ArrayList<>();
-            try (ResultSet rs = statement.executeQuery(query)) {
-              while (rs.next()) {
-                tableList.add(rs.getString(1));
-              }
-            }
-            for (String table : tableList) {
-              statement.execute("TRUNCATE TABLE " + table);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
-    List<String> tableList = new ArrayList<>();
-    try (Statement statement = connection.createStatement()) {
-      String query =
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
-      try (ResultSet rs = statement.executeQuery(query)) {
-        while (rs.next()) {
-          tableList.add(rs.getString(1));
-        }
-      }
-
-      if (tableList.isEmpty()) {
-        return;
-      }
-
-      // Merge all TRUNCATE operations into a single DO block to improve efficiency
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
-    }
+  /**
+   * Empties the shared database mid-test ({@link ResetStrategy#DELETE_ROWS}), for a test that runs
+   * several scenarios in a loop.
+   */
+  protected void resetDatabase() throws SQLException {
+    DatabaseResetter.reset(backendType, ResetStrategy.DELETE_ROWS);
   }
 
   protected BaseMetalake createAndInsertMakeLake(String metalakeName) throws IOException {
@@ -234,6 +214,10 @@ public abstract class TestJDBCBackend {
         tableName = "function_meta";
         idColumnName = "function_id";
         break;
+      case SEMANTIC_MODEL:
+        tableName = "semantic_model_meta";
+        idColumnName = "semantic_model_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -271,6 +255,32 @@ public abstract class TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  /**
+   * Counts the rows a fileset holds in {@code fileset_version_info}.
+   *
+   * <p>A snapshot is one row per storage location, so the row count, unlike the number of distinct
+   * versions, shows what an alter that allocates a version actually costs.
+   *
+   * @param filesetId the fileset ID
+   * @return the number of active and deleted version rows
+   */
+  protected int countFilesetVersionRows(Long filesetId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT COUNT(*) AS row_count FROM fileset_version_info WHERE fileset_id = %d",
+                    filesetId))) {
+      rs.next();
+      return rs.getInt("row_count");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   protected Map<Integer, Long> listPolicyVersions(Long policyId) {
@@ -327,6 +337,24 @@ public abstract class TestJDBCBackend {
       } else {
         throw new RuntimeException("Doesn't contain data");
       }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected int countActiveRowsWhere(String table, String whereClause) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, whereClause))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("Doesn't contain data");
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }
@@ -400,6 +428,14 @@ public abstract class TestJDBCBackend {
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  protected TableEntity createAndInsertTableEntity(Namespace namespace, String name)
+      throws IOException {
+    TableEntity tableEntity =
+        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, name, AUDIT_INFO);
+    backend.insert(tableEntity, false);
+    return tableEntity;
   }
 
   protected FilesetEntity createFilesetEntity(
@@ -525,12 +561,39 @@ public abstract class TestJDBCBackend {
         .build();
   }
 
-  protected GenericEntity createViewEntity(Long id, Namespace namespace, String viewName) {
-    return GenericEntity.builder()
+  protected ViewEntity createViewEntity(Long id, Namespace namespace, String viewName) {
+    return ViewEntity.builder()
         .withId(id)
         .withName(viewName)
         .withNamespace(namespace)
-        .withEntityType(Entity.EntityType.VIEW)
+        .withColumns(new Column[0])
+        .withRepresentations(
+            new Representation[] {
+              SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+            })
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected FunctionEntity createFunctionEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    FunctionParam param1 = FunctionParams.of("param1", Types.IntegerType.get());
+    FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1, param2},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {impl});
+    return FunctionEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment("test function comment")
+        .withFunctionType(FunctionType.SCALAR)
+        .withDeterministic(false)
+        .withDefinitions(new FunctionDefinition[] {definition})
+        .withAuditInfo(auditInfo)
         .build();
   }
 
@@ -540,5 +603,87 @@ public abstract class TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
+  }
+
+  protected static JobTemplateEntity newShellJobTemplateEntity(
+      String name, String comment, String metalake) {
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withExecutable("/bin/echo")
+            .build();
+
+    return JobTemplateEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected static JobTemplateEntity newSparkJobTemplateEntity(
+      String name, String comment, String metalake) {
+    SparkJobTemplate sparkJobTemplate =
+        SparkJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withClassName("org.apache.spark.examples.SparkPi")
+            .withExecutable("file:/path/to/spark-examples.jar")
+            .build();
+
+    return JobTemplateEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected JobTemplateEntity createAndInsertShellJobTemplateEntity(
+      String name, String comment, String metalake) throws IOException {
+    JobTemplateEntity jobTemplateEntity = newShellJobTemplateEntity(name, comment, metalake);
+    backend.insert(jobTemplateEntity, false);
+    return jobTemplateEntity;
+  }
+
+  protected JobTemplateEntity createAndInsertSparkJobTemplateEntity(
+      String name, String comment, String metalake) throws IOException {
+    JobTemplateEntity jobTemplateEntity = newSparkJobTemplateEntity(name, comment, metalake);
+    backend.insert(jobTemplateEntity, false);
+    return jobTemplateEntity;
+  }
+
+  protected TagEntity createAndInsertTagEntity(String name, String comment, String metalake)
+      throws IOException {
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(NamespaceUtil.ofTag(metalake))
+            .withComment(comment)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(tagEntity, false);
+    return tagEntity;
+  }
+
+  protected PolicyEntity createAndInsertPolicyEntity(
+      String policyName, String comment, PolicyContent policyContent, String metalake)
+      throws IOException {
+    PolicyEntity policyEntity =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withComment(comment)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(policyContent)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(policyEntity, false);
+    return policyEntity;
   }
 }

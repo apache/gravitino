@@ -158,7 +158,7 @@ export default function FilesetDetailsPage({ ...props }) {
       key: 'files',
       disabled: disableFilesystemOps
     },
-    ...(anthEnable ? [{ label: 'Associated roles', key: 'Associated roles' }] : [])
+    ...(anthEnable ? [{ label: 'Associated Roles', key: 'Associated Roles' }] : [])
   ]
 
   const handleEditTable = () => {
@@ -265,9 +265,10 @@ export default function FilesetDetailsPage({ ...props }) {
         </Space>
       </Spin>
       <Tabs items={tabOptions} activeKey={activeTab} onChange={setActiveTab} />
-      {activeTab === 'files' && (
+      {activeTab === 'files' && !store.activatedDetailsLoading && (
         <div data-refer='tab-files-panel'>
           <ListFiles
+            key={`${catalog}.${schema}.${fileset}`}
             metalake={currentMetalake}
             catalog={catalog}
             schema={schema}
@@ -277,7 +278,7 @@ export default function FilesetDetailsPage({ ...props }) {
           />
         </div>
       )}
-      {anthEnable && activeTab === 'Associated roles' && fileset && (
+      {anthEnable && activeTab === 'Associated Roles' && fileset && (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'fileset'}

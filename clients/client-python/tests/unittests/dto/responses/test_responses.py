@@ -19,16 +19,20 @@ from __future__ import annotations
 
 import json as _json
 import unittest
+from datetime import datetime, timezone
 
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
+from gravitino.dto.responses.function_list_response import FunctionListResponse
+from gravitino.dto.responses.function_response import FunctionResponse
 from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
+from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
@@ -36,168 +40,17 @@ from gravitino.dto.responses.partition_name_list_response import (
 from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.fixtures.table_fixtures import (
+    IDENTITY_PARTITION_WITH_PROPERTIES_JSON_STRING,
+    TABLE_JSON_STRING_WITH_ANONYMOUS_CREATOR_AND_ID_SORT,
+)
 
 
 class TestResponses(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.PARTITION_JSON_STRING = """
-            {
-                "type": "identity",
-                "name": "test_identity_partition",
-                "fieldNames": [
-                    [
-                        "upper"
-                    ],
-                    [
-                        "lower"
-                    ]
-                ],
-                "values": [
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "0"
-                    },
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "100"
-                    }
-                ],
-                "properties": {
-                    "key1": "value1",
-                    "key2": "value2"
-                }
-            }
-        """
-        cls.TABLE_JSON_STRING = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "anonymous",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
+        cls.PARTITION_JSON_STRING = IDENTITY_PARTITION_WITH_PROPERTIES_JSON_STRING
+        cls.TABLE_JSON_STRING = TABLE_JSON_STRING_WITH_ANONYMOUS_CREATOR_AND_ID_SORT
 
     def test_file_location_response(self):
         json_data = {"code": 0, "fileLocation": "file:/test/1"}
@@ -276,7 +129,8 @@ class TestResponses(unittest.TestCase):
         self.assertEqual({"key1": "value1"}, model_resp.model().properties())
         self.assertEqual("anonymous", model_resp.model().audit_info().creator())
         self.assertEqual(
-            "2024-04-05T10:10:35.218Z", model_resp.model().audit_info().create_time()
+            datetime(2024, 4, 5, 10, 10, 35, 218000, tzinfo=timezone.utc),
+            model_resp.model().audit_info().create_time(),
         )
 
         json_data_missing = {
@@ -354,7 +208,8 @@ class TestResponses(unittest.TestCase):
         self.assertEqual({"key1": "value1"}, resp.model_version().properties())
         self.assertEqual("anonymous", resp.model_version().audit_info().creator())
         self.assertEqual(
-            "2024-04-05T10:10:35.218Z", resp.model_version().audit_info().create_time()
+            datetime(2024, 4, 5, 10, 10, 35, 218000, tzinfo=timezone.utc),
+            resp.model_version().audit_info().create_time(),
         )
 
         json_data = {
@@ -502,3 +357,108 @@ class TestResponses(unittest.TestCase):
         """
         resp: TableResponse = TableResponse.from_json(json_string)
         resp.validate()
+
+    def test_function_response(self):
+        """Test FunctionResponse."""
+        json_str = """
+            {
+                "code": 0,
+                "function": {
+                    "name": "func1",
+                    "functionType": "SCALAR",
+                    "deterministic": true,
+                    "definitions": [
+                        {
+                            "parameters": [],
+                            "returnType": "integer",
+                            "impls": [
+                                {
+                                    "language": "SQL",
+                                    "runtime": "SPARK",
+                                    "sql": "SELECT 1"
+                                }
+                            ]
+                        }
+                    ],
+                    "comment": "comment",
+                    "audit": {
+                        "creator": "anonymous",
+                        "createTime": "2024-04-05T10:10:35.218Z"
+                    }
+                }
+            }
+        """
+        resp = FunctionResponse.from_json(json_str)
+        resp.validate()
+        self.assertEqual("func1", resp.function().name())
+        self.assertEqual("SCALAR", resp.function().function_type().name)
+
+        with self.assertRaises(IllegalArgumentException):
+            FunctionResponse.from_json('{"code": 0, "function": null}').validate()
+
+    def test_function_list_response(self):
+        """Test FunctionListResponse."""
+        json_str = """
+            {
+                "code": 0,
+                "functions": [
+                    {
+                        "name": "func1",
+                        "functionType": "SCALAR",
+                        "deterministic": true,
+                        "definitions": [
+                            {
+                                "parameters": [],
+                                "returnType": "integer",
+                                "impls": [
+                                    {
+                                        "language": "SQL",
+                                        "runtime": "SPARK",
+                                        "sql": "SELECT 1"
+                                    }
+                                ]
+                            }
+                        ],
+                        "comment": "comment",
+                        "audit": {
+                            "creator": "anonymous",
+                            "createTime": "2024-04-05T10:10:35.218Z"
+                        }
+                    }
+                ]
+            }
+        """
+        resp = FunctionListResponse.from_json(json_str)
+        resp.validate()
+        self.assertEqual(1, len(resp.functions()))
+        self.assertEqual("func1", resp.functions()[0].name())
+
+    def test_role_names_list_response(self) -> None:
+        role_response = NameListResponse(0, ["role1", "role2", "role3"])
+        role_response.validate()
+        json_str = _json.dumps(
+            {
+                "code": 0,
+                "names": ["role1", "role2", "role3"],
+            }
+        )
+
+        ser_json = _json.dumps(role_response.to_dict())
+        self.assertEqual(json_str, ser_json)
+        deser_dict = _json.loads(ser_json)
+
+        self.assertEqual(0, deser_dict.get("code"))
+        self.assertIsNotNone(deser_dict.get("names"))
+        self.assertEqual(3, len(deser_dict.get("names")))
+        self.assertEqual("role1", deser_dict["names"][0])
+        self.assertEqual("role2", deser_dict["names"][1])
+        self.assertEqual("role3", deser_dict["names"][2])
+
+    def test_role_names_list_response_validation(self) -> None:
+        with self.assertRaises(IllegalArgumentException):
+            role_response = NameListResponse(0, None)  # type: ignore
+            role_response.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            role_response = NameListResponse(0, ["role1", ""])
+            role_response.validate()

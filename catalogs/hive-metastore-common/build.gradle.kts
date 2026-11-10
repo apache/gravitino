@@ -24,75 +24,64 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    compileOnly(libs.thrift)
+    testImplementation(libs.thrift)
   }
+
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.hive2.metastore) {
+    exclude(group = "log4j")
+    exclude(group = "org.apache.logging.log4j")
+  }
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
+  compileOnly(libs.caffeine)
+  compileOnly(libs.guava)
+  compileOnly(libs.slf4j.api)
+  compileOnly(libs.log4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":common")) {
+  implementation(project(":catalogs:hadoop-auth")) {
     exclude("*")
   }
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
-
-  implementation(libs.caffeine)
-  implementation(libs.guava)
-  implementation(libs.slf4j.api)
-
-  compileOnly(libs.hive2.metastore)
-  compileOnly(libs.immutables.value)
-  compileOnly(libs.lombok)
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.collections3)
   testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
-  testImplementation(libs.hive2.metastore) {
-    exclude("ant")
-    exclude("co.cask.tephra")
-    exclude("com.github.joshelser")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.code.findbugs", "sr305")
-    exclude("com.tdunning", "json")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metrics")
-    exclude("javax.transaction", "transaction-api")
-    exclude("org.apache.ant")
-    exclude("org.apache.avro")
-    exclude("org.apache.curator")
-    exclude("org.apache.derby")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.hbase")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("org.apache.zookeeper")
-    exclude("org.datanucleus")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.slf4j")
-  }
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.auth) {
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
-  testImplementation(libs.htrace.core4)
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
   testImplementation(libs.hive2.exec) {
     artifact {
       classifier = "core"
@@ -119,11 +108,37 @@ dependencies {
     exclude("org.pentaho")
     exclude("org.slf4j")
   }
+  testImplementation(libs.hive2.metastore) {
+    exclude("ant")
+    exclude("co.cask.tephra")
+    exclude("com.github.joshelser")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.code.findbugs", "sr305")
+    exclude("com.tdunning", "json")
+    exclude("com.zaxxer", "HikariCP")
+    exclude("io.dropwizard.metrics")
+    exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.ant")
+    exclude("org.apache.avro")
+    exclude("org.apache.curator")
+    exclude("org.apache.derby")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.hbase")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.zookeeper")
+    exclude("org.datanucleus")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    exclude("org.slf4j")
+  }
+  testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.woodstox.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
-  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(libs.woodstox.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -141,12 +156,15 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Ensure the shaded Hive metastore lib jars exist before compiling this module,
-// since compileOnly(project(":catalogs:hive-metastore{2,3}-libs")) puts those
-// jars on the compile classpath and they are produced by the copyDepends tasks.
-tasks.named<JavaCompile>("compileJava") {
+// Ensure the shaded Hive metastore lib jars (plus the HiveShimV2/HiveShimV3 classes compiled in
+// those modules) exist before running tests: HiveClientClassLoader loads every jar under
+// hive-metastore{2,3}-libs/build/libs at test time (GRAVITINO_TEST), so their own compiled-source
+// jars must be built too, not just their copyDepends-copied external dependency jars. This is on
+// "test" rather than "compileJava": those two modules compileOnly this module (for the shared
+// HiveShim base class), so depending on their "jar" task from "compileJava" would be circular.
+tasks.named<Test>("test") {
   dependsOn(
-    ":catalogs:hive-metastore2-libs:copyDepends",
-    ":catalogs:hive-metastore3-libs:copyDepends"
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
   )
 }

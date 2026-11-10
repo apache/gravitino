@@ -598,6 +598,43 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
+  public void clickBackHomeBtn() {
+    try {
+      String urlBefore = driver.getCurrentUrl();
+      WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(10));
+      WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(MAX_TIMEOUT));
+
+      // Strategy 1: Normal click
+      wait.until(ExpectedConditions.elementToBeClickable(backHomeBtn));
+      clickAndWait(backHomeBtn);
+      if (isUrlChanged(urlBefore, shortWait)) {
+        LOG.info("Back home navigation succeeded via normal click");
+        return;
+      }
+      LOG.warn("Normal back home click did not navigate, trying JavaScript click...");
+
+      // Strategy 2: JavaScript click
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", backHomeBtn);
+      Thread.sleep(ACTION_SLEEP * 1000);
+      if (isUrlChanged(urlBefore, shortWait)) {
+        LOG.info("Back home navigation succeeded via JavaScript click");
+        return;
+      }
+      LOG.warn("JavaScript back home click did not navigate, trying direct URL navigation...");
+
+      // Strategy 3: Extract href and navigate directly
+      String href = backHomeBtn.getAttribute("href");
+      if (href != null && !href.isEmpty()) {
+        driver.get(href);
+        LOG.info("Back home navigation succeeded via direct URL: {}", href);
+        return;
+      }
+      LOG.error("Failed to navigate back home: href was empty");
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
   private boolean isElementPresent(String xpath, WebDriverWait wait) {
     try {
       wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(xpath)));
@@ -1581,25 +1618,45 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTreeNodes(List<String> treeNodes) {
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(ACTION_SLEEP));
-    List<WebElement> list =
-        wait.until(
-            ExpectedConditions.visibilityOfAllElementsLocatedBy(
-                By.xpath(
-                    "//div[@data-refer='tree-view']"
-                        + "//div[@class='ant-tree-list-holder']"
-                        + "/div/div[@class='ant-tree-list-holder-inner']"
-                        + "/div[contains(@class, 'ant-tree-treenode')]")));
-    List<String> texts = new ArrayList<>();
-    for (WebElement webElement : list) {
-      String nodeName =
-          webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
-      texts.add(nodeName);
+
+    // Retry logic to handle stale element references
+    int maxRetries = 3;
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        List<WebElement> list =
+            wait.until(
+                ExpectedConditions.visibilityOfAllElementsLocatedBy(
+                    By.xpath(
+                        "//div[@data-refer='tree-view']"
+                            + "//div[@class='ant-tree-list-holder']"
+                            + "/div/div[@class='ant-tree-list-holder-inner']"
+                            + "/div[contains(@class, 'ant-tree-treenode')]")));
+        List<String> texts = new ArrayList<>();
+        for (WebElement webElement : list) {
+          String nodeName =
+              webElement.findElement(By.xpath(".//span[@class='ant-tree-title']")).getText();
+          texts.add(nodeName);
+        }
+        if (!treeNodes.containsAll(texts)) {
+          LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
+          return false;
+        }
+        return true;
+      } catch (org.openqa.selenium.StaleElementReferenceException e) {
+        if (attempt == maxRetries - 1) {
+          LOG.error(
+              "Failed to verify tree nodes after {} attempts due to stale elements", maxRetries);
+          throw e;
+        }
+        LOG.warn("Stale element encountered, retrying... (attempt {}/{})", attempt + 1, maxRetries);
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
-    if (!treeNodes.containsAll(texts)) {
-      LOG.error("tree nodes list: {} does not containsAll treeNodes: {}", texts, treeNodes);
-      return false;
-    }
-    return true;
+    return false;
   }
 
   public boolean verifySelectedNode(String nodeName) {

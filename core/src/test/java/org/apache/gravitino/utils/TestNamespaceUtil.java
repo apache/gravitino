@@ -91,6 +91,17 @@ public class TestNamespaceUtil {
             IllegalNamespaceException.class, () -> NamespaceUtil.checkView(abcd));
     Assertions.assertTrue(
         excep6.getMessage().contains("View namespace must be non-null and have 3 levels"));
+
+    // Test semantic model
+    Assertions.assertThrows(
+        IllegalNamespaceException.class, () -> NamespaceUtil.checkSemanticModel(null));
+    Throwable excep7 =
+        Assertions.assertThrows(
+            IllegalNamespaceException.class, () -> NamespaceUtil.checkSemanticModel(abcd));
+    Assertions.assertTrue(
+        excep7
+            .getMessage()
+            .contains("Semantic model namespace must be non-null and have 3 levels"));
   }
 
   @Test

@@ -1,1282 +1,344 @@
 ---
-title: Manage model metadata using Gravitino
-slug: /manage-model-metadata-using-gravitino
-date: 2024-12-26
-keyword: Gravitino model metadata manage
-license: This software is licensed under the Apache License version 2.
+title: "Manage Model Metadata"
+slug: "/manage-model-metadata-using-gravitino"
+keyword: "model management, model version, alias, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage model metadata in Apache Gravitino. Gravitino model catalog
-is a kind of model registry, which provides the ability to manage machine learning models'
-versioned metadata. It follows the typical Gravitino 3-level namespace (catalog, schema, and
-model) and supports managing the versions for each model.
+## Introduction
 
-Currently, it supports model and model version registering, listing, loading, and deleting.
+This page covers the Gravitino API for models and model versions. For what a model catalog is, how
+versions and aliases work, and how several URIs on one version behave, see
+[Model Catalog](./model-catalog.md). For creating the catalog and schema a model lives in, see
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md).
 
-To use the model catalog, please make sure that:
+## Model Operations
 
- - The Gravitino server has started, and is serving at, e.g. [http://localhost:8090](http://localhost:8090).
- - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
+### Register a Model
 
-## Catalog operations
+Registering creates the model with no versions. It needs a name, and can carry a comment and
+properties.
 
-### Create a catalog
-
-:::info
-For a model catalog, you must specify the catalog `type` as `MODEL` when creating the catalog.
-Please also be aware that the `provider` is not required for a model catalog.
-:::
-
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
-endpoint or just use the Gravitino Java/Python client. The following is an example of creating a
-catalog:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "model_catalog",
-  "type": "MODEL",
-  "comment": "This is a model catalog",
-  "properties": {
-    "k1": "v1"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs
+  -H "Content-Type: application/json" -d '{
+  "name": "churn_predictor",
+  "comment": "Customer churn model",
+  "properties": {"team": "risk"}
+}' http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("example")
-    .build();
+Catalog catalog = client.loadCatalog("models");
+ModelCatalog models = catalog.asModelCatalog();
 
-Map<String, String> properties = ImmutableMap.<String, String>builder()
-    .put("k1", "v1")
-    .build();
-
-Catalog catalog = gravitinoClient.createCatalog(
-    "model_catalog",
-    Type.MODEL,
-    "This is a model catalog",
-    properties);
+Model model = models.registerModel(
+    NameIdentifier.of("customer", "churn_predictor"),
+    "Customer churn model",
+    ImmutableMap.of("team", "risk"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-catalog = gravitino_client.create_catalog(name="model_catalog",
-                                          catalog_type=Catalog.Type.MODEL,
-                                          provider=None,
-                                          comment="This is a model catalog",
-                                          properties={"k1": "v1"})
+catalog = client.load_catalog("models")
+models = catalog.as_model_catalog()
+
+model = models.register_model(
+    model_ident=NameIdentifier.of("customer", "churn_predictor"),
+    comment="Customer churn model",
+    properties={"team": "risk"})
 ```
 
 </TabItem>
 </Tabs>
 
-### Load a catalog
+### Get a Model
 
-Refer to [Load a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
-in relational catalog for more details. For a model catalog, the load operation is the same.
-
-### Alter a catalog
-
-Refer to [Alter a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
-in relational catalog for more details. For a model catalog, the alter operation is the same.
-
-### Drop a catalog
-
-Refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
-in relational catalog for more details. For a model catalog, the drop operation is the same.
-
-### List all catalogs in a metalake
-
-Please refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
-in relational catalog for more details. For a model catalog, the list operation is the same.
-
-### List all catalogs' information in a metalake
-
-Please refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
-in relational catalog for more details. For a model catalog, the list operation is the same.
-
-## Schema operations
-
-`Schema` is a virtual namespace in a model catalog, which is used to organize the models. It
-is similar to the concept of `schema` in the relational catalog.
-
-:::tip
-Users should create a metalake and a catalog before creating a schema.
-:::
-
-### Create a schema
-
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
-endpoint or just use the Gravitino Java/Python client. The following is an example of creating a
-schema:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "model_schema",
-  "comment": "This is a model schema",
-  "properties": {
-    "k1": "v1"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("example")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-
-SupportsSchemas supportsSchemas = catalog.asSchemas();
-
-Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
-    .put("k1", "v1")
-    .build();
-Schema schema = supportsSchemas.createSchema(
-    "model_schema",
-    "This is a schema",
-    schemaProperties);
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_schemas().create_schema(name="model_schema",
-                                   comment="This is a schema",
-                                   properties={"k1": "v1"})
-```
-
-</TabItem>
-</Tabs>
-
-### Load a schema
-
-Please refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
-in relational catalog for more details. For a model catalog, the schema load operation is the
-same.
-
-### Alter a schema
-
-Please refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
-in relational catalog for more details. For a model catalog, the schema alter operation is the
-same.
-
-### Drop a schema
-
-Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
-in relational catalog for more details. For a model catalog, the schema drop operation is the
-same.
-
-Note that the drop operation will delete all the model metadata under this schema if `cascade`
-set to `true`.
-
-### List all schemas under a catalog
-
-Please refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
-in relational catalog for more details. For a model catalog, the schema list operation is the
-same.
-
-## Model operations
-
-:::tip
- - Users should create a metalake, a catalog, and a schema before creating a model.
-:::
-
-### Register a model
-
-You can register a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or just use the Gravitino
-Java/Python client. The following is an example of creating a model:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "example_model",
-  "comment": "This is an example model",
-  "properties": {
-    "k1": "v1"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("example")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
-        .put("k1", "v1")
-        .build();
-
-Model model = catalog.asModelCatalog().registerModel(
-    NameIdentifier.of("model_schema", "example_model"),
-    "This is an example model",
-    propertiesMap);
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model: Model = catalog.as_model_catalog().register_model(ident=NameIdentifier.of("model_schema", "example_model"),
-                                                         comment="This is an example model",
-                                                         properties={"k1": "v1"})
-```
-
-</TabItem>
-</Tabs>
-
-### Get a model
-
-You can get a model by sending a `GET` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using the
-Gravitino Java/Python client. The following is an example of getting a model:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-Model model = catalog.asModelCatalog().getModel(NameIdentifier.of("model_schema", "example_model"));
-// ...
+Model model = models.getModel(NameIdentifier.of("customer", "churn_predictor"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("model_schema", "example_model"))
+model = models.get_model(NameIdentifier.of("customer", "churn_predictor"))
 ```
 
 </TabItem>
 </Tabs>
 
-### Alter a model
+### Alter a Model
 
-You can modify a model's metadata (e.g. rename, update comment, or modify properties) by 
-sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
-{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
+| Change             | JSON                                                         | Java                                        |
+|--------------------|--------------------------------------------------------------|---------------------------------------------|
+| Rename             | `{"@type":"rename","newName":"churn_v2"}`                    | `ModelChange.rename("churn_v2")`            |
+| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`       | `ModelChange.updateComment("new_comment")`  |
+| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `ModelChange.setProperty("key1", "value1")` |
+| Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `ModelChange.removeProperty("key1")`        |
 
-<Tabs groupId="language" queryString>
- <TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
-cat <<EOF >model.json
-{
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
   "updates": [
-    {
-      "@type": "updateComment",
-      "newComment": "Updated model comment"
-    },
-    {
-      "@type": "rename",
-      "newName": "new_name"
-    },
-    {
-      "@type": "setProperty",
-      "property": "k2",
-      "value": "v2"
-    },
-    {
-      "@type": "removeProperty",
-      "property": "k1"
-    }
+    {"@type": "setProperty", "property": "default-uri-name", "value": "us"}
   ]
-}
-EOF
- 
-curl -X PUT \
-  -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '@model.json' \
-  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel
- ```
-
-
- </TabItem>
- <TabItem value="java" label="Java">
-
- ```java
- // Load the catalog and model
- GravitinoClient gravitinoClient = GravitinoClient
-     .builder("http://localhost:8090")
-     .withMetalake("example")
-     .build();
-
- Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
- ModelCatalog modelCatalog = catalog.asModelCatalog();
-
- // Define modifications
- ModelChange[] changes = {
-     ModelChange.rename("example_model_renamed"),
-     ModelChange.updatComment("new comment"),
-     ModelChange.setProperty("k2", "v2"),
-     ModelChange.removeProperty("k1")
- };
-
- // Apply changes
- Model updatedModel = modelCatalog.alterModel(
-     NameIdentifier.of("model_schema", "example_model"),
-     changes
- );
- ```
-
- </TabItem>
-<TabItem value="python" label="Python">
-
- ```python
-client = GravitinoClient(uri="http://localhost:8090", 
-                         metalake_name="mymetalake")
-
-catalog = client.load_catalog(name="mycatalog").as_model_catalog()
-
-# Define modifications
-changes = (
-    ModelChange.rename("renamed"),
-    ModelChange.update_comment("new comment"),
-    ModelChange.set_property("k2", "v2"),
-    ModelChange.remove_property("k1"),
-)
-
-# Apply changes
-updated_model = model_catalog.alter_model(
-    ident=NameIdentifier.of("myschema", "mymodel"), *changes
-)
- ```
- </TabItem>
- </Tabs>
-
-#### Supported modifications
-
-The following operations are supported for altering a model:
-
-
-| Operation           | JSON Example                                               | Java Method                                | Python Method                               |
-|---------------------|------------------------------------------------------------|--------------------------------------------|---------------------------------------------|
-| **Rename model**    | `{"@type":"rename","newName":"new_name"}`                  | `ModelChange.rename("new_name")`           | `ModelChange.rename("new_name")`            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new comment"}`     | `ModelChange.updateComment("new comment")` | `ModelChange.update_comment("new comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelChange.setProperty("key", "value")`  | `ModelChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelChange.removeProperty("key")`        | `ModelChange.remove_property("key")`        |
-
-:::note
-- Multiple modifications can be applied in a single request.
-- If the target model does not exist, a `404 Not Found` error will be returned.
-  :::
-
-### Delete a model
-
-You can delete a model by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using the
-Gravitino Java/Python client. The following is an example of deleting a model:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model
+}' http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().deleteModel(NameIdentifier.of("model_schema", "example_model"));
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().delete_model(NameIdentifier.of("model_schema", "example_model"))
+Model model = models.alterModel(
+    NameIdentifier.of("customer", "churn_predictor"),
+    ModelChange.setProperty("default-uri-name", "us"));
 ```
 
 </TabItem>
 </Tabs>
 
-Note that the delete operation will delete all the model versions under this model.
+### List and Delete Models
 
-### List models
-
-You can list all the models in a schema by sending a `GET` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or by using the
-Gravitino Java/Python client. The following is an example of listing all the models in a schema:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models
+
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-NameIdentifier[] identifiers = catalog.asModelCatalog().listModels(Namespace.of("model_schema"));
-// ...
+NameIdentifier[] identifiers = models.listModels(Namespace.of("customer"));
+boolean deleted = models.deleteModel(NameIdentifier.of("customer", "churn_predictor"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model_list = catalog.as_model_catalog().list_models(namespace=Namespace.of("model_schema")))
+identifiers = models.list_models(Namespace.of("customer"))
+deleted = models.delete_model(NameIdentifier.of("customer", "churn_predictor"))
 ```
 
 </TabItem>
 </Tabs>
 
-## ModelVersion operations
+Deleting a model deletes all of its versions.
 
-:::tip
- - Users should create a metalake, a catalog, a schema, and a model before link a model version
-   to the model.
-:::
+## Model Version Operations
 
-### Link a ModelVersion
+### Link a Version
 
-You can link a ModelVersion by sending a `POST` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint or by using
-the Gravitino Java/Python client. The following is an example of linking a ModelVersion:
+Linking creates a version of an existing model. The version number is assigned in sequence starting
+at zero.
 
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "uri": "path/to/model",
-  "aliases": ["alias1", "alias2"],
-  "comment": "This is version 0",
-  "properties": {
-    "k1": "v1"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions
+  -H "Content-Type: application/json" -d '{
+  "uri": "s3a://models/churn/v0",
+  "aliases": ["production"],
+  "comment": "First release",
+  "properties": {"framework": "xgboost"}
+}' http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().linkModelVersion(
-    NameIdentifier.of("model_schema", "example_model"),
-    "path/to/model",
-    new String[] {"alias1", "alias2"},
-    "This is version 0",
-    ImmutableMap.of("k1", "v1"));
+models.linkModelVersion(
+    NameIdentifier.of("customer", "churn_predictor"),
+    "s3a://models/churn/v0",
+    new String[] {"production"},
+    "First release",
+    ImmutableMap.of("framework", "xgboost"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("model_schema", "example_model"),
-                                              uri="path/to/model",
-                                              aliases=["alias1", "alias2"],
-                                              comment="This is version 0",
-                                              properties={"k1": "v1"})
+models.link_model_version(
+    model_ident=NameIdentifier.of("customer", "churn_predictor"),
+    uri="s3a://models/churn/v0",
+    aliases=["production"],
+    comment="First release",
+    properties={"framework": "xgboost"})
 ```
 
 </TabItem>
 </Tabs>
 
-The comment and properties of ModelVersion can be different from the model.
-
-You can also link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
-
-If you associate only one URI with a ModelVersion and do not specify a URI name
-(as introduced in the previous paragraph), Gravitino will automatically generate a default URI name "unknown".
-
-The following is an example of linking a ModelVersion with multiple model URIs:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+To give a version several named URIs, send `uris` as a map instead of a single `uri`, and set
+`default-uri-name` to pick the one returned when a caller does not name one. In Java the same
+`linkModelVersion` takes a map; in Python it is `link_model_version_with_multiple_uris`.
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
+  -H "Content-Type: application/json" -d '{
   "uris": {
-    "s3": "s3://path/to/model",
-    "hdfs": "hdfs://path/to/model"
+    "us": "s3a://models-us/churn/v0",
+    "eu": "s3a://models-eu/churn/v0"
   },
-  "aliases": ["alias1", "alias2"],
-  "comment": "This is version 0",
-  "properties": {
-    "k1": "v1"
-  }
-}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions
+  "aliases": ["production"],
+  "properties": {"default-uri-name": "us"}
+}' http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions
 ```
 
-</TabItem>
-<TabItem value="java" label="Java">
+### Get a Version
 
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().linkModelVersion(
-    NameIdentifier.of("model_schema", "example_model"),
-    ImmutableMap.of("s3", "s3://path/to/model", "hdfs", "hdfs://path/to/model"),
-    new String[] {"alias1", "alias2"},
-    "This is version 0",
-    ImmutableMap.of("k1", "v1"));
-```
+A version is fetched by number or by alias, and its URI can be fetched directly.
 
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().link_model_version_with_multiple_uris(model_ident=NameIdentifier.of("model_schema", "example_model"),
-                                                                 uris={"s3": "s3://path/to/model", "hdfs": "hdfs://path/to/model"},
-                                                                 aliases=["alias1", "alias2"],
-                                                                 comment="This is version 0",
-                                                                 properties={"k1": "v1"})
-```
-
-</TabItem>
-</Tabs>
-
-### Get a ModelVersion
-
-You can get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
-endpoint or by using the Gravitino Java/Python client. The following is an example of getting
-a ModelVersion:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0
-```
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions/0
 
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().getModelVersion(NameIdentifier.of("model_schema", "example_model"), 0);
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().get_model_version(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0)
-```
-
-</TabItem>
-</Tabs>
-
-### Get a ModelVersion by alias
-
-You can also get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
-by using the Gravitino Java/Python client. The following is an example of getting a ModelVersion
-by alias:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1
-```
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/aliases/production
 
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-ModelVersion modelVersion = catalog.asModelCatalog().getModelVersion(NameIdentifier.of("model_schema", "example_model"), "alias1");
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1")
-```
-
-</TabItem>
-</Tabs>
-
-### Get ModelVersion URI
-
-You can get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}/uri?uriName={uriName}`
-endpoint or by using the Gravitino Java/Python client. The following is an example of getting
-the URI of a ModelVersion:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0/uri?uriName=s3
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/aliases/production/uri
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), 0, "s3");
-// ...
+ModelVersion byNumber = models.getModelVersion(
+    NameIdentifier.of("customer", "churn_predictor"), 0);
+
+ModelVersion byAlias = models.getModelVersion(
+    NameIdentifier.of("customer", "churn_predictor"), "production");
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+by_number = models.get_model_version(
+    NameIdentifier.of("customer", "churn_predictor"), 0)
 
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0, uri_name="s3")
+by_alias = models.get_model_version_by_alias(
+    NameIdentifier.of("customer", "churn_predictor"), "production")
 ```
 
 </TabItem>
 </Tabs>
 
-The param `uriName` is not required. If it is not specified, Gravitino will obtain 
-the corresponding URI based on the `default-uri-name` property set in the Model or ModelVersion.
-You can refer to [Model Properties](./model-catalog.md#Model properties) and
-[ModelVersion properties](./model-catalog.md#ModelVersion properties) for more details.
-If the `default-uri-name` property is not set in either the model or the model version, 
-an `IllegalArgumentException` will be thrown.
+### Alter a Version
 
-The following is an example of getting the URI of a ModelVersion without specifying the uriName:
+Aliases move between versions with `updateAliases`, which adds and removes in one call. URIs are
+added, updated, and removed by name.
 
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+| Change             | JSON                                                                        | Java                                                       |
+|--------------------|-----------------------------------------------------------------------------|------------------------------------------------------------|
+| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`                      | `ModelVersionChange.updateComment("new_comment")`          |
+| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}`                | `ModelVersionChange.setProperty("key1", "value1")`         |
+| Remove a property  | `{"@type":"removeProperty","property":"key1"}`                              | `ModelVersionChange.removeProperty("key1")`                |
+| Update the URI     | `{"@type":"updateUri","newUri":"s3a://models/churn/v1"}`                    | `ModelVersionChange.updateUri(...)`                        |
+| Add a named URI    | `{"@type":"addUri","uriName":"eu","uri":"s3a://models-eu/churn/v0"}`        | `ModelVersionChange.addUri("eu", ...)`                     |
+| Remove a named URI | `{"@type":"removeUri","uriName":"eu"}`                                      | `ModelVersionChange.removeUri("eu")`                       |
+| Move aliases       | `{"@type":"updateAliases","aliasesToAdd":["production"],"aliasesToRemove":[]}` | `ModelVersionChange.updateAliases(...)`                  |
 
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0/uri
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), 0, null);
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0)
-```
-
-</TabItem>
-</Tabs>
-
-### Get ModelVersion URI by alias
-
-You can also get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}/uri?uriName={uriName}`
-endpoint or by using the Gravitino Java/Python client. The following is an example of getting
-the URI of a ModelVersion:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1/uri?uriName=s3
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), "alias", "s3");
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1", uri_name="s3")
-```
-
-</TabItem>
-</Tabs>
-
-Similarly, The param `uriName` is not required.
-The following is an example of getting the URI of a ModelVersion by alias without specifying the uriName:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1/uri
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), "alias", null);
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1")
-```
-
-</TabItem>
-</Tabs>
-
-### Alter a ModelVersion
-
-You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
-by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}
-/schemas/{schema_name} /models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
-Java/Python client. The following is an example of modifying a model version:
-
-<Tabs groupId="language" queryString>
- <TabItem value="shell" label="Shell">
-
-```shell
-cat <<EOF >model.json
-{
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
   "updates": [
-    {
-      "@type": "updateComment",
-      "newComment": "Updated comment of model version"
-    },
-    {
-      "@type": "updateUri",
-      "uriName": "uri_name",
-      "newUri": "new_uri"
-    },
-    {
-      "@type": "addUri",
-      "uriName": "uri_name",
-      "uri": "uri"
-    },
-    {
-      "@type": "removeUri",
-      "uriName": "uri_name"
-    },
-    {
-      "@type": "setProperty",
-      "property": "key",
-      "value": "value"
-    },
-    {
-      "@type": "removeProperty",
-      "property": "key"
-    },
-    {
-      "@type": "updateAliases",
-      "aliasesToAdd": [
-          "alias1",
-          "alias2"
-      ],
-      "aliasesToRemove": [
-          "alias3"
-      ]
-    }
+    {"@type": "updateAliases", "aliasesToAdd": ["production"], "aliasesToRemove": []}
   ]
-}
-EOF
- 
-curl -X PUT \
-  -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '@model.json' \
-  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel/versions/0
-```
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// Load the model catalog
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("example")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-ModelCatalog modelCatalog = catalog.asModelCatalog();
-
-// Define modifications
-ModelVersionChange[] changes = {
-     ModelVersionChange.updateComment("Updated comment of model version"),
-     ModelVersionChange.updateUri("uri_name", "new_uri"),
-     ModelVersionChange.addUri("uri_name", "new_uri"),
-     ModelVersionChange.removeUri("uri_name"),
-     ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key"),
-     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
- };
-
-// Apply changes
-ModelVersion updatedModelVersion = modelCatalog.alterModelVersion(
-     NameIdentifier.of("model_schema", "example_model"),
-     0,
-     changes
- );
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-client = GravitinoClient(
-    uri="http://localhost:8090", metalake_name="mymetalake"
-)
-
-# Load Model Catalog
-model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
-
-# Define modifications
-changes = (
-    ModelVersionChange.update_comment("Updated comment of model version"),
-    ModelVersionChange.update_uri("new_uri", "uri_name"),
-    ModelVersionChange.add_uri("uri_name", "uri"),
-    ModelVersionChange.remove_uri("uri_name"),
-    ModelVersionChange.set_property("k2", "v2"),
-    ModelVersionChange.remove_property("k1"),
-    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
-)
-
-# Apply changes
-updated_model = model_catalog.alter_model_version(
-    NameIdentifier.of("myschema", "mymodel"), 0, *changes
-)
-```
-
-</TabItem>
-</Tabs>
-
-#### Supported modifications
-
-| Operation           | JSON Example                                                                                | Java Method                                                                                    | Python Method                                                         |
-|---------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri","uriName":"uri_name"}`                            | `ModelVersionChange.updateUri("uri_name", "new_uri")`                                          | `ModelVersionChange.update_uri("new_uri", "uri_name")`                |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                      | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                  | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                               | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type":"updateAliases","aliasesToAdd":["alias1","alias2"],"aliasesToRemove":["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
-| **Add uri**         | `{"@type":"addUri","uriName":"uri_name","uri":"uri"}`                                       | `ModelVersionChange.addUri("uri_name", "new_uri")`                                             | `ModelVersionChange.add_uri("uri_name", "uri")`                       |
-| **Remove uri**      | `{"@type":"removeUri","uriName":"uri_name"}`                                                | `ModelVersionChange.removeUri("uri_name")`                                                     | `ModelVersionChange.remove_uri("uri_name")`                           |
-
-:::note
-- Multiple modifications can be applied in a single request.
-- If the target model does not exist, a `404 Not Found` error will be returned.
-- If the target model version does not exist, a `404 Not Found` error will be returned.
-  :::
-
-### Alter a ModelVersion by alias
-
-You can also modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
-properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/
-{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
-Java/Python client. The following is an example of modifying a model version:
-
-<Tabs groupId="language" queryString>
- <TabItem value="shell" label="Shell">
-
-```shell
-cat <<EOF >model.json
-{
-  "updates": [
-    {
-      "@type": "updateComment",
-      "newComment": "Updated comment of model version"
-    },
-    {
-      "@type": "updateUri",
-      "uriName": "uri_name",
-      "newUri": "new_uri"
-    },
-    {
-      "@type": "addUri",
-      "uriName": "uri_name",
-      "uri": "uri"
-    },
-    {
-      "@type": "removeUri",
-      "uriName": "uri_name"
-    },
-    {
-      "@type": "setProperty",
-      "property": "key",
-      "value": "value"
-    },
-    {
-      "@type": "removeProperty",
-      "property": "key"
-    },
-    {
-      "@type": "updateAliases",
-      "aliasesToAdd": [
-          "alias1",
-          "alias2"
-      ],
-      "aliasesToRemove": [
-          "alias3"
-      ]
-    }
-  ]
-}
-EOF
- 
-curl -X PUT \
-  -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '@model.json' \
-  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel/aliases/myalias
-```
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// Load the model catalog
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("example")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-ModelCatalog modelCatalog = catalog.asModelCatalog();
-
-// Define modifications
-ModelVersionChange[] changes = {
-     ModelVersionChange.updateComment("Updated comment of model version"), 
-     ModelVersionChange.updateUri("uri_name", "new_uri"),
-     ModelVersionChange.addUri("uri_name", "new_uri"),
-     ModelVersionChange.removeUri("uri_name"),
-     ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key"),
-     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
- };
-
-// Apply changes
-ModelVersion updatedModelVersion = modelCatalog.alterModelVersion(
-     NameIdentifier.of("model_schema", "example_model"),
-     "myalias",
-     changes
- );
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-client = GravitinoClient(
-    uri="http://localhost:8090", metalake_name="mymetalake"
-)
-
-# Load Model Catalog
-model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
-
-# Define modifications
-changes = (
-    ModelVersionChange.update_comment("Updated comment of model version"),
-    ModelVersionChange.update_uri("new_uri", "uri_name"),
-    ModelVersionChange.add_uri("uri_name", "uri"),
-    ModelVersionChange.remove_uri("uri_name"),
-    ModelVersionChange.set_property("k2", "v2"),
-    ModelVersionChange.remove_property("k1"),
-    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
-)
-
-# Apply changes
-updated_model = model_catalog.alter_model_version_by_alias(
-    NameIdentifier.of("myschema", "myalias", "mymodel"), *changes
-)
-```
-
-</TabItem>
-</Tabs>
-
-#### Supported modifications
-
-| Operation           | JSON Example                                                                                | Java Method                                                                                    | Python Method                                                         |
-|---------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri","uriName":"uri_name"}`                            | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                      | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                  | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                               | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type":"updateAliases","aliasesToAdd":["alias1","alias2"],"aliasesToRemove":["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
-| **Add uri**         | `{"@type":"addUri","uriName":"uri_name","uri":"uri"}`                                       | `ModelVersionChange.addUri("uri_name", "new_uri")`                                             | `ModelVersionChange.add_uri("uri_name", "uri")`                       |
-| **Remove uri**      | `{"@type":"removeUri","uriName":"uri_name"}`                                                | `ModelVersionChange.removeUri("uri_name")`                                                     | `ModelVersionChange.remove_uri("uri_name")`                           |
-
-
-:::note
-- Multiple modifications can be applied in a single request.
-- If the target model does not exist, a `404 Not Found` error will be returned.
-- If the target model version does not exist, a `404 Not Found` error will be returned.
-  :::
-
-### Delete a ModelVersion
-
-You can delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
-endpoint or by using the Gravitino Java/Python client. The following is an example of deleting
-a ModelVersion:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0
+}' http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions/1
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().deleteModelVersion(NameIdentifier.of("model_schema", "example_model"), 0);
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().delete_model_version(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0)
+models.alterModelVersion(
+    NameIdentifier.of("customer", "churn_predictor"),
+    1,
+    ModelVersionChange.updateAliases(new String[] {"production"}, new String[] {}));
 ```
 
 </TabItem>
 </Tabs>
 
-### Delete a ModelVersion by alias
+Moving an alias onto a new version removes it from the version that held it, since an alias belongs
+to one version at a time.
 
-You can also delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
-by using the Gravitino Java/Python client. The following is an example of deleting a ModelVersion
-by alias:
+### List and Delete Versions
 
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-catalog.asModelCatalog().deleteModelVersion(NameIdentifier.of("model_schema", "example_model"), "alias1");
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-catalog.as_model_catalog().delete_model_version_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1")
-```
-
-</TabItem>
-</Tabs>
-
-### List ModelVersions
-
-You can list all the ModelVersions in a model by sending a `GET` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint
-or by using the Gravitino Java/Python client. The following is an example of listing all the 
-ModelVersions in a model:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions
+
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/catalogs/models/schemas/customer/models/churn_predictor/versions/0
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-int[] modelVersions = catalog.asModelCatalog().listModelVersions(NameIdentifier.of("model_schema", "example_model"));
-// ...
+int[] versions = models.listModelVersions(
+    NameIdentifier.of("customer", "churn_predictor"));
+
+boolean deleted = models.deleteModelVersion(
+    NameIdentifier.of("customer", "churn_predictor"), 0);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+versions = models.list_model_versions(
+    NameIdentifier.of("customer", "churn_predictor"))
 
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model_versions: List[int] = catalog.as_model_catalog().list_model_versions(model_ident=NameIdentifier.of("model_schema", "example_model"))
-```
-
-</TabItem>
-</Tabs>
-
-### List all versions' information in a model
-
-You can list all versions' information in a model by sending a `GET` request to the `/api/metalakes/
-{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?detail=true` endpoint
-or by using the Gravitino Java/Python client. The following is an example of listing all the
-versions' information in a model:
-
-<Tabs groupId="language" queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions?detail=true
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-// ...
-Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
-ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(NameIdentifier.of("model_schema", "example_model"));
-// ...
-```
-
-</TabItem>
-<TabItem value="python" label="Python">
-
-```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
-
-catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
-model_versions: List[ModelVersion] = catalog.as_model_catalog().list_model_version_infos(model_ident=NameIdentifier.of("model_schema", "example_model"))
+deleted = models.delete_model_version(
+    NameIdentifier.of("customer", "churn_predictor"), 0)
 ```
 
 </TabItem>

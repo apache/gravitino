@@ -157,6 +157,16 @@ public class TestSparkPartitionUtils {
           SparkPartitionUtils.getSparkPartitionValue(hivePartitionValues[i], dataType));
     }
 
+    Assertions.assertNull(
+        SparkPartitionUtils.getSparkPartitionValue(
+            "__HIVE_DEFAULT_PARTITION__", DataTypes.IntegerType));
+    Assertions.assertNull(
+        SparkPartitionUtils.getSparkPartitionValue(
+            "HIVE_DEFAULT_PARTITION", DataTypes.IntegerType));
+    Assertions.assertNull(
+        SparkPartitionUtils.getSparkPartitionValue(
+            "__HIVE_DEFAULT_PARTITION__", DataTypes.StringType));
+
     Assertions.assertThrowsExactly(
         UnsupportedOperationException.class,
         () ->

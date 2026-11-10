@@ -54,6 +54,8 @@ public interface MetadataObject {
     TABLE,
     /** A view is mapped to the view of relational data sources like Apache Hive, MySQL, etc. */
     VIEW,
+    /** A Semantic Model represents a governed analytical semantic definition. */
+    SEMANTIC_MODEL,
     /**
      * A topic is mapped the topic of messaging data sources like Apache Kafka, Apache Pulsar, etc.
      */
@@ -73,7 +75,9 @@ public interface MetadataObject {
     /** A job represents a data processing task in Gravitino. */
     JOB,
     /** A job template represents a reusable template for creating jobs in Gravitino. */
-    JOB_TEMPLATE;
+    JOB_TEMPLATE,
+    /** A function represents a user-defined function registered in Gravitino. */
+    FUNCTION;
   }
 
   /**

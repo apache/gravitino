@@ -43,7 +43,7 @@ public class GravitinoStrategy implements PartitionStrategy {
   /** Rule key for the partition table score aggregation mode. */
   public static final String PARTITION_TABLE_SCORE_MODE = "partition_table_score_mode";
   /** Rule key for the maximum number of partitions selected for execution. */
-  public static final String MAX_PARTITION_NUM = "max_partition_num";
+  public static final String MAX_PARTITION_NUM = "max-partition-num";
 
   private static final int DEFAULT_MAX_PARTITION_NUM = 100;
 

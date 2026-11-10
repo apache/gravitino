@@ -18,8 +18,9 @@
 
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from typing import Optional
+from typing import Optional, overload
 
+from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
@@ -27,6 +28,7 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
 from gravitino.exceptions.base import (
+    NoSuchSchemaException,
     NoSuchTableException,
     UnsupportedOperationException,
 )
@@ -54,18 +56,35 @@ class TableCatalog(ABC):
             NoSuchSchemaException: If the schema does not exist.
         """
 
+    @overload
     @abstractmethod
-    def load_table(self, identifier: NameIdentifier) -> Table:
-        """Load table metadata by `NameIdentifier` from the catalog.
+    def load_table(self, identifier: NameIdentifier) -> Table: ...
+
+    @overload
+    @abstractmethod
+    def load_table(
+        self, identifier: NameIdentifier, required_privilege_names: set[Privilege.Name]
+    ) -> Table: ...
+
+    @abstractmethod
+    def load_table(
+        self,
+        identifier: NameIdentifier,
+        required_privilege_names: Optional[set[Privilege.Name]] = None,
+    ) -> Table:
+        """Load table metadata by `NameIdentifier` from the catalog with required privileges.
 
         Args:
             identifier (NameIdentifier): A table identifier.
+            required_privilege_names (Optional[set[Privilege.Name]], optional):
+                The required privilege names to access the table. Defaults to `None`.
 
         Returns:
             Table: The table metadata.
 
         Raises:
             NoSuchTableException: If the table does not exist.
+            NoSuchSchemaException: If the containing schema does not exist.
         """
 
     def table_exists(self, identifier: NameIdentifier) -> bool:
@@ -77,7 +96,7 @@ class TableCatalog(ABC):
         Returns:
             bool: `True` If the table exists, `False` otherwise.
         """
-        with suppress(NoSuchTableException):
+        with suppress(NoSuchTableException, NoSuchSchemaException):
             self.load_table(identifier)
             return True
         return False

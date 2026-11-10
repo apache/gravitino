@@ -24,7 +24,10 @@ lance_rest_server_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
 cd ${lance_rest_server_dir}
 
-python bin/rewrite_config.py
+# Skip config rewrite if SKIP_CONFIG_REWRITE is set (e.g., in Kubernetes)
+if [ "${SKIP_CONFIG_REWRITE}" != "true" ]; then
+  python bin/rewrite_config.py
+fi
 
 JAVA_OPTS+=" -XX:-UseContainerSupport"
 export JAVA_OPTS

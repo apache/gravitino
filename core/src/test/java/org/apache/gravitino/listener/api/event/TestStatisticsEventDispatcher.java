@@ -100,6 +100,15 @@ public class TestStatisticsEventDispatcher {
     Assertions.assertEquals(ListStatisticsEvent.class, event.getClass());
     Assertions.assertEquals(OperationType.LIST_STATISTICS, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(0, ((ListStatisticsEvent) event).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testListStatisticsEventDeprecatedConstructorReturnsNegativeCount() {
+    ListStatisticsEvent event =
+        new ListStatisticsEvent("user", NameIdentifier.of("metalake", "catalog", "db", "table"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -141,6 +150,19 @@ public class TestStatisticsEventDispatcher {
         NameIdentifier.of("metalake", "catalog", "db", "table"), event.identifier());
     Assertions.assertEquals(ListPartitionStatisticsEvent.class, event.getClass());
     Assertions.assertEquals(OperationType.LIST_PARTITION_STATISTICS, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(0, ((ListPartitionStatisticsEvent) event).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testListPartitionStatisticsEventDeprecatedConstructorReturnsNegativeCount() {
+    ListPartitionStatisticsEvent event =
+        new ListPartitionStatisticsEvent(
+            "user",
+            NameIdentifier.of("metalake", "catalog", "db", "table"),
+            PartitionRange.upTo("p1", PartitionRange.BoundType.CLOSED));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test

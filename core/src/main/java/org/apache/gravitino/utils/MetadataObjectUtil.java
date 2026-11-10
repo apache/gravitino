@@ -24,12 +24,17 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
@@ -60,6 +65,8 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
           .put(MetadataObject.Type.JOB, Entity.EntityType.JOB)
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
+          .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
+          .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
           .build();
 
   private MetadataObjectUtil() {}
@@ -110,7 +117,7 @@ public class MetadataObjectUtil {
 
     switch (metadataObject.type()) {
       case METALAKE:
-        return NameIdentifierUtil.ofMetalake(metalakeName);
+        return NameIdentifierUtil.ofMetalake(metadataObject.name());
       case ROLE:
         return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
       case TAG:
@@ -122,6 +129,7 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
       case VIEW:
+      case SEMANTIC_MODEL:
       case CATALOG:
       case SCHEMA:
       case TABLE:
@@ -129,12 +137,77 @@ public class MetadataObjectUtil {
       case FILESET:
       case COLUMN:
       case MODEL:
+      case FUNCTION:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
       default:
         throw new IllegalArgumentException(
             "Unknown metadata object type: " + metadataObject.type());
     }
+  }
+
+  /**
+   * Returns the ancestor metadata objects from which the given metadata object inherits tags and
+   * policies, ordered from the nearest ancestor to the outermost (the metadata object itself is not
+   * included).
+   *
+   * <p>This is similar to repeatedly calling {@link MetadataObjects#parent(MetadataObject)}, but it
+   * additionally expands hierarchical (multi-level) schemas: a schema name such as {@code a:b:c}
+   * (using the configured schema separator) has the intermediate schemas {@code a:b} and {@code a}
+   * as ancestors. Without this expansion, inheritance would jump directly from {@code a:b:c} to the
+   * catalog and skip the intermediate parent schemas, so tags/policies assigned to a parent schema
+   * would not be inherited by its child schemas and the objects within them.
+   *
+   * <p>The hierarchical schema separator is resolved from {@link
+   * HierarchicalSchemaUtil#schemaSeparator()}, which reads the server config from {@link
+   * org.apache.gravitino.GravitinoEnv} and falls back to the default {@code ":"} ({@link
+   * org.apache.gravitino.Configs#SCHEMA_SEPARATOR}) when the config is not available (for example
+   * in unit tests that do not boot the server). Tests that need a deterministic separator without
+   * booting the server should call {@link #getParentMetadataObjects(MetadataObject, String)} with
+   * an explicit separator instead.
+   *
+   * @param object The metadata object
+   * @return The ancestor metadata objects, nearest first
+   */
+  public static List<MetadataObject> getParentMetadataObjects(MetadataObject object) {
+    return getParentMetadataObjects(object, HierarchicalSchemaUtil.schemaSeparator());
+  }
+
+  /**
+   * Returns the ancestor metadata objects of the given metadata object using the provided
+   * hierarchical schema separator. See {@link #getParentMetadataObjects(MetadataObject)}.
+   *
+   * @param object The metadata object
+   * @param separator The external hierarchical schema separator
+   * @return The ancestor metadata objects, nearest first
+   */
+  static List<MetadataObject> getParentMetadataObjects(MetadataObject object, String separator) {
+    Preconditions.checkArgument(object != null, "metadataObject cannot be null");
+
+    List<MetadataObject> parents = new ArrayList<>();
+    MetadataObject current = object;
+    while (current != null) {
+      // When the current object is a hierarchical (multi-level) schema, its intermediate parent
+      // schemas are ancestors too. Add them (nearest first) before walking up to the catalog.
+      if (current.type() == MetadataObject.Type.SCHEMA
+          && HierarchicalSchemaUtil.isHierarchical(current.name(), separator)) {
+        String catalogName = current.parent();
+        List<String> ancestorSchemas =
+            HierarchicalSchemaUtil.getAncestorNames(current.name(), separator);
+        for (int i = ancestorSchemas.size() - 1; i >= 0; i--) {
+          parents.add(
+              MetadataObjects.of(catalogName, ancestorSchemas.get(i), MetadataObject.Type.SCHEMA));
+        }
+      }
+
+      MetadataObject parent = MetadataObjects.parent(current);
+      if (parent != null) {
+        parents.add(parent);
+      }
+      current = parent;
+    }
+
+    return parents;
   }
 
   /**
@@ -162,54 +235,68 @@ public class MetadataObjectUtil {
           throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
         }
         NameIdentifierUtil.checkMetalake(identifier);
-        check(env.metalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
+        check(
+            env.internalMetalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
         break;
 
       case CATALOG:
         NameIdentifierUtil.checkCatalog(identifier);
-        check(env.catalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
+        check(env.internalCatalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
         break;
 
       case SCHEMA:
         NameIdentifierUtil.checkSchema(identifier);
-        check(env.schemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
+        check(env.internalSchemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
         break;
 
       case FILESET:
         NameIdentifierUtil.checkFileset(identifier);
-        check(env.filesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
+        check(env.internalFilesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
         break;
 
       case TABLE:
         NameIdentifierUtil.checkTable(identifier);
-        check(env.tableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
+        check(env.internalTableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
         break;
 
       case COLUMN:
         NameIdentifierUtil.checkColumn(identifier);
         NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.tableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
+        check(env.internalTableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
         break;
 
       case TOPIC:
         NameIdentifierUtil.checkTopic(identifier);
-        check(env.topicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
+        check(env.internalTopicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
         break;
 
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
-        check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        check(env.internalModelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case FUNCTION:
+        NameIdentifierUtil.checkFunction(identifier);
+        check(
+            env.internalFunctionDispatcher().functionExists(identifier), exceptionToThrowSupplier);
         break;
 
       case VIEW:
         NameIdentifierUtil.checkView(identifier);
-        check(env.viewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        check(
+            env.internalSemanticModelDispatcher().semanticModelExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case ROLE:
         AuthorizationUtils.checkRole(identifier);
         try {
-          env.accessControlDispatcher().getRole(metalake, object.fullName());
+          env.internalAccessControlDispatcher().getRole(metalake, object.fullName());
         } catch (NoSuchRoleException nsr) {
           throw exceptionToThrowSupplier.get();
         }
@@ -218,7 +305,7 @@ public class MetadataObjectUtil {
       case TAG:
         NameIdentifierUtil.checkTag(identifier);
         try {
-          env.tagDispatcher().getTag(metalake, object.fullName());
+          env.internalTagDispatcher().getTag(metalake, object.fullName());
         } catch (NoSuchTagException nsr) {
           throw exceptionToThrowSupplier.get();
         }
@@ -227,7 +314,7 @@ public class MetadataObjectUtil {
       case POLICY:
         NameIdentifierUtil.checkPolicy(identifier);
         try {
-          env.policyDispatcher().getPolicy(metalake, object.fullName());
+          env.internalPolicyDispatcher().getPolicy(metalake, object.fullName());
         } catch (NoSuchPolicyException nsr) {
           throw checkNotNull(exceptionToThrowSupplier).get();
         }
@@ -236,7 +323,7 @@ public class MetadataObjectUtil {
       case JOB:
         NameIdentifierUtil.checkJob(identifier);
         try {
-          env.jobOperationDispatcher().getJob(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJob(metalake, object.fullName(), false);
         } catch (NoSuchJobException e) {
           throw exceptionToThrowSupplier.get();
         }
@@ -245,7 +332,7 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         NameIdentifierUtil.checkJobTemplate(identifier);
         try {
-          env.jobOperationDispatcher().getJobTemplate(metalake, object.fullName());
+          env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
           throw exceptionToThrowSupplier.get();
         }
@@ -254,6 +341,42 @@ public class MetadataObjectUtil {
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  /**
+   * Checks metadata objects, checking each distinct table only once for tables and their columns.
+   *
+   * <p>Every object's identifier is validated. Successful table checks are shared only within this
+   * call. Like {@link #checkMetadataObject(String, MetadataObject)}, this must be called outside
+   * the tree lock because checking an object may load it into the entity store.
+   *
+   * @param metalake The metalake name.
+   * @param objects The metadata objects to check, in order.
+   * @throws NoSuchMetadataObjectException if a metadata object does not exist.
+   */
+  public static void checkMetadataObjects(String metalake, List<MetadataObject> objects) {
+    Set<NameIdentifier> checkedTables = new HashSet<>();
+    for (MetadataObject object : objects) {
+      Preconditions.checkArgument(object != null, "metadataObject cannot be null");
+      if (object.type() != MetadataObject.Type.TABLE
+          && object.type() != MetadataObject.Type.COLUMN) {
+        checkMetadataObject(metalake, object);
+        continue;
+      }
+
+      NameIdentifier identifier = toEntityIdent(metalake, object);
+      NameIdentifier tableIdentifier;
+      if (object.type() == MetadataObject.Type.COLUMN) {
+        NameIdentifierUtil.checkColumn(identifier);
+        tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+      } else {
+        NameIdentifierUtil.checkTable(identifier);
+        tableIdentifier = identifier;
+      }
+      if (checkedTables.add(tableIdentifier)) {
+        checkMetadataObject(metalake, object);
+      }
     }
   }
 

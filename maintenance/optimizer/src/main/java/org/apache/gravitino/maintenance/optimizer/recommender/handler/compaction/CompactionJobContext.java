@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.ToString;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
@@ -31,11 +30,12 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 @RequiredArgsConstructor
-@ToString
 public class CompactionJobContext implements JobExecutionContext {
   private final NameIdentifier name;
   private final Map<String, String> jobOptions;
   private final String jobTemplateName;
+  @Getter private final String rewriteStrategy;
+  @Getter private final String sortOrder;
   @Getter private final Column[] columns;
   @Getter private final Transform[] partitioning;
   @Getter private final List<PartitionPath> partitions;
@@ -53,5 +53,32 @@ public class CompactionJobContext implements JobExecutionContext {
   @Override
   public String jobTemplateName() {
     return jobTemplateName;
+  }
+
+  // `columns`, `partitioning` & `partitions` fields are not logged to make toString() output more
+  // readable (especially for big tables). Only their length is logged instead.
+  @Override
+  public String toString() {
+    return "CompactionJobContext{"
+        + "name="
+        + name
+        + ", jobTemplateName='"
+        + jobTemplateName
+        + '\''
+        + ", rewriteStrategy='"
+        + rewriteStrategy
+        + '\''
+        + ", sortOrder='"
+        + sortOrder
+        + '\''
+        + ", jobOptions="
+        + jobOptions
+        + ", columnCount="
+        + (columns != null ? columns.length : 0)
+        + ", partitioningCount="
+        + (partitioning != null ? partitioning.length : 0)
+        + ", partitionCount="
+        + (partitions != null ? partitions.size() : 0)
+        + '}';
   }
 }

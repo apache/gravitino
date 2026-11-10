@@ -33,9 +33,7 @@ import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -48,19 +46,16 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
-      ImmutableMap.of(
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.KET_TAB_URI_KEY,
-          KerberosConfig.KET_TAB_URI_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY);
+      ImmutableMap.<String, String>builder()
+          .put(KerberosConfig.PRINCIPAL_KEY, KerberosConfig.PRINCIPAL_KEY)
+          .put(KerberosConfig.KET_TAB_URI_KEY, KerberosConfig.KET_TAB_URI_KEY)
+          .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
+          .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
+          .put(
+              AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+              AuthenticationConfig.IMPERSONATION_ENABLE_KEY)
+          .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)
+          .build();
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -88,58 +83,97 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                "s3 access key ID",
+                GRAVITINO_JDBC_USER,
+                "JDBC user for Iceberg JDBC backend",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "s3 secret access key",
+                GRAVITINO_JDBC_PASSWORD,
+                "JDBC password for Iceberg JDBC backend",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-                "OSS access key ID",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-                "OSS access key secret",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
-                "Azure storage account name",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-                "Azure storage account key",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
-                "Table metadata cache implementation",
+                "Table metadata cache implementation. Set to empty string(\"\") if "
+                    + "catalog-backend is rest catalog, or custom catalog without the "
+                    + "SupportsMetadataLocation interface.",
                 false /* immutable */,
-                null /* defaultValue */,
+                LocalTableMetadataCache.class.getName() /* defaultValue */,
                 false /* hidden */),
             integerOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_CAPACITY,
                 "Table metadata cache capacity",
                 false /* immutable */,
-                200 /* defaultValue */,
+                1000 /* defaultValue */,
                 false /* hidden */),
             integerOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
                 "Table metadata cache TTL in minutes",
                 false /* immutable */,
                 60 /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.DATA_ACCESS,
+                "Iceberg REST data access mode. Supported values are vended-credentials and"
+                    + " remote-signing.",
+                false,
+                null,
+                false),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+                "HTTP connection timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                10000 /* defaultValue */,
+                false /* hidden */),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+                "HTTP socket timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                60000 /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                "How the REST catalog backend authenticates to the remote catalog: user-token"
+                    + " forwards the calling user's token, service-account connects with a"
+                    + " configured credential and authorizes every request in Gravitino",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_TOKEN,
+                "Static bearer token the service account presents to the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_CREDENTIAL,
+                "OAuth2 client credential (client_id:client_secret) the service account uses"
+                    + " with the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI,
+                "OAuth2 token endpoint for the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_SCOPE,
+                "OAuth2 scope requested with the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
+                "Who issues storage credentials for a federated REST catalog: remote passes"
+                    + " through the remote catalog's credentials, local issues them through"
+                    + " this catalog's credential providers. Service-account connections always"
+                    + " use local credentials",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));

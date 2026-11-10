@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.handler.compactio
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
@@ -28,6 +29,7 @@ import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.BaseExpressionStrategyHandler;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.rel.Table;
 
 /**
@@ -35,7 +37,7 @@ import org.apache.gravitino.rel.Table;
  */
 public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
 
-  public static final String NAME = "compaction";
+  public static final String NAME = IcebergDataCompactionContent.STRATEGY_TYPE_VALUE;
 
   @Override
   public Set<DataRequirement> dataRequirements() {
@@ -62,8 +64,29 @@ public class CompactionStrategyHandler extends BaseExpressionStrategyHandler {
         nameIdentifier,
         jobOptions,
         strategy.jobTemplateName(),
+        readRewriteStrategy(strategy),
+        readSortOrder(strategy),
         tableMetadata.columns(),
         tableMetadata.partitioning(),
         resolvedPartitions);
+  }
+
+  private static String readRewriteStrategy(Strategy strategy) {
+    Object value = strategy.rules().get(IcebergDataCompactionContent.REWRITE_STRATEGY_KEY);
+    if (value == null) {
+      return IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY;
+    }
+    String strategyValue = value.toString().trim().toLowerCase(Locale.ROOT);
+    return strategyValue.isEmpty()
+        ? IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY
+        : strategyValue;
+  }
+
+  private static String readSortOrder(Strategy strategy) {
+    Object value = strategy.rules().get(IcebergDataCompactionContent.SORT_ORDER_KEY);
+    if (value == null) {
+      return IcebergDataCompactionContent.DEFAULT_SORT_ORDER;
+    }
+    return value.toString().trim();
   }
 }

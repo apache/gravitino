@@ -37,6 +37,7 @@ import {
 } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
+import { canCreateMetalake } from '@/lib/utils/metalakePermissions'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -69,15 +70,24 @@ const MetalakeList = () => {
   const [search, setSearch] = useState('')
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
-  const { serviceAdmins, authUser, anthEnable } = auth
+  const { isServiceAdmin, authUser, anthEnable, authType, authToken } = auth
+  const showCreateMetalake = canCreateMetalake(anthEnable, isServiceAdmin)
+  const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
   const [tableData, setTableData] = useState([])
 
   useEffect(() => {
     dispatch(resetMetalakeStore())
-    dispatch(fetchMetalakes())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
+    dispatch(fetchMetalakes())
+  }, [dispatch, isAuthReady])
 
   useEffect(() => {
     const filteredData = store.metalakes
@@ -273,7 +283,7 @@ const MetalakeList = () => {
           return (
             <div className='flex gap-2' key={record.name}>
               <NameContext.Provider value={record.name}>{contextHolder}</NameContext.Provider>
-              {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !authUser) && (
+              {(isServiceAdmin || !authUser) && (
                 <a data-refer={`edit-metalake-${record.name}`}>
                   <Tooltip title='Edit'>
                     <Icons.Pencil className='size-4' onClick={() => handleEditMetalake(record.name)} />
@@ -336,7 +346,7 @@ const MetalakeList = () => {
         }
       }
     ],
-    [anthEnable, ownerRefreshKey]
+    [anthEnable, authUser, isServiceAdmin, ownerRefreshKey]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
@@ -361,7 +371,7 @@ const MetalakeList = () => {
               placeholder='Search...'
               onChange={onSearchTable}
             />
-            {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !anthEnable) && (
+            {showCreateMetalake && (
               <Button
                 data-refer='create-metalake-btn'
                 type='primary'

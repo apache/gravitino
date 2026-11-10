@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -156,7 +157,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-                Privileges.CreateTable.allow()));
+                Privileges.CreateTable.allow(),
+                // Spark JDBC needs both secret privileges to receive catalog credentials.
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
     gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
   }
@@ -179,6 +183,34 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             .appName("Spark connector integration test")
             .config(sparkConf)
             .getOrCreate();
+  }
+
+  /** Verifies Spark cannot initialize a JDBC catalog with either secret privilege missing. */
+  @Test
+  @Order(0)
+  public void testCatalogRequiresBothCredentialPrivileges() {
+    GravitinoMetalake metalake = client.loadMetalake(METALAKE);
+    MetadataObject catalog =
+        MetadataObjects.of(ImmutableList.of(JDBC_CATALOG), MetadataObject.Type.CATALOG);
+    try {
+      metalake.revokePrivilegesFromRole(
+          ROLE, catalog, ImmutableSet.of(Privileges.UseSecrets.allow()));
+      assertThrows(
+          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+
+      metalake.grantPrivilegesToRole(
+          ROLE, catalog, ImmutableList.of(Privileges.UseSecrets.allow()));
+      metalake.revokePrivilegesFromRole(
+          ROLE, catalog, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
+      assertThrows(
+          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+    } finally {
+      metalake.grantPrivilegesToRole(
+          ROLE,
+          catalog,
+          ImmutableList.of(
+              Privileges.UseSecrets.allow(), Privileges.IncludeCredentialSecrets.allow()));
+    }
   }
 
   @Test
@@ -282,7 +314,12 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
     // Create role with CREATE_TABLE but without SELECT_TABLE privilege
     SecurableObject catalogObject =
-        SecurableObjects.ofCatalog(JDBC_CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
+        SecurableObjects.ofCatalog(
+            JDBC_CATALOG,
+            ImmutableList.of(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject,
@@ -307,6 +344,71 @@ public abstract class SparkAuthorizationIT extends BaseIT {
       tableCatalog.dropTable(NameIdentifier.of(JDBC_DATABASE, testTable));
     } finally {
       // Clean up test role and restore ROLE to user for subsequent tests
+      gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(testRole), NORMAL_USER);
+      gravitinoMetalake.deleteRole(testRole);
+      gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
+    }
+  }
+
+  @Test
+  @Order(6)
+  public void testLoadTableForWriting() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    String testTable = "test_write_table";
+    String testRole = "role_no_modify";
+
+    // Temporarily revoke ROLE from user
+    gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(ROLE), NORMAL_USER);
+
+    // Create a role with SELECT_TABLE but without MODIFY_TABLE privilege
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            JDBC_CATALOG,
+            ImmutableList.of(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSchema.allow(),
+                Privileges.SelectTable.allow(),
+                Privileges.CreateTable.allow(),
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
+    gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
+
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(JDBC_CATALOG).asTableCatalog();
+    try {
+      // Create a test table first
+      normalUserSparkSession.sql("use " + JDBC_CATALOG);
+      normalUserSparkSession.sql("use " + JDBC_DATABASE);
+      tableCatalog.createTable(
+          NameIdentifier.of(JDBC_DATABASE, testTable),
+          new Column[] {
+            Column.of("id", Types.StringType.get()), Column.of("name", Types.StringType.get())
+          },
+          "",
+          new HashMap<>());
+
+      // Deny MODIFY_TABLE privilege explicitly
+      gravitinoMetalake.grantPrivilegesToRole(
+          testRole,
+          MetadataObjects.of(
+              ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, testTable), MetadataObject.Type.TABLE),
+          ImmutableList.of(Privileges.ModifyTable.deny()));
+
+      // INSERT must be rejected: BaseCatalog implements
+      // loadTable(Identifier, Set<TableWritePrivilege>), so Spark routes the write through the
+      // privilege-checking path.
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              normalUserSparkSession.sql(
+                  String.format("INSERT INTO %s VALUES (1, 'test')", testTable)));
+    } finally {
+      // Clean up
+      try {
+        tableCatalog.dropTable(NameIdentifier.of(JDBC_DATABASE, testTable));
+      } catch (Exception e) {
+        Assertions.fail("Failed to drop test table " + testTable, e);
+      }
       gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(testRole), NORMAL_USER);
       gravitinoMetalake.deleteRole(testRole);
       gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);

@@ -40,6 +40,7 @@ import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.gravitino.rel.types.Types.StringType;
 import org.apache.gravitino.rel.types.Types.StructType;
 import org.apache.gravitino.rel.types.Types.TimestampType;
+import org.apache.gravitino.rel.types.Types.UUIDType;
 import org.apache.gravitino.rel.types.Types.VarCharType;
 import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
@@ -77,6 +78,7 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
     gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
     gravitinoToSparkTypeMapper.put(TimestampType.withTimeZone(), DataTypes.TimestampType);
+    gravitinoToSparkTypeMapper.put(TimestampType.withoutTimeZone(), DataTypes.TimestampNTZType);
     gravitinoToSparkTypeMapper.put(
         ListType.of(IntegerType.get(), true), DataTypes.createArrayType(DataTypes.IntegerType));
     gravitinoToSparkTypeMapper.put(
@@ -93,6 +95,8 @@ public class TestSparkTypeConverter {
     gravitinoToSparkTypeMapper.forEach(
         (gravitinoType, sparkType) ->
             Assertions.assertEquals(sparkType, sparkTypeConverter.toSparkType(gravitinoType)));
+
+    Assertions.assertEquals(DataTypes.StringType, sparkTypeConverter.toSparkType(UUIDType.get()));
 
     notSupportGravitinoTypes.forEach(
         gravitinoType ->

@@ -68,7 +68,7 @@ spec:
 
     # Extra exposed ports
   {{- if .Values.extraExposePorts }}
-    - {{ tpl (toYaml .Values.extraExposePorts) . | trim }}
+    {{- tpl (toYaml .Values.extraExposePorts) . | nindent 4 }}
   {{- end }}
 
     # Selector for pods

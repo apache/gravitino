@@ -25,35 +25,34 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   implementation(libs.guava)
   implementation(libs.kafka.clients)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
-  testImplementation(libs.curator.test)
   testImplementation(libs.commons.lang3)
+  testImplementation(libs.curator.test)
+  testImplementation(libs.javax.ws.rs.api)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.servlet)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
@@ -72,6 +71,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/kafka/libs")
   }

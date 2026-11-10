@@ -1,0 +1,156 @@
+---
+title: "Iceberg Compaction Policy"
+slug: "/iceberg-compaction-policy"
+date: 2026-03-05
+keyword: "iceberg, compaction, policy, optimizer, Gravitino"
+license: "This software is licensed under the Apache License version 2."
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Overview
+
+`system_iceberg_compaction` is a built-in policy type used by the optimizer to generate compaction strategies and job contexts for Iceberg tables.
+
+This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
+
+## Policy Content
+
+The typed content for `system_iceberg_compaction` supports the following fields:
+
+| Field                    | Required | Default             | Description                                                                                                   |
+| ------------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `minDataFileMse`         | No       | `405323966463344`   | Minimum threshold for metric `custom-data-file-mse`. Must be `>= 0`.                                          |
+| `minDeleteFileNumber`    | No       | `1`                 | Minimum threshold for metric `custom-delete-file-number`. Must be `>= 0`.                                     |
+| `dataFileMseWeight`      | No       | `1`                 | Score weight of `custom-data-file-mse`. Must be `>= 0`.                                                       |
+| `deleteFileNumberWeight` | No       | `100`               | Score weight of `custom-delete-file-number`. Must be `>= 0`.                                                  |
+| `maxPartitionNum`        | No       | `50`                | Maximum number of partitions selected by optimizer. Must be `> 0`.                                            |
+| `rewriteStrategy`        | No       | `binpack`           | Iceberg `rewrite_data_files` top-level `strategy`. Supported values: `binpack`, `sort`.                       |
+| `sortOrder`              | No       | `""`                | Iceberg `rewrite_data_files` top-level `sort_order`. Required for `sort`; must be empty for `binpack`.        |
+| `rewriteOptions`         | No       | `{}`                | Iceberg `rewrite_data_files` `options` map entries, expanded as `job.options.*` rules.                        |
+
+`rewriteStrategy` and `sortOrder` are **not** part of `rewriteOptions`. Iceberg treats them as procedure
+parameters separate from the `options` map.
+
+## Generated Rules and Properties
+
+The policy content is converted to:
+
+- Properties:
+  - `strategy.type=iceberg-data-compaction`
+  - `job.template-name=builtin-iceberg-rewrite-data-files`
+- Rules:
+  - `trigger-expr=custom-data-file-mse >= minDataFileMse || custom-delete-file-number >= minDeleteFileNumber`
+  - `score-expr=custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
+  - `max-partition-num=<maxPartitionNum>`
+  - `rewriteStrategy=<rewriteStrategy>`
+  - `sortOrder=<sortOrder>`
+  - `job.options.<key>=<value>` for each rewrite option
+
+## Parameter Tuning Guide
+
+### Metric Unit and Threshold Formula
+
+`custom-data-file-mse` is expected to be in `byte^2`.
+
+Use the target file size and a tolerance ratio to set `minDataFileMse`:
+
+`minDataFileMse = (target-file-size-bytes * ratio)^2`
+
+Recommended `ratio` range: `0.1` to `0.2`.
+
+Default values use:
+
+- `target-file-size-bytes = 134217728` (128 MiB)
+- `ratio = 0.15`
+- `minDataFileMse = 405323966463344`
+
+### Trigger Behavior
+
+The trigger expression uses `>=`.
+
+- Set `minDeleteFileNumber = 1` to trigger when at least one delete file exists.
+- Set `minDeleteFileNumber > 1` to reduce compaction frequency for delete files.
+
+### Score Weights
+
+Score is computed as:
+
+`custom-data-file-mse * dataFileMseWeight + custom-delete-file-number * deleteFileNumberWeight`
+
+- Keep `dataFileMseWeight = 1` as baseline.
+- Increase `deleteFileNumberWeight` if you want partitions with more delete files to be prioritized.
+- Keep both weights non-negative.
+
+### Recommended Defaults for Production Start
+
+- `minDataFileMse = 405323966463344` (computed from 128 MiB and ratio `0.15`)
+- `minDeleteFileNumber = 1`
+- `dataFileMseWeight = 1`
+- `deleteFileNumberWeight = 100`
+- `maxPartitionNum = 50`
+
+Recommended `rewriteOptions`:
+
+- `target-file-size-bytes = 134217728`
+- `min-input-files = 5`
+- `delete-file-threshold = 1`
+
+### Rewrite Strategy and Sort Order
+
+Use `rewriteStrategy = sort` with a non-empty `sortOrder` when compaction should rewrite files with
+Iceberg sort or z-order, for example:
+
+- `rewriteStrategy = sort`
+- `sortOrder = zorder(c1,c2)`
+- `sortOrder = id DESC NULLS LAST`
+
+Keep the defaults (`binpack` and empty `sortOrder`) for size-based binpack compaction.
+
+## Policy Examples
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "iceberg_compaction_default",
+    "comment": "Built-in iceberg compaction policy",
+    "policyType": "system_iceberg_compaction",
+    "enabled": true,
+    "content": {}
+  }' \
+  http://localhost:8090/api/metalakes/test/policies
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...;
+
+PolicyContent content = PolicyContents.icebergDataCompaction();
+
+Policy policy =
+    client.createPolicy(
+        "iceberg_compaction_default",
+        "system_iceberg_compaction",
+        "Built-in iceberg compaction policy",
+        true,
+        content);
+```
+
+</TabItem>
+</Tabs>
+
+## Apply the Policy Through a Tag
+
+After creating the policy, create or reuse a tag, associate the policy with that tag using the
+`ALL_VALUES` selector, and assign the tag to a table or one of its ancestors. The optimizer reads
+the table's derived policies to evaluate strategy triggering and job submission context. See
+[Manage Policies](./manage-policies-in-gravitino.md#policy-to-tag-associations) for association
+operations and the [Table maintenance service walkthrough](./table-maintenance-service/optimizer.md#step-4-configure-a-compaction-policy-through-a-tag)
+for a complete REST example.

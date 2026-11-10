@@ -56,6 +56,9 @@ class MetadataObject(ABC):
         MySQL, etc.
         """
 
+        VIEW = "view"
+        """A view is mapped to the view of relational data sources like Apache Hive, MySQL, etc."""
+
         TOPIC = "topic"
         """A topic is mapped the topic of messaging data sources like Apache Kafka,
         Apache Pulsar, etc.
@@ -83,6 +86,12 @@ class MetadataObject(ABC):
 
         JOB_TEMPLATE = "job_template"
         """A job template represents a reusable template for creating jobs in Gravitino."""
+
+        SEMANTIC_MODEL = "semantic_model"
+        """A Semantic Model defines business semantics over catalog data."""
+
+        FUNCTION = "function"
+        """A function represents a user-defined function registered in Gravitino."""
 
     @abstractmethod
     def parent(self) -> Optional[str]:

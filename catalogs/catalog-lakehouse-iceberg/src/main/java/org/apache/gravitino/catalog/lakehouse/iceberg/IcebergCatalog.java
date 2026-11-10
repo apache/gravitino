@@ -18,12 +18,18 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
@@ -63,8 +69,24 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   }
 
   @Override
+  public boolean shouldValidateOnCreate() {
+    Map<String, String> properties = entity().getProperties();
+    return properties != null
+        && shouldValidateWarehouseProperty(
+            properties.get(IcebergConstants.CATALOG_BACKEND),
+            properties.get(IcebergConstants.WAREHOUSE));
+  }
+
+  // REST resolves `warehouse` as a server-side catalog selector, so validate it at create; hive and
+  // jdbc use it as a storage location and need no create-time connection.
+  static boolean shouldValidateWarehouseProperty(String backend, String warehouse) {
+    return IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
+        && StringUtils.isNotBlank(warehouse);
+  }
+
+  @Override
   public Capability newCapability() {
-    return new IcebergCatalogCapability();
+    return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());
   }
 
   @Override
@@ -80,5 +102,42 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   public PropertiesMetadata schemaPropertiesMetadata() throws UnsupportedOperationException {
     return SCHEMA_PROPERTIES_META;
+  }
+
+  @Override
+  @Evolving
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> props = super.propertiesWithCredentialProviders();
+    // Iceberg is security-first: disable s3:ListBucket on bare location prefix so a vended
+    // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
+    props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
+    // super() skips addCatalogSpecificCredentialProviders when credential-providers is already
+    // set; keep jdbc listed so getCredentials can still vend JDBC credentials alongside an
+    // explicit provider list (jdbc does not conflict with path-based storage providers).
+    String catalogBackend = props.get(IcebergConstants.CATALOG_BACKEND);
+    if (catalogBackend != null
+        && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
+      String jdbcUser = props.get(IcebergConstants.GRAVITINO_JDBC_USER);
+      String jdbcPassword = props.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
+        ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
+      }
+    }
+    return props;
+  }
+
+  @Override
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
+    String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
+    if (catalogBackend != null
+        && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
+      String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
+      String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
+        credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+      }
+    }
+    addStorageCredentialProviders(properties, credentialProviders);
   }
 }

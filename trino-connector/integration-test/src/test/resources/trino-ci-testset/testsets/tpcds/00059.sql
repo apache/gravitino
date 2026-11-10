@@ -20,13 +20,13 @@ SELECT
   "s_store_name1"
 , "s_store_id1"
 , "d_week_seq1"
-, ("sun_sales1" / "sun_sales2")
-, ("mon_sales1" / "mon_sales2")
-, ("tue_sales1" / "tue_sales2")
-, ("wed_sales1" / "wed_sales2")
-, ("thu_sales1" / "thu_sales2")
-, ("fri_sales1" / "fri_sales2")
-, ("sat_sales1" / "sat_sales2")
+, CAST(("sun_sales1" / "sun_sales2") AS DECIMAL(38,2))
+, CAST(("mon_sales1" / "mon_sales2") AS DECIMAL(38,2))
+, CAST(("tue_sales1" / "tue_sales2") AS DECIMAL(38,2))
+, CAST(("wed_sales1" / "wed_sales2") AS DECIMAL(38,2))
+, CAST(("thu_sales1" / "thu_sales2") AS DECIMAL(38,2))
+, CAST(("fri_sales1" / "fri_sales2") AS DECIMAL(38,2))
+, CAST(("sat_sales1" / "sat_sales2") AS DECIMAL(38,2))
 FROM
   (
    SELECT

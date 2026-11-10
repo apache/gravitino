@@ -37,21 +37,40 @@ class Indexes:
 
     @staticmethod
     def of(
-        index_type: Index.IndexType, name: Optional[str], field_names: List[List[str]]
+        index_type: Index.IndexType,
+        name: Optional[str],
+        field_names: List[List[str]],
+        properties: Optional[dict[str, str]] = None,
     ) -> Index:
-        return Indexes.IndexImpl(index_type, name, field_names)
+        return Indexes.IndexImpl(index_type, name, field_names, properties or {})
 
     @staticmethod
-    def unique(name: str, field_names: List[List[str]]) -> Index:
-        return Indexes.IndexImpl(Index.IndexType.UNIQUE_KEY, name, field_names)
+    def unique(
+        name: str,
+        field_names: List[List[str]],
+        properties: Optional[dict[str, str]] = None,
+    ) -> Index:
+        return Indexes.IndexImpl(
+            Index.IndexType.UNIQUE_KEY, name, field_names, properties or {}
+        )
 
     @staticmethod
-    def primary(name: str, field_names: List[List[str]]) -> Index:
-        return Indexes.IndexImpl(Index.IndexType.PRIMARY_KEY, name, field_names)
+    def primary(
+        name: str,
+        field_names: List[List[str]],
+        properties: Optional[dict[str, str]] = None,
+    ) -> Index:
+        return Indexes.IndexImpl(
+            Index.IndexType.PRIMARY_KEY, name, field_names, properties or {}
+        )
 
     @staticmethod
-    def create_mysql_primary_key(field_names: List[List[str]]) -> Index:
-        return Indexes.primary(Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, field_names)
+    def create_mysql_primary_key(
+        field_names: List[List[str]], properties: Optional[dict[str, str]] = None
+    ) -> Index:
+        return Indexes.primary(
+            Indexes.DEFAULT_MYSQL_PRIMARY_KEY_NAME, field_names, properties or {}
+        )
 
     @final
     class IndexImpl(Index):
@@ -60,10 +79,12 @@ class Indexes:
             index_type: Index.IndexType,
             name: Optional[str],
             field_names: List[List[str]],
+            properties: Optional[dict[str, str]] = None,
         ):
             self._index_type = index_type
             self._name = name
             self._field_names = field_names
+            self._properties = properties or {}
 
         def type(self) -> Index.IndexType:
             return self._index_type
@@ -73,3 +94,6 @@ class Indexes:
 
         def field_names(self) -> List[List[str]]:
             return self._field_names
+
+        def properties(self) -> dict[str, str]:
+            return self._properties

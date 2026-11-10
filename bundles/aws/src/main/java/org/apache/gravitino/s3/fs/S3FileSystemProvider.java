@@ -61,7 +61,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
       ImmutableMap.of(
           S3Properties.GRAVITINO_S3_ENDPOINT, Constants.ENDPOINT,
           S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, Constants.ACCESS_KEY,
-          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, Constants.SECRET_KEY);
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, Constants.SECRET_KEY,
+          S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, Constants.PATH_STYLE_ACCESS);
 
   // We can't use Constants.AWS_CREDENTIALS_PROVIDER directly, as in 2.7, this key does not exist.
   private static final String S3_CREDENTIAL_KEY = "fs.s3a.aws.credentials.provider";

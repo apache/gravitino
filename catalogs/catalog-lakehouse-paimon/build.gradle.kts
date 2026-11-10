@@ -28,20 +28,30 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
+val s3aTestRuntime by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
+configurations.testRuntimeOnly {
+  extendsFrom(s3aTestRuntime)
+}
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.lombok)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
-  implementation(project(":common")) {
+  implementation(project(":catalogs:hadoop-auth")) {
     exclude("*")
   }
-  implementation(project(":core")) {
-    exclude("*")
-  }
+
+  implementation(libs.bundles.log4j)
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -86,6 +96,7 @@ dependencies {
     exclude("commons-codec")
     exclude("commons-cli")
     exclude("tomcat")
+    exclude("org.apache.tomcat.embed")
     exclude("org.apache.avro")
     exclude("net.sf.opencsv")
     exclude("javolution")
@@ -101,38 +112,85 @@ dependencies {
     exclude("com.google.code.findbugs")
     exclude("com.github.spotbugs")
   }
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hadoop2.common) {
+
+  constraints {
+    implementation(libs.snakeyaml)
+    implementation(libs.woodstox.core)
+  }
+
+  implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
+    exclude("com.github.pjfanning", "jersey-json")
     exclude("javax.servlet")
+    exclude("org.apache.avro")
+    exclude("net.java.dev.jets3t")
     exclude("org.apache.curator")
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
+    exclude("org.eclipse.jetty")
+    exclude("ch.qos.reload4j")
+    exclude("org.slf4j", "slf4j-reload4j")
   }
-  implementation(libs.hadoop2.hdfs) {
+  implementation(libs.hadoop3.hdfs) {
     exclude("*")
   }
-  implementation(libs.hadoop2.hdfs.client) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.fusesource.leveldbjni")
-    exclude("org.mortbay.jetty")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.hdfs.client)
+  implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
-  annotationProcessor(libs.lombok)
-  compileOnly(libs.lombok)
 
+  // Required by Paimon HiveCatalog#createView, which calls hive ql metadata Table APIs.
+  runtimeOnly(libs.hive2.exec) {
+    // Use the lightweight core artifact instead of the shaded hive-exec fat jar.
+    artifact {
+      classifier = "core"
+    }
+    // Keep hive-exec footprint minimal for catalog runtime packaging.
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.protobuf")
+    exclude("org.apache.ant")
+    exclude("org.apache.avro")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.hive", "hive-llap-tez")
+    exclude("org.apache.hive", "hive-vector-code-gen")
+    exclude("org.apache.ivy")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.tomcat.embed")
+    exclude("org.apache.zookeeper")
+    exclude("org.codehaus.groovy")
+    exclude("org.datanucleus")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    // Avoid resolving non-Central transitive artifacts (e.g. pentaho-aggdesigner-algorithm).
+    exclude("org.pentaho")
+    exclude("org.codehaus.janino")
+    exclude("net.hydromatic", "eigenbase-properties")
+    exclude("org.slf4j")
+    exclude("stax", "stax-api")
+  }
+
+  annotationProcessor(libs.lombok)
+
+  testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common")) {
     exclude("org.mortbay.jetty")
     exclude("com.sun.jersey.contribs")
+  }
+
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.hadoop")
   }
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
@@ -145,28 +203,59 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.hadoop")
-  }
-
   testImplementation(libs.awaitility)
-  testImplementation(libs.slf4j.api)
-  testImplementation(libs.awaitility)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
-  testImplementation(libs.h2db)
   testImplementation(libs.bundles.log4j)
+  testImplementation(libs.h2db)
+  testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.paimon.oss)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
+  // Keep optional Hadoop S3A dependencies available only to tests.
+  s3aTestRuntime(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  // The embedded JDBC credential integration test loads this driver by class name.
+  testRuntimeOnly(libs.sqlite.jdbc)
 }
+
+val s3aTestLibDirectory =
+  "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
+val copyS3ATestDependencies =
+  tasks.register("copyS3ATestDependencies") {
+    inputs.files(s3aTestRuntime)
+    outputs.files(
+      provider {
+        s3aTestRuntime.files.filter {
+          it.name.startsWith("hadoop-aws-") || it.name.startsWith("aws-java-sdk-bundle-")
+        }.map { file("$s3aTestLibDirectory/${it.name}") }
+      }
+    )
+    // Copy tasks targeting the distribution depend on cleanDistributionPackage. Test setup
+    // must preserve the existing deployment, so copy the optional jars in a regular task.
+    doLast {
+      copy {
+        from(s3aTestRuntime) {
+          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+        }
+        into(s3aTestLibDirectory)
+      }
+    }
+  }
+val cleanS3ATestDependencies =
+  tasks.register<Delete>("cleanS3ATestDependencies") {
+    delete(
+      fileTree(s3aTestLibDirectory) {
+        include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+      }
+    )
+  }
 
 tasks {
   register("runtimeJars", Copy::class) {
@@ -180,6 +269,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/lakehouse-paimon/libs")
   }
@@ -219,6 +309,11 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+  }
+
+  if (project.properties["testMode"] == "deploy") {
+    dependsOn(copyS3ATestDependencies)
+    finalizedBy(cleanS3ATestDependencies)
   }
 }
 

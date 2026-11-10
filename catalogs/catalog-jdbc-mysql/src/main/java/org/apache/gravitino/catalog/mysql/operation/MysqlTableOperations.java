@@ -18,9 +18,10 @@
  */
 package org.apache.gravitino.catalog.mysql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter.CURRENT_TIMESTAMP;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -35,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -45,24 +48,37 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for MySQL. */
 public class MysqlTableOperations extends JdbcTableOperations {
 
-  private static final String BACK_QUOTE = "`";
+  private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
+      new MysqlTablePropertiesMetadata();
   private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Mysql does not support nested column names.";
+
+  // MySQL's JDBC driver reduces these types to a bare name and/or an unusable COLUMN_SIZE via
+  // DatabaseMetaData.getColumns, so the JdbcTypeConverter maps them to Types.BinaryType or a
+  // bare Types.ExternalType, losing the length/enumerated values. See correctLossyTypeColumns.
+  private static final String VARBINARY = "varbinary";
+  private static final String ENUM = "enum";
+  private static final String SET = "set";
+  private static final Pattern LENGTH_PATTERN = Pattern.compile("\\((\\d+)\\)");
 
   @Override
   protected String generateCreateTableSql(
@@ -78,26 +94,16 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
 
     Preconditions.checkArgument(
-        Distributions.NONE.equals(distribution), "MySQL does not support distribution");
+        Distributions.isNone(distribution), "MySQL does not support distribution");
 
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("CREATE TABLE ")
-        .append(BACK_QUOTE)
-        .append(tableName)
-        .append(BACK_QUOTE)
-        .append(" (\n");
+    sqlBuilder.append("CREATE TABLE ").append(quote(tableName)).append(" (\n");
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder
-          .append(SPACE)
-          .append(SPACE)
-          .append(BACK_QUOTE)
-          .append(column.name())
-          .append(BACK_QUOTE);
+      sqlBuilder.append(SPACE).append(SPACE).append(quote(column.name()));
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -113,14 +119,14 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+      sqlBuilder.append(" COMMENT='").append(escapeSqlLiteral(comment, '\'')).append("'");
     }
 
     // Add table properties if any
     if (MapUtils.isNotEmpty(properties)) {
       sqlBuilder.append(
           properties.entrySet().stream()
-              .map(entry -> String.format("%s = %s", entry.getKey(), entry.getValue()))
+              .map(entry -> generateTableProperty(entry.getKey(), entry.getValue()))
               .collect(Collectors.joining(",\n", "\n", "")));
     }
 
@@ -146,7 +152,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         case UNIQUE_KEY:
           sqlBuilder.append("CONSTRAINT ");
           if (null != index.name()) {
-            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
+            sqlBuilder.append(quote(index.name()));
           }
           sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
           break;
@@ -202,6 +208,145 @@ public class MysqlTableOperations extends JdbcTableOperations {
       tableBuilder.withComment(
           tableBuilder.properties().getOrDefault(COMMENT, tableBuilder.comment()));
     }
+    correctLossyTypeColumns(connection, databaseName, tableName, tableBuilder);
+  }
+
+  /**
+   * VARBINARY/ENUM/SET fall back to a bare Types.ExternalType, BIT/BINARY of any width both
+   * collapse to plain Types.BinaryType, and the fractional seconds precision of TIME/DATETIME/
+   * TIMESTAMP is unknown when the driver predates 8.0.16, because JdbcTypeConverter only sees
+   * TYPE_NAME/COLUMN_SIZE. If any column needs it, this queries information_schema.columns once for
+   * the whole table to recover the full declaration (e.g. "enum('a','b','c')", "binary(16)",
+   * "datetime(6)") and fixes those columns.
+   */
+  private static void correctLossyTypeColumns(
+      Connection connection, String databaseName, String tableName, JdbcTable.Builder tableBuilder)
+      throws SQLException {
+    Column[] columns = tableBuilder.columns();
+    if (ArrayUtils.isEmpty(columns)
+        || Arrays.stream(columns).noneMatch(MysqlTableOperations::isLossyTypeCandidate)) {
+      return;
+    }
+
+    Map<String, String> fullTypesByColumn =
+        fetchColumnFullTypes(connection, databaseName, tableName);
+    JdbcColumn[] correctedColumns = new JdbcColumn[columns.length];
+    for (int i = 0; i < columns.length; i++) {
+      JdbcColumn column = (JdbcColumn) columns[i];
+      correctedColumns[i] =
+          isLossyTypeCandidate(column)
+              ? correctColumnType(column, fullTypesByColumn.get(column.name()))
+              : column;
+    }
+    tableBuilder.withColumns(correctedColumns);
+  }
+
+  private static boolean isLossyTypeCandidate(Column column) {
+    Type type = column.dataType();
+    if (type instanceof Types.BinaryType || hasUnknownDatetimePrecision(type)) {
+      return true;
+    }
+    if (type instanceof Types.ExternalType) {
+      String catalogString = ((Types.ExternalType) type).catalogString();
+      return VARBINARY.equalsIgnoreCase(catalogString)
+          || ENUM.equalsIgnoreCase(catalogString)
+          || SET.equalsIgnoreCase(catalogString);
+    }
+    return false;
+  }
+
+  private static JdbcColumn correctColumnType(JdbcColumn column, String fullType) {
+    if (StringUtils.isEmpty(fullType)) {
+      return column;
+    }
+    Type type = column.dataType();
+    if (hasUnknownDatetimePrecision(type)) {
+      // MySQL leaves the precision out of the declaration when it is 0, e.g. "datetime".
+      return copyWithType(column, withDatetimePrecision(type, parseLength(fullType, 0)));
+    }
+    // A plain BINARY(1) (or unspecified length) already round-trips to Types.BinaryType as-is.
+    if (type instanceof Types.BinaryType && parseLength(fullType, 1) <= 1) {
+      return column;
+    }
+    return copyWithType(column, Types.ExternalType.of(fullType));
+  }
+
+  private static boolean hasUnknownDatetimePrecision(Type type) {
+    if (type instanceof Types.TimeType) {
+      return !((Types.TimeType) type).hasPrecisionSet();
+    }
+    if (type instanceof Types.TimestampType) {
+      return !((Types.TimestampType) type).hasPrecisionSet();
+    }
+    return false;
+  }
+
+  private static Type withDatetimePrecision(Type type, int precision) {
+    if (type instanceof Types.TimeType) {
+      return Types.TimeType.of(precision);
+    }
+    return ((Types.TimestampType) type).hasTimeZone()
+        ? Types.TimestampType.withTimeZone(precision)
+        : Types.TimestampType.withoutTimeZone(precision);
+  }
+
+  /** Parses the "(n)" of a column declaration such as "binary(16)" or "datetime(6)". */
+  private static int parseLength(String fullType, int defaultLength) {
+    Matcher matcher = LENGTH_PATTERN.matcher(fullType);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : defaultLength;
+  }
+
+  private static JdbcColumn copyWithType(JdbcColumn column, Type type) {
+    return JdbcColumn.builder()
+        .withName(column.name())
+        .withType(type)
+        .withComment(column.comment())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .build();
+  }
+
+  private static Map<String, String> fetchColumnFullTypes(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    // TABLE_SCHEMA/TABLE_NAME comparisons in information_schema use a case-insensitive collation.
+    // TABLE_NAME is re-checked exactly, matching the pattern used in getColumnBuilder. The rows are
+    // grouped by their exact TABLE_SCHEMA: with lower_case_table_names=0 both "a_b" and "A_B" may
+    // exist and only the exact one is wanted, while with lower_case_table_names=1 the stored name
+    // may differ in case from the requested one and is then the only candidate.
+    Map<String, Map<String, String>> columnTypesBySchema = new HashMap<>();
+    String query =
+        "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE FROM information_schema.columns "
+            + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    try (PreparedStatement statement = connection.prepareStatement(query)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          if (Objects.equals(resultSet.getString("TABLE_NAME"), tableName)) {
+            columnTypesBySchema
+                .computeIfAbsent(resultSet.getString("TABLE_SCHEMA"), schema -> new HashMap<>())
+                .put(resultSet.getString("COLUMN_NAME"), resultSet.getString("COLUMN_TYPE"));
+          }
+        }
+      }
+    }
+    Map<String, String> exactSchemaTypes = columnTypesBySchema.get(databaseName);
+    if (exactSchemaTypes != null) {
+      return exactSchemaTypes;
+    }
+    if (columnTypesBySchema.size() == 1) {
+      return columnTypesBySchema.values().iterator().next();
+    }
+    if (columnTypesBySchema.size() > 1) {
+      LOG.warn(
+          "Schemas {} differ only in case from {} and none matches exactly, leaving the column "
+              + "types of {} as reported by the driver",
+          columnTypesBySchema.keySet(),
+          databaseName,
+          tableName);
+    }
+    return Collections.emptyMap();
   }
 
   @Override
@@ -241,7 +386,8 @@ public class MysqlTableOperations extends JdbcTableOperations {
         TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
             (TableChange.UpdateColumnDefaultValue) change;
         alterSql.add(
-            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+            updateColumnDefaultValueFieldDefinition(
+                updateColumnDefaultValue, lazyLoadTable, changes));
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
@@ -267,7 +413,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+                (TableChange.UpdateColumnNullability) change, lazyLoadTable, changes));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
@@ -286,7 +432,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       if (null == StringIdentifier.fromComment(newComment)) {
         // Detect and add Gravitino id.
         JdbcTable jdbcTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -295,7 +441,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add("COMMENT '" + escapeSqlLiteral(newComment, '\'') + "'");
     }
 
     if (!setProperties.isEmpty()) {
@@ -306,9 +452,32 @@ public class MysqlTableOperations extends JdbcTableOperations {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    String result = "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>MySQL requires the fractional seconds precision of CURRENT_TIMESTAMP to match the one of the
+   * column: {@code DATETIME(6) DEFAULT CURRENT_TIMESTAMP} is rejected while {@code DATETIME(6)
+   * DEFAULT CURRENT_TIMESTAMP(6)} is accepted. Columns without a precision, or with precision 0,
+   * keep the bare CURRENT_TIMESTAMP.
+   *
+   * @see <a href="https://dev.mysql.com/doc/refman/8.0/en/timestamp-initialization.html">Automatic
+   *     Initialization and Updating for TIMESTAMP and DATETIME</a>
+   */
+  @Override
+  protected String renderDefaultValue(Type type, Expression defaultValue) {
+    String rendered = super.renderDefaultValue(type, defaultValue);
+    if (CURRENT_TIMESTAMP.equals(rendered) && type instanceof Types.TimestampType) {
+      int precision = ((Types.TimestampType) type).precision();
+      if (precision > 0) {
+        return String.format("%s(%d)", rendered, precision);
+      }
+    }
+    return rendered;
   }
 
   private String updateColumnAutoIncrementDefinition(
@@ -332,11 +501,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(change.isAutoIncrement())
             .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   @VisibleForTesting
@@ -348,28 +513,15 @@ public class MysqlTableOperations extends JdbcTableOperations {
               .anyMatch(index -> index.name().equals(deleteIndex.getName())),
           "Index does not exist");
     }
-    return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
+    return "DROP INDEX " + quote(deleteIndex.getName());
   }
 
   private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table) {
-    validateUpdateColumnNullable(change, table);
+      TableChange.UpdateColumnNullability change, JdbcTable table, TableChange... changes) {
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(change.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    JdbcColumn updateColumn = withPendingDefaultValueAndNullability(column, changes);
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   @VisibleForTesting
@@ -386,11 +538,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         sqlBuilder.append("PRIMARY KEY ");
         break;
       case UNIQUE_KEY:
-        sqlBuilder
-            .append("UNIQUE INDEX ")
-            .append(BACK_QUOTE)
-            .append(addIndex.getName())
-            .append(BACK_QUOTE);
+        sqlBuilder.append("UNIQUE INDEX ").append(quote(addIndex.getName()));
         break;
       default:
         break;
@@ -402,9 +550,22 @@ public class MysqlTableOperations extends JdbcTableOperations {
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
     return setProperties.stream()
         .map(
-            setProperty ->
-                String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
+            setProperty -> generateTableProperty(setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
+  }
+
+  private String generateTableProperty(String key, String value) {
+    Map<String, String> logicalProperties =
+        TABLE_PROPERTIES_METADATA.convertFromJdbcProperties(Collections.singletonMap(key, value));
+    Preconditions.checkArgument(
+        !logicalProperties.isEmpty(),
+        "Unsupported MySQL table option: %s. Supported options: %s",
+        key,
+        String.join(", ", MysqlTablePropertiesMetadata.GRAVITINO_CONFIG_TO_MYSQL.values()));
+    String encoded =
+        TABLE_PROPERTIES_METADATA.transformToJdbcProperties(logicalProperties).get(key);
+    Preconditions.checkArgument(encoded != null, "MySQL table option %s cannot be null", key);
+    return key + " = " + encoded;
   }
 
   private String updateColumnCommentFieldDefinition(
@@ -424,11 +585,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -441,9 +598,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
+        .append(quote(col))
         .append(SPACE)
         .append(dataType)
         .append(SPACE);
@@ -460,14 +615,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append default value if available
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition
           .append("DEFAULT ")
-          .append(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue()))
+          .append(renderDefaultValue(addColumn.getDataType(), addColumn.getDefaultValue()))
           .append(SPACE);
     }
 
@@ -476,11 +634,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition
-          .append(AFTER)
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing, follow the default behavior of mysql
     } else {
@@ -499,15 +653,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String newColumnName = renameColumn.getNewName();
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
     StringBuilder sqlBuilder =
-        new StringBuilder(
-            "CHANGE COLUMN "
-                + BACK_QUOTE
-                + oldColumnName
-                + BACK_QUOTE
-                + SPACE
-                + BACK_QUOTE
-                + newColumnName
-                + BACK_QUOTE);
+        new StringBuilder("CHANGE COLUMN " + quote(oldColumnName) + SPACE + quote(newColumnName));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(newColumnName)
@@ -534,12 +680,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(quote(s)));
     }
     return columnDefinition.toString();
   }
@@ -563,25 +709,20 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+    return "DROP COLUMN " + quote(col);
   }
 
   private String updateColumnDefaultValueFieldDefinition(
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue,
+      JdbcTable jdbcTable,
+      TableChange... changes) {
     if (updateColumnDefaultValue.fieldName().length > 1) {
       throw new UnsupportedOperationException(MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quote(col));
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withType(column.dataType())
-            .withNullable(column.nullable())
-            .withComment(column.comment())
-            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
-            .build();
+    JdbcColumn newColumn = withPendingDefaultValueAndNullability(column, changes);
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
@@ -598,7 +739,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withName(col)
             .withType(updateColumnType.getNewDataType())
             .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+            .withDefaultValue(column.defaultValue())
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
@@ -626,13 +767,13 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }
 
   private static String quote(String name) {
-    return BACK_QUOTE + name + BACK_QUOTE;
+    return JdbcConnectorUtils.quoteIdentifier(name, '`');
   }
 
   /**
@@ -693,11 +834,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
       String driverVersion = getMySQLDriverVersion();
       if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
         LOG.warn(
-            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
-                + "Returning null for {} type precision. Driver version: {}",
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision "
+                + "calculation. Falling back to information_schema for the {} precision.",
             driverVersion,
-            upperTypeName,
-            driverVersion);
+            upperTypeName);
         return null;
       }
     }

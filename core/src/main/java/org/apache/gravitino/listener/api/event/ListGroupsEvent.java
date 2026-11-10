@@ -24,16 +24,39 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after successfully listing groups from a specific metalake. */
 @DeveloperApi
-public class ListGroupsEvent extends GroupEvent {
+public class ListGroupsEvent extends GroupEvent implements ListEvent {
+
+  private final int groupCount;
 
   /**
-   * Constructs a new {@link ListGroupsEvent} with the specified initiator and metalake name.
+   * Constructs a new {@link ListGroupsEvent} with the specified initiator, metalake name and count.
    *
    * @param initiator the user who initiated the list-groups request.
    * @param metalake the name of the metalake from which the groups were listed.
+   * @param groupCount the number of groups returned by the list operation.
    */
-  public ListGroupsEvent(String initiator, String metalake) {
+  public ListGroupsEvent(String initiator, String metalake, int groupCount) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+    this.groupCount = groupCount;
+  }
+
+  /**
+   * Constructs a new {@link ListGroupsEvent} without a count.
+   *
+   * @param initiator the user who initiated the list-groups request.
+   * @param metalake the name of the metalake from which the groups were listed.
+   * @deprecated Use {@link #ListGroupsEvent(String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListGroupsEvent(String initiator, String metalake) {
+    this(initiator, metalake, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return groupCount;
   }
 
   /**

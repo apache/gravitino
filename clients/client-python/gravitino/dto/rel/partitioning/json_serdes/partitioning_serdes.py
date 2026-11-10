@@ -68,7 +68,7 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
     )
 
     @classmethod
-    def serialize(cls, data_type: Partitioning) -> Dict[str, Any]:
+    def serialize(cls, value: Partitioning) -> Dict[str, Any]:
         """Serialize the given PartitionDTO object.
 
         Args:
@@ -81,28 +81,28 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
             IOError: If partitioning strategy is unknown.
         """
 
-        strategy = data_type.strategy()
+        strategy = value.strategy()
         result = {cls.STRATEGY: strategy.name.lower()}
 
         if strategy in cls._SINGLE_FIELD_PARTITIONING:
-            dto = cast(SingleFieldPartitioning, data_type)
+            dto = cast(SingleFieldPartitioning, value)
             return {**result, cls.FIELD_NAME: dto.field_name()}
         if strategy is Partitioning.Strategy.BUCKET:
-            dto = cast(BucketPartitioningDTO, data_type)
+            dto = cast(BucketPartitioningDTO, value)
             return {
                 **result,
                 cls.NUM_BUCKETS: dto.num_buckets(),
                 cls.FIELD_NAMES: dto.field_names(),
             }
         if strategy is Partitioning.Strategy.TRUNCATE:
-            dto = cast(TruncatePartitioningDTO, data_type)
+            dto = cast(TruncatePartitioningDTO, value)
             return {
                 **result,
                 cls.WIDTH: dto.width(),
                 cls.FIELD_NAME: dto.field_name(),
             }
         if strategy is Partitioning.Strategy.LIST:
-            dto = cast(ListPartitioningDTO, data_type)
+            dto = cast(ListPartitioningDTO, value)
             return {
                 **result,
                 cls.FIELD_NAMES: dto.field_names(),
@@ -112,7 +112,7 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 ],
             }
         if strategy is Partitioning.Strategy.RANGE:
-            dto = cast(RangePartitioningDTO, data_type)
+            dto = cast(RangePartitioningDTO, value)
             return {
                 **result,
                 cls.FIELD_NAME: dto.field_name(),
@@ -122,7 +122,7 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 ],
             }
         if strategy is Partitioning.Strategy.FUNCTION:
-            dto = cast(FunctionPartitioningDTO, data_type)
+            dto = cast(FunctionPartitioningDTO, value)
             return {
                 **result,
                 cls.FUNCTION_NAME: dto.function_name(),

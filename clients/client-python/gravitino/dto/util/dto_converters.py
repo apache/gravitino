@@ -41,7 +41,21 @@ from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
+from gravitino.api.rel.representation import Representation
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table import Table
+from gravitino.api.rel.table_change import (
+    AddColumn,
+    DeleteColumn,
+    RenameColumn,
+    TableChange,
+    UpdateColumnAutoIncrement,
+    UpdateColumnComment,
+    UpdateColumnDefaultValue,
+    UpdateColumnNullability,
+    UpdateColumnPosition,
+    UpdateColumnType,
+)
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -75,8 +89,14 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+from gravitino.dto.rel.representation_dto import RepresentationDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.requests.table_update_request import (
+    TableUpdateRequest,
+    TableUpdateRequestBase,
+)
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -106,7 +126,12 @@ class DTOConverters:
             dto = cast(LiteralDTO, arg)
             if dto.value() is None or dto.data_type() == Types.NullType.get():
                 return Literals.NULL
-            return Literals.of(dto.value(), dto.data_type())
+            data_type = dto.data_type()
+            if DTOConverters._is_binary_or_fixed(data_type):
+                return Literals.of(
+                    DTOConverters._decode_binary_hex(dto.value(), data_type), data_type
+                )
+            return Literals.of(dto.value(), data_type)
         if arg_type is FunctionArg.ArgType.FIELD:
             dto = cast(FieldReferenceDTO, arg)
             return NamedReference.field(dto.field_name())
@@ -170,7 +195,7 @@ class DTOConverters:
         Returns:
             Index: The index.
         """
-        return Indexes.of(dto.type(), dto.name(), dto.field_names())
+        return Indexes.of(dto.type(), dto.name(), dto.field_names(), dto.properties())
 
     @from_dto.register
     @staticmethod
@@ -200,16 +225,43 @@ class DTOConverters:
         Returns:
             Column: The column.
         """
-        if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET:
+        if (
+            dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            and dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+        ):
             return dto
+        default_value = (
+            Column.DEFAULT_VALUE_NOT_SET
+            if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.default_value())
+        )
+        initial_default_value = (
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            if dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.initial_default_value())
+        )
         return Column.of(
             dto.name(),
             dto.data_type(),
             dto.comment(),
             dto.nullable(),
             dto.auto_increment(),
-            DTOConverters.from_function_arg(dto.default_value()),
+            default_value,
+            initial_default_value,
         )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: SQLRepresentationDTO) -> SQLRepresentation:
+        """Converts a SQLRepresentationDTO to a SQLRepresentation.
+
+        Args:
+            dto (SQLRepresentationDTO): The SQLRepresentation DTO to be converted.
+
+        Returns:
+            SQLRepresentation: The SQLRepresentation.
+        """
+        return SQLRepresentation(_dialect=dto.dialect(), _sql=dto.sql())
 
     @from_dto.register
     @staticmethod
@@ -361,20 +413,23 @@ class DTOConverters:
 
     @overload
     @staticmethod
+    def from_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[Representation]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
     def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...  # pragma: no cover
 
     @staticmethod
     def from_dtos(dtos):
-        """Converts list of `ColumnDTO`, `IndexDTO`, `SortOrderDTO`, or `Partitioning`
-        to the corresponding list of `Column`s, `Index`es, `SortOrder`s, or `Transform`s.
+        """Converts a list of DTOs to the corresponding API objects.
 
         Args:
-            dtos (list[ColumnDTO] | list[IndexDTO] | list[SortOrderDTO] | list[Partitioning]):
-                The DTOs to be converted.
+            dtos: The DTOs to be converted.
 
         Returns:
-            list[Column] | list[Index] | list[SortOrder] | list[Transform]:
-                The list of Columns, Indexes, SortOrders, or Transforms depends on the input DTOs.
+            The converted objects.
         """
         if not dtos:
             return []
@@ -414,7 +469,11 @@ class DTOConverters:
                 return LiteralDTO.NULL
             return (
                 LiteralDTO.builder()
-                .with_value(str(expression.value()))
+                .with_value(
+                    DTOConverters._literal_value_to_dto_string(
+                        expression.value(), expression.data_type()
+                    )
+                )
                 .with_data_type(expression.data_type())
                 .build()
             )
@@ -510,6 +569,12 @@ class DTOConverters:
                 or obj.default_value() is Column.DEFAULT_VALUE_NOT_SET
                 else DTOConverters.to_function_arg(obj.default_value())
             )
+            .with_initial_default_value(
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                if obj.initial_default_value() is None
+                or obj.initial_default_value() is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                else DTOConverters.to_function_arg(obj.initial_default_value())
+            )
             .build()
         )
 
@@ -540,6 +605,16 @@ class DTOConverters:
             name=obj.name(),
             field_names=obj.field_names(),
         )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: RepresentationDTO) -> RepresentationDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SQLRepresentation) -> SQLRepresentationDTO:
+        return SQLRepresentationDTO(_dialect=obj.dialect(), _sql=obj.sql())
 
     @to_dto.register
     @staticmethod
@@ -632,6 +707,18 @@ class DTOConverters:
 
     @overload
     @staticmethod
+    def to_dtos(
+        dtos: list[Representation],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
     def to_dtos(dtos: list[Transform]) -> list[Partitioning]: ...  # pragma: no cover
 
     @overload
@@ -643,3 +730,184 @@ class DTOConverters:
         if not dtos:
             return []
         return [DTOConverters.to_dto(dto) for dto in dtos]
+
+    @singledispatchmethod
+    @staticmethod
+    def _to_column_update_request(change) -> TableUpdateRequestBase:
+        raise IllegalArgumentException(
+            f"Unknown column change type: {change.__class__.__name__}"
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: AddColumn) -> TableUpdateRequestBase:
+        default_value = (
+            None
+            if change.get_default_value() is None
+            or change.get_default_value() == Column.DEFAULT_VALUE_NOT_SET
+            else DTOConverters.to_function_arg(change.get_default_value())
+        )
+        return TableUpdateRequest.AddTableColumnRequest(
+            _field_name=change.field_name(),
+            _data_type=change.get_data_type(),
+            _comment=change.get_comment(),
+            _position=change.get_position(),
+            _nullable=change.is_nullable(),
+            _auto_increment=change.is_auto_increment(),
+            _default_value=default_value,
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: RenameColumn) -> TableUpdateRequestBase:
+        return TableUpdateRequest.RenameTableColumnRequest(
+            _old_field_name=change.field_name(),
+            _new_field_name=change.get_new_name(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnDefaultValue) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+            _field_name=change.field_name(),
+            _new_default_value=DTOConverters.to_function_arg(
+                change.get_new_default_value()
+            ),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnType) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnTypeRequest(
+            _field_name=change.field_name(),
+            _new_type=change.get_new_data_type(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnComment) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnCommentRequest(
+            _field_name=change.field_name(),
+            _new_comment=change.get_new_comment(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnPosition) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnPositionRequest(
+            _field_name=change.field_name(),
+            _new_position=change.get_position(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: DeleteColumn) -> TableUpdateRequestBase:
+        return TableUpdateRequest.DeleteTableColumnRequest(
+            _field_name=change.field_name(),
+            _if_exists=change.get_if_exists(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnNullability) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateTableColumnNullabilityRequest(
+            _field_name=change.field_name(),
+            _nullable=change.get_nullable(),
+        )
+
+    @_to_column_update_request.register
+    @staticmethod
+    def _(change: UpdateColumnAutoIncrement) -> TableUpdateRequestBase:
+        return TableUpdateRequest.UpdateColumnAutoIncrementRequest(
+            _field_name=change.field_name(),
+            _auto_increment=change.is_auto_increment(),
+        )
+
+    @staticmethod
+    def to_table_update_request(change) -> TableUpdateRequestBase:
+        if isinstance(change, TableChange.RenameTable):
+            rename_table = cast(TableChange.RenameTable, change)
+            return TableUpdateRequest.RenameTableRequest(
+                _new_name=rename_table.get_new_name(),
+                _new_schema_name=rename_table.get_new_schema_name(),
+            )
+
+        if isinstance(change, TableChange.UpdateComment):
+            return TableUpdateRequest.UpdateTableCommentRequest(
+                _new_comment=cast(TableChange.UpdateComment, change).get_new_comment()
+            )
+
+        if isinstance(change, TableChange.SetProperty):
+            set_property = cast(TableChange.SetProperty, change)
+            return TableUpdateRequest.SetTablePropertyRequest(
+                _prop=set_property.get_property(),
+                _prop_value=set_property.get_value(),
+            )
+
+        if isinstance(change, TableChange.RemoveProperty):
+            remove_property = cast(TableChange.RemoveProperty, change)
+            return TableUpdateRequest.RemoveTablePropertyRequest(
+                _property=remove_property.get_property()
+            )
+
+        if isinstance(change, TableChange.ColumnChange):
+            return DTOConverters._to_column_update_request(change)
+
+        if isinstance(change, TableChange.AddIndex):
+            add_index = cast(TableChange.AddIndex, change)
+            return TableUpdateRequest.AddTableIndexRequest(
+                Indexes.of(
+                    add_index.get_type(),
+                    add_index.get_name(),
+                    add_index.get_field_names(),
+                ),
+            )
+
+        if isinstance(change, TableChange.DeleteIndex):
+            delete_index = cast(TableChange.DeleteIndex, change)
+            return TableUpdateRequest.DeleteTableIndexRequest(
+                _name=delete_index.get_name(),
+                _if_exists=delete_index.is_if_exists(),
+            )
+
+        raise IllegalArgumentException(
+            f"Unknown change type: {change.__class__.__name__}"
+        )
+
+    @staticmethod
+    def _is_binary_or_fixed(data_type) -> bool:
+        return isinstance(data_type, (Types.BinaryType, Types.FixedType))
+
+    @staticmethod
+    def _literal_value_to_dto_string(value, data_type) -> Optional[str]:
+        if value is None:
+            return None
+        # Match Java DTOConverters / #14609: 0x + lowercase hex for binary/fixed bytes.
+        if DTOConverters._is_binary_or_fixed(data_type) and isinstance(
+            value, (bytes, bytearray)
+        ):
+            return "0x" + bytes(value).hex()
+        return str(value)
+
+    @staticmethod
+    def _decode_binary_hex(value: str, data_type):
+        # Match Java DTOConverters: decode 0x-prefixed hex; keep unprefixed strings for
+        # provider-specific interpretation (#14609).
+        if not value.lower().startswith("0x"):
+            return value
+        hex_value = value[2:]
+        try:
+            decoded = bytes.fromhex(hex_value)
+        except ValueError as exc:
+            raise IllegalArgumentException(
+                "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs"
+            ) from exc
+        if (
+            isinstance(data_type, Types.FixedType)
+            and len(decoded) != data_type.length()
+        ):
+            raise IllegalArgumentException(
+                f"Fixed literal length mismatch: expected {data_type.length()} bytes, "
+                f"got {len(decoded)}"
+            )
+        return decoded

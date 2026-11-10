@@ -50,7 +50,7 @@ public class AwsIrsaCredential implements Credential {
    */
   public AwsIrsaCredential(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
-    validate(accessKeyId, secretAccessKey, sessionToken);
+    validate(accessKeyId, secretAccessKey, sessionToken, expireTimeInMs);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
@@ -84,7 +84,7 @@ public class AwsIrsaCredential implements Credential {
     String accessKeyId = credentialInfo.get(ACCESS_KEY_ID);
     String secretAccessKey = credentialInfo.get(SECRET_ACCESS_KEY);
     String sessionToken = credentialInfo.get(SESSION_TOKEN);
-    validate(accessKeyId, secretAccessKey, sessionToken);
+    validate(accessKeyId, secretAccessKey, sessionToken, expireTimeInMs);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
@@ -118,12 +118,15 @@ public class AwsIrsaCredential implements Credential {
     return sessionToken;
   }
 
-  private void validate(String accessKeyId, String secretAccessKey, String sessionToken) {
+  private void validate(
+      String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(accessKeyId), "Access key Id should not be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(secretAccessKey), "Secret access key should not be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sessionToken), "Session token should not be empty");
+    Preconditions.checkArgument(
+        expireTimeInMs > 0, "The expiration time of AwsIrsaCredential should be greater than 0");
   }
 }

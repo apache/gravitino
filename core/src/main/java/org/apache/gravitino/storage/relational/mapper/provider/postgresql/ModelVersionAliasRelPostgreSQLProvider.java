@@ -18,24 +18,22 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionAliasRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRelBaseSQLProvider {
 
   @Override
-  public String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+  public String softDeleteModelVersionAliasRelsByModelId(Long modelId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " mvar SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE mvar.model_id = ("
-        + " SELECT mm.model_id FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " mm WHERE mm.schema_id = #{schemaId} AND mm.model_name = #{modelName}"
-        + " AND mm.deleted_at = 0) AND mvar.deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
   @Override
@@ -43,39 +41,36 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
   }
 
   @Override
-  public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return "UPDATE "
+  public String softDeleteModelVersionAliasRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE model_id = #{modelId} AND model_version = ("
-        + " SELECT model_version FROM "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
-  @Override
-  public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0) AND deleted_at = 0";
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND deleted_at = 0) AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override
   public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -86,7 +81,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME

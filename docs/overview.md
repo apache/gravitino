@@ -1,6 +1,6 @@
 ---
-title: Overview
-slug: /overview
+title: "Overview"
+slug: "/overview"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -30,7 +30,7 @@ Gravitino aims to provide several key features:
 
 ## Features
 
-### Unified metadata management and governance
+### Unified Metadata Management and Governance
 
 Gravitino abstracts the unified metadata models and APIs for different kinds of metadata sources.
 For example, relational metadata models for tabular data, like Hive, MySQL, PostgreSQL, etc.
@@ -40,23 +40,20 @@ Besides the unified metadata models, Gravitino also provides a unified metadata 
 to manage the metadata in a unified way, including access control, auditing, discovery and
 others.
 
-### Direct metadata management
+### Direct Metadata Management
 
 Unlike traditional metadata management systems, which need to collect the metadata
 actively or passively from underlying systems, Gravitino manages these systems directly.
 It provides a set of connectors to connect to different metadata sources.
 The changes in Gravitino directly reflect in the underlying systems, and vice versa.
 
-### Geo-distribution support (WIP)
+### Geo-Distribution Support
 
-Gravitino supports geo-distribution deployment, which means different instances of Gravitino
-can deploy in different regions or clouds, and they can connect to get
-the metadata from each other. With this, users can get a global view of metadata across the
-regions or clouds.
+Gravitino supports geo-distributed deployment of Iceberg REST (IRC) catalogs. Different instances of Gravitino can run in different regions or clouds, with a local IRC catalog proxying requests to a remote IRC catalog so users get a global view of metadata across regions or clouds.
 
-### Multi-engine support
+### Multi-Engine Support
 
-Gravitino supports different query engines to access the metadata. Currently, it supports
+Gravitino supports different query engines to access the metadata. It supports
 [Trino](https://trino.io/), users can use Trino to query the metadata and data without needing to
 change the existing SQL dialects.
 
@@ -64,13 +61,13 @@ In addition, Gravitino has expanded its support to include [Apache Spark](https:
 [Apache Flink](https://flink.apache.org/), and [Daft](https://docs.daft.ai/), among other query engines. Further enhancements and
 additions to the supported query engines are also on the roadmap.
 
-### AI asset management
+### AI Asset Management
 
 The goal of Gravitino is to unify the data management in both data and AI assets, including raw files, models, etc.
 
 ## Terminology
 
-### The metadata object of Apache Gravitino
+### The Metadata Object
 
 * **Metalake**: The container/tenant for metadata. Typically, one group has one metalake
   to manage all the metadata in it. Each metalake exposes a three-level namespace (catalog.schema.

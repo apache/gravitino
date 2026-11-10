@@ -1,8 +1,10 @@
 ---
-title: "Installing Apache Hive"
-slug: /getting-started/hive
+title: "Install Apache Hive"
+slug: "/getting-started/hive"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 To install Apache Hive and Hadoop on Google Cloud Platform manually,
 follow [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and
@@ -20,7 +22,7 @@ sudo docker run --name gravitino-container -d \
   -p 9000:9000 -p 8088:8088 -p 50010:50010 -p 50070:50070 \
   -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 \
   -p 9083:9083 -p 8022:22 \
-  apache/gravitino-playground:hive:2.7.3
+  apache/gravitino-playground:hive-0.1.15
 ```
 
 Once Docker is installed, you can start the container with the command:

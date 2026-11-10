@@ -37,16 +37,10 @@ public interface FunctionVersionMetaMapper {
       method = "insertFunctionVersionMeta")
   void insertFunctionVersionMeta(@Param("functionVersionMeta") FunctionVersionPO functionVersionPO);
 
-  @InsertProvider(
-      type = FunctionVersionMetaSQLProviderFactory.class,
-      method = "insertFunctionVersionMetaOnDuplicateKeyUpdate")
-  void insertFunctionVersionMetaOnDuplicateKeyUpdate(
-      @Param("functionVersionMeta") FunctionVersionPO functionVersionPO);
-
   @UpdateProvider(
       type = FunctionVersionMetaSQLProviderFactory.class,
-      method = "softDeleteFunctionVersionMetasBySchemaId")
-  Integer softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteFunctionVersionMetasBySchemaIds")
+  Integer softDeleteFunctionVersionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = FunctionVersionMetaSQLProviderFactory.class,

@@ -18,12 +18,41 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestMetadataObjectUtil {
 
@@ -78,6 +107,17 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.VIEW,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.FUNCTION,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.SEMANTIC_MODEL,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of(
+                "catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL)));
   }
 
   @Test
@@ -96,6 +136,13 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE)));
+
+    // Verify that toEntityIdent uses the metadata object's name, not the context metalakeName
+    Assertions.assertEquals(
+        NameIdentifier.of("target_metalake"),
+        MetadataObjectUtil.toEntityIdent(
+            "request_metalake",
+            MetadataObjects.of(null, "target_metalake", MetadataObject.Type.METALAKE)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog"),
@@ -138,5 +185,287 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "function"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "sales_model"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of(
+                "catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL)));
+  }
+
+  @Test
+  public void testGetParentMetadataObjectsForFlatSchema() {
+    // A table under a flat (single-level) schema inherits from [schema, catalog].
+    MetadataObject table = MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.schema", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(table, ":")));
+
+    // A flat schema inherits only from its catalog.
+    MetadataObject schema = MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA);
+    Assertions.assertEquals(
+        List.of("CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(schema, ":")));
+
+    // A semantic model under a flat schema inherits from [schema, catalog], so tags and policies
+    // assigned to its schema or catalog reach it.
+    MetadataObject semanticModel =
+        MetadataObjects.of("catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.schema", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(semanticModel, ":")));
+
+    // A catalog has no ancestors.
+    MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertTrue(MetadataObjectUtil.getParentMetadataObjects(catalog, ":").isEmpty());
+  }
+
+  @Test
+  public void testGetParentMetadataObjectsForHierarchicalSchema() {
+    // A table under hierarchical schema a:b:c inherits from the schema and all its ancestor
+    // schemas (nearest first), then the catalog.
+    MetadataObject table = MetadataObjects.of("catalog.a:b:c", "table", MetadataObject.Type.TABLE);
+    Assertions.assertEquals(
+        List.of(
+            "SCHEMA:catalog.a:b:c", "SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(table, ":")));
+
+    // The hierarchical schema itself inherits from its ancestor schemas and the catalog, but not
+    // from itself.
+    MetadataObject schema = MetadataObjects.of("catalog", "a:b:c", MetadataObject.Type.SCHEMA);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(schema, ":")));
+
+    // A column under a hierarchical schema walks table -> schema -> ancestor schemas -> catalog.
+    MetadataObject column =
+        MetadataObjects.of("catalog.a:b.table", "col", MetadataObject.Type.COLUMN);
+    Assertions.assertEquals(
+        List.of(
+            "TABLE:catalog.a:b.table", "SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(column, ":")));
+  }
+
+  @Test
+  public void testCheckMetadataObjectUsesInternalDispatchers() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+    CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+    SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+    FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+    TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+    TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
+    ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
+    FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
+    ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+    SemanticModelDispatcher semanticModelDispatcher = mock(SemanticModelDispatcher.class);
+    AccessControlDispatcher accessControlDispatcher = mock(AccessControlDispatcher.class);
+    TagDispatcher tagDispatcher = mock(TagDispatcher.class);
+    PolicyDispatcher policyDispatcher = mock(PolicyDispatcher.class);
+    JobOperationDispatcher jobDispatcher = mock(JobOperationDispatcher.class);
+
+    when(env.internalMetalakeDispatcher()).thenReturn(metalakeDispatcher);
+    when(env.internalCatalogDispatcher()).thenReturn(catalogDispatcher);
+    when(env.internalSchemaDispatcher()).thenReturn(schemaDispatcher);
+    when(env.internalFilesetDispatcher()).thenReturn(filesetDispatcher);
+    when(env.internalTableDispatcher()).thenReturn(tableDispatcher);
+    when(env.internalTopicDispatcher()).thenReturn(topicDispatcher);
+    when(env.internalModelDispatcher()).thenReturn(modelDispatcher);
+    when(env.internalFunctionDispatcher()).thenReturn(functionDispatcher);
+    when(env.internalViewDispatcher()).thenReturn(viewDispatcher);
+    when(env.internalSemanticModelDispatcher()).thenReturn(semanticModelDispatcher);
+    when(env.internalAccessControlDispatcher()).thenReturn(accessControlDispatcher);
+    when(env.internalTagDispatcher()).thenReturn(tagDispatcher);
+    when(env.internalPolicyDispatcher()).thenReturn(policyDispatcher);
+    when(env.internalJobOperationDispatcher()).thenReturn(jobDispatcher);
+
+    NameIdentifier metalakeIdent = NameIdentifier.of("metalake");
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");
+    NameIdentifier schemaIdent = NameIdentifier.of("metalake", "catalog", "schema");
+    NameIdentifier filesetIdent = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    NameIdentifier tableIdent = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier topicIdent = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    NameIdentifier modelIdent = NameIdentifier.of("metalake", "catalog", "schema", "model");
+    NameIdentifier functionIdent = NameIdentifier.of("metalake", "catalog", "schema", "function");
+    NameIdentifier viewIdent = NameIdentifier.of("metalake", "catalog", "schema", "view");
+
+    when(metalakeDispatcher.metalakeExists(metalakeIdent)).thenReturn(true);
+    when(catalogDispatcher.catalogExists(catalogIdent)).thenReturn(true);
+    when(schemaDispatcher.schemaExists(schemaIdent)).thenReturn(true);
+    when(filesetDispatcher.filesetExists(filesetIdent)).thenReturn(true);
+    when(tableDispatcher.tableExists(tableIdent)).thenReturn(true);
+    when(topicDispatcher.topicExists(topicIdent)).thenReturn(true);
+    when(modelDispatcher.modelExists(modelIdent)).thenReturn(true);
+    when(functionDispatcher.functionExists(functionIdent)).thenReturn(true);
+    when(viewDispatcher.viewExists(viewIdent)).thenReturn(true);
+    when(semanticModelDispatcher.semanticModelExists(modelIdent)).thenReturn(true);
+
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "fileset", MetadataObject.Type.FILESET));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema.table", "column", MetadataObject.Type.COLUMN));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "topic", MetadataObject.Type.TOPIC));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.MODEL));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake",
+          MetadataObjects.of("catalog.schema", "model", MetadataObject.Type.SEMANTIC_MODEL));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "role", MetadataObject.Type.ROLE));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "tag", MetadataObject.Type.TAG));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "policy", MetadataObject.Type.POLICY));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "job", MetadataObject.Type.JOB));
+      MetadataObjectUtil.checkMetadataObject(
+          "metalake", MetadataObjects.of(null, "template", MetadataObject.Type.JOB_TEMPLATE));
+    }
+
+    verify(metalakeDispatcher).metalakeExists(metalakeIdent);
+    verify(catalogDispatcher).catalogExists(catalogIdent);
+    verify(schemaDispatcher).schemaExists(schemaIdent);
+    verify(filesetDispatcher).filesetExists(filesetIdent);
+    verify(tableDispatcher, times(2)).tableExists(tableIdent);
+    verify(topicDispatcher).topicExists(topicIdent);
+    verify(modelDispatcher).modelExists(modelIdent);
+    verify(functionDispatcher).functionExists(functionIdent);
+    verify(viewDispatcher).viewExists(viewIdent);
+    verify(semanticModelDispatcher).semanticModelExists(modelIdent);
+    verify(env, never()).semanticModelDispatcher();
+    verify(accessControlDispatcher).getRole("metalake", "role");
+    verify(tagDispatcher).getTag("metalake", "tag");
+    verify(policyDispatcher).getPolicy("metalake", "policy");
+    verify(jobDispatcher).getJob("metalake", "job", false);
+    verify(jobDispatcher).getJobTemplate("metalake", "template");
+  }
+
+  @Test
+  void testBatchChecksEachTableOnceAndDoesNotReuseChecksAcrossCalls() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    TableDispatcher dispatcher = mock(TableDispatcher.class);
+    when(env.internalTableDispatcher()).thenReturn(dispatcher);
+    NameIdentifier tableIdentifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    when(dispatcher.tableExists(tableIdentifier)).thenReturn(true);
+    MetadataObject table = MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE);
+    MetadataObject first =
+        MetadataObjects.of("catalog.schema.table", "first", MetadataObject.Type.COLUMN);
+    MetadataObject second =
+        MetadataObjects.of("catalog.schema.table", "second", MetadataObject.Type.COLUMN);
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      MetadataObjectUtil.checkMetadataObjects("metalake", List.of(table, first, second, table));
+      verify(dispatcher, times(1)).tableExists(tableIdentifier);
+      MetadataObjectUtil.checkMetadataObjects("metalake", List.of(first, second, table));
+      verify(dispatcher, times(2)).tableExists(tableIdentifier);
+
+      when(dispatcher.tableExists(tableIdentifier)).thenReturn(false);
+      NoSuchMetadataObjectException exception =
+          Assertions.assertThrows(
+              NoSuchMetadataObjectException.class,
+              () -> MetadataObjectUtil.checkMetadataObjects("metalake", List.of(first, table)));
+      Assertions.assertEquals(
+          "Metadata object catalog.schema.table.first type COLUMN doesn't exist",
+          exception.getMessage());
+      verify(dispatcher, times(3)).tableExists(tableIdentifier);
+    }
+  }
+
+  @Test
+  void testBatchChecksTablesWithTheSameNameInDifferentNamespaces() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    TableDispatcher dispatcher = mock(TableDispatcher.class);
+    when(env.internalTableDispatcher()).thenReturn(dispatcher);
+    when(dispatcher.tableExists(any())).thenReturn(true);
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      MetadataObjectUtil.checkMetadataObjects(
+          "metalake",
+          List.of(
+              MetadataObjects.of("catalog.schema.table", "first", MetadataObject.Type.COLUMN),
+              MetadataObjects.of("catalog.other.table", "second", MetadataObject.Type.COLUMN),
+              MetadataObjects.of("other.schema", "table", MetadataObject.Type.TABLE)));
+      verify(dispatcher).tableExists(NameIdentifier.of("metalake", "catalog", "schema", "table"));
+      verify(dispatcher).tableExists(NameIdentifier.of("metalake", "catalog", "other", "table"));
+      verify(dispatcher).tableExists(NameIdentifier.of("metalake", "other", "schema", "table"));
+    }
+  }
+
+  @Test
+  void testBatchStillChecksNonTableObjects() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    SchemaDispatcher dispatcher = mock(SchemaDispatcher.class);
+    when(env.internalSchemaDispatcher()).thenReturn(dispatcher);
+    NameIdentifier schemaIdentifier = NameIdentifier.of("metalake", "catalog", "schema");
+    when(dispatcher.schemaExists(schemaIdentifier)).thenReturn(false);
+    MetadataObject schema = MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA);
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertThrows(
+          NoSuchMetadataObjectException.class,
+          () -> MetadataObjectUtil.checkMetadataObjects("metalake", List.of(schema)));
+      verify(dispatcher).schemaExists(schemaIdentifier);
+    }
+  }
+
+  @Test
+  void testBatchRejectsNullObject() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                MetadataObjectUtil.checkMetadataObjects(
+                    "metalake", Collections.singletonList(null)));
+    Assertions.assertEquals("metadataObject cannot be null", exception.getMessage());
+  }
+
+  @Test
+  void testBatchRejectsMalformedColumnIdentifier() {
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    TableDispatcher dispatcher = mock(TableDispatcher.class);
+    when(env.internalTableDispatcher()).thenReturn(dispatcher);
+    NameIdentifier tableIdentifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    when(dispatcher.tableExists(tableIdentifier)).thenReturn(true);
+    MetadataObject table = MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE);
+    MetadataObject malformedColumn = mock(MetadataObject.class);
+    when(malformedColumn.type()).thenReturn(MetadataObject.Type.COLUMN);
+    when(malformedColumn.fullName()).thenReturn("catalog.schema.table.column.extra");
+    try (MockedStatic<GravitinoEnv> mockedEnv = mockStatic(GravitinoEnv.class)) {
+      mockedEnv.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertThrows(
+          IllegalNamespaceException.class,
+          () ->
+              MetadataObjectUtil.checkMetadataObjects("metalake", List.of(table, malformedColumn)));
+      verify(dispatcher, times(1)).tableExists(tableIdentifier);
+    }
+  }
+
+  private static List<String> describe(List<MetadataObject> objects) {
+    return objects.stream().map(o -> o.type() + ":" + o.fullName()).collect(Collectors.toList());
   }
 }

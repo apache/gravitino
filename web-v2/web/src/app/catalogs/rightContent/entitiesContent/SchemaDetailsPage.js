@@ -22,7 +22,21 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Breadcrumb, Button, Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tooltip, Typography } from 'antd'
+import {
+  Breadcrumb,
+  Button,
+  Divider,
+  Flex,
+  Input,
+  Modal,
+  Popover,
+  Space,
+  Spin,
+  Table,
+  Tabs,
+  Tooltip,
+  Typography
+} from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -35,12 +49,17 @@ import Icons from '@/components/Icons'
 import Policies from '@/components/PolicyTag'
 import TableActions from '@/components/TableActions'
 import PropertiesContent from '@/components/PropertiesContent'
+import buildSchemaColumns from './SharedSchemaColumns'
 import {
   getCatalogDetails,
+  fetchSchemas,
+  deleteSchema,
   deleteFileset,
   deleteModel,
   deleteTopic,
   deleteTable,
+  deleteView,
+  deleteSemanticModel,
   getTableDetails,
   getCurrentEntityOwner
 } from '@/lib/store/metalakes'
@@ -52,6 +71,8 @@ import CreateFilesetDialog from '../CreateFilesetDialog'
 import RegisterModelDialog from '../RegisterModelDialog'
 import CreateTopicDialog from '../CreateTopicDialog'
 import CreateTableDialog from '../CreateTableDialog'
+import CreateSemanticModelDialog from '../CreateSemanticModelDialog'
+import ImportSemanticModelDialog from '../ImportSemanticModelDialog'
 import Functions from './Functions'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
@@ -64,11 +85,16 @@ const { Search } = Input
 
 export default function SchemaDetailsPage() {
   const [openSchema, setOpenSchema] = useState(false)
+  const [editSchemaName, setEditSchemaName] = useState('')
+  const [editSchemaInit, setEditSchemaInit] = useState(true)
   const [openTable, setOpenTable] = useState(false)
   const [openFileset, setOpenFileset] = useState(false)
   const [openTopic, setOpenTopic] = useState(false)
   const [openOwner, setOpenOwner] = useState(false)
   const [openModel, setOpenModel] = useState(false)
+  const [openSemanticModel, setOpenSemanticModel] = useState(false)
+  const [openImportSemanticModel, setOpenImportSemanticModel] = useState(false)
+  const [editSemanticModel, setEditSemanticModel] = useState('')
   const [editTable, setEditTable] = useState('')
   const [editFileset, setEditFileset] = useState('')
   const [editTopic, setEditTopic] = useState('')
@@ -83,6 +109,10 @@ export default function SchemaDetailsPage() {
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
   const store = useAppSelector(state => state.metalakes)
+
+  const semanticModelRequest =
+    store.semanticModelRequests[`{{${currentMetalake}}}{{${catalog}}}{{relational}}{{${schema}}}`]
+  const semanticModelListLoading = !!semanticModelRequest?.inFlight.includes(store.semanticModelListRequestId)
   const dispatch = useAppDispatch()
   const [search, setSearch] = useState('')
   const [tabOptions, setTabOptions] = useState([])
@@ -90,10 +120,12 @@ export default function SchemaDetailsPage() {
   const [entityType, setEntityType] = useState('')
   const [tabKey, setTabKey] = useState('')
   const [nameCol, setNameCol] = useState('')
+  const [subSchemas, setSubSchemas] = useState([])
   const { ref, width } = useResizeObserver()
   const treeRef = useContext(TreeRefContext)
   const [catalogData, setCatalogData] = useState(null)
   const [ownerData, setOwnerData] = useState(null)
+  const [modal, contextHolder] = Modal.useModal()
 
   useEffect(() => {
     if (!currentMetalake || !catalog) return
@@ -120,88 +152,191 @@ export default function SchemaDetailsPage() {
   }, [anthEnable])
 
   useEffect(() => {
+    if (!currentMetalake || !catalog || !schema) {
+      setSubSchemas([])
+
+      return
+    }
+
+    // Wait for catalogData to be loaded before checking catalog type
+    if (!catalogData) {
+      return
+    }
+
+    const provider = catalogData?.provider
+    const catalogBackend = catalogData?.properties?.['catalog-backend']
+    const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+    if (!isIcebergJdbcCatalog) {
+      // only iceberg jdbc catalogs support subschemas
+      setSubSchemas([])
+
+      return
+    }
+
+    // Use subschemas from store
+    const nextSubSchemas = (store.subschemas || []).map(item => {
+      return {
+        ...item,
+        name: item.name,
+        key: item.name,
+        title: item.name
+      }
+    })
+
+    setSubSchemas(nextSubSchemas)
+  }, [currentMetalake, catalog, schema, catalogData, store.subschemas])
+
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    const withSubSchemas = tabs => (hasSubSchemas ? [{ label: 'Subschemas', key: 'Subschemas' }, ...tabs] : tabs)
+
+    let nextTabOptions = []
+    let nextCreateBtn = ''
+    let nextNameCol = ''
+    let nextEntityType = ''
+
     switch (catalogType) {
       case 'relational':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
+                { label: 'Semantic Models', key: 'Semantic Models' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
+                { label: 'Semantic Models', key: 'Semantic Models' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Tables')
-        setCreateBtn('Create Table')
-        setNameCol('Table Name')
-        setEntityType('table')
+        nextCreateBtn = 'Create Table'
+        nextNameCol = 'Table Name'
+        nextEntityType = 'table'
         break
       case 'messaging':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Topics', key: 'Topics' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Topics', key: 'Topics' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Topics')
-        setCreateBtn('Create Topic')
-        setNameCol('Topic Name')
-        setEntityType('topic')
+        nextCreateBtn = 'Create Topic'
+        nextNameCol = 'Topic Name'
+        nextEntityType = 'topic'
         break
       case 'fileset':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Filesets', key: 'Filesets' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Filesets', key: 'Filesets' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Filesets')
-        setCreateBtn('Create Fileset')
-        setNameCol('Fileset Name')
-        setEntityType('fileset')
+        nextCreateBtn = 'Create Fileset'
+        nextNameCol = 'Fileset Name'
+        nextEntityType = 'fileset'
         break
       case 'model':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Models', key: 'Models' },
                 { label: 'Functions', key: 'Functions' },
-                { label: 'Associated roles', key: 'Associated roles' }
+                { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Models', key: 'Models' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Models')
-        setCreateBtn('Register Model')
-        setNameCol('Model Name')
-        setEntityType('model')
+        nextCreateBtn = 'Register Model'
+        nextNameCol = 'Model Name'
+        nextEntityType = 'model'
         break
       default:
-        setTabOptions([])
-        setCreateBtn('')
-        setEntityType('')
+        nextTabOptions = []
+        nextCreateBtn = ''
+        nextEntityType = ''
     }
-  }, [catalogType, anthEnable])
+
+    setTabOptions(nextTabOptions)
+    setCreateBtn(nextCreateBtn)
+    setNameCol(nextNameCol)
+    setEntityType(nextEntityType)
+  }, [catalogType, anthEnable, subSchemas])
+
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    if (hasSubSchemas) {
+      setTabKey('Subschemas')
+    } else {
+      switch (catalogType) {
+        case 'relational':
+          setTabKey('Tables')
+          break
+        case 'messaging':
+          setTabKey('Topics')
+          break
+        case 'fileset':
+          setTabKey('Filesets')
+          break
+        case 'model':
+          setTabKey('Models')
+          break
+        default:
+          setTabKey('')
+      }
+    }
+  }, [subSchemas, catalogType])
 
   const onChangeTab = key => {
     setTabKey(key)
+  }
+
+  const showDeleteSchemaConfirm = name => {
+    let validateFn = null
+
+    const registerValidate = fn => {
+      validateFn = fn
+    }
+
+    modal.confirm({
+      title: `Are you sure to delete the schema ${name}?`,
+      icon: <ExclamationCircleFilled />,
+      content: <ConfirmInput name={name} registerValidate={registerValidate} />,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      async onOk() {
+        if (validateFn && !validateFn()) return
+
+        await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
+
+        // Fetch subschemas again to update store.subschemas
+        await dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+
+        treeRef.current.onLoadData(
+          { key: `{{${currentMetalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`, nodeType: 'schema' },
+          true
+        )
+      }
+    })
   }
 
   const tableData = [...store.tableData]
@@ -217,6 +352,42 @@ export default function SchemaDetailsPage() {
         children: undefined
       }
     })
+
+  const viewData = [...(store.views || [])]
+    .filter(c => {
+      if (search === '') return true
+
+      return c.name.includes(search)
+    })
+    .map(entity => ({
+      ...entity,
+      key: entity.name,
+      children: undefined
+    }))
+
+  const semanticModelData = [...(store.semanticModels || [])]
+    .filter(c => {
+      if (search === '') return true
+
+      return c.name.includes(search)
+    })
+    .map(entity => ({
+      ...entity,
+      key: entity.name,
+      children: undefined
+    }))
+
+  const subSchemaData = [...subSchemas]
+    .filter(item => {
+      if (search === '') return true
+
+      return item.name.includes(search)
+    })
+    .map(item => ({
+      ...item,
+      key: item.name,
+      children: undefined
+    }))
 
   const tagContent = (
     <div>
@@ -261,6 +432,8 @@ export default function SchemaDetailsPage() {
   }
 
   const handleEditSchema = () => {
+    setEditSchemaName(schema)
+    setEditSchemaInit(true)
     setOpenSchema(true)
   }
 
@@ -305,7 +478,20 @@ export default function SchemaDetailsPage() {
     setOpenOwner(true)
   }
 
-  const showDeleteConfirm = async (modal, entityObj, type) => {
+  const showDeleteConfirm = async (maybeModalOrEntityObj, maybeEntityObj, maybeType) => {
+    // support two call signatures:
+    // 1) showDeleteConfirm(modalInstance, entityObj, type)
+    // 2) showDeleteConfirm(entityObj, type)
+    let modalToUse = modal
+    let entityObj = maybeModalOrEntityObj
+    let type = maybeEntityObj
+
+    if (maybeModalOrEntityObj && typeof maybeModalOrEntityObj.confirm === 'function') {
+      modalToUse = maybeModalOrEntityObj
+      entityObj = maybeEntityObj
+      type = maybeType
+    }
+
     const { name: entity, storageLocation, type: managedOrExtenalType } = entityObj
     let isManaged = false
     let location = ''
@@ -320,28 +506,19 @@ export default function SchemaDetailsPage() {
       location = catalogData?.provider === 'hive' ? table.properties?.['location'] : ''
     }
 
-    let confirmInput = ''
     let validateFn = null
-
-    const setConfirmInput = value => {
-      confirmInput = value
-    }
 
     const registerValidate = fn => {
       validateFn = fn
     }
 
-    modal.confirm({
-      title: `Are you sure to delete the ${type} ${entity}?`,
+    const typeLabel = type === 'semanticModel' ? 'semantic model' : type
+
+    modalToUse.confirm({
+      title: `Are you sure to delete the ${typeLabel} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
-        <ConfirmInput
-          name={entity}
-          setConfirmInput={setConfirmInput}
-          isManaged={isManaged}
-          location={location}
-          registerValidate={registerValidate}
-        />
+        <ConfirmInput name={entity} isManaged={isManaged} location={location} registerValidate={registerValidate} />
       ),
       okText: 'Delete',
       okType: 'danger',
@@ -360,7 +537,15 @@ export default function SchemaDetailsPage() {
               )
               break
             case 'relational':
-              await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              if (type === 'view') {
+                await dispatch(deleteView({ metalake: currentMetalake, catalog, schema, view: entity }))
+              } else if (type === 'semanticModel') {
+                await dispatch(
+                  deleteSemanticModel({ metalake: currentMetalake, catalog, schema, semanticModel: entity })
+                )
+              } else {
+                await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              }
               break
             case 'model':
               await dispatch(deleteModel({ metalake: currentMetalake, catalog, catalogType, schema, model: entity }))
@@ -441,12 +626,164 @@ export default function SchemaDetailsPage() {
     [nameCol, entityType, store.tableLoading, anthEnable, catalogData?.provider]
   )
 
+  const viewColumns = useMemo(
+    () => [
+      {
+        title: 'View Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`view-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&view=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      },
+      {
+        title: 'Actions',
+        dataIndex: 'action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <a data-refer={`delete-view-${record.name}`}>
+            <Tooltip title='Delete'>
+              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(record, 'view')} />
+            </Tooltip>
+          </a>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
+  )
+
+  const semanticModelColumns = useMemo(
+    () => [
+      {
+        title: 'Semantic Model Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`semantic-model-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&semanticModel=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      },
+      {
+        title: 'Tags',
+        dataIndex: 'tags',
+        key: 'tags',
+        render: (_, record) => (
+          <Tags metadataObjectType={'semantic_model'} metadataObjectFullName={`${catalog}.${schema}.${record.name}`} />
+        )
+      },
+      {
+        title: 'Actions',
+        dataIndex: 'action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <Space size={4}>
+            <Tooltip title='Edit'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Edit Semantic Model'
+                data-refer={`edit-semantic-model-${record.name}`}
+                icon={<Icons.Pencil className='size-4' />}
+                onClick={() => {
+                  setEditSemanticModel(record.name)
+                  setOpenSemanticModel(true)
+                }}
+              />
+            </Tooltip>
+            <Tooltip title='Delete'>
+              <Button
+                type='text'
+                size='small'
+                aria-label='Delete Semantic Model'
+                data-refer={`delete-semantic-model-${record.name}`}
+                icon={<Icons.Trash2Icon className='size-4' />}
+                onClick={() => showDeleteConfirm(record, 'semanticModel')}
+              />
+            </Tooltip>
+            {anthEnable && (
+              <Tooltip title='Set Owner'>
+                <Button
+                  type='text'
+                  size='small'
+                  aria-label='Set Owner'
+                  data-refer={`set-owner-semantic-model-${record.name}`}
+                  icon={<Icons.UserPen className='size-4' />}
+                  onClick={() => handleSetOwner('semantic_model', `${catalog}.${schema}.${record.name}`)}
+                />
+              </Tooltip>
+            )}
+          </Space>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog, schema, anthEnable]
+  )
+
+  const subSchemaColumns = useMemo(() => {
+    return buildSchemaColumns({
+      currentMetalake,
+      catalog,
+      catalogType,
+      anthEnable,
+      provider: catalogData?.provider,
+      handleEditSchema: name => {
+        setEditSchemaName(name)
+        setEditSchemaInit(false)
+        setOpenSchema(true)
+      },
+      showDeleteConfirm: name => showDeleteSchemaConfirm(name),
+      handleSetOwner
+    })
+  }, [currentMetalake, catalog, catalogType, schema, anthEnable, catalogData?.provider])
+
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
   }, [columns])
 
+  const {
+    resizableColumns: viewResizableColumns,
+    components: viewComponents,
+    tableWidth: viewTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: viewColumns, minWidth: 100 }
+  }, [viewColumns])
+
+  const {
+    resizableColumns: semanticModelResizableColumns,
+    components: semanticModelComponents,
+    tableWidth: semanticModelTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: semanticModelColumns, minWidth: 100 }
+  }, [semanticModelColumns])
+
+  const {
+    resizableColumns: subSchemaResizableColumns,
+    components: subSchemaComponents,
+    tableWidth: subSchemaTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: subSchemaColumns, minWidth: 100 }
+  }, [subSchemaColumns])
+
   return (
     <div ref={ref}>
+      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>
@@ -535,15 +872,107 @@ export default function SchemaDetailsPage() {
           )}
         </Space>
       </Spin>
-      <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
-      {tabKey === 'Associated roles' ? (
+      <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={onChangeTab} items={tabOptions} />
+      {tabKey === 'Associated Roles' ? (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}
-          metadataObjectFullName={`${catalog}.${store.activatedDetails.name}`}
+          metadataObjectFullName={`${catalog}.${schema}`}
         />
+      ) : tabKey === 'Subschemas' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchSubSchemaInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='subschema-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: subSchemaTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={subSchemaData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={subSchemaResizableColumns}
+            components={subSchemaComponents}
+          />
+        </>
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
+      ) : tabKey === 'Views' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchViewInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='view-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: viewTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={viewData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={viewResizableColumns}
+            components={viewComponents}
+          />
+        </>
+      ) : tabKey === 'Semantic Models' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4' gap='middle' wrap>
+            <Search
+              className='w-full sm:w-64'
+              name='searchSemanticModelInput'
+              placeholder='Search...'
+              value={search}
+              onChange={onSearchTable}
+            />
+            <Space wrap>
+              <Button onClick={() => setOpenImportSemanticModel(true)}>Import OSSIE</Button>
+              <Button
+                data-refer='create-semantic-model-btn'
+                type='primary'
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditSemanticModel('')
+                  setOpenSemanticModel(true)
+                }}
+              >
+                Create Semantic Model
+              </Button>
+            </Space>
+          </Flex>
+          <Spin spinning={store.tableLoading || semanticModelListLoading}>
+            <Table
+              data-refer='semantic-model-list-grid'
+              size='small'
+              scroll={{ x: semanticModelTableWidth, y: 'max(20rem, calc(100vh - 37rem))' }}
+              dataSource={semanticModelData}
+              pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+              columns={semanticModelResizableColumns}
+              components={semanticModelComponents}
+            />
+          </Spin>
+          {openImportSemanticModel && (
+            <ImportSemanticModelDialog
+              open={openImportSemanticModel}
+              setOpen={setOpenImportSemanticModel}
+              metalake={currentMetalake}
+              catalog={catalog}
+              schema={schema}
+            />
+          )}
+          {openSemanticModel && (
+            <CreateSemanticModelDialog
+              open={openSemanticModel}
+              setOpen={setOpenSemanticModel}
+              metalake={currentMetalake}
+              catalog={catalog}
+              schema={schema}
+              editSemanticModel={editSemanticModel}
+            />
+          )}
+        </>
       ) : (
         <>
           <Flex justify='flex-end' className='mb-4'>
@@ -644,7 +1073,8 @@ export default function SchemaDetailsPage() {
           catalogType={catalogType}
           provider={catalogData?.provider}
           locationProviders={catalogData?.properties?.['filesystem-providers']?.split(',') || []}
-          editSchema={schema}
+          editSchema={editSchemaName || schema}
+          init={editSchemaInit}
         />
       )}
       {openOwner && (

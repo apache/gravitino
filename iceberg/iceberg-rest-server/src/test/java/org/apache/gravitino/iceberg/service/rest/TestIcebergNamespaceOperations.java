@@ -18,10 +18,23 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -29,6 +42,9 @@ import org.apache.gravitino.listener.api.event.IcebergCreateNamespacePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespacePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespacePreEvent;
@@ -37,10 +53,19 @@ import org.apache.gravitino.listener.api.event.IcebergNamespaceExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
@@ -51,6 +76,9 @@ import org.mockito.Mockito;
 
 public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
+  private static final Schema DROP_NONEMPTY_TABLE_SCHEMA =
+      new Schema(NestedField.required(1, "foo_string", StringType.get()));
+
   private DummyEventListener dummyEventListener;
 
   @Override
@@ -59,6 +87,7 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     ResourceConfig resourceConfig =
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergNamespaceOperations.class, true, Arrays.asList(dummyEventListener));
+    resourceConfig.register(MockIcebergTableOperations.class);
 
     // register a mock HttpServletRequest with user info
     resourceConfig.register(
@@ -140,11 +169,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "b"));
 
-    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
-    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
+    // Iceberg 1.11: dropping a namespace that still has child namespaces returns 409 Conflict.
+    verifyDropNamespaceFail(409, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
 
     verifyDropNamespaceSucc(Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
+    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
   }
@@ -166,12 +198,38 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergDropNamespaceFailureEvent);
 
-    // jersery route failed
-    verifyDropNamespaceFail(500, Namespace.of(""));
+    // Empty namespace encodes to a path Jersey cannot bind for DELETE → 405 Method Not Allowed
+    // (previously mis-mapped to 500 by IcebergExceptionMapper).
+    verifyDropNamespaceFail(405, Namespace.of(""));
 
     verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
     verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));
     verifyDropNamespaceSucc(Namespace.of("drop_foo3", "a"));
+
+    // drop non-empty namespace should return 409 Conflict per Iceberg REST spec
+    Namespace nonEmptyNs = Namespace.of("drop_nonempty_foo");
+    verifyCreateNamespaceSucc(nonEmptyNs);
+    verifyCreateTableSucc(nonEmptyNs, "drop_nonempty_table");
+    verifyDropNamespaceFail(409, nonEmptyNs);
+    verifyDropTableSucc(nonEmptyNs, "drop_nonempty_table");
+    verifyDropNamespaceSucc(nonEmptyNs);
+  }
+
+  private void verifyCreateTableSucc(Namespace ns, String tableName) {
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(DROP_NONEMPTY_TABLE_SCHEMA)
+            .build();
+    Response response =
+        getTableClientBuilder(ns, Optional.empty())
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  private void verifyDropTableSucc(Namespace ns, String tableName) {
+    Response response = getTableClientBuilder(ns, Optional.of(tableName)).delete();
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
   @Test
@@ -189,12 +247,39 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyRegisterTableSucc("register_foo2", Namespace.of("register_ns_2", "a"));
   }
 
+  @Test
+  void testRegisterTableReturnsETag() {
+    Namespace ns = Namespace.of("register_etag_ns");
+    Response response = doRegisterTable("register_etag_foo1", ns);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in register table response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+
+    // Verify the ETag value matches the expected SHA-256 hash of the known mock metadata location
+    Optional<EntityTag> expectedETag =
+        IcebergRESTUtils.generateETag(
+            "/mock/metadata/v1.metadata.json", IcebergRESTUtils.SnapshotMode.ALL.getValue());
+    Assertions.assertTrue(expectedETag.isPresent(), "Expected ETag should be generated");
+    Assertions.assertEquals(
+        "\"" + expectedETag.get().getValue() + "\"",
+        etag,
+        "ETag should match SHA-256 hash of mock metadata location with default snapshots");
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
   void testListNamespace(String prefix) {
     setUrlPathWithPrefix(prefix);
     dropAllExistingNamespace();
+
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event emptyListEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(emptyListEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(0, ((IcebergListNamespacesEvent) emptyListEvent).resultCount());
 
     doCreateNamespace(Namespace.of("list_foo1"));
     doCreateNamespace(Namespace.of("list_foo2"));
@@ -203,16 +288,93 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("list_foo3", "a", "z"));
     doCreateNamespace(Namespace.of("list_foo3", "a", "y"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList("list_foo1", "list_foo2", "list_foo3"));
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event listEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(3, ((IcebergListNamespacesEvent) listEvent).resultCount());
+
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3")), Arrays.asList("list_foo3.a", "list_foo3.b"));
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3", "a")),
         Arrays.asList("list_foo3.a.y", "list_foo3.a.z"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceFail(Optional.of(Namespace.of("list_fooxx")), 404);
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergListNamespacesFailureEvent);
+
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "c")), 404);
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "a", "x")), 404);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListNamespaceWithPagination(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    dropAllExistingNamespace();
+
+    doCreateNamespace(Namespace.of("page_ns1"));
+    doCreateNamespace(Namespace.of("page_ns2"));
+    doCreateNamespace(Namespace.of("page_ns3"));
+
+    // pageSize alone must not truncate the list.
+    try (Response response =
+        getNamespaceClientBuilder(
+                Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+            .get()) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+      ListNamespacesResponse all = response.readEntity(ListNamespacesResponse.class);
+      Assertions.assertEquals(3, all.namespaces().size());
+      Assertions.assertNull(all.nextPageToken());
+    }
+
+    // First page: an empty pageToken starts paging
+    Response firstPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListNamespacesResponse firstPage = firstPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(2, firstPage.namespaces().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using the nextPageToken
+    Response secondPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListNamespacesResponse secondPage = secondPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(1, secondPage.namespaces().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // Verify combined results
+    Set<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.namespaces().stream(), secondPage.namespaces().stream())
+            .map(Namespace::toString)
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of("page_ns1", "page_ns2", "page_ns3"), paginatedNames);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListNamespacesEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListNamespacesEvent event =
+        new IcebergListNamespacesEvent(
+            Mockito.mock(IcebergRequestContext.class), NameIdentifier.of("metalake", "catalog"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -233,5 +395,78 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(Namespace.of("update_foo3", "a"));
     dummyEventListener.clearEvent();
     verifyUpdateNamespaceSucc(Namespace.of("update_foo3", "a"));
+  }
+
+  @Test
+  void testUpdateNamespaceRejectsNullPropertyValue() {
+    verifyCreateNamespaceSucc("update_null_value");
+    Response response =
+        getUpdateNamespaceClientBuilder(Namespace.of("update_null_value"))
+            .post(
+                Entity.entity(
+                    "{\"removals\":[],\"updates\":{\"k\":null}}", MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(400, response.getStatus());
+
+    // Nothing was stored, so the namespace can still be loaded and changed.
+    verifyLoadNamespaceSucc(Namespace.of("update_null_value"));
+    verifyUpdateNamespaceSucc(Namespace.of("update_null_value"));
+  }
+
+  @Test
+  void testRegisterTableWithCredentialVending() {
+    // register without credential vending -- no credentials in response
+    verifyRegisterTableSucc("register_cred_foo1", Namespace.of("register_cred_ns"));
+
+    // register with credential vending but local location -- should NOT vend
+    Response response =
+        doRegisterTableWithCredentialVending(
+            "register_cred_foo2", Namespace.of("register_cred_ns2"), "mock");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertFalse(loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    // register with credential vending and S3 location -- SHOULD vend
+    String s3Location = "s3://dummy-bucket/register_cred_foo3";
+    response =
+        doRegisterTableWithCredentialVending(
+            "register_cred_foo3", Namespace.of("register_cred_ns3"), s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+    // DummyCredentialProvider.SimpleCredential is not one of the typed credentials handled
+    // in CredentialPropertyUtils#toIcebergProperties, so it falls through to
+    // Credential#toProperties, which always emits credential-type and expire-time-in-ms.
+    // Asserting both guards against partial-injection regressions.
+    Assertions.assertEquals("0", loadTableResponse.config().get(Credential.EXPIRE_TIME_IN_MS));
+  }
+
+  @Test
+  void testRegisterTableWithOtherAccessDelegationIsNotRefused() {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name("remote_signing_test")
+            .metadataLocation("mock")
+            .build();
+    // A delegation mechanism the server does not offer does not change the outcome: the request
+    // is handled exactly as without the header.
+    int withoutHeader =
+        getNamespaceClientBuilder(
+                Optional.of(Namespace.of("register_remote_ns")),
+                Optional.of("register"),
+                Optional.empty())
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))
+            .getStatus();
+    for (String header : new String[] {"remote-signing", "invalid-value"}) {
+      Response response =
+          getNamespaceClientBuilder(
+                  Optional.of(Namespace.of("register_remote_ns")),
+                  Optional.of("register"),
+                  Optional.empty())
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, header)
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(withoutHeader, response.getStatus(), header);
+    }
   }
 }

@@ -19,44 +19,57 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.maintenance.optimizer.api.monitor.MetricsEvaluator;
 import org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsCalculator;
 
 public class InstanceLoaderUtils {
 
   public static <T extends StatisticsCalculator> T createStatisticsCalculatorInstance(
       String calculatorName) {
-    ServiceLoader<StatisticsCalculator> loader = ServiceLoader.load(StatisticsCalculator.class);
+    return createInstanceByName(
+        StatisticsCalculator.class, calculatorName, StatisticsCalculator::name);
+  }
+
+  public static <T extends MetricsEvaluator> T createMetricsEvaluatorInstance(
+      String evaluatorName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(evaluatorName), "metrics evaluator name must not be null or blank");
+    return createInstanceByName(MetricsEvaluator.class, evaluatorName, MetricsEvaluator::name);
+  }
+
+  private static <B, T extends B> T createInstanceByName(
+      Class<B> typeClass, String instanceName, Function<B, String> nameFunction) {
+    ServiceLoader<B> loader = ServiceLoader.load(typeClass);
     List<Class<? extends T>> providers =
         Streams.stream(loader.iterator())
-            .filter(p -> p.name().equalsIgnoreCase(calculatorName))
+            .filter(p -> nameFunction.apply(p).equalsIgnoreCase(instanceName))
             .map(p -> (Class<? extends T>) p.getClass())
             .collect(Collectors.toList());
 
     if (providers.isEmpty()) {
       throw new IllegalArgumentException(
-          "No "
-              + StatisticsCalculator.class.getSimpleName()
-              + " class found for: "
-              + calculatorName);
+          "No " + typeClass.getSimpleName() + " class found for: " + instanceName);
     } else if (providers.size() > 1) {
       throw new IllegalArgumentException(
-          "Multiple "
-              + StatisticsCalculator.class.getSimpleName()
-              + " found for: "
-              + calculatorName);
+          "Multiple " + typeClass.getSimpleName() + " found for: " + instanceName);
     } else {
       Class<? extends T> providerClz = Iterables.getOnlyElement(providers);
       try {
         return providerClz.getDeclaredConstructor().newInstance();
       } catch (Exception e) {
         throw new RuntimeException(
-            "Failed to instantiate StatisticsCalculator: "
-                + calculatorName
+            "Failed to instantiate "
+                + typeClass.getSimpleName()
+                + ": "
+                + instanceName
                 + ", class: "
                 + providerClz.getName(),
             e);

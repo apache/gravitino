@@ -30,6 +30,9 @@ import org.apache.gravitino.dto.AuditDTO;
 /** Represents a Group Data Transfer Object (DTO). */
 public class GroupDTO implements Group {
 
+  @JsonProperty("id")
+  private Long id;
+
   @JsonProperty("name")
   private String name;
 
@@ -45,14 +48,24 @@ public class GroupDTO implements Group {
   /**
    * Creates a new instance of GroupDTO.
    *
+   * @param id The id of the Group DTO.
    * @param name The name of the Group DTO.
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
    */
-  protected GroupDTO(String name, List<String> roles, AuditDTO audit) {
+  protected GroupDTO(Long id, String name, List<String> roles, AuditDTO audit) {
+    this.id = id;
     this.name = name;
     this.audit = audit;
     this.roles = roles;
+  }
+
+  /**
+   * @return The id of the Group DTO.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -97,6 +110,9 @@ public class GroupDTO implements Group {
    */
   public static class Builder<S extends Builder> {
 
+    /** The id of the group. */
+    protected Long id;
+
     /** The name of the group. */
     protected String name;
 
@@ -105,6 +121,17 @@ public class GroupDTO implements Group {
 
     /** The audit information of the group. */
     protected AuditDTO audit;
+
+    /**
+     * Sets the id of the group.
+     *
+     * @param id The id of the group.
+     * @return The builder instance.
+     */
+    public S withId(Long id) {
+      this.id = id;
+      return (S) this;
+    }
 
     /**
      * Sets the name of the group.
@@ -149,9 +176,10 @@ public class GroupDTO implements Group {
      * @throws IllegalArgumentException If the name or audit are not set.
      */
     public GroupDTO build() {
+      Preconditions.checkArgument(id != null, "id cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new GroupDTO(name, roles, audit);
+      return new GroupDTO(id, name, roles, audit);
     }
   }
 }

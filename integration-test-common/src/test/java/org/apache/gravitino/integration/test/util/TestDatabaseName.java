@@ -60,6 +60,23 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
   MYSQL_CATALOG_MYSQL_IT,
 
+  /** Represents the MySQL database used for testing catalog credential integration. */
+  MYSQL_CATALOG_CREDENTIAL_IT,
+
+  /**
+   * Represents the first MySQL-backed database used by
+   * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT to verify ClassLoader isolation and
+   * sharing across Iceberg catalogs whose JDBC backend URI differs only by database name.
+   */
+  MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_A,
+
+  /**
+   * Represents the second MySQL-backed database used by
+   * lakehouse.iceberg.integration.test.IcebergClassLoaderPoolIT (different {@code uri} than {@link
+   * #MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_A}).
+   */
+  MYSQL_TEST_ICEBERG_CLASSLOADER_POOL_B,
+
   PG_JDBC_BACKEND,
 
   /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
@@ -116,9 +133,19 @@ public enum TestDatabaseName {
   },
   PG_ICEBERG_AUTHZ_IT,
 
+  /** Represents the PostgreSQL database for experimental Iceberg authorization tests. */
+  PG_ICEBERG_EXPERIMENTAL_AUTHZ_IT,
+
+  /** Represents the PostgreSQL database for Iceberg read-restriction tests. */
+  PG_ICEBERG_READ_RESTRICTION_IT,
+
+  PG_ICEBERG_ASYNC_CLEANUP_IT,
+
   CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT,
   CLICKHOUSE_CATALOG_CLICKHOUSE_IT,
   CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT,
+  CLICKHOUSE_CLUSTER_CLICKHOUSE_IT,
+  CLICKHOUSE_ENGINE_IT,
 
   /** Represents the PostgreSQL database for partition statistics integration tests. */
   PG_TEST_PARTITION_STATS {
@@ -129,4 +156,7 @@ public enum TestDatabaseName {
     }
   },
   FLINK_HIVE_CATALOG_IT,
+
+  /** Represents the MySQL database for the Flink Iceberg JDBC-backend catalog integration test. */
+  FLINK_ICEBERG_JDBC_CATALOG_IT,
 }

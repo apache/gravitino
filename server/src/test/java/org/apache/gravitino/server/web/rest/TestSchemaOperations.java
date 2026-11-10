@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.SCHEMA_SEPARATOR;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -27,6 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -35,6 +38,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -43,6 +47,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -67,6 +72,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestSchemaOperations extends BaseOperationsTest {
@@ -94,6 +101,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    Mockito.doReturn(":").when(config).get(SCHEMA_SEPARATOR);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
@@ -178,12 +186,58 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testListSchemasWithParentSchemaPassToDispatcher() {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "A:sales");
+    when(dispatcher.listSchemas(any())).thenReturn(new NameIdentifier[] {ident});
+
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+    Assertions.assertEquals(1, listResp.identifiers().length);
+    Assertions.assertEquals("A:sales", listResp.identifiers()[0].name());
+
+    verify(dispatcher).listSchemas(eq(Namespace.of(metalake, catalog, "A")));
+  }
+
+  @Test
+  public void testListSchemasWithMalformedParentSchemaReturnsBadRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A::B")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    // The malformed parentSchema must be rejected before reaching the dispatcher.
+    verify(dispatcher, never()).listSchemas(any());
+  }
+
+  @Test
+  public void testCreateSchemaWithNullRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateSchema() {
     SchemaCreateRequest req =
         new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
-    when(dispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(dispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -205,7 +259,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     // Test throw NoSuchCatalogException
     doThrow(new NoSuchCatalogException("mock error"))
         .when(dispatcher)
-        .createSchema(any(), any(), any());
+        .createSchema(any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -222,7 +276,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     // Test throw SchemaAlreadyExistsException
     doThrow(new SchemaAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createSchema(any(), any(), any());
+        .createSchema(any(), any(), any(), any(), any());
 
     Response resp2 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -239,7 +293,9 @@ public class TestSchemaOperations extends BaseOperationsTest {
         SchemaAlreadyExistsException.class.getSimpleName(), errorResp2.getType());
 
     // Test throw RuntimeException
-    doThrow(new RuntimeException("mock error")).when(dispatcher).createSchema(any(), any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(dispatcher)
+        .createSchema(any(), any(), any(), any(), any());
 
     Response resp3 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -308,6 +364,34 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testAlterSchemaWithNullRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 256, 257})
+  void testAlterSchemaRejectsCommentUpdatesBeforeDispatch(int commentLength) {
+    String json =
+        "{\"updates\":[{\"@type\":\"updateComment\",\"newComment\":\""
+            + "c".repeat(commentLength)
+            + "\"}]}";
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
   }
 
   @Test
@@ -390,6 +474,27 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
+  void testDropNonEmptySchemaWithoutCascadeReturnsConflict() {
+    NameIdentifier identifier = NameIdentifier.of(metalake, catalog, "schema1");
+    doThrow(new NonEmptySchemaException("Schema schema1 is not empty"))
+        .when(dispatcher)
+        .dropSchema(identifier, false);
+
+    try (Response response =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .queryParam("cascade", false)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+      Assertions.assertEquals(NonEmptySchemaException.class.getSimpleName(), error.getType());
+      verify(dispatcher).dropSchema(identifier, false);
+    }
   }
 
   @Test
@@ -488,5 +593,14 @@ public class TestSchemaOperations extends BaseOperationsTest {
     when(mockSchema.auditInfo()).thenReturn(mockAudit);
 
     return mockSchema;
+  }
+
+  @Test
+  public void testSchemaUpdatesRequestWithUpdatesNull() {
+    SchemaUpdatesRequest schemaUpdatesRequest = new SchemaUpdatesRequest(null);
+
+    Throwable exception =
+        Assertions.assertThrows(IllegalArgumentException.class, schemaUpdatesRequest::validate);
+    Assertions.assertEquals("updates must not be null", exception.getMessage());
   }
 }

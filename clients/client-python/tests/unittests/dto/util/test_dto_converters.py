@@ -23,6 +23,7 @@ from typing import Dict, cast
 from unittest.mock import MagicMock, patch
 
 from gravitino.api.rel.column import Column
+from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.expression import Expression
@@ -41,6 +42,7 @@ from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -71,9 +73,11 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.fixtures.table_fixtures import TABLE_DTO_JSON_STRING
 
 
 class TestDTOConverters(unittest.TestCase):
@@ -118,139 +122,22 @@ class TestDTOConverters(unittest.TestCase):
             Transforms.NAME_OF_HOUR: Transforms.hour("createTime"),
         }
 
-        cls.table_dto_json = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "Apache Gravitino",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "age" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
+        cls.table_dto_json = TABLE_DTO_JSON_STRING
 
     def test_from_function_arg_literal_dto(self):
         for data_type, value in TestDTOConverters.literals.items():
             expected = Literals.of(value=value, data_type=data_type)
+            wire_value = value
+            if isinstance(
+                data_type, (Types.BinaryType, Types.FixedType)
+            ) and isinstance(value, (bytes, bytearray)):
+                # Wire form is 0x + lowercase hex (#14609 / Iceberg Appendix D).
+                wire_value = "0x" + bytes(value).hex()
             literal_dto = (
-                LiteralDTO.builder().with_data_type(data_type).with_value(value).build()
+                LiteralDTO.builder()
+                .with_data_type(data_type)
+                .with_value(wire_value)
+                .build()
             )
             self.assertTrue(DTOConverters.from_function_arg(literal_dto) == expected)
 
@@ -359,7 +246,7 @@ class TestDTOConverters(unittest.TestCase):
             field_names=field_names,
         )
         converted = DTOConverters.from_dto(index_dto)
-        expected = Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", field_names)
+        expected = Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", field_names, {})
         self.assertTrue(converted.type() == expected.type())
         self.assertTrue(converted.name() == expected.name())
         self.assertListEqual(converted.field_names(), expected.field_names())
@@ -385,6 +272,16 @@ class TestDTOConverters(unittest.TestCase):
         )
         converted = DTOConverters.from_dto(sort_order_dto)
         self.assertTrue(converted == expected)
+
+    def test_from_dto_sql_representation(self):
+        representation_dto = SQLRepresentationDTO(Dialects.TRINO, "SELECT 1")
+
+        converted = DTOConverters.from_dto(representation_dto)
+
+        self.assertEqual(
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            converted,
+        )
 
     def test_from_dto_column(self):
         column_name = "test_column"
@@ -493,7 +390,7 @@ class TestDTOConverters(unittest.TestCase):
         ]
         converted_dtos = DTOConverters.from_dtos(dtos)
         expected_items = [
-            Indexes.of(index_type, index_type.value, field_names)
+            Indexes.of(index_type, index_type.value, field_names, {})
             for index_type in Index.IndexType
         ]
         self.assertEqual(len(converted_dtos), len(expected_items))
@@ -535,6 +432,20 @@ class TestDTOConverters(unittest.TestCase):
                 )
             )
         converted = DTOConverters.from_dtos(sort_order_dtos)
+        self.assertListEqual(converted, expected)
+
+    def test_from_dtos_representations(self):
+        representation_dtos = [
+            SQLRepresentationDTO(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentationDTO(Dialects.SPARK, "SELECT 2"),
+        ]
+        expected = [
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentation(Dialects.SPARK, "SELECT 2"),
+        ]
+
+        converted = DTOConverters.from_dtos(representation_dtos)
+
         self.assertListEqual(converted, expected)
 
     def test_from_dtos_partitioning(self):
@@ -625,10 +536,19 @@ class TestDTOConverters(unittest.TestCase):
 
         for data_type, value in TestDTOConverters.literals.items():
             literal = Literals.of(value=value, data_type=data_type)
+            if value is None:
+                expected_value = None
+            elif isinstance(
+                data_type, (Types.BinaryType, Types.FixedType)
+            ) and isinstance(value, (bytes, bytearray)):
+                # Wire form is 0x + lowercase hex (#14609 / Iceberg Appendix D).
+                expected_value = "0x" + bytes(value).hex()
+            else:
+                expected_value = str(value)
             expected = (
                 LiteralDTO.builder()
                 .with_data_type(data_type)
-                .with_value(str(value))
+                .with_value(expected_value)
                 .build()
             )
             self.assertTrue(DTOConverters.to_function_arg(literal) == expected)
@@ -664,9 +584,65 @@ class TestDTOConverters(unittest.TestCase):
         ):
             DTOConverters.to_function_arg(DistributionDTO.NONE)
 
+    def test_binary_and_fixed_literal_hex_round_trip(self):
+        bytes_value = bytes([0x01, 0x02, 0x03])
+        for data_type in (Types.BinaryType.get(), Types.FixedType.of(3)):
+            literal = Literals.of(value=bytes_value, data_type=data_type)
+            dto = DTOConverters.to_function_arg(literal)
+            self.assertIsInstance(dto, LiteralDTO)
+            self.assertEqual("0x010203", cast(LiteralDTO, dto).value())
+            round_trip = DTOConverters.from_function_arg(dto)
+            self.assertEqual(literal, round_trip)
+
+        # Uppercase hex after 0x must also decode.
+        upper = (
+            LiteralDTO.builder()
+            .with_data_type(Types.BinaryType.get())
+            .with_value("0x0A1B2C")
+            .build()
+        )
+        decoded = DTOConverters.from_function_arg(upper)
+        self.assertEqual(
+            Literals.of(
+                value=bytes([0x0A, 0x1B, 0x2C]), data_type=Types.BinaryType.get()
+            ),
+            decoded,
+        )
+
+        # Unprefixed wire values keep provider-specific string interpretation (#14609).
+        unprefixed = (
+            LiteralDTO.builder()
+            .with_data_type(Types.BinaryType.get())
+            .with_value("AB")
+            .build()
+        )
+        self.assertEqual(
+            Literals.of(value="AB", data_type=Types.BinaryType.get()),
+            DTOConverters.from_function_arg(unprefixed),
+        )
+        self.assertEqual(
+            "legacy",
+            cast(
+                LiteralDTO,
+                DTOConverters.to_function_arg(
+                    Literals.of(value="legacy", data_type=Types.BinaryType.get())
+                ),
+            ).value(),
+        )
+
     def test_to_dto_raise_exception(self):
         with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
             DTOConverters.to_dto("test")
+
+    def test_to_dto_sql_representation(self):
+        representation = SQLRepresentation(Dialects.TRINO, "SELECT 1")
+
+        dto = DTOConverters.to_dto(representation)
+
+        self.assertIsInstance(dto, SQLRepresentationDTO)
+        self.assertEqual(Dialects.TRINO, dto.dialect())
+        self.assertEqual("SELECT 1", dto.sql())
+        self.assertIs(dto, DTOConverters.to_dto(dto))
 
     def test_to_dto_range_partition(self):
         converted = DTOConverters.to_dto(
@@ -839,7 +815,7 @@ class TestDTOConverters(unittest.TestCase):
         field_names = [[f"field_{i}"] for i in range(2)]
 
         indexes: list[Index] = [
-            Indexes.of(index_type, index_type.value, field_names)
+            Indexes.of(index_type, index_type.value, field_names, {})
             for index_type in Index.IndexType
         ]
         expected_dtos: list[IndexDTO] = [
@@ -856,6 +832,21 @@ class TestDTOConverters(unittest.TestCase):
             self.assertEqual(converted.name(), expected.name())
             self.assertListEqual(converted.field_names(), expected.field_names())
 
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
+
+    def test_to_dtos_representations(self):
+        representations = [
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentation(Dialects.SPARK, "SELECT 2"),
+        ]
+        expected_dtos = [
+            SQLRepresentationDTO(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentationDTO(Dialects.SPARK, "SELECT 2"),
+        ]
+
+        converted_dtos = DTOConverters.to_dtos(representations)
+
+        self.assertListEqual(converted_dtos, expected_dtos)
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
     def test_to_dtos_single_field_transforms(self):

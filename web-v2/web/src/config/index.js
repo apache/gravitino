@@ -108,7 +108,7 @@ export const ColumnType = [
   'decimal'
 ]
 
-export const ColumnTypeForMysql = ['byte unsigned', 'short unsigned', 'integer unsigned', 'long unsigned']
+export const ColumnTypeForUnsigned = ['byte unsigned', 'short unsigned', 'integer unsigned', 'long unsigned']
 
 export const ColumnTypeSupportAutoIncrement = [
   'byte',
@@ -127,6 +127,7 @@ export const ColumnSpesicalType = ['union', 'list', 'map', 'struct']
 
 export const UnsupportColumnType = {
   'lakehouse-iceberg': ['varchar', 'char', 'byte', 'short', 'interval_day', 'interval_year', 'union'],
+  glue: ['fixed', 'time', 'timestamp_tz', 'uuid'],
   hive: ['fixed', 'time', 'timestamp_tz', 'uuid'],
   'jdbc-mysql': [
     'boolean',
@@ -155,10 +156,27 @@ export const UnsupportColumnType = {
     'time'
   ],
   'lakehouse-generic': ['char', 'varchar', 'time', 'timestamp_tz'],
-  'lakehouse-paimon': ['interval_day', 'interval_year', 'union', 'uuid']
+  'lakehouse-paimon': ['interval_day', 'interval_year', 'union', 'uuid'],
+  'jdbc-clickhouse': [
+    'binary',
+    'fixed',
+    'struct',
+    'list',
+    'map',
+    'interval_day',
+    'interval_year',
+    'union',
+    'time',
+    'timestamp_tz'
+  ]
 }
 
 const tableLevelPropInfoMap = {
+  glue: {
+    reserved: [],
+    immutable: ['format', 'input-format', 'output-format', 'serde-lib'],
+    allowAdd: true
+  },
   hive: {
     reserved: ['comment', 'EXTERNAL', 'numFiles', 'totalSize', 'transient_lastDdlTime'],
     immutable: [
@@ -258,11 +276,22 @@ export const distributionInfoMap = {
   }
 }
 
+export const sqlFormatterDialectMap = {
+  mysql: 'mysql',
+  postgresql: 'postgresql',
+  postgres: 'postgresql',
+  spark: 'spark',
+  trino: 'trino',
+  hive: 'spark',
+  sql: 'sql'
+}
+
 export const partitionInfoMap = {
   hive: ['identity'],
   'jdbc-doris': ['range', 'list'],
   'lakehouse-iceberg': ['identity', 'bucket', 'truncate', 'year', 'month', 'day', 'hour'],
-  'lakehouse-paimon': ['identity']
+  'lakehouse-paimon': ['identity'],
+  'jdbc-clickhouse': ['identity', 'year', 'month', 'day']
 }
 
 export const transformsLimitMap = {
@@ -288,7 +317,8 @@ export const transformsLimitMap = {
 
 export const sortOrdersInfoMap = {
   hive: ['field'],
-  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
+  'lakehouse-iceberg': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour'],
+  'jdbc-clickhouse': ['field', 'bucket', 'truncate', 'year', 'month', 'day', 'hour']
 }
 
 export const indexesInfoMap = {
@@ -297,7 +327,8 @@ export const indexesInfoMap = {
   'jdbc-mysql': ['primary_key', 'unique_key'],
   'jdbc-oceanbase': ['primary_key', 'unique_key'],
   'jdbc-postgresql': ['primary_key', 'unique_key'],
-  'lakehouse-paimon': ['primary_key']
+  'lakehouse-paimon': ['primary_key'],
+  'jdbc-clickhouse': ['primary_key']
 }
 
 export const autoIncrementInfoMap = {

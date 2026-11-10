@@ -75,7 +75,7 @@ public class OwnerOperations {
   @ResponseMetered(name = "get-object-owner", absolute = true)
   @AuthorizationExpression(
       expression = CAN_ACCESS_METADATA,
-      errorMessage = "Current user can not get this objects's owner")
+      errorMessage = "Current user cannot get this object's owner")
   public Response getOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -88,7 +88,10 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
+            if (object.type() != MetadataObject.Type.METALAKE) {
+              MetalakeManager.checkMetalakeInUse(metalake);
+            }
+            TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
@@ -110,13 +113,21 @@ public class OwnerOperations {
   @ResponseMetered(name = "set-object-owner", absolute = true)
   @AuthorizationExpression(
       expression = CAN_SET_OWNER,
-      errorMessage = "Current user can not set this objects's owner")
+      errorMessage = "Current user cannot set this object's owner")
   public Response setOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("metadataObjectType") String metadataObjectType,
-      @PathParam("fullName") String fullName,
+      @PathParam("metadataObjectType") @AuthorizationObjectType String metadataObjectType,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       OwnerSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleOwnerException(
+          OperationType.SET,
+          String.format("metadata object %s", fullName),
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       MetadataObject object =
           MetadataObjects.parse(
@@ -127,6 +138,7 @@ public class OwnerOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
+            TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             ownerDispatcher.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));

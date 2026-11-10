@@ -25,42 +25,47 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude(group = "*")
-  }
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.guava)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude(group = "*")
   }
   implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
-  implementation(project(":common")) {
+  // hadoop-common's Kerberos path lives in :catalogs:hadoop-auth; bundle it into the
+  // catalog runtime libs (the hadoop-common dependency above is non-transitive).
+  implementation(project(":catalogs:hadoop-auth")) {
     exclude(group = "*")
   }
-  implementation(project(":core")) {
-    exclude(group = "*")
-  }
-  implementation(libs.awaitility)
+
   implementation(libs.caffeine)
   implementation(libs.cglib)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
-  implementation(libs.slf4j.api)
   implementation(libs.metrics.caffeine)
   implementation(libs.metrics.core)
+  implementation(libs.slf4j.api)
 
-  compileOnly(libs.guava)
-
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
-  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":api"))
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:tencent-bundle", configuration = "shadow"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.hadoop3.minicluster)
@@ -74,6 +79,8 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
+  // The RustFS fixture uses the S3 SDK v2; Hadoop's AWS bundle supplies the S3 SDK v1.
+  testRuntimeOnly(libs.aws.s3)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -88,6 +95,7 @@ tasks {
     from("build/libs") {
       exclude("slf4j-*.jar")
       exclude("guava-*.jar")
+      exclude("error_prone_annotations-*.jar")
       exclude("curator-*.jar")
       exclude("netty-*.jar")
       exclude("snappy-*.jar")
@@ -141,6 +149,7 @@ tasks.test {
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:tencent-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

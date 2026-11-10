@@ -40,13 +40,12 @@ class Strategy(Enum):
         upper_name = name.upper()
         if upper_name == "NONE":
             return Strategy.NONE
-        elif upper_name == "HASH":
+        if upper_name == "HASH":
             return Strategy.HASH
-        elif upper_name == "RANGE":
+        if upper_name == "RANGE":
             return Strategy.RANGE
-        elif upper_name in {"EVEN", "RANDOM"}:
+        if upper_name in {"EVEN", "RANDOM"}:
             return Strategy.EVEN
-        else:
-            raise ValueError(
-                f"Invalid distribution strategy: {name}. Valid values are: {[s.value for s in Strategy]}"
-            )
+        raise ValueError(
+            f"Invalid distribution strategy: {name}. Valid values are: {[s.value for s in Strategy]}"
+        )

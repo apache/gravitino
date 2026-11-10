@@ -40,7 +40,8 @@ import {
   providerBase,
   rangerDefaultProps,
   regionOptions,
-  relationalProviders
+  relationalProviders,
+  sensitiveCatalogPropertyKeys
 } from '@/config/catalog'
 import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
@@ -77,6 +78,13 @@ export default function CreateCatalogDialog({ ...props }) {
   const dispatch = useAppDispatch()
   const isShowTestConnect = ['fileset', 'model'].includes(catalogType) || currentProvider === 'lakehouse-generic'
 
+  const isRequiredField = prop => {
+    return (
+      prop.required ||
+      (prop.key === 'warehouse' && currentProvider === 'lakehouse-iceberg' && ['hive', 'jdbc'].includes(catalogBackend))
+    )
+  }
+
   const defaultValues = {
     name: '',
     type: catalogType,
@@ -106,14 +114,19 @@ export default function CreateCatalogDialog({ ...props }) {
   )
 
   const isHidden = prop => {
-    const { parentField, hide, required, key } = prop
+    const { parentField, hide, key } = prop
+
+    // In edit mode, hide props not present in the loaded catalog response
+    if (editCatalog && cacheData?.properties && !(key in cacheData.properties)) {
+      return true
+    }
     switch (parentField) {
       case 'catalog-backend':
         return catalogBackend && hide && hide.includes(catalogBackend)
       case 'authentication.type':
         return !authType || (hide && hide.includes(authType))
       default:
-        return !(!editCatalog || ['region', 'location'].includes(key) || required)
+        return !(!editCatalog || ['region', 'location'].includes(key) || isRequiredField(prop))
     }
   }
 
@@ -294,6 +307,17 @@ export default function CreateCatalogDialog({ ...props }) {
         setConfirmLoading(true)
         const submitData = getSubmitData()
         if (editCatalog) {
+          // Backfill hidden default props that the form doesn't render during edit
+          const allDefaultProps =
+            (catalogType === 'model'
+              ? providerBase['model'].defaultProps
+              : providerBase[currentProvider]?.defaultProps) || []
+          allDefaultProps.forEach(prop => {
+            if (isHidden(prop) && !(prop.key in submitData.properties) && cacheData?.properties?.[prop.key] != null) {
+              submitData.properties[prop.key] = cacheData.properties[prop.key]
+            }
+          })
+
           // update catalog
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
@@ -343,12 +367,18 @@ export default function CreateCatalogDialog({ ...props }) {
           return <Icons.paimon className={small ? 'size-6' : 'size-12'}></Icons.paimon>
         case 'custom-icons-hudi':
           return <Icons.hudi className={small ? 'size-6' : 'size-12'}></Icons.hudi>
+        case 'custom-icons-hologres':
+          return <Icons.hologres className={small ? 'size-6' : 'size-12'}></Icons.hologres>
         case 'custom-icons-oceanbase':
           return <Icons.oceanbase className={small ? 'size-6' : 'size-12'}></Icons.oceanbase>
         case 'custom-icons-starrocks':
           return <Icons.starrocks className={small ? 'size-6' : 'size-12'}></Icons.starrocks>
         case 'custom-icons-lakehouse':
           return <Icons.lakehouse className={small ? 'size-6' : 'size-12'}></Icons.lakehouse>
+        case 'custom-icons-clickhouse':
+          return <Icons.clickhouse className={small ? 'size-6' : 'size-12'}></Icons.clickhouse>
+        case 'custom-icons-glue':
+          return <Icons.glue className={small ? 'size-6' : 'size-12'}></Icons.glue>
       }
     } else {
       return <Icons.iconify icon={calalogIcon} className={small ? 'size-6' : 'size-12'} />
@@ -361,7 +391,7 @@ export default function CreateCatalogDialog({ ...props }) {
         key={idx}
         data-refer={`catalog-provider-${provider.value}`}
         className={cn('provider-card flex items-center justify-between', {
-          'actived-default': provider.value === currentProvider,
+          'actived-default bg-defaultPrimary': provider.value === currentProvider,
           disabled: editCatalog
         })}
         onClick={() => handleSelectProvider(provider.value)}
@@ -383,9 +413,9 @@ export default function CreateCatalogDialog({ ...props }) {
           </div>
         </div>
         {provider.value === currentProvider ? (
-          <Icons.CircleCheckBig className='provider-radio size-4 text-white default-theme-radio' />
+          <Icons.CircleCheckBig className='provider-radio size-4 shrink-0 text-white default-theme-radio' />
         ) : (
-          <Icons.Circle className='provider-radio size-4 text-gray-400 default-theme-radio' />
+          <Icons.Circle className='provider-radio size-4 shrink-0 text-gray-400 default-theme-radio' />
         )}
       </div>
     )
@@ -492,7 +522,7 @@ export default function CreateCatalogDialog({ ...props }) {
                       messageVariables={{ label: 'catalog name' }}
                       data-refer='catalog-name-field'
                     >
-                      <Input placeholder={mismatchName} disabled={!init} />
+                      <Input placeholder={mismatchName} disabled={init} />
                     </Form.Item>
                     {providerBase[catalogType === 'model' ? 'model' : currentProvider]?.defaultProps
                       ?.filter(p => !isHidden(p))
@@ -504,11 +534,7 @@ export default function CreateCatalogDialog({ ...props }) {
                             key={idx}
                             rules={[
                               {
-                                required:
-                                  prop.required ||
-                                  (prop.key === 'warehouse' &&
-                                    currentProvider === 'lakehouse-iceberg' &&
-                                    ['hive', 'jdbc'].includes(catalogBackend))
+                                required: isRequiredField(prop)
                               }
                             ]}
                             messageVariables={{ label: prop.label.toLowerCase() }}
@@ -531,7 +557,7 @@ export default function CreateCatalogDialog({ ...props }) {
                                 data-refer={`catalog-props-${prop.key}`}
                                 placeholder={prop.description ? prop.description : ''}
                                 disabled={prop.disabled}
-                                type={prop.key === 'jdbc-password' ? 'password' : 'text'}
+                                type={sensitiveCatalogPropertyKeys.includes(prop.key) ? 'password' : 'text'}
                               />
                             )}
                           </Form.Item>

@@ -41,6 +41,8 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
       Field.required("id", Long.class, "The unique id of the function entity.");
   public static final Field NAME =
       Field.required("name", String.class, "The name of the function entity.");
+  public static final Field NAMESPACE =
+      Field.required("namespace", Namespace.class, "The namespace of the function entity.");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description of the function entity.");
   public static final Field FUNCTION_TYPE =
@@ -68,6 +70,7 @@ public class FunctionEntity implements Entity, Auditable, HasIdentifier, Functio
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
+    fields.put(NAMESPACE, namespace);
     fields.put(COMMENT, comment);
     fields.put(FUNCTION_TYPE, functionType);
     fields.put(DETERMINISTIC, deterministic);

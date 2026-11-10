@@ -19,9 +19,9 @@
 services:
 
   hive:
-    image: apache/gravitino-ci:hive-0.1.13
+    image: apache/gravitino-ci:hive-0.1.20
     networks:
-      - trino-net
+      - default
     container_name: trino-ci-hive
     environment:
       - HADOOP_USER_NAME=anonymous
@@ -45,7 +45,7 @@ services:
       POSTGRES_PASSWORD: ds123
       ALLOW_IP_RANGE: 0.0.0.0/0
     networks:
-      - trino-net
+      - default
     volumes:
       - ./init/postgres:/docker-entrypoint-initdb.d/
     healthcheck:
@@ -58,7 +58,7 @@ services:
     image: mysql:8.0
     container_name: trino-ci-mysql
     networks:
-      - trino-net
+      - default
     volumes:
       - ./init/mysql:/docker-entrypoint-initdb.d/
     environment:
@@ -79,9 +79,9 @@ services:
       retries: 5
 
   trino:
-    image: trinodb/trino:435
+    image: trinodb/trino:${TRINO_VERSION:-483}
     networks:
-      - trino-net
+      - default
     container_name: trino-ci-trino
     environment:
       - HADOOP_USER_NAME=anonymous
@@ -94,7 +94,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-482-483/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -113,9 +113,9 @@ services:
         condition: service_healthy
 
   trino-worker:
-    image: trinodb/trino:435
+    image: trinodb/trino:${TRINO_VERSION:-483}
     networks:
-      - trino-net
+      - default
     deploy:
       replicas: ${TRINO_WORKER_NUM:-0}
     environment:
@@ -128,7 +128,7 @@ services:
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
-      - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-../../trino-connector/trino-connector-482-483/build/libs}:/usr/lib/trino/plugin/gravitino
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -140,9 +140,9 @@ services:
         condition: service_healthy
 
 networks:
-  trino-net:
-    driver: bridge
+  default:
     name: trino-net
+    driver: bridge
     ipam:
       config:
         - subnet: 10.20.31.16/28

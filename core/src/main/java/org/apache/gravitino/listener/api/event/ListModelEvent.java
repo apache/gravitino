@@ -25,18 +25,34 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is generated after a model listing operation. */
 @DeveloperApi
-public class ListModelEvent extends ModelEvent {
+public class ListModelEvent extends ModelEvent implements ListEvent {
   private final Namespace namespace;
+  private final int modelCount;
 
   /**
-   * Constructs an instance of {@code ListModelEvent}, with the specified user and namespace.
+   * Constructs an instance of {@code ListModelEvent}, with the specified user, namespace and count.
    *
    * @param user The username of the individual who initiated the model listing.
    * @param namespace The namespace from which models were listed.
+   * @param modelCount The number of models returned by the list operation.
    */
-  public ListModelEvent(String user, Namespace namespace) {
+  public ListModelEvent(String user, Namespace namespace, int modelCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.modelCount = modelCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListModelEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the model listing.
+   * @param namespace The namespace from which models were listed.
+   * @deprecated Use {@link #ListModelEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListModelEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -46,6 +62,12 @@ public class ListModelEvent extends ModelEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return modelCount;
   }
 
   /**

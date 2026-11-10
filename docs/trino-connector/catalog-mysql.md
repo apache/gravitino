@@ -1,12 +1,14 @@
 ---
-title: "Apache Gravitino Trino connector - MySQL catalog"
-slug: /trino-connector/catalog-mysql
-keyword: gravitino connector trino
+title: "Trino Connector: MySQL Catalog"
+slug: "/trino-connector/catalog-mysql"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
-You can join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
+Join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
 
 ## Requirements
 
@@ -14,13 +16,30 @@ To connect to MySQL, you need:
 - MySQL 5.7, 8.0 or higher.
 - Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
 
-## Create table
+## Create Table
 
 At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys, indexes, default values and auto-increment.
+The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 
-The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+:::note
+`CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
+:::
 
-## Alter table
+### Time type mapping
+
+`TIME`, `TIMESTAMP` and `TIMESTAMP WITH TIME ZONE` columns keep their precision in both directions, the same way
+the native Trino MySQL connector does:
+
+| Trino type                    | MySQL type     |
+|-------------------------------|----------------|
+| `TIME(n)`                     | `TIME(n)`      |
+| `TIMESTAMP(n)`                | `DATETIME(n)`  |
+| `TIMESTAMP(n) WITH TIME ZONE` | `TIMESTAMP(n)` |
+
+`n` ranges from 0 to 6, a higher precision is reduced to 6. `TIMESTAMP` without a precision is `TIMESTAMP(3)` in
+Trino, so it creates a `DATETIME(3)` column.
+
+## Alter Table
 
 Support for the following alter table operations:
 - Rename table
@@ -32,7 +51,7 @@ Support for the following alter table operations:
 ## Select
 
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
+It doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Update
 
@@ -46,28 +65,27 @@ If the `WHERE` clause is specified, only the matching rows are deleted. Otherwis
 
 Not support.
 
-## Table and Schema properties
+## Table and Schema Properties
 
 MySQL's schemas cannot support properties.
 
 The following are supported MySQL table properties:
 
-| Property name                      | Type   | Default Value  | Description                                                                                                                             | Required | Since Version |
-|------------------------------------|--------|----------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| engine                             | string | InnoDB         | The engine that MySQL table uses.                                                                                                       | No       | 0.4.0         |
-| auto_increment_offset              | string | (none)         | The auto increment offset for the table.                                                                                                | No       | 0.4.0         |
-| primary_key                        | list   | (none)         | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       | 1.0.0         |
-| unique_key                         | list   | (none)         | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       | 1.0.0         |
+| Property name         | Type   | Default Value | Description                                                                                                                             | Required |
+|-----------------------|--------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|
+| engine                | string | InnoDB        | The engine that MySQL table uses.                                                                                                       | No       |
+| auto_increment_offset | string | (none)        | The auto increment offset for the table.                                                                                                | No       |
+| primary_key           | list   | (none)        | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       |
+| unique_key            | list   | (none)        | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       |
 
 The following are supported MySQL column properties:
 
-| Property name                      | Type    | Default Value | Description                                       | Required | Since Version |
-|------------------------------------|---------|---------------|---------------------------------------------------|----------|---------------|
-| auto_increment                     | boolean | false         | The auto increment column.                        | No       | 1.0.0         |
-| default                            | string  | (none)        | The default value for column.                     | No       | 1.0.0         |
+| Property name  | Type    | Default Value | Description                   | Required |
+|----------------|---------|---------------|-------------------------------|----------|
+| auto_increment | boolean | false         | The auto increment column.    | No       |
+| default        | string  | (none)        | The default value for column. | No       |
 
-**Note:** Currently, creating tables only supports constant default values and does not support expression default values, 
-and `show create table` also exclusively renders constant default values in its output.
+**Note:** Creating tables supports constant default values only. Expression default values are not supported. `SHOW CREATE TABLE` also renders only constant default values.
 The following are Trino type which support configuration of default values:
 
 | Type name | Default Value example                   |
@@ -85,9 +103,9 @@ The following are Trino type which support configuration of default values:
 | TIME      | 01:01:01                                | 
 | TIMESTAMP | 2025-08-07 01:01:01 (CURRENT_TIMESTAMP) | 
 
-## Basic usage examples
+## Examples
 
-You need to do the following steps before you can use the MySQL catalog in Trino through Gravitino.
+Complete the following steps before you can use the MySQL catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `mysql_test`,
 then you can use the following code to create them in Gravitino:
@@ -115,7 +133,7 @@ curl -X POST -H "Content-Type: application/json" \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the MySQL catalog, please refer to [MySQL catalog](../jdbc-mysql-catalog.md).
+For More information about the MySQL catalog, refer to [MySQL catalog](../jdbc-mysql-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 
@@ -145,7 +163,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Creating tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `test.mysql_test` catalog.
 
@@ -208,7 +226,7 @@ WITH (
 );
 ```
 
-### Writing data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -235,7 +253,7 @@ DELETE FROM mysql_test.database_01.table_01 WHERE salary = 12;
 DELETE FROM mysql_test.database_01.table_01;
 ```
 
-### Querying data
+### Query Data
 
 Query the `table_01` table:
 
@@ -243,7 +261,7 @@ Query the `table_01` table:
 SELECT * FROM mysql_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 

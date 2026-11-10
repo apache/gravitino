@@ -13,7 +13,7 @@ Before building Gravitino, ensure you have:
 - Linux or macOS operating system
 - Git installed
 - Java Development Kit (JDK) 17 installed to launch Gradle
-- Python 3.8–3.12 to build the Gravitino Python client
+- Python 3.10–3.12 to build the Gravitino Python client
 - Optionally, Docker to run integration tests
 
 Full build instructions: [Gravitino How to Build](https://gravitino.apache.org/docs/how-to-build/)

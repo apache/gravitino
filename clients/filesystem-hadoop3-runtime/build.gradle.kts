@@ -30,6 +30,7 @@ dependencies {
   implementation(project(":bundles:aws"))
   implementation(project(":bundles:azure"))
   implementation(project(":bundles:gcp"))
+  implementation(project(":bundles:tencent"))
   implementation(project(":clients:filesystem-hadoop3")) {
     exclude(group = "org.slf4j")
   }
@@ -42,8 +43,18 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  // Strip shaded slf4j-api brought in by :clients:client-java-runtime — Hadoop classpaths
+  // usually ship slf4j 1.7.x, and bundling 2.x here breaks that binding at runtime.
+  exclude("org/slf4j/**")
+  exclude("META-INF/maven/org.slf4j/**")
+  exclude("META-INF/services/org.slf4j.spi.SLF4JServiceProvider")
+
   // Relocate dependencies to avoid conflicts
-  relocate("com.google", "org.apache.gravitino.shaded.com.google")
+  relocate("com.google", "org.apache.gravitino.shaded.com.google") {
+    // Do not relocate com.google.cloud.hadoop classes — they come from the external
+    // gcs-connector jar on the user's Hadoop classpath and must keep their original package name.
+    exclude("com.google.cloud.hadoop.**")
+  }
   relocate("com.github.benmanes.caffeine", "org.apache.gravitino.shaded.com.github.benmanes.caffeine")
   // relocate common lang3 package
   relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")

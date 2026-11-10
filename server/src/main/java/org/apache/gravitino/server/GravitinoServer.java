@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.server;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -32,30 +36,46 @@ import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.lineage.LineageService;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.ConfigServlet;
+import org.apache.gravitino.server.web.HealthAliasServlet;
+import org.apache.gravitino.server.web.HealthCheckPathMatcher;
+import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
+import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
+import org.apache.gravitino.server.web.mapper.ErrorExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
+import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
+import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
+import org.apache.gravitino.server.web.mapper.WebApplicationExceptionMapper;
+import org.apache.gravitino.server.web.rest.SemanticModelSourceValidator;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -74,6 +94,18 @@ public class GravitinoServer extends ResourceConfig {
 
   private static final String API_ANY_PATH = "/api/*";
 
+  // Servlets mounted outside API_ANY_PATH that still need request-context tracking and
+  // audit-on-failure coverage. VersioningFilter is intentionally not applied to these: it
+  // negotiates Gravitino's "application/vnd.gravitino.vN+json" media type for the Jersey-managed
+  // REST surface, and none of these servlets are part of it or read that header. /metrics and
+  // /prometheus/metrics are registered directly on JettyServer's servlet context, outside the
+  // Jersey-managed REST surface. See GH-12760.
+  private static final ImmutableList<String> ROOT_MOUNTED_PATHS =
+      ImmutableList.<String>builder()
+          .add("/configs")
+          .addAll(JettyServer.METRICS_PATH_SPECS)
+          .build();
+
   public static final String CONF_FILE = "gravitino.conf";
 
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
@@ -88,6 +120,8 @@ public class GravitinoServer extends ResourceConfig {
 
   private final LineageService lineageService;
 
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
+
   public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     this.serverConfig = config;
     this.server = new JettyServer();
@@ -100,7 +134,8 @@ public class GravitinoServer extends ResourceConfig {
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
-    server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
+    server.initialize(jettyServerConfig, SERVER_NAME);
+    server.addMetricsServlets(gravitinoEnv.metricsSystem());
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
@@ -110,14 +145,14 @@ public class GravitinoServer extends ResourceConfig {
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
 
     // initialize Jersey REST API resources.
-    initializeRestApi();
+    initializeRestApi(jettyServerConfig);
   }
 
   public ServerConfig serverConfig() {
     return serverConfig;
   }
 
-  private void initializeRestApi() {
+  private void initializeRestApi(JettyServerConfig jettyServerConfig) {
     HashSet<String> restApiPackagesSet = new HashSet<>();
     restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
     restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
@@ -137,7 +172,9 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
+            bindAsContract(SemanticModelSourceValidator.class);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
+            bind(gravitinoEnv.viewDispatcher()).to(ViewDispatcher.class).ranked(1);
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
@@ -146,17 +183,30 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.credentialOperationDispatcher())
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
+            bind(gravitinoEnv.secretPropertyOperationDispatcher())
+                .to(SecretPropertyOperationDispatcher.class)
+                .ranked(1);
+            bind(gravitinoEnv.secretProviderRegistry()).to(SecretProviderRegistry.class).ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(gravitinoEnv.functionDispatcher()).to(FunctionDispatcher.class).ranked(1);
+            bind(gravitinoEnv.semanticModelDispatcher())
+                .to(SemanticModelDispatcher.class)
+                .ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
             bind(gravitinoEnv.statisticDispatcher()).to(StatisticDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
+    register(new OutOfMemoryErrorListener());
+    register(ErrorExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
-    register(ObjectMapperProvider.class).register(JacksonFeature.class);
+    register(ParamExceptionMapper.class);
+    register(NotFoundExceptionMapper.class);
+    register(WebApplicationExceptionMapper.class);
+    register(new ObjectMapperProvider(jettyServerConfig.isIncludeErrorStackTrace()))
+        .register(JacksonFeature.class);
     property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 
     if (!enableAuthorization) {
@@ -172,12 +222,62 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addCustomFilters(API_ANY_PATH);
-    server.addFilter(new VersioningFilter(), API_ANY_PATH);
-    server.addSystemFilters(API_ANY_PATH);
 
-    server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
-    server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    // Root-level aliases for enterprise GTMs that require probes at well-known root paths.
+    // Forwards /health, /health/live, /health/ready, and /health.html to the canonical
+    // /api/health/* endpoints. Not part of ROOT_MOUNTED_PATHS below: HealthAliasServlet forwards
+    // every request into /api/health*, which API_ANY_PATH already covers via the servlet
+    // container's FORWARD dispatcher type, so binding the filters again here would double-log
+    // every probe.
+    server.addServlet(new HealthAliasServlet(), "/health/*");
+    server.addServlet(new HealthAliasServlet(), "/health.html");
+
+    // API_ANY_PATH keeps its original, unabridged filter set: this is the only pathspec that is
+    // part of the Jersey-managed REST surface, so it's the only one VersioningFilter applies to.
+    ClientAddressResolver clientAddressResolver = jettyServerConfig.getClientAddressResolver();
+    server.addFilter(
+        new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), API_ANY_PATH);
+    server.addFilter(createHttpAuditFilter(clientAddressResolver), API_ANY_PATH);
+    server.addFilter(
+        new VersioningFilter(jettyServerConfig.isIncludeErrorStackTrace()), API_ANY_PATH);
+
+    // GH-12760: servlets mounted outside API_ANY_PATH used to receive none of the filters below
+    // (no request-context tracking, no audit-on-failure, no custom filters), with nothing in the
+    // build catching it. Every pathSpec a servlet is registered under above must appear in
+    // ROOT_MOUNTED_PATHS, unless it forwards into an already-covered path (see HealthAliasServlet
+    // above) or is added to the exemption list documented on
+    // TestGravitinoServer#testEveryServletPathIsCoveredByAuditFilter. RequestContextFilter is
+    // given gravitinoEnv.eventBus() here too (not just API_ANY_PATH) so query-parameter capture
+    // (see RequestContextFilter's class doc) applies uniformly, not only to the REST API.
+    for (String pathSpec : ROOT_MOUNTED_PATHS) {
+      server.addFilter(
+          new RequestContextFilter(gravitinoEnv.eventBus(), clientAddressResolver), pathSpec);
+      server.addFilter(createHttpAuditFilter(clientAddressResolver), pathSpec);
+    }
+
+    // Custom filters are registered once, across every filtered path in a single call, so a
+    // filter whose init() isn't safe to run more than once per JVM only runs it once rather than
+    // once per pathSpec.
+    List<String> customFilterPaths = new ArrayList<>(ROOT_MOUNTED_PATHS);
+    customFilterPaths.add(API_ANY_PATH);
+    server.addCustomFilters(customFilterPaths.toArray(new String[0]));
+
+    // Only API_ANY_PATH requires authentication today. /configs must stay open for the Web UI's
+    // pre-login OAuth bootstrap (see docs/gravitino-server-config.md). Secret provider discovery
+    // lives under /api/metalakes/{metalake}/secrets/providers (see GH-12921).
+    server.addSystemFilters(API_ANY_PATH);
+    if (server.isWebUiEnabled()) {
+      server.addFilter(new WebUIFilter(), "/"); // Redirect to the /ui/index html page.
+      server.addFilter(new WebUIFilter(), "/ui/*"); // Redirect to the static html file.
+    }
+  }
+
+  private HttpAuditFilter createHttpAuditFilter(ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        gravitinoEnv.eventBus(),
+        EventSource.GRAVITINO_SERVER,
+        new HealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 
   public void start() throws Exception {
@@ -196,6 +296,13 @@ public class GravitinoServer extends ResourceConfig {
     if (lineageService != null) {
       lineageService.close();
     }
+  }
+
+  void gracefulStop() throws IOException {
+    if (!isStopped.compareAndSet(false, true)) {
+      return;
+    }
+    stop();
   }
 
   public static void main(String[] args) {
@@ -219,8 +326,8 @@ public class GravitinoServer extends ResourceConfig {
             new Thread(
                 () -> {
                   try {
-                    // Register some clean-up tasks that need to be done before shutting down
                     Thread.sleep(server.serverConfig.get(ServerConfig.SERVER_SHUTDOWN_TIMEOUT));
+                    server.gracefulStop();
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.error("Interrupted exception:", e);
@@ -233,7 +340,7 @@ public class GravitinoServer extends ResourceConfig {
 
     LOG.info("Shutting down Gravitino Server ... ");
     try {
-      server.stop();
+      server.gracefulStop();
       LOG.info("Gravitino Server has shut down.");
     } catch (Exception e) {
       LOG.error("Error while stopping Gravitino Server", e);

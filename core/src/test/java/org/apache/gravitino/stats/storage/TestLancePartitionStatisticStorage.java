@@ -209,10 +209,9 @@ public class TestLancePartitionStatisticStorage {
   }
 
   @Test
-  public void testLancePartitionStatisticStorageWithCache() throws Exception {
+  public void testExceedMaxStatisticsPerUpdateLimit() throws Exception {
     PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
 
-    // Prepare table entity
     String metalakeName = "metalake";
     String catalogName = "catalog";
     String schemaName = "schema";
@@ -225,157 +224,69 @@ public class TestLancePartitionStatisticStorage {
     EntityStore entityStore = mock(EntityStore.class);
     TableEntity tableEntity = mock(TableEntity.class);
     when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
-    when(tableEntity.id()).thenReturn(1L);
+    when(tableEntity.id()).thenReturn(101L);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
 
-    String location = Files.createTempDirectory("lance_stats_test").toString();
+    String location = Files.createTempDirectory("lance_stats_exceed_test").toString();
     Map<String, String> properties = Maps.newHashMap();
     properties.put("location", location);
-    properties.put("datasetCacheSize", "1000");
+    // Default limit is 100, generate 101 statistics to exceed the limit
 
     LancePartitionStatisticStorage storage =
         (LancePartitionStatisticStorage) factory.create(properties);
 
-    int count = 100;
-    int partitions = 10;
-    Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
-        generateData(metadataObject, count, partitions);
-    Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
-        convertData(originData);
+    try {
+      // Generate 101 statistics which exceeds the default limit of 100
+      int count = 101;
+      Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> originData =
+          generateData(metadataObject, count, 1);
+      Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate =
+          convertData(originData);
 
-    List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
-    for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
-        statisticsToUpdate.entrySet()) {
-      MetadataObject metadata = entry.getKey();
-      List<PartitionStatisticsUpdate> updates = entry.getValue();
-      objectUpdates.add(MetadataObjectStatisticsUpdate.of(metadata, updates));
-    }
-    storage.updateStatistics(metalakeName, objectUpdates);
-    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-
-    String fromPartitionName =
-        "partition" + String.format("%0" + String.valueOf(partitions).length() + "d", 0);
-    String toPartitionName =
-        "partition" + String.format("%0" + String.valueOf(partitions).length() + "d", 1);
-
-    List<PersistedPartitionStatistics> listedStats =
-        storage.listStatistics(
-            metalakeName,
-            metadataObject,
-            PartitionRange.between(
-                fromPartitionName,
-                PartitionRange.BoundType.CLOSED,
-                toPartitionName,
-                PartitionRange.BoundType.OPEN));
-    Assertions.assertEquals(1, listedStats.size());
-    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-
-    String targetPartitionName = "partition00";
-    for (PersistedPartitionStatistics persistStat : listedStats) {
-      String partitionName = persistStat.partitionName();
-      List<PersistedStatistic> stats = persistStat.statistics();
-      Assertions.assertEquals(targetPartitionName, partitionName);
-      Assertions.assertEquals(10, stats.size());
-
-      for (PersistedStatistic statistic : stats) {
-        String statisticName = statistic.name();
-        StatisticValue<?> statisticValue = statistic.value();
-
-        Assertions.assertTrue(
-            originData.get(metadataObject).get(targetPartitionName).containsKey(statisticName));
-        Assertions.assertEquals(
-            originData.get(metadataObject).get(targetPartitionName).get(statisticName).value(),
-            statisticValue.value());
-        Assertions.assertNotNull(statistic.auditInfo());
-      }
-    }
-
-    // Drop one statistic from partition00
-    List<MetadataObjectStatisticsDrop> tableStatisticsToDrop =
-        Lists.newArrayList(
-            MetadataObjectStatisticsDrop.of(
-                metadataObject,
-                Lists.newArrayList(
-                    PartitionStatisticsModification.drop(
-                        targetPartitionName, Lists.newArrayList("statistic0")))));
-
-    storage.dropStatistics(metalakeName, tableStatisticsToDrop);
-    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-
-    listedStats =
-        storage.listStatistics(
-            metalakeName,
-            metadataObject,
-            PartitionRange.between(
-                fromPartitionName,
-                PartitionRange.BoundType.CLOSED,
-                toPartitionName,
-                PartitionRange.BoundType.OPEN));
-    Assertions.assertEquals(1, listedStats.size());
-    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-
-    for (PersistedPartitionStatistics partitionStat : listedStats) {
-      String partitionName = partitionStat.partitionName();
-      List<PersistedStatistic> stats = partitionStat.statistics();
-      Assertions.assertEquals(targetPartitionName, partitionName);
-      Assertions.assertEquals(9, stats.size());
-
-      for (PersistedStatistic statistic : stats) {
-        String statisticName = statistic.name();
-        StatisticValue<?> statisticValue = statistic.value();
-
-        Assertions.assertTrue(
-            originData.get(metadataObject).get(targetPartitionName).containsKey(statisticName));
-        Assertions.assertEquals(
-            originData.get(metadataObject).get(targetPartitionName).get(statisticName).value(),
-            statisticValue.value());
-        Assertions.assertNotNull(statistic.auditInfo());
+      List<MetadataObjectStatisticsUpdate> objectUpdates = Lists.newArrayList();
+      for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
+          statisticsToUpdate.entrySet()) {
+        objectUpdates.add(MetadataObjectStatisticsUpdate.of(entry.getKey(), entry.getValue()));
       }
 
-      // Drop one statistics from partition01 and partition02
-      tableStatisticsToDrop =
-          Lists.newArrayList(
-              MetadataObjectStatisticsDrop.of(
-                  metadataObject,
-                  Lists.newArrayList(
-                      PartitionStatisticsModification.drop(
-                          "partition01", Lists.newArrayList("statistic1")),
-                      PartitionStatisticsModification.drop(
-                          "partition02", Lists.newArrayList("statistic2")))));
-      storage.dropStatistics(metalakeName, tableStatisticsToDrop);
-      Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-
-      listedStats =
-          storage.listStatistics(
-              metalakeName,
-              metadataObject,
-              PartitionRange.between(
-                  fromPartitionName,
-                  PartitionRange.BoundType.CLOSED,
-                  "partition03",
-                  PartitionRange.BoundType.OPEN));
-      Assertions.assertEquals(3, listedStats.size());
-      Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
-      for (PersistedPartitionStatistics persistPartStat : listedStats) {
-        stats = persistPartStat.statistics();
-        Assertions.assertEquals(9, stats.size());
-        for (PersistedStatistic statistic : stats) {
-          partitionName = persistPartStat.partitionName();
-          String statisticName = statistic.name();
-          StatisticValue<?> statisticValue = statistic.value();
-
-          Assertions.assertTrue(
-              originData.get(metadataObject).get(partitionName).containsKey(statisticName));
-          Assertions.assertEquals(
-              originData.get(metadataObject).get(partitionName).get(statisticName).value(),
-              statisticValue.value());
-          Assertions.assertNotNull(statistic.auditInfo());
-        }
-      }
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> storage.updateStatistics(metalakeName, objectUpdates));
+      Assertions.assertTrue(exception.getMessage().contains("exceeds the maximum limit"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
     }
+  }
 
-    FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
-    storage.close();
+  @Test
+  public void testInvalidMaxStatisticsPerUpdateConfiguration() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_invalid_config_test").toString();
+
+    try {
+      // Test that zero value throws an exception
+      Map<String, String> properties = Maps.newHashMap();
+      properties.put("location", location);
+      properties.put("maxStatisticsPerUpdate", "0");
+
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+
+      // Test that negative value throws an exception
+      properties.put("maxStatisticsPerUpdate", "-1");
+
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> new LancePartitionStatisticStorage(properties));
+      Assertions.assertTrue(
+          exception.getMessage().contains("maxStatisticsPerUpdate must be positive"));
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
   }
 
   private Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> generateData(
@@ -411,5 +322,106 @@ public class TestLancePartitionStatisticStorage {
       }
     }
     return newData;
+  }
+
+  @Test
+  public void testDropStatisticsWithQuoteInPartitionAndStatisticName() throws Exception {
+    PartitionStatisticStorageFactory factory = new LancePartitionStatisticStorageFactory();
+    String metalakeName = "metalake";
+    MetadataObject metadataObject =
+        MetadataObjects.of(
+            Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    String location = Files.createTempDirectory("lance_stats_test_quote").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+
+    LancePartitionStatisticStorage storage =
+        (LancePartitionStatisticStorage) factory.create(properties);
+    try {
+      String quotedPartition = "partition'01";
+      String quotedStatistic = "statistic'0";
+      String normalStatistic = "statistic1";
+
+      Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+      stats.put(quotedStatistic, StatisticValues.stringValue("value0"));
+      stats.put(normalStatistic, StatisticValues.stringValue("value1"));
+
+      storage.updateStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsUpdate.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.update(quotedPartition, stats)))));
+
+      List<PersistedPartitionStatistics> listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(2, listedStats.get(0).statistics().size());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(quotedStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertEquals(1, listedStats.size());
+      Assertions.assertEquals(quotedPartition, listedStats.get(0).partitionName());
+      Assertions.assertEquals(1, listedStats.get(0).statistics().size());
+      Assertions.assertEquals(normalStatistic, listedStats.get(0).statistics().get(0).name());
+
+      storage.dropStatistics(
+          metalakeName,
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          quotedPartition, Lists.newArrayList(normalStatistic))))));
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED,
+                  quotedPartition,
+                  PartitionRange.BoundType.CLOSED));
+
+      Assertions.assertTrue(listedStats.isEmpty());
+    } finally {
+      FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
+      storage.close();
+    }
   }
 }

@@ -19,37 +19,34 @@
 
 package org.apache.gravitino.audit;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * DefaultFileAuditWriter is the default implementation of AuditLogWriter, which writes audit logs
- * to a file.
+ * FileAuditWriter is the default implementation of {@link AuditLogWriter}. It delegates all file
+ * management (rotation, compression, retention) to Log4j2 via a dedicated logger named {@code
+ * gravitino.audit}. Configure the appender in {@code conf/log4j2.properties}.
  */
 public class FileAuditWriter implements AuditLogWriter {
-  private static final Logger Log = LoggerFactory.getLogger(FileAuditWriter.class);
 
-  private static final String AUDIT_LOG_FILE_NAME = "fileName";
-  private static final String APPEND = "append";
-  private static final String FLUSH_INTERVAL_SECS = "flushIntervalSecs";
-  private static final String LINE_SEPARATOR = System.lineSeparator();
+  private static final Logger LOG = LoggerFactory.getLogger(FileAuditWriter.class);
 
-  @VisibleForTesting Writer outWriter;
-  @VisibleForTesting String fileName;
+  /** Logger name that must match the {@code logger.audit.name} entry in log4j2.properties. */
+  static final String AUDIT_LOGGER_NAME = "gravitino.audit";
+
+  private static final Map<String, String> DEPRECATED_KEYS =
+      ImmutableMap.of(
+          "fileName",
+          "configure appender.audit_file.fileName in log4j2.properties",
+          "append",
+          "configure appender.audit_file.append in log4j2.properties",
+          "flushIntervalSecs",
+          "configure immediateFlush or an async appender in log4j2.properties");
 
   private Formatter formatter;
-  private boolean append;
-  private int flushIntervalSecs;
-  private Instant nextFlushTime = Instant.now();
+  private Logger auditLogger;
 
   @Override
   public Formatter getFormatter() {
@@ -59,63 +56,28 @@ public class FileAuditWriter implements AuditLogWriter {
   @Override
   public void init(Formatter formatter, Map<String, String> properties) {
     this.formatter = formatter;
-    this.fileName =
-        System.getProperty("gravitino.log.path")
-            + "/"
-            + properties.getOrDefault(AUDIT_LOG_FILE_NAME, "gravitino_audit.log");
-    this.append = Boolean.parseBoolean(properties.getOrDefault(APPEND, "true"));
-    this.flushIntervalSecs = Integer.parseInt(properties.getOrDefault(FLUSH_INTERVAL_SECS, "10"));
-    try {
-      OutputStream outputStream = new FileOutputStream(fileName, append);
-      this.outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      throw new GravitinoRuntimeException(
-          e, "Init audit log writer fail, filename is %s", fileName);
-    }
+    DEPRECATED_KEYS.forEach(
+        (key, hint) -> {
+          if (properties.containsKey(key)) {
+            LOG.warn(
+                "FileAuditWriter config key '{}' is deprecated and has no effect. {}", key, hint);
+          }
+        });
+    this.auditLogger = LoggerFactory.getLogger(AUDIT_LOGGER_NAME);
   }
 
   @Override
   public void doWrite(AuditLog auditLog) {
-    String log = auditLog.toString();
-    try {
-      outWriter.write(log + LINE_SEPARATOR);
-      tryFlush();
-    } catch (Exception e) {
-      Log.warn("Failed to write audit log: {}", log, e);
-    }
+    auditLogger.info(auditLog.toString());
   }
 
   @Override
   public void close() {
-    if (outWriter != null) {
-      try {
-        outWriter.close();
-      } catch (Exception e) {
-        Log.warn("Failed to close writer", e);
-      }
-    }
+    // Log4j2 manages the appender lifecycle; nothing to close here.
   }
 
   @Override
   public String name() {
     return "file";
-  }
-
-  private void tryFlush() {
-    Instant now = Instant.now();
-    if (now.isAfter(nextFlushTime)) {
-      nextFlushTime = now.plusSeconds(flushIntervalSecs);
-      doFlush();
-    }
-  }
-
-  private void doFlush() {
-    if (outWriter != null) {
-      try {
-        outWriter.flush();
-      } catch (Exception e) {
-        Log.warn("Flush audit log failed,", e);
-      }
-    }
   }
 }

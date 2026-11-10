@@ -33,6 +33,7 @@ import org.apache.iceberg.types.Types;
 public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
   public static final int PRECISION_MICROSECOND = 6;
+  public static final int PRECISION_NANOSECOND = 9;
 
   public FromIcebergType() {}
 
@@ -77,6 +78,11 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
   }
 
   @Override
+  public Type variant(Types.VariantType variant) {
+    return org.apache.gravitino.rel.types.Types.VariantType.get();
+  }
+
+  @Override
   public Type primitive(org.apache.iceberg.types.Type.PrimitiveType primitive) {
     switch (primitive.typeId()) {
       case BOOLEAN:
@@ -102,6 +108,15 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
           return org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
               PRECISION_MICROSECOND);
         }
+      case TIMESTAMP_NANO:
+        Types.TimestampNanoType tsNano = (Types.TimestampNanoType) primitive;
+        if (tsNano.shouldAdjustToUTC()) {
+          return org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(
+              PRECISION_NANOSECOND);
+        } else {
+          return org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+              PRECISION_NANOSECOND);
+        }
       case STRING:
         return org.apache.gravitino.rel.types.Types.StringType.get();
       case UUID:
@@ -115,6 +130,18 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         Types.DecimalType decimal = (Types.DecimalType) primitive;
         return org.apache.gravitino.rel.types.Types.DecimalType.of(
             decimal.precision(), decimal.scale());
+      case UNKNOWN:
+        // Iceberg V3 unknown is the null-only placeholder type; map it to Gravitino's NullType,
+        // matching how Iceberg's own engine converters map unknown <-> the engine null type.
+        return org.apache.gravitino.rel.types.Types.NullType.get();
+      case GEOMETRY:
+        return org.apache.gravitino.rel.types.Types.GeometryType.of(
+            ((Types.GeometryType) primitive).crs());
+      case GEOGRAPHY:
+        Types.GeographyType geography = (Types.GeographyType) primitive;
+        // EdgeAlgorithm.toString() is the lowercase spec name, which GeographyType requires.
+        return org.apache.gravitino.rel.types.Types.GeographyType.of(
+            geography.crs(), geography.algorithm().toString());
       default:
         return org.apache.gravitino.rel.types.Types.ExternalType.of(primitive.typeId().name());
     }

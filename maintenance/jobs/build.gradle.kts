@@ -31,11 +31,16 @@ repositories {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4spark35.get()
 val sparkMajorVersion = "3.5"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":maintenance:maintenance-common"))
+  implementation(project(":maintenance:optimizer-api"))
+  implementation(project(":maintenance:updaters"))
 
   compileOnly(libs.slf4j.api)
   compileOnly(libs.jackson.databind)
@@ -51,6 +56,10 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":maintenance:optimizer"))
+  testImplementation(project(":common"))
+  // Used to check that the placeholders of the built-in templates resolve the way the server does.
+  testImplementation(project(":core"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
     exclude("org.slf4j")
@@ -59,6 +68,11 @@ dependencies {
     exclude("javax.servlet")
   }
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.awaitility)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
+  testRuntimeOnly(libs.mysql.driver)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion") {
     exclude("org.slf4j")
     exclude("org.apache.logging.log4j")
@@ -72,6 +86,12 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+// The optimizer packages its runtime dependencies beside its jar in build/libs.
+// Order the integration-test compile after that directory has been populated.
+tasks.compileTestJava {
+  dependsOn(":maintenance:optimizer:copyDepends")
+}
+
 tasks.test {
   useJUnitPlatform()
 }
@@ -81,6 +101,9 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
   mergeServiceFiles()
+
+  // Exclude Java 21 multi-release classes to avoid ASM compatibility issues with shadow plugin
+  exclude("META-INF/versions/21/**")
 
   dependencies {
     relocate("com.google", "org.apache.gravitino.shaded.com.google")

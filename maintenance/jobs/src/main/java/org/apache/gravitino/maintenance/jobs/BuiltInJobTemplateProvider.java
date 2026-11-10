@@ -25,7 +25,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRemoveOrphanFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateManifestStatsJob;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetricsJob;
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +47,15 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
       Pattern.compile(JobTemplateProvider.VERSION_VALUE_PATTERN);
 
   private static final List<BuiltInJob> BUILT_IN_JOBS =
-      ImmutableList.of(new SparkPiJob(), new IcebergRewriteDataFilesJob());
+      ImmutableList.of(
+          new SparkPiJob(),
+          new IcebergRewriteDataFilesJob(),
+          new IcebergRewriteManifestsJob(),
+          new IcebergUpdateStatsAndMetricsJob(),
+          new IcebergUpdateManifestStatsJob(),
+          new IcebergExpireSnapshotsJob(),
+          new IcebergRemoveOrphanFilesJob(),
+          new IcebergMaintenanceJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {
@@ -60,7 +74,7 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
     Optional<String> version =
         Optional.ofNullable(template.customFields())
             .map(fields -> fields.get(JobTemplateProvider.PROPERTY_VERSION_KEY));
-    if (version.isEmpty() || !VERSION_PATTERN.matcher(version.get()).matches()) {
+    if (!version.isPresent() || !VERSION_PATTERN.matcher(version.get()).matches()) {
       LOG.warn("Skip built-in job template {} without valid version", template.name());
       return false;
     }

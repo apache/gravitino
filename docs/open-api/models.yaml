@@ -133,6 +133,15 @@ paths:
               examples:
                 NoSuchModelException:
                   $ref: "#/components/examples/NoSuchModelException"
+        "409":
+          description: Conflict - The target model already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ModelAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/ModelAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -385,7 +394,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         "200":
@@ -423,7 +431,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         "200":
@@ -889,6 +896,7 @@ components:
           type: array
           description: The list of model versions
           items:
+            type: integer
             format: int32
 
     ModelVersionInfoListResponse:

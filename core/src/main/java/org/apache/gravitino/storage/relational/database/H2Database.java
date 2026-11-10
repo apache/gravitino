@@ -106,7 +106,13 @@ public class H2Database implements JDBCDatabase {
     Path path = Paths.get(dbPath);
     // Relative Path
     if (!path.isAbsolute()) {
-      path = Paths.get(System.getenv("GRAVITINO_HOME"), dbPath);
+      String gravitinoHome = System.getenv("GRAVITINO_HOME");
+      if (StringUtils.isBlank(gravitinoHome)) {
+        throw new IllegalArgumentException(
+            "GRAVITINO_HOME environment variable must be set when using relative storage path: "
+                + dbPath);
+      }
+      path = Paths.get(gravitinoHome, dbPath);
       return path.toString();
     }
 

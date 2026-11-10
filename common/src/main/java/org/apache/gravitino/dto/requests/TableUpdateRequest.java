@@ -29,11 +29,15 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -42,6 +46,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to update a table. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -95,6 +100,19 @@ public interface TableUpdateRequest extends RESTRequest {
    * @return An instance of TableChange.
    */
   TableChange tableChange();
+
+  /**
+   * Validates the request with a prefix for writable-type field paths.
+   *
+   * <p>The default implementation delegates to {@link #validate()} and preserves existing
+   * validation messages.
+   *
+   * @param fieldPrefix the field path prefix, including a trailing dot when nonempty
+   * @throws IllegalArgumentException if the request is invalid
+   */
+  default void validateWithPrefix(String fieldPrefix) throws IllegalArgumentException {
+    validate();
+  }
 
   /** Represents a request to rename a table. */
   @EqualsAndHashCode
@@ -395,13 +413,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          dataType != null, "\"type\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -410,7 +422,30 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.addColumn(
-          fieldName, dataType, comment, position, nullable, autoIncrement, defaultValue);
+          fieldName,
+          dataType,
+          comment,
+          position,
+          nullable,
+          autoIncrement,
+          defaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) defaultValue)
+              : defaultValue);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          dataType != null, "\"%stype\" field is required and cannot be empty", fieldPrefix);
+      WritableDataTypeValidator.validate(dataType, fieldPrefix + "type");
+      WritableDataTypeValidator.validateExpression(defaultValue, fieldPrefix + "defaultValue");
     }
   }
 
@@ -507,14 +542,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
-          "\"newDefaultValue\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -522,7 +550,28 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
+      return TableChange.updateColumnDefaultValue(
+          fieldName,
+          newDefaultValue instanceof FunctionArg
+              ? DTOConverters.fromFunctionArg((FunctionArg) newDefaultValue)
+              : newDefaultValue);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          (newDefaultValue != null && newDefaultValue != DEFAULT_VALUE_NOT_SET),
+          "\"%snewDefaultValue\" field is required and cannot be empty",
+          fieldPrefix);
+      WritableDataTypeValidator.validateExpression(
+          newDefaultValue, fieldPrefix + "newDefaultValue");
     }
   }
 
@@ -564,13 +613,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          fieldName != null
-              && fieldName.length > 0
-              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
-          "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          newType != null, "\"newType\" field is required and cannot be empty");
+      validateWithPrefix("");
     }
 
     /**
@@ -579,6 +622,20 @@ public interface TableUpdateRequest extends RESTRequest {
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnType(fieldName, newType);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void validateWithPrefix(String fieldPrefix) {
+      Preconditions.checkArgument(
+          fieldName != null
+              && fieldName.length > 0
+              && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
+          "\"%sfieldName\" field is required and cannot be empty",
+          fieldPrefix);
+      Preconditions.checkArgument(
+          newType != null, "\"%snewType\" field is required and cannot be empty", fieldPrefix);
+      WritableDataTypeValidator.validate(newType, fieldPrefix + "newType");
     }
   }
 
@@ -623,9 +680,6 @@ public interface TableUpdateRequest extends RESTRequest {
               && fieldName.length > 0
               && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
           "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
     }
 
     /**
@@ -821,7 +875,20 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param fieldNames The field names under the table contained in the index.
      */
     public AddTableIndexRequest(Index.IndexType type, String name, String[][] fieldNames) {
-      this.index = Indexes.of(type, name, fieldNames);
+      this(type, name, fieldNames, Collections.emptyMap());
+    }
+
+    /**
+     * The constructor of the add table index request with extra properties.
+     *
+     * @param type The type of the index
+     * @param name The name of the index
+     * @param fieldNames The field names under the table contained in the index.
+     * @param properties Extra properties for index configuration
+     */
+    public AddTableIndexRequest(
+        Index.IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
+      this.index = Indexes.of(type, name, fieldNames, properties);
     }
 
     /**
@@ -843,11 +910,15 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
+      return TableChange.addIndex(
+          index.type(), index.name(), index.fieldNames(), index.properties());
     }
   }
 
-  /** Represents a request to delete an index from a table. */
+  /**
+   * Represents a request to delete an index from a table. If `ifExists` is null, it will be treated
+   * as false, which means the request will fail if the index does not exist.
+   */
   @EqualsAndHashCode
   @ToString
   class DeleteTableIndexRequest implements TableUpdateRequest {
@@ -855,8 +926,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("ifExists")
-    private Boolean ifExists;
+    @JsonProperty(value = "ifExists", defaultValue = "false")
+    private boolean ifExists;
 
     /** Default constructor for Jackson deserialization. */
     public DeleteTableIndexRequest() {}
@@ -869,7 +940,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     public DeleteTableIndexRequest(String name, Boolean ifExists) {
       this.name = name;
-      this.ifExists = ifExists;
+      this.ifExists = ifExists != null && ifExists;
     }
 
     /**

@@ -36,6 +36,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -73,14 +75,16 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
       String comment,
       Fileset.Type type,
       Map<String, String> storageLocations,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     Fileset fileset =
         dispatcher.createMultipleLocationFileset(
-            ident, comment, type, storageLocations, properties);
+            ident, comment, type, storageLocations, properties, secretBindings, secretReferences);
 
     // Set the creator as the owner of the fileset.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),
@@ -114,8 +118,11 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.FILESET);
     boolean dropped = dispatcher.dropFileset(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.FILESET, locations);
+    // A false result means the fileset was already gone and the registration was kept.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.FILESET, locations);
+    }
     return dropped;
   }
 

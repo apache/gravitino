@@ -15,7 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 from mcp_server.client.statistic_operation import StatisticOperation
 
 
@@ -25,17 +28,18 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         self.rest_client = rest_client
 
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{metalake_name}/objects/{metadata_type}/{metadata_fullname}/statistics"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_fullname)}/statistics"
         )
         return extract_content_from_response(response, "statistics", [])
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -44,9 +48,15 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{metalake_name}/objects/{metadata_type}/{metadata_fullname}/statistics/"
-            f"partitions?from={from_partition_name}&to={to_partition_name}&fromInclusive={from_inclusive}"
-            f"&toInclusive={to_inclusive}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/objects/{encode_path_segment(metadata_type)}"
+            f"/{encode_path_segment(metadata_fullname)}/statistics/partitions",
+            params={
+                "from": from_partition_name,
+                "to": to_partition_name,
+                "fromInclusive": from_inclusive,
+                "toInclusive": to_inclusive,
+            },
         )
         return extract_content_from_response(
             response, "partitionStatistics", []

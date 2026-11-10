@@ -18,4 +18,5 @@
  */
 package org.apache.gravitino.spark.connector.hive;
 
-public class GravitinoHiveCatalogSpark35 extends GravitinoHiveCatalogSpark34 {}
+/** Spark 3.5 specific Gravitino Hive catalog implementation. */
+public class GravitinoHiveCatalogSpark35 extends GravitinoHiveCatalog {}

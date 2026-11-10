@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -50,7 +52,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ITUtils {
+
+  private static final int PORT_CHECK_TIMEOUT_MS = 500;
   private static final Logger LOG = LoggerFactory.getLogger(ITUtils.class);
+  private static final String CI_ENV = "CI";
+  private static final String GITHUB_ACTIONS_ENV = "GITHUB_ACTIONS";
 
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
@@ -210,6 +216,10 @@ public class ITUtils {
   }
 
   public static void cleanDisk() {
+    if (!isCiEnvironment(System.getenv())) {
+      LOG.info("Skip disk cleanup because current environment is not CI.");
+      return;
+    }
 
     Object output =
         CommandExecutor.executeCommandLocalHost(
@@ -220,8 +230,9 @@ public class ITUtils {
             "free -m", false, ProcessData.TypesOfData.STREAMS_MERGED, Map.of());
     LOG.info("Before clean: Command free -m output:\n{}", output);
 
-    // Execute docker system prune -af to free up space before starting the OceanBase container
-    ProcessBuilder processBuilder = new ProcessBuilder("/bin/bash", "-c", "docker system prune -f");
+    // Execute docker container prune -f to clean only stopped containers in CI.
+    ProcessBuilder processBuilder =
+        new ProcessBuilder("/bin/bash", "-c", "docker container prune -f");
     try {
       Process process = processBuilder.start();
       int exitCode = process.waitFor();
@@ -245,5 +256,39 @@ public class ITUtils {
     LOG.info("After clean: Command free -m output:\n{}", output);
   }
 
+  static boolean isCiEnvironment(Map<String, String> env) {
+    return "true".equalsIgnoreCase(env.get(CI_ENV))
+        || "true".equalsIgnoreCase(env.get(GITHUB_ACTIONS_ENV));
+  }
+
   private ITUtils() {}
+
+  /**
+   * Refuses to start a server on a port something else already holds.
+   *
+   * <p>The readiness probe that follows a deploy mode launch only asks whether an HTTP server
+   * answers on the port, not whether it is the one just launched. A Gravitino left behind by an
+   * interrupted run therefore satisfies it, and the suite proceeds against a stranger with
+   * unrelated configuration, failing later in ways that point away from the cause. Checking here
+   * turns that into an immediate, accurate error.
+   *
+   * @param host The host the server is configured to bind.
+   * @param port The port the server is configured to bind.
+   * @throws IllegalStateException If something already listens on the port.
+   */
+  public static void checkServerPortIsFree(String host, int port) {
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress(host, port), PORT_CHECK_TIMEOUT_MS);
+    } catch (IOException e) {
+      // Nothing answered, which is what we want.
+      return;
+    }
+
+    throw new IllegalStateException(
+        String.format(
+            "Something already listens on %s:%d, so the server under test cannot bind it and the "
+                + "readiness probe would accept the existing process as if it were ours. Stop it "
+                + "first, for instance with `lsof -nP -iTCP:%d -sTCP:LISTEN`.",
+            host, port, port));
+  }
 }

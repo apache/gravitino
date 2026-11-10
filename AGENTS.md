@@ -22,16 +22,19 @@
 ## General Coding Standards
 - **Language**: Use English for all code, comments, and documentation.
 - **Style**: Follow rigid Google Java Style. Run `./gradlew spotlessApply` to format.
-- **Imports**: prioritizing standard imports over Fully Qualified Class Names (FQN).
+- **Javadoc**: All new `public` and `protected` classes, methods, and fields must have Javadoc. Missing Javadoc fails the checkstyle CI step (runs with `-Werror`).
+- **Imports**: Always use normal `import` statements instead of Fully Qualified Class Names (FQN) in Java code whenever possible.
   - **Bad**: `org.apache.gravitino.rel.Table table = ...;`
   - **Good**: `Table table = ...;` (with `import org.apache.gravitino.rel.Table;`)
+  - Do not write inline types like `java.nio.file.Paths` or `org.apache.xxx.Table` unless there is a real class name conflict that cannot be resolved cleanly.
+  - If two classes share the same simple name, prefer imports plus small refactors over keeping FQNs throughout the code.
 - **Safety**: Use `@Nullable` annotations. Handle resources with try-with-resources.
 - **Logging**: Use SLF4J. No `System.out.println`.
 - **Testing**:
   - Write unit tests for ALL new logic. NO tests = NO merge.
   - Use `TestXxx` naming pattern (e.g., `TestCatalogService`).
   - Run tests: `./gradlew test -PskipITs`.
-  - Docker tests: Tag with `@Tag("gravitino-docker-test")`.
+  - Docker tests: Tag with `@Tag("gravitino-docker-test")`; run them with `-PskipDockerTests=false`.
 - **Class Member Ordering**: Follow the order:
   1. `static` constants (e.g., `LOG`).
   2. `static` fields.
@@ -39,7 +42,8 @@
   4. Constructors.
   5. Methods (Group by visibility, putting `private` methods at the end).
 
-## Issue and PR Guidelines
+## Create Issue and PR Guidelines
+[IMPORTANT] Before creating an issue or PR using the gh command or the GitHub MCP server, please show a preview of the PR/issue first. Submit it only after I confirm. The issue/PR format should follow the reference and keep the content concise and clear.
 - **Issue Templates**: Use the appropriate template from `.github/ISSUE_TEMPLATE/`
 - **PR Description**: Follow the template in `.github/PULL_REQUEST_TEMPLATE`
 
@@ -57,3 +61,10 @@
 - **Unit Tests**: `./gradlew test -PskipITs -PskipDockerTests=false`
 - **Integration Tests**: `./gradlew test -PskipTests -PskipDockerTests=false`
 - **OpenAPI Docs Validation**: `./gradlew :docs:build` — Run this after any changes to `docs/open-api/*.yaml` to validate OpenAPI specification correctness.
+
+## Claude Memory Usage
+- Before starting any task, use mcp-search to check if similar work has been done before.
+  When encountering unfamiliar code or configuration, search memory for prior context.
+- When hitting a problem, search memory first for known solutions before debugging from scratch.
+- After completing a task, save key findings and solutions to claude-mem for future reference.
+- Use multiple keyword combinations when searching (e.g., module name + issue type, class name + error).

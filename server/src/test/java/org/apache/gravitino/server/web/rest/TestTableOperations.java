@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,6 +49,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.dto.rel.ColumnDTO;
@@ -107,6 +109,7 @@ public class TestTableOperations extends BaseOperationsTest {
     }
   }
 
+  private static SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private TableOperationDispatcher dispatcher = mock(TableOperationDispatcher.class);
 
   private final String metalake = "metalake1";
@@ -125,6 +128,7 @@ public class TestTableOperations extends BaseOperationsTest {
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    Mockito.doReturn(true).when(schemaDispatcher).schemaExists(any());
   }
 
   @Override
@@ -148,6 +152,74 @@ public class TestTableOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  @Test
+  public void testRejectUnresolvedTypesBeforeDispatch() {
+    String[] columns = {
+      "{\"name\":\"c\",\"type\":\"future_type\"}",
+      "{\"name\":\"c\",\"type\":{\"type\":\"external\",\"catalogString\":\" \"}}",
+      "{\"name\":\"c\",\"type\":\"string\",\"defaultValue\":{\"type\":\"literal\",\"dataType\":\"future_type\",\"value\":null}}"
+    };
+    for (String column : columns) {
+      String json = "{\"name\":\"t\",\"columns\":[" + column + "]}";
+      try (Response response =
+          target(tablePath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(json))) {
+        Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response.readEntity(ErrorResponse.class).getMessage().contains("columns[0]"));
+      }
+    }
+    String update =
+        """
+        {"updates":[{"@type":"updateColumnDefaultValue","fieldName":["c"],
+          "newDefaultValue":{"type":"function","funcName":"f","funcArgs":[
+            {"type":"literal","dataType":"future_type","value":null}]}}]}
+        """;
+    try (Response response =
+        target(tablePath(metalake, catalog, schema) + "t")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.json(update))) {
+      Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          response
+              .readEntity(ErrorResponse.class)
+              .getMessage()
+              .contains("updates[0].newDefaultValue.funcArgs[0].dataType"));
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  public void testRejectNullTableInputsBeforeDispatch() {
+    String[][] invalidRequests = {
+      {"{\"name\":\"t\"}", "columns"},
+      {"{\"name\":\"t\",\"columns\":null}", "columns"},
+      {"{\"name\":\"t\",\"columns\":[null]}", "columns[0]"},
+      {
+        "{\"name\":\"t\",\"columns\":[{\"name\":\"c\",\"type\":\"string\"}],\"sortOrders\":[null]}",
+        "sortOrders[0]"
+      }
+    };
+    for (String[] invalidRequest : invalidRequests) {
+      try (Response response =
+          target(tablePath(metalake, catalog, schema))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(Entity.json(invalidRequest[0]))) {
+        Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertTrue(
+            response
+                .readEntity(ErrorResponse.class)
+                .getMessage()
+                .contains("\"" + invalidRequest[1] + "\" field is required and cannot be null"));
+      }
+    }
+    Mockito.verifyNoInteractions(dispatcher);
   }
 
   @Test
@@ -220,6 +292,17 @@ public class TestTableOperations extends BaseOperationsTest {
           .withSortTerm(FieldReferenceDTO.of(columnName))
           .build()
     };
+  }
+
+  @Test
+  public void testCreateTableWithNullRequest() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test
@@ -495,6 +578,32 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testLoadTableWithSpaceInName() {
+    when(dispatcher.loadTable(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier ident = invocation.getArgument(0);
+              return mockTable(
+                  ident.name(),
+                  new Column[] {mockColumn("col1", Types.StringType.get())},
+                  "mock comment",
+                  ImmutableMap.of(),
+                  new Transform[0]);
+            });
+
+    // The client builds request paths with RESTUtils.encodeString, so the server must decode the
+    // encoded name back to the original one.
+    try (Response resp =
+        target(tablePath(metalake, catalog, schema) + RESTUtils.encodeString("table 1"))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+      Assertions.assertEquals("table 1", resp.readEntity(TableResponse.class).getTable().name());
+    }
+  }
+
+  @Test
   public void testLoadTable() {
     Column[] columns =
         new Column[] {
@@ -547,6 +656,18 @@ public class TestTableOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
     Assertions.assertEquals(NoSuchTableException.class.getSimpleName(), errorResp.getType());
 
+    doThrow(new NoSuchSchemaException("schema missing")).when(dispatcher).loadTable(any());
+    Response missingSchema =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), missingSchema.getStatus());
+    ErrorResponse schemaError = missingSchema.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, schemaError.getCode());
+    Assertions.assertEquals(NoSuchSchemaException.class.getSimpleName(), schemaError.getType());
+    Assertions.assertTrue(schemaError.getMessage().contains("schema missing"));
+
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error")).when(dispatcher).loadTable(any());
 
@@ -562,6 +683,38 @@ public class TestTableOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testAlterTableWithNullRequest() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenameTableToExistingName() {
+    TableAlreadyExistsException exception =
+        new TableAlreadyExistsException("Table existing already exists");
+    doThrow(exception).when(dispatcher).alterTable(any(), any(TableChange.class));
+    TableUpdatesRequest request =
+        new TableUpdatesRequest(
+            Collections.singletonList(new TableUpdateRequest.RenameTableRequest("existing")));
+    try (Response response =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(TableAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
   }
 
   @Test

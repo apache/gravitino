@@ -22,18 +22,41 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event that is triggered upon the successful listing of tags. */
+/** Represents an event that is triggered upon the successful listing of tag info objects. */
 @DeveloperApi
-public final class ListTagsInfoEvent extends TagEvent {
+public final class ListTagsInfoEvent extends TagEvent implements ListEvent {
+
+  private final int tagCount;
 
   /**
-   * Constructs an instance of {@code ListTagsEvent}.
+   * Constructs an instance of {@code ListTagsInfoEvent}.
    *
    * @param user The username of the individual who initiated the tag listing.
-   * @param metalake The namespace from which tags were listed.
+   * @param metalake The metalake from which tags were listed.
+   * @param tagCount The number of tags returned by the list operation.
    */
-  public ListTagsInfoEvent(String user, String metalake) {
+  public ListTagsInfoEvent(String user, String metalake, int tagCount) {
     super(user, NameIdentifier.of(metalake));
+    this.tagCount = tagCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListTagsInfoEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the tag listing.
+   * @param metalake The metalake from which tags were listed.
+   * @deprecated Use {@link #ListTagsInfoEvent(String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListTagsInfoEvent(String user, String metalake) {
+    this(user, metalake, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return tagCount;
   }
 
   /**

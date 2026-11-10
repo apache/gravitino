@@ -83,13 +83,19 @@ public class TableColumnSQLProviderFactory {
     return getProvider().softDeleteColumnsByCatalogId(catalogId);
   }
 
-  public static String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteColumnsBySchemaId(schemaId);
+  public static String softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteColumnsBySchemaIds(schemaIds);
   }
 
   public static String selectColumnIdByTableIdAndName(
       @Param("tableId") Long tableId, @Param("columnName") String name) {
     return getProvider().selectColumnIdByTableIdAndName(tableId, name);
+  }
+
+  /** Returns the SQL for a batched active-column lookup. */
+  public static String selectColumnIdsByTableIdAndNames(
+      @Param("tableId") Long tableId, @Param("columnNames") List<String> columnNames) {
+    return getProvider().selectColumnIdsByTableIdAndNames(tableId, columnNames);
   }
 
   public static String selectColumnPOById(@Param("columnId") Long columnId) {

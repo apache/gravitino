@@ -132,12 +132,14 @@ export default function CreateTopicDialog({ ...props }) {
           // update topic
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
-            await dispatch(updateTopic({ metalake, catalog, catalogType, schema, topic: editTopic, data: reqData }))
+            await dispatch(
+              updateTopic({ init, metalake, catalog, catalogType, schema, topic: editTopic, data: reqData })
+            )
           }
         } else {
           await dispatch(createTopic({ data: submitData, metalake, catalog, schema, catalogType }))
         }
-        init && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+        !editTopic && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
         setConfirmLoading(false)
         setOpen(false)
       })

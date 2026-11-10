@@ -26,9 +26,7 @@ import { initialVersion, fetchGitHubInfo, setStars, setForks } from '@/lib/store
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 import { to } from '../utils'
-import { getAuthConfigs, setAuthToken, setAuthUser } from '../store/auth'
-
-import { useIdle } from 'react-use'
+import { getAuthConfigs, getAuthMe, setAuthToken, setAuthUser } from '../store/auth'
 
 const authProvider = {
   version: '',
@@ -51,16 +49,6 @@ const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
 
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
-
-  const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
-  const idleOn = (expiredIn + 60) * 1000
-  const isIdle = useIdle(idleOn)
-
-  useEffect(() => {
-    if (isIdle) {
-      localStorage.setItem('isIdle', true)
-    }
-  }, [isIdle])
 
   const goToMetalakeListPage = () => {
     try {
@@ -109,9 +97,27 @@ const AuthProvider = ({ children }) => {
           router.push('/login')
         } else {
           dispatch(setAuthUser(sessionUser))
+          if (sessionUser) {
+            await dispatch(getAuthMe())
+          }
           goToMetalakeListPage()
         }
+      } else if (authType === 'basic') {
+        const tokenToUse = sessionStorage.getItem('accessToken')
+
+        if (tokenToUse) {
+          dispatch(setAuthToken(tokenToUse))
+          await dispatch(getAuthMe())
+          dispatch(initialVersion())
+          goToMetalakeListPage()
+        } else {
+          router.push('/login')
+        }
       } else if (authType === 'oauth') {
+        // Clear any residual simpleAuthUser when authType is oauth
+        sessionStorage.removeItem('simpleAuthUser')
+        sessionStorage.removeItem('simpleAuthToken')
+
         const tokenToUse = await oauthProviderFactory.getAccessToken()
         const user = await oauthProviderFactory.getUserProfile()
 
@@ -122,6 +128,7 @@ const AuthProvider = ({ children }) => {
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
           user && dispatch(setAuthUser(user))
+          await dispatch(getAuthMe())
           dispatch(initialVersion())
           goToMetalakeListPage()
         } else {

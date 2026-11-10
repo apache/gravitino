@@ -30,7 +30,10 @@ import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoClientUtils;
-import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 
 /** Submits optimizer jobs to Gravitino using job template adapters. */
 public class GravitinoJobSubmitter implements JobSubmitter {
@@ -47,7 +50,15 @@ public class GravitinoJobSubmitter implements JobSubmitter {
    * @return provider name
    */
   private final Map<String, Class<? extends GravitinoJobAdapter>> jobAdapters =
-      ImmutableMap.of(CompactionStrategyHandler.NAME, GravitinoCompactionJobAdapter.class);
+      ImmutableMap.of(
+          IcebergDataCompactionContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoCompactionJobAdapter.class,
+          IcebergRewriteManifestsContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoManifestRewriteJobAdapter.class,
+          IcebergOrphanFileRemovalContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoOrphanFileRemovalJobAdapter.class,
+          IcebergSnapshotExpirationContent.JOB_TEMPLATE_NAME_VALUE,
+          GravitinoSnapshotExpirationJobAdapter.class);
 
   @Override
   public String name() {

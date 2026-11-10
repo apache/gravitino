@@ -43,6 +43,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.dto.messaging.TopicDTO;
@@ -79,6 +80,7 @@ public class TestTopicOperations extends BaseOperationsTest {
     }
   }
 
+  private static SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private TopicOperationDispatcher dispatcher = mock(TopicOperationDispatcher.class);
   private final String metalake = "metalake";
   private final String catalog = "catalog1";
@@ -94,6 +96,7 @@ public class TestTopicOperations extends BaseOperationsTest {
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    Mockito.doReturn(true).when(schemaDispatcher).schemaExists(any());
   }
 
   @Override
@@ -224,6 +227,17 @@ public class TestTopicOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTopicWithNullRequest() {
+    Response resp =
+        target(topicPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTopic() {
     Topic topic = mockTopic("topic1", "comment", ImmutableMap.of("key1", "value1"));
     when(dispatcher.createTopic(any(), any(), any(), any())).thenReturn(topic);
@@ -298,6 +312,17 @@ public class TestTopicOperations extends BaseOperationsTest {
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
+  public void testAlterTopicWithNullRequest() {
+    Response resp =
+        target(topicPath(metalake, catalog, schema) + "/topic1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

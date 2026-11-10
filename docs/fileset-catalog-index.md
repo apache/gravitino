@@ -1,12 +1,12 @@
 ---
-title: "Fileset catalog index"
-slug: /fileset-catalog-index
+title: "Fileset Catalog Index"
+slug: "/fileset-catalog-index"
 date: 2025-01-13
-keyword: Fileset catalog index S3 GCS ADLS OSS
+keyword: "Fileset catalog index S3 GCS ADLS OSS"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-### Fileset catalog overall
+## Fileset Catalog Overall
 
 Gravitino Fileset catalog index includes the following chapters:
 
@@ -14,13 +14,16 @@ Gravitino Fileset catalog index includes the following chapters:
 - [Manage Fileset catalog with Gravitino API](./manage-fileset-metadata-using-gravitino.md): This chapter explains how to manage fileset metadata using Gravitino API and provides detailed examples.
 - [Using Fileset catalog with Gravitino virtual file system](how-to-use-gvfs.md): This chapter explains how to use Fileset catalog with the Gravitino virtual file system and provides detailed examples.
 
-### Fileset catalog with cloud storage
+## Fileset Catalog with Cloud Storage
 
-Apart from the above, you can also refer to the following topics to manage and access cloud storage like S3, GCS, ADLS, and OSS:
+Each cloud backend has its own page with a runnable end-to-end example covering catalog setup and
+Java/Hadoop data access. The S3, GCS, ADLS, and OSS pages also cover Python and pandas; COS
+currently has no Python data-plane implementation:
 
-- [Using Fileset catalog to manage S3](./fileset-catalog-with-s3.md).
-- [Using Fileset catalog to manage GCS](./fileset-catalog-with-gcs.md).
-- [Using Fileset catalog to manage ADLS](./fileset-catalog-with-adls.md).
-- [Using Fileset catalog to manage OSS](./fileset-catalog-with-oss.md).
+- [Using Fileset catalog to manage Amazon S3](./fileset-catalog-with-s3.md).
+- [Using Fileset catalog to manage Google Cloud Storage](./fileset-catalog-with-gcs.md).
+- [Using Fileset catalog to manage Azure Data Lake Storage](./fileset-catalog-with-adls.md).
+- [Using Fileset catalog to manage Alibaba Cloud OSS](./fileset-catalog-with-oss.md).
+- [Using Fileset catalog to manage Tencent Cloud COS](./fileset-catalog-with-cos.md).
 
 More storage options will be added soon. Stay tuned!

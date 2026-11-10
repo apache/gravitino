@@ -1,6 +1,6 @@
 ---
-title: "Apache Doris catalog"
-slug: /jdbc-doris-catalog
+title: "Doris Catalog"
+slug: "/jdbc-doris-catalog"
 keywords:
 - jdbc
 - Apache Doris
@@ -17,43 +17,61 @@ Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apa
 
 :::caution
 Gravitino saves some system information in schema and table comments, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the Doris instance.
-- Supports metadata management of Doris (1.2.x).
-- Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports metadata management of Doris (1.2.x, 2.1.x, 3.0.x, 4.0.x).
+- Supports table index (PRIMARY_KEY, UNIQUE_KEY, INVERTED, BITMAP (legacy), ANN/VECTOR).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a Doris data source any property that isn't defined by Gravitino by adding
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
+Pass to a Doris data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
 `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-You can check the relevant data source configuration in
+Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Doris catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
-|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                                                                                                                                                                                                                                         | (none)        | Yes      | 0.5.0            |
-| `jdbc-user`             | The JDBC user name.                                                                                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-password`         | The JDBC password.                                                                                                                                                                                                                                                                                                                                                                                               | (none)        | Yes      | 0.5.0            |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                                                                                                                                                                                                                                                   | `2`           | No       | 0.5.0            |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0            |
-| `replication_num`       | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If not specified and the number of backend servers greater or equals to 3, the default value (3) in Doris server will be used. For more, please see the [doc](https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/) | `1` or `3`    | No       | 0.6.0-incubating |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                                                                                                                                                                                                                                                | `30000`       | No       | 1.1.0            |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                 | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
+
+### Doris 2.1.0 Table Comments
+
+Doris 2.1.0 can discard table comments when its Nereids planner handles `CREATE TABLE`.
+After every table creation, on all Doris versions, Gravitino reads the stored comment from
+`information_schema.TABLES` and, if it differs, restores it with
+`ALTER TABLE ... MODIFY COMMENT`, including Gravitino's table identifier. On affected servers,
+the JDBC user must have permission to alter the created table. The connector leaves the
+planner settings unchanged.
+
+If the comment lookup or restoration fails after `CREATE TABLE` succeeds, Gravitino reports
+that the table was created but its comment could not be verified or restored. Doris DDL is
+not rolled back, so the table remains and may be missing its Gravitino identifier. Drop the
+created table in Doris before retrying creation; otherwise, the retry fails because the table
+already exists.
 
 ### Driver Version Compatibility
 
@@ -80,105 +98,245 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
+:::
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the Doris database.
 - Supports creating schema.
 - Supports dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Support schema properties, including Doris database properties and user-defined properties.
 
-### Schema operations
+### Schema Operations
 
-Please refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
-#### Table column types
+#### Table Column Types
 
-| Gravitino Type   | Doris Type      |
-|------------------|-----------------|
-| `Boolean`        | `Boolean`       |
-| `Byte`           | `TinyInt`       |
-| `Short`          | `SmallInt`      |
-| `Integer`        | `Int`           |
-| `Long`           | `BigInt`        |
-| `Float`          | `Float`         |
-| `Double`         | `Double`        |
-| `Decimal`        | `Decimal`       |
-| `Date`           | `Date`          |
-| `Timestamp[(p)]` | `Datetime[(p)]` |
-| `VarChar`        | `VarChar`       |
-| `FixedChar`      | `Char`          |
-| `String`         | `String`        |
-
+| Gravitino Type             | Doris Type           |
+|----------------------------|----------------------|
+| `Boolean`                  | `Boolean`            |
+| `Byte`                     | `TinyInt`            |
+| `Short`                    | `SmallInt`           |
+| `Integer`                  | `Int`                |
+| `Long`                     | `BigInt`             |
+| `Float`                    | `Float`              |
+| `Double`                   | `Double`             |
+| `Decimal`                  | `Decimal`            |
+| `Date`                     | `Date`/`DateV2`      |
+| `Timestamp[(p)]`           | `Datetime[(p)]`      |
+| `VarChar`                  | `VarChar`            |
+| `FixedChar`                | `Char`               |
+| `String`                   | `String`             |
+| `Binary`                   | `Binary`/`VarBinary` |
+| `ExternalType("json")`     | `JSON`               |
+| `ExternalType("variant")`  | `Variant`            |
+| `ExternalType("ipv4")`     | `IPv4`               |
+| `ExternalType("ipv6")`     | `IPv6`               |
+| `ExternalType("largeint")` | `LargeInt`           |
+| `ExternalType("bitmap")`   | `Bitmap`             |
+| `ExternalType("hll")`      | `HLL`                |
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
-Gravitino can not load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
+The table above describes type mappings; it does not guarantee that every type can be used to create a table through Gravitino. `BITMAP` and `HLL` columns are supported only when loading metadata for existing Doris tables. Creating tables with these column types through Gravitino is not supported.
+
+Doris `array`, `map`, and `struct` types are loaded as `ExternalType` with the full type string preserved (e.g. `array<int(11)>`). They are not resolved into Gravitino native composite types (`ListType`, `MapType`, `StructType`). The type identifier in `ExternalType` is always lowercase (e.g. `"json"`, not `"JSON"`), matching Doris JDBC metadata behavior.
+:::
+
+:::tip Version Compatibility
+- `DateV2` type: Doris 1.2+ (required on 4.0.x where `disable_datev1=true`)
+- `JSON` type name: Doris 2.0+; Doris 1.2 uses `JSONB`, so `ExternalType("json")` cannot be used to create a JSON column on Doris 1.2.
+- `Binary` / `VarBinary` type: Doris 4.0+ (not available on 3.x)
+- `Auto-Increment` column: Doris 2.1+
+- `INVERTED` index: Doris 3.0+
+- `ANN` / `VECTOR` index: Doris 4.0.6+
 :::
 
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
-Unsupported for now.
+Auto-increment columns are supported on Doris 2.1+. Gravitino validates the Doris version at table creation time and rejects auto-increment columns on older versions.
 
-### Table properties
+Doris enforces the following constraints (violations are rejected by the Doris server):
 
-- Doris supports table properties, and you can set them in the table properties.
-- Only supports Doris table properties and doesn't support user-defined properties.
+- The table must use `UNIQUE KEY` or `DUPLICATE KEY` model.
+- The auto-increment column must be `BIGINT NOT NULL` with no `DEFAULT` value.
+- Each table can have at most one auto-increment column.
 
-### Table indexes
+An auto-increment column can only be defined when the table is created. Gravitino rejects adding one with `alterTable`.
 
-- Supports PRIMARY_KEY
+:::note
+Gravitino currently supports creating `UNIQUE KEY` tables via the `UNIQUE_KEY` index type. To create a `DUPLICATE KEY` table, omit key indexes from the table definition — Doris defaults to the DUPLICATE model when no key is specified.
+:::
 
-    Please be aware that the index can only apply to a single column.
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
 
-    <Tabs groupId='language' queryString>
-    <TabItem value="json" label="Json">
-
-    ```json
+```json
+{
+  "columns": [
     {
-      "indexes": [
-        {
-          "indexType": "primary_key",
-          "name": "PRIMARY",
-          "fieldNames": [["id"]]
-        }
-      ]
+      "name": "id",
+      "type": "long",
+      "nullable": false,
+      "autoIncrement": true
     }
-    ```
-
-    </TabItem>
-    <TabItem value="java" label="Java">
-
-    ```java
-    Index[] indexes = new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+  ],
+  "indexes": [
+    {
+      "indexType": "unique_key",
+      "name": "id_key",
+      "fieldNames": [["id"]]
     }
-    ```
+  ]
+}
+```
 
-    </TabItem>
-    </Tabs>
+</TabItem>
+<TabItem value="java" label="Java">
 
-### Table partitioning
+```java
+Column column = Column.of("id", Types.LongType.get(), "", false, true, null);
+Index[] indexes = new Index[] {
+    Indexes.of(Index.IndexType.UNIQUE_KEY, "id_key", new String[][]{{"id"}}, Map.of())
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Table Properties
+
+Doris table properties can be set when creating a table.
+Only Doris built-in table properties are supported; user-defined properties are not supported.
+
+| Property Name                      | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `replication_num`                  | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        |
+| `replication_allocation`           | The replication allocation policy for the table. It cannot be set together with `replication_num`.                                                                                          | (none)        | No       | No       | No        |
+| `compression`                      | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       |
+| `bloom_filter_columns`             | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        |
+| `storage_policy`                   | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        |
+| `light_schema_change`              | Whether light schema change is enabled for the table. Can be modified via ALTER TABLE SET.                                                                                                  | `true`        | No       | No       | No        |
+| `enable_unique_key_merge_on_write` | Whether merge-on-write is enabled for Unique Key tables. Must be set at CREATE TABLE time; cannot be changed after creation.                                                                | `true`        | No       | No       | Yes       |
+
+:::note
+**Immutable** properties can be set at CREATE TABLE time but cannot be changed via ALTER TABLE.
+**Reserved** properties (none currently) are read-only and cannot be set by users.
+:::
+
+### Table Indexes
+
+The Doris catalog supports the following index types. Each index applies to a single column.
+
+| Gravitino Index Type | Doris DDL                                                              | Doris Version |
+|----------------------|------------------------------------------------------------------------|---------------|
+| `PRIMARY_KEY`        | `` INDEX `PRIMARY` (col) `` (in the INDEX clause, no USING)            | 1.2+          |
+| `UNIQUE_KEY`         | `UNIQUE KEY(col)` (in the table model section, not INDEX clause)       | 1.2+          |
+| `INVERTED`           | `INDEX name (col) USING INVERTED [PROPERTIES(...)]`                    | 3.0+          |
+| `BITMAP`             | `INDEX name (col)` (bare, no USING clause; write-only, see note below) | 1.2+          |
+| `VECTOR`             | `INDEX name (col) USING ANN`                                           | 4.0.6+        |
+
+:::note
+- `PRIMARY_KEY` stays in the INDEX clause as a bare index (e.g. `` INDEX `PRIMARY` (`id`) ``), with no USING clause.
+- `UNIQUE_KEY` is emitted as a table model declaration (e.g. `` UNIQUE KEY(`id`) ``), outside the INDEX clause.
+- `INVERTED` properties can be supplied through `Index.properties()` for CREATE TABLE or `TableChange.AddIndex.getProperties()` for ALTER TABLE. Loaded native and Gravitino-created INVERTED indexes expose the effective Doris properties through `Index.properties()`. Supported keys, values, and server-added defaults depend on the Doris version and are validated by Doris.
+- `SHOW INDEX` does not escape embedded double quotes in property keys or values. Gravitino therefore does not guarantee their round-trip and rejects metadata that falls outside the supported flat quoted-pair format.
+- Index comments are not currently represented by the Gravitino `Index` API and are not preserved on round-trip.
+- `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+- Native Doris `NGRAM_BF` indexes are detected during table loading but are not currently representable by a Gravitino index type. Loading a table that contains one fails with `UnsupportedOperationException` instead of mapping it to an unrelated Gravitino index type. Creating or altering NGRAM_BF indexes through Gravitino and preserving their `gram_size` or `bf_size` properties are not supported.
+:::
+
+**Primary Key example:**
+
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
+};
+```
+
+</TabItem>
+</Tabs>
+
+**Inverted Index example (Doris 3.0+):**
+
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "indexes": [
+    {
+      "indexType": "inverted",
+      "name": "idx_name",
+      "fieldNames": [["name"]],
+      "properties": {
+        "parser": "english",
+        "support_phrase": "true"
+      }
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(
+        IndexType.INVERTED,
+        "idx_name",
+        new String[][]{{"name"}},
+        Map.of("parser", "english", "support_phrase", "true"))
+};
+```
+
+</TabItem>
+</Tabs>
+
+### Table Partitioning
 
 The Doris catalog supports partitioned tables. 
 Users can create partitioned tables in the Doris catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating Doris tables. 
@@ -191,20 +349,20 @@ Note that although Gravitino supports several partitioning strategies, Apache Do
 The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
 :::
 
-### Table distribution
+### Table Distribution
 
-Users can also specify the distribution strategy when creating tables in the Doris catalog. Currently, the Doris catalog supports the following distribution strategies:
+Users can also specify the distribution strategy when creating tables in the Doris catalog. The Doris catalog supports the following distribution strategies:
 - `HASH`
 - `RANDOM`
 
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
 
 
-### Table operations
+### Table Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 
@@ -224,6 +382,6 @@ Please be aware that:
  - Supports modifying multiple column comments at the same time.
  - Doesn't support modifying the column type and column comment at the same time.
  - The schema alteration in Doris is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+   execute a schema query immediately after the alteration. Pause briefly
+   after the alteration. Gravitino will surface the schema-alteration status in the
+   schema information in an upcoming release to solve this.

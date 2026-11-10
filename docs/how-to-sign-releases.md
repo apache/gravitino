@@ -1,8 +1,10 @@
 ---
-title: How to sign and verify Gravitino releases
-slug: /how-to-sign-releases
+title: "Sign and Verify Releases"
+slug: "/how-to-sign-releases"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 These instructions provide a guide to signing and verifying Apache Gravitino releases to enhance the security of releases. A signed release enables people to confirm the author of the release and guarantees that the code hasn't been altered.
 
@@ -13,7 +15,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
 - GPG/GnuPG
 - Release artifacts
 
-## Platform support
+## Platform Support
 
  These instructions are for macOS. You may need to make adjustments for other platforms.
 
@@ -33,7 +35,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     brew install gpg
     ```
 
-## Signing a release
+## Sign a Release
 
 1. **Create a Public/Private Key Pair:**
 
@@ -133,13 +135,13 @@ Keep your private key secure and saved somewhere other than just on your compute
     Use the following command to generate hashes for a release:
 
     ```shell
-    shasum -a 256 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha256
+    shasum -a 512 <filename>.[zip|tar.gz] > <filename>.[zip|tar.gz].sha512
     ```
 
-    For example, to generate a hash for the Gravitino 0.2.0 release you would use this command:
+    For example, to generate a hash for the Gravitino 1.3.1 release you would use this command:
 
     ```shell
-    shasum -a 256 gravitino.0.2.0.zip > gravitino.0.2.0.zip.sha256
+    shasum -a 512 gravitino-1.3.1-bin.tar.gz > gravitino-1.3.1-bin.tar.gz.sha512
     ```
 
 4. **Copy your public key to the KEYS file:**
@@ -153,13 +155,13 @@ Keep your private key secure and saved somewhere other than just on your compute
 
 5. **Publish hashes and signatures:**
 
-    Upload the generated .asc and .sha256 files along with the release artifacts and KEYS file to the release area.
+    Upload the generated .asc and .sha512 files along with the release artifacts and KEYS file to the release area.
 
-## Verifying a release
+## Verify a Release
 
 1. **Import public keys:**
 
-    Download the KEYS file. Import the public keys used to sign all previous releases with this command. It doesn't matter if you have already imported the keys.
+    Download the KEYS file from https://downloads.apache.org/gravitino/KEYS. Import the public keys used to sign all previous releases with this command. It doesn't matter if you have already imported the keys.
 
     ```shell
     gpg --import KEYS
@@ -186,13 +188,13 @@ Keep your private key secure and saved somewhere other than just on your compute
     Check if the hashes match, using the following command:
 
     ```shell
-    diff -u <filename>.[zip|tar.gz].sha256 <(shasum -a 256 <filename>.[zip|tar.gz])
+    diff -u <filename>.[zip|tar.gz].sha512 <(shasum -a 512 <filename>.[zip|tar.gz])
     ```
 
-    For example to verify the Gravitino 2.0 zip file you would use this command:
+    For example to verify the Gravitino 1.3.1 binary tarball you would use this command:
 
     ```shell
-    diff -u gravitino.0.2.0.zip.sha256 <(shasum -a 256 gravitino.0.2.0.zip)
+    diff -u gravitino-1.3.1-bin.tar.gz.sha512 <(shasum -a 512 gravitino-1.3.1-bin.tar.gz)
     ```
 
     This command ensures that the signatures match and that there are no differences between them.

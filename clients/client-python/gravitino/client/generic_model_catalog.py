@@ -53,7 +53,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class GenericModelCatalog(BaseSchemaCatalog):
+class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
     """
     The generic model catalog is a catalog that supports model and model version operations,
     for example, model register, model version link, model and model version list, etc.
@@ -134,7 +134,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_resp = ModelResponse.from_json(resp.body, infer_missing=True)
         model_resp.validate()
 
-        return GenericModel(model_resp.model())
+        return GenericModel(model_resp.model(), self.rest_client, model_full_ns)
 
     def register_model(
         self, ident: NameIdentifier, comment: str, properties: Dict[str, str]
@@ -172,7 +172,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_resp = ModelResponse.from_json(resp.body, infer_missing=True)
         model_resp.validate()
 
-        return GenericModel(model_resp.model())
+        return GenericModel(model_resp.model(), self.rest_client, model_full_ns)
 
     def delete_model(self, model_ident: NameIdentifier) -> bool:
         """Delete the model from the catalog. If the model does not exist, return false.
@@ -344,7 +344,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         )
         model_response = ModelResponse.from_json(resp.body, infer_missing=True)
         model_response.validate()
-        return GenericModel(model_response.model())
+        return GenericModel(model_response.model(), self.rest_client, model_full_ns)
 
     def alter_model_version(
         self, model_ident: NameIdentifier, version: int, *changes: ModelVersionChange

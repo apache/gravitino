@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,6 +29,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -40,6 +48,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -47,12 +56,14 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -62,13 +73,19 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.iceberg.SnapshotRef;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.metrics.MetricsReport;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -86,20 +103,25 @@ public class IcebergTableOperations {
   @VisibleForTesting
   public static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
 
+  @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
+
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  private IcebergReadRestrictionLoader readRestrictionLoader;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergReadRestrictionLoader readRestrictionLoader) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
+    this.readRestrictionLoader = readRestrictionLoader;
   }
 
   @GET
@@ -112,9 +134,12 @@ public class IcebergTableOperations {
   public Response listTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace) {
+          String namespace,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -131,6 +156,11 @@ public class IcebergTableOperations {
                   filterListTablesResponse(
                       listTablesResponse, authContext.metalakeName(), catalogName);
             }
+            listTablesResponse =
+                IcebergPaginationHelper.paginateTables(
+                    listTablesResponse,
+                    Optional.ofNullable(pageToken),
+                    Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(listTablesResponse);
           });
     } catch (Exception e) {
@@ -154,9 +184,11 @@ public class IcebergTableOperations {
           String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(createTableRequest, "CreateTableRequest");
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",
@@ -173,7 +205,7 @@ public class IcebergTableOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -186,10 +218,7 @@ public class IcebergTableOperations {
   @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -198,8 +227,10 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
       UpdateTableRequest updateTableRequest) {
+    IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     if (LOG.isInfoEnabled()) {
       LOG.info(
@@ -218,7 +249,7 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -231,10 +262,7 @@ public class IcebergTableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+      expression = DROP_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -244,7 +272,8 @@ public class IcebergTableOperations {
           String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
@@ -273,10 +302,9 @@ public class IcebergTableOperations {
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE || ANY_CREATE_TABLE)",
+      expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -284,10 +312,12 @@ public class IcebergTableOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = RequestType.LOAD_TABLE) @Encoded() @PathParam("table")
           String table,
-      @DefaultValue("all") @QueryParam("snapshots") String snapshots,
-      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @DefaultValue(IcebergRESTUtils.SNAPSHOT_ALL) @QueryParam("snapshots") String snapshots,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
+      @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
@@ -298,7 +328,6 @@ public class IcebergTableOperations {
         tableName,
         accessDelegation,
         isCredentialVending);
-    // todo support snapshots
     try {
       return Utils.doAs(
           httpRequest,
@@ -306,9 +335,38 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+
+            // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
+            if (!readRestrictionLoader.enabled() && StringUtils.isNotBlank(ifNoneMatch)) {
+              Optional<String> metadataLocation =
+                  tableOperationDispatcher.getTableMetadataLocation(context, tableIdentifier);
+              if (metadataLocation.isPresent()) {
+                Optional<EntityTag> etag = generateETag(metadataLocation.get(), snapshots);
+                if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+                  return Response.notModified(etag.get()).build();
+                }
+              }
+            }
+
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.loadTable(context, tableIdentifier);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            if (IcebergRESTUtils.SnapshotMode.REFS.getValue().equals(snapshots)) {
+              loadTableResponse =
+                  readRestrictionLoader.preserveSnapshotFilteredFields(
+                      loadTableResponse, filterSnapshotsByRefs(loadTableResponse));
+            }
+            IcebergReadRestrictionLoader.Result restrictionResult =
+                readRestrictionLoader.load(context, tableIdentifier, loadTableResponse);
+            loadTableResponse = restrictionResult.response();
+            Optional<EntityTag> etag =
+                generateETag(
+                    loadTableResponse.tableMetadata().metadataFileLocation(),
+                    snapshots,
+                    restrictionResult.etagSeed());
+            if (etag.isPresent() && etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
+            }
+            return buildResponseWithETag(loadTableResponse, etag);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -321,10 +379,7 @@ public class IcebergTableOperations {
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)",
+      expression = AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -333,7 +388,8 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
@@ -364,13 +420,19 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
+  @AuthorizationExpression(
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response reportTableMetrics(
-      @PathParam("prefix") String prefix,
-      @Encoded() @PathParam("namespace") String namespace,
-      @Encoded() @PathParam("table") String table,
+      @AuthorizationMetadata(type = EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
+    IcebergRESTUtils.validateRequest(request, "ReportMetricsRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Report Iceberg table metrics, catalog: {}, namespace: {}, table: {}",
@@ -381,8 +443,12 @@ public class IcebergTableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean accepted =
-                icebergMetricsManager.recordMetric(catalogName, icebergNS, request.report());
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            MetricsReport report = request.report();
+            tableOperationDispatcher.checkTableMetricsReport(context, tableIdentifier, report);
+            boolean accepted = icebergMetricsManager.recordMetric(catalogName, icebergNS, report);
             if (accepted) {
               return IcebergRESTUtils.noContent();
             } else {
@@ -417,10 +483,7 @@ public class IcebergTableOperations {
   @Timed(name = "get-table-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-table-credentials", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response getTableCredentials(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -428,7 +491,8 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Get Iceberg table credentials, catalog: {}, namespace: {}, table: {}",
@@ -465,31 +529,38 @@ public class IcebergTableOperations {
    * @return Response containing the scan plan with tasks
    */
   @POST
-  @Path("{table}/scan")
+  @Path("{table}/plan")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "plan-table-scan", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response planTableScan(
       @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
       @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
-      PlanTableScanRequest scanRequest) {
+      PlanTableScanRequest scanRequest,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(scanRequest, "PlanTableScanRequest");
+    if (scanRequest == null) {
+      return missingRequestBody("plan table scan");
+    }
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
-        "Plan table scan, catalog: {}, namespace: {}, table: {}",
+        "Plan table scan, catalog: {}, namespace: {}, table: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
-        tableName);
+        tableName,
+        accessDelegation,
+        isCredentialVending);
 
     try {
       return Utils.doAs(
@@ -497,7 +568,7 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
 
             PlanTableScanResponse scanResponse =
                 tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
@@ -510,24 +581,178 @@ public class IcebergTableOperations {
     }
   }
 
-  private boolean isCredentialVending(String accessDelegation) {
+  /**
+   * Fetch scan tasks endpoint. Completes the second step of the Iceberg REST two-step scan planning
+   * protocol: a client exchanges a {@code plan-task} handed out by {@code POST
+   * .../tables/{table}/plan} for the scan tasks it covers.
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param request The request containing the {@code plan-task}
+   * @return Response containing the scan tasks for the given plan task
+   */
+  @POST
+  @Path("{table}/tasks")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Timed(name = "fetch-scan-tasks." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "fetch-scan-tasks", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response fetchScanTasks(
+      @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
+      @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
+          String namespace,
+      @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
+      FetchScanTasksRequest request) {
+    IcebergRESTUtils.validateRequest(request, "FetchScanTasksRequest");
+    if (request == null) {
+      return missingRequestBody("fetch scan tasks");
+    }
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    String tableName = RESTUtil.decodeString(table);
+    LOG.info(
+        "Fetch scan tasks, catalog: {}, namespace: {}, table: {}, planTask: {}",
+        catalogName,
+        icebergNS,
+        tableName,
+        request.planTask());
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+
+            FetchScanTasksResponse response =
+                tableOperationDispatcher.fetchScanTasks(context, tableIdentifier, request);
+
+            return IcebergRESTUtils.ok(response);
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to fetch scan tasks: {}", e.getMessage(), e);
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Filters the {@link LoadTableResponse} to include only snapshots that are directly referenced by
+   * the table's refs (branches and tags). This implements the {@code snapshots=refs} query
+   * parameter behavior per the Iceberg REST specification.
+   *
+   * @param loadTableResponse the original response containing all snapshots
+   * @return a new response with only ref-referenced snapshots
+   */
+  @VisibleForTesting
+  static LoadTableResponse filterSnapshotsByRefs(LoadTableResponse loadTableResponse) {
+    TableMetadata metadata = loadTableResponse.tableMetadata();
+    Map<String, SnapshotRef> refs = metadata.refs();
+    Set<Long> referencedSnapshotIds =
+        refs.values().stream().map(SnapshotRef::snapshotId).collect(Collectors.toSet());
+    // If all snapshots are already referenced by refs, return the original response
+    if (metadata.snapshots().stream()
+        .allMatch(s -> referencedSnapshotIds.contains(s.snapshotId()))) {
+      return loadTableResponse;
+    }
+    TableMetadata filteredMetadata =
+        TableMetadata.buildFrom(metadata)
+            .withMetadataLocation(metadata.metadataFileLocation())
+            .suppressHistoricalSnapshots()
+            .discardChanges()
+            .build();
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(filteredMetadata)
+            .addAllConfig(loadTableResponse.config());
+    if (loadTableResponse.credentials() != null) {
+      builder.addAllCredentials(loadTableResponse.credentials());
+    }
+    return builder.build();
+  }
+
+  /**
+   * Builds a 400 response for a request that arrived without a body. Jersey passes a {@code null}
+   * entity when the body is absent, which would otherwise surface as a 500 from a downstream NPE
+   * even though the Iceberg REST specification expects a 400 for a malformed request.
+   */
+  private static Response missingRequestBody(String operation) {
+    return IcebergExceptionMapper.toRESTResponse(
+        new IllegalArgumentException("Missing request body for " + operation));
+  }
+
+  private static Response buildResponseWithETag(LoadTableResponse loadTableResponse) {
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse);
+  }
+
+  private static Response buildResponseWithETag(
+      LoadTableResponse loadTableResponse, Optional<EntityTag> etag) {
+    return IcebergRESTUtils.buildResponseWithETag(loadTableResponse, etag);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(String metadataLocation) {
+    return IcebergRESTUtils.generateETag(metadataLocation);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots);
+  }
+
+  @VisibleForTesting
+  static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
+    return IcebergRESTUtils.generateETag(metadataLocation, snapshots, representationSeed);
+  }
+
+  /**
+   * Checks if the client's If-None-Match header value matches the current ETag.
+   *
+   * @param ifNoneMatch the If-None-Match header value from the client
+   * @param etag the current ETag
+   * @return true if the ETag matches (table unchanged), false otherwise
+   */
+  private static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
+    if (StringUtils.isBlank(ifNoneMatch)) {
+      return false;
+    }
+    // Strip quotes if present to compare the raw value
+    String clientEtag = ifNoneMatch.trim();
+    if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
+      clientEtag = clientEtag.substring(1, clientEtag.length() - 1);
+    }
+    return etag.getValue().equals(clientEtag);
+  }
+
+  /**
+   * Parses the {@code X-Iceberg-Access-Delegation} header value and returns whether the client is
+   * requesting credential vending. Package-private and static so that {@link
+   * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
+   * package.
+   *
+   * <p>The header is a comma-separated list of the mechanisms the client supports, and the server
+   * may serve the request with any or none of them, so mechanisms this server does not offer (such
+   * as remote-signing) are ignored.
+   */
+  static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
+    for (String mechanism : accessDelegation.split(",")) {
+      if ("vended-credentials".equalsIgnoreCase(mechanism.trim())) {
+        return true;
+      }
     }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
-    }
+    return false;
   }
 
   private NameIdentifier[] toNameIdentifiers(
@@ -538,7 +763,11 @@ public class IcebergTableOperations {
       TableIdentifier identifier = identifiers.get(i);
       nameIdentifiers[i] =
           NameIdentifier.of(
-              metalake, catalogName, identifier.namespace().level(0), identifier.name());
+              metalake,
+              catalogName,
+              IcebergIdentifierUtils.icebergNamespaceToSchemaName(
+                  identifier.namespace(), HierarchicalSchemaUtil.schemaSeparator()),
+              identifier.name());
     }
     return nameIdentifiers;
   }
@@ -554,7 +783,10 @@ public class IcebergTableOperations {
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
     for (NameIdentifier ident : idents) {
       filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(0)), ident.name()));
+          TableIdentifier.of(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+                  ident.namespace().level(2), HierarchicalSchemaUtil.schemaSeparator()),
+              ident.name()));
     }
     return ListTablesResponse.builder()
         .addAll(filteredIdentifiers)

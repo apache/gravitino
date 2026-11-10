@@ -1,0 +1,216 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.iceberg.service;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import javax.servlet.ServletRequest;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.auth.IllegalActiveRolesException;
+import org.apache.gravitino.exceptions.TokenExpiredException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+public class TestIcebergAuthenticationFilter {
+
+  private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
+
+  /** Exposes the protected {@code isHealthCheckRequest} method for white-box testing. */
+  private static class TestableFilter extends IcebergAuthenticationFilter {
+    boolean isHealth(ServletRequest request) {
+      return isHealthCheckRequest(request);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/iceberg/health",
+        "/iceberg/health/live",
+        "/iceberg/health/ready",
+        "/health",
+        "/health/live",
+        "/health/ready",
+        "/health.html",
+        "/api/health",
+        "/api/health/live",
+        "/api/health/ready"
+      })
+  public void testHealthPathsBypassAuth(String path) {
+    TestableFilter filter = new TestableFilter();
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getRequestURI()).thenReturn(path);
+    Assertions.assertTrue(filter.isHealth(req), "Expected health bypass for path: " + path);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/iceberg/v1/namespaces",
+        "/iceberg/v1/config",
+        "/iceberg/healthcheck",
+        "/api/metalakes"
+      })
+  public void testNonHealthPathsRequireAuth(String path) {
+    TestableFilter filter = new TestableFilter();
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getRequestURI()).thenReturn(path);
+    Assertions.assertFalse(filter.isHealth(req), "Expected auth required for path: " + path);
+  }
+
+  @Test
+  public void testUnauthorizedErrorReturnsJson() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new UnauthorizedException("The provided credentials did not support"));
+
+    verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(401, errorResponse.code());
+    Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
+    Assertions.assertEquals("The provided credentials did not support", errorResponse.message());
+  }
+
+  @Test
+  public void testIllegalActiveRolesReturnsBadRequest() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new IllegalActiveRolesException("malformed active-roles header"));
+
+    verify(response).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+    printWriter.flush();
+    ErrorResponse errorResponse = MAPPER.readValue(stringWriter.toString(), ErrorResponse.class);
+    Assertions.assertEquals(400, errorResponse.code());
+  }
+
+  @Test
+  public void testInternalServerErrorReturnsJson() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(response, new RuntimeException("Something went wrong"));
+
+    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(500, errorResponse.code());
+    Assertions.assertEquals("ServiceFailureException", errorResponse.type());
+    Assertions.assertEquals("Something went wrong", errorResponse.message());
+    Assertions.assertFalse(json.contains("\"stack\""), json);
+  }
+
+  @Test
+  public void testForbiddenExceptionReturnsJson() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new org.apache.gravitino.exceptions.ForbiddenException("Access denied"));
+
+    verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(403, errorResponse.code());
+    Assertions.assertEquals("ForbiddenException", errorResponse.type());
+    Assertions.assertEquals("Access denied", errorResponse.message());
+  }
+
+  @Test
+  public void testNullMessageUsesDefaultStatusMessage() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(response, new RuntimeException((String) null));
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(500, errorResponse.code());
+    Assertions.assertEquals("ServiceFailureException", errorResponse.type());
+    Assertions.assertEquals("Server Error", errorResponse.message());
+  }
+
+  @Test
+  public void testTokenExpiredExceptionReturns419() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new TokenExpiredException("Authentication token is expired"));
+
+    verify(response).setStatus(419);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(419, errorResponse.code());
+    Assertions.assertEquals("AuthenticationTimeoutException", errorResponse.type());
+    Assertions.assertEquals("Authentication token is expired", errorResponse.message());
+  }
+}

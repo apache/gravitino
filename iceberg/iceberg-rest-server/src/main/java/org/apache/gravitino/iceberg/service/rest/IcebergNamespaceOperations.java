@@ -23,8 +23,9 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -33,6 +34,7 @@ import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -54,17 +56,21 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,10 +103,15 @@ public class IcebergNamespaceOperations {
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listNamespaces(
       @DefaultValue("") @Encoded() @QueryParam("parent") String parent,
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix) {
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace parentNamespace =
-        parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
+        parent.isEmpty()
+            ? Namespace.empty()
+            : RESTUtil.decodeNamespace(
+                parent, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "List Iceberg namespaces, catalog: {}, parentNamespace: {}", catalogName, parentNamespace);
     try {
@@ -117,6 +128,9 @@ public class IcebergNamespaceOperations {
               response =
                   filterListNamespacesResponse(response, authContext.metalakeName(), catalogName);
             }
+            response =
+                IcebergPaginationHelper.paginateNamespaces(
+                    response, Optional.ofNullable(pageToken), Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(response);
           });
     } catch (Exception e) {
@@ -138,7 +152,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Load Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -161,15 +176,15 @@ public class IcebergNamespaceOperations {
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA || ANY_CREATE_SCHEMA)",
+      expression = AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response namespaceExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Check Iceberg namespace exists, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -203,7 +218,8 @@ public class IcebergNamespaceOperations {
           String namespace) {
     // todo check if table exists in namespace after table ops is added
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Drop Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -224,11 +240,14 @@ public class IcebergNamespaceOperations {
   @Timed(name = "create-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespace", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      CreateNamespaceRequest createNamespaceRequest) {
+      @IcebergAuthorizationMetadata(
+              type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
+          CreateNamespaceRequest createNamespaceRequest) {
+    IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
@@ -262,8 +281,11 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Update Iceberg namespace, catalog: {}, namespace: {}, updateNamespacePropertiesRequest: {}",
         catalogName,
@@ -300,61 +322,103 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      RegisterTableRequest registerTableRequest) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.REGISTER_TABLE)
+          RegisterTableRequest registerTableRequest,
+      @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
+    boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
-        "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}",
+        "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
-        registerTableRequest);
+        registerTableRequest,
+        accessDelegation,
+        isCredentialVending);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);
-            return IcebergRESTUtils.ok(loadTableResponse);
+            return IcebergRESTUtils.buildResponseWithETag(loadTableResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
   }
 
-  private NameIdentifier[] toNameIdentifiers(
-      ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
-    List<Namespace> namespaces = listNamespacesResponse.namespaces();
-    NameIdentifier[] nameIdentifiers = new NameIdentifier[namespaces.size()];
-    for (int i = 0; i < namespaces.size(); i++) {
-      Namespace namespace = namespaces.get(i);
-      // Convert Iceberg Namespace to Gravitino NameIdentifier
-      // Namespace should have at least one level for schema name
-      String schemaName = namespace.isEmpty() ? "" : namespace.level(0);
-      nameIdentifiers[i] = NameIdentifier.of(metalake, catalogName, schemaName);
+  @POST
+  @Path("{namespace}/register-view")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "register-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  public Response registerView(
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      RegisterViewRequest registerViewRequest) {
+    IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    LOG.info(
+        "Register Iceberg view, catalog: {}, namespace: {}, registerViewRequest: {}",
+        catalogName,
+        icebergNS,
+        registerViewRequest);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            LoadViewResponse loadViewResponse =
+                namespaceOperationDispatcher.registerView(context, icebergNS, registerViewRequest);
+            return IcebergRESTUtils.ok(loadViewResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
     }
-    return nameIdentifiers;
   }
 
-  private ListNamespacesResponse filterListNamespacesResponse(
+  /**
+   * Keeps the namespaces the caller may see, as the catalog listed them.
+   *
+   * @param listNamespacesResponse the namespaces the catalog returned
+   * @param metalake the metalake of the catalog
+   * @param catalogName the catalog
+   * @return the namespaces the caller may see
+   */
+  @VisibleForTesting
+  static ListNamespacesResponse filterListNamespacesResponse(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
-    NameIdentifier[] idents =
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    Namespace[] namespaces =
+        listNamespacesResponse.namespaces().stream()
+            .filter(namespace -> !namespace.isEmpty())
+            .toArray(Namespace[]::new);
+    // Filter the namespaces as the catalog listed them. Rebuilding them from the Gravitino schema
+    // name would split a level that contains the separator into several levels.
+    Namespace[] filtered =
         MetadataAuthzHelper.filterByExpression(
             metalake,
             AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
             Entity.EntityType.SCHEMA,
-            toNameIdentifiers(listNamespacesResponse, metalake, catalogName));
-    List<Namespace> filteredNamespaces = new ArrayList<>();
-    for (NameIdentifier ident : idents) {
-      // Convert back from NameIdentifier to Iceberg Namespace
-      if (ident.hasNamespace() && ident.namespace().levels().length >= 2) {
-        // Schema name is the last level in the namespace
-        String schemaName = ident.name();
-        filteredNamespaces.add(Namespace.of(schemaName));
-      }
-    }
+            namespaces,
+            namespace ->
+                NameIdentifier.of(
+                    metalake, catalogName, String.join(separator, namespace.levels())));
+    List<Namespace> filteredNamespaces = Arrays.asList(filtered);
     return ListNamespacesResponse.builder().addAll(filteredNamespaces).build();
   }
 
@@ -366,6 +430,8 @@ public class IcebergNamespaceOperations {
 
   private String SerializeUpdateNamespacePropertiesRequest(
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+    IcebergRESTUtils.validateRequest(
+        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     try {
       return icebergObjectMapper.writeValueAsString(updateNamespacePropertiesRequest);
     } catch (JsonProcessingException e) {

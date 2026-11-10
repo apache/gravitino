@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
@@ -58,6 +59,21 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Returns SQL that selects and locks an active group by ID. */
+  public static String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForUpdate(groupId);
+  }
+
+  /** Returns SQL that selects an active group by ID and locks it for shared access. */
+  public static String selectGroupMetaByIdForShare(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForShare(groupId);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeIdAndNames(
+      @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
+    return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
+  }
+
   public static String insertGroupMeta(@Param("groupMeta") GroupPO groupPO) {
     return getProvider().insertGroupMeta(groupPO);
   }
@@ -66,8 +82,9 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().insertGroupMetaOnDuplicateKeyUpdate(groupPO);
   }
 
-  public static String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
-    return getProvider().softDeleteGroupMetaByGroupId(groupId);
+  public static String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteGroupMetaByGroupId(groupId, currentVersion);
   }
 
   public static String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -91,8 +108,39 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().listExtendedGroupPOsByMetalakeId(metalakeId);
   }
 
+  public static String countGroupMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return getProvider().countGroupMetasByMetalakeName(metalakeName);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return getProvider().listExtendedGroupPOsByMetalakeNamePaginated(metalakeName, offset, limit);
+  }
+
   public static String deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String touchGroupUpdatedAt(@Param("groupId") long groupId) {
+    return getProvider().touchGroupUpdatedAt(groupId);
+  }
+
+  public static String getGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
+    return getProvider().getGroupUpdatedAt(metalakeName, groupName);
+  }
+  /**
+   * Returns SQL for a principal and membership snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param groupName the principal name
+   * @return the aggregate select SQL
+   */
+  public static String selectGroupWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("groupName") String groupName) {
+    return getProvider().selectGroupWithRolesByMetalakeIdAndName(metalakeId, groupName);
   }
 }

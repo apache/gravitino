@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.AUTHENTICATION_PROPERTY_ENTRIES;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.KERBEROS_PROPERTY_ENTRIES;
+import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
@@ -28,9 +29,9 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.cloud.storage.CloudPropertiesMetadata;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
 
@@ -73,9 +74,19 @@ public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
                 true /* immutable */,
                 null,
                 false /* hidden */))
+        .put(
+            PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED,
+            PropertyEntry.booleanPropertyEntry(
+                PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED,
+                "Whether a managed fileset may be created on a non-empty location that already exists",
+                false /* required */,
+                true /* immutable */,
+                false /* default value */,
+                false /* hidden */,
+                false /* reserved */))
         .putAll(KERBEROS_PROPERTY_ENTRIES)
         .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
-        .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
+        .putAll(CloudPropertiesMetadata.STORAGE_PROPERTY_ENTRIES);
     return builder.build();
   }
 }

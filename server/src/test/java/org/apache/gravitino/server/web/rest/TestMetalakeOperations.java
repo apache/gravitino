@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -51,6 +52,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
+import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -58,7 +60,9 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -70,6 +74,7 @@ import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
@@ -234,6 +239,113 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateMetalakeWithNullRequest() {
+    // Test with null request body - should not throw NPE
+    Response resp =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(null, MediaType.APPLICATION_JSON_TYPE));
+
+    // Should return BAD_REQUEST instead of INTERNAL_SERVER_ERROR from NPE
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
+  }
+
+  @Test
+  public void testAlterMetalakeWithNullRequest() {
+    Response resp =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testSetMetalakeRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/test")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+      }
+    }
+    Mockito.verify(metalakeManager, Mockito.never()).enableMetalake(any());
+    Mockito.verify(metalakeManager, Mockito.never()).disableMetalake(any());
+  }
+
+  @Test
+  public void testSetMetalake() {
+    Mockito.doNothing().when(metalakeManager).enableMetalake(any());
+    Mockito.doNothing().when(metalakeManager).disableMetalake(any());
+
+    Response enableResp =
+        target("/metalakes/test")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method(
+                "PATCH",
+                Entity.entity(new MetalakeSetRequest(true), MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), enableResp.getStatus());
+    Mockito.verify(metalakeManager).enableMetalake(any());
+
+    Response disableResp =
+        target("/metalakes/test")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method(
+                "PATCH",
+                Entity.entity(new MetalakeSetRequest(false), MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), disableResp.getStatus());
+    Mockito.verify(metalakeManager).disableMetalake(any());
+  }
+
+  @Test
+  public void testSetMetalakeWithNullRequest() {
+    Response resp =
+        target("/metalakes/test")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testSetMetalakeWithMalformedJson() {
+    // The null-body guard must not take over malformed JSON, which keeps using the registered
+    // Jackson exception mappers.
+    Response resp =
+        target("/metalakes/test")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("{", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Malformed json request"));
+  }
+
+  @Test
   public void testLoadMetalake() {
     String metalakeName = "test";
     Long id = 1L;
@@ -306,6 +418,28 @@ public class TestMetalakeOperations extends BaseOperationsTest {
         errorResponse1
             .getMessage()
             .contains("Failed to operate object [" + metalakeName + "] operation [LOAD]"));
+  }
+
+  @Test
+  void testRenameMetalakeToExistingName() {
+    MetalakeAlreadyExistsException exception =
+        new MetalakeAlreadyExistsException("Metalake existing already exists");
+    doThrow(exception).when(metalakeManager).alterMetalake(any(), any(MetalakeChange.class));
+    MetalakeUpdatesRequest request =
+        new MetalakeUpdatesRequest(
+            Collections.singletonList(new MetalakeUpdateRequest.RenameMetalakeRequest("existing")));
+    try (Response response =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(
+          MetalakeAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
   }
 
   @Test
@@ -431,6 +565,27 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(
         errorResponse.getMessage().contains("Failed to operate object [test] operation [DROP]"));
+  }
+
+  @Test
+  public void testDropNonEmptyMetalake() {
+    doThrow(
+            new NonEmptyMetalakeException(
+                "Metalake test has catalogs, please drop them first or use force option"))
+        .when(metalakeManager)
+        .dropMetalake(any(), anyBoolean());
+
+    Response response =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NON_EMPTY_CODE, error.getCode());
+    Assertions.assertEquals(NonEmptyMetalakeException.class.getSimpleName(), error.getType());
+    Assertions.assertTrue(error.getMessage().contains("Metalake test has catalogs"));
   }
 
   @Test

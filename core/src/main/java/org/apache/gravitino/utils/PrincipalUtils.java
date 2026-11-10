@@ -20,9 +20,11 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.base.Throwables;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Base64;
 import javax.security.auth.Subject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
@@ -31,10 +33,17 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class PrincipalUtils {
-
   private static final Logger LOG = LoggerFactory.getLogger(PrincipalUtils.class);
 
   private PrincipalUtils() {}
+
+  public static final Principal ANONYMOUS_PRINCIPAL =
+      new UserPrincipal(
+          AuthConstants.ANONYMOUS_USER,
+          AuthConstants.AUTHORIZATION_BASIC_HEADER
+              + " "
+              + Base64.getEncoder()
+                  .encodeToString(AuthConstants.ANONYMOUS_USER.getBytes(StandardCharsets.UTF_8)));
 
   public static <T> T doAs(Principal principal, PrivilegedExceptionAction<T> action)
       throws Exception {
@@ -43,12 +52,13 @@ public class PrincipalUtils {
       subject.getPrincipals().add(principal);
       return Subject.doAs(subject, action);
     } catch (PrivilegedActionException pae) {
+      LOG.error("doAs method encountered an exception", pae);
       Throwable cause = pae.getCause();
       Throwables.propagateIfPossible(cause, Exception.class);
-      throw new RuntimeException("doAs method occurs an unexpected exception", pae);
-    } catch (Error t) {
-      LOG.warn("doAs method occurs an unexpected error", t);
-      throw new RuntimeException("doAs method occurs an unexpected exception", t);
+      throw new RuntimeException("doAs method encountered an unexpected exception", pae);
+    } catch (Error error) {
+      LOG.error("doAs method encountered an unexpected error", error);
+      throw error;
     }
   }
 
@@ -57,7 +67,7 @@ public class PrincipalUtils {
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     if (subject == null || subject.getPrincipals(UserPrincipal.class).isEmpty()) {
-      return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
+      return ANONYMOUS_PRINCIPAL;
     }
 
     return subject.getPrincipals(UserPrincipal.class).iterator().next();

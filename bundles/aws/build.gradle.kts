@@ -46,6 +46,11 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
 
   testImplementation(libs.aws.iam)
+  testImplementation(libs.aws.policy)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)

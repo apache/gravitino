@@ -33,10 +33,16 @@ public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
 
+  /** Fully qualified class name of {@code BasicAuthenticator} in the idp-basic plugin. */
+  private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
+      "org.apache.gravitino.idp.auth.BasicAuthenticator";
+
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
+          AuthenticatorType.BASIC.name().toLowerCase(),
+          BASIC_AUTHENTICATOR_CLASS_NAME,
           AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName(),
           AuthenticatorType.KERBEROS.name().toLowerCase(),

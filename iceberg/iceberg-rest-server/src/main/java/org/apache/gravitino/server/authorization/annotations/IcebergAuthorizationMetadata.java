@@ -30,7 +30,11 @@ import java.lang.annotation.Target;
 public @interface IcebergAuthorizationMetadata {
   enum RequestType {
     LOAD_TABLE,
+    LOAD_VIEW,
     RENAME_TABLE,
+    RENAME_VIEW,
+    CREATE_NAMESPACE,
+    REGISTER_TABLE,
   }
   /**
    * The type of the parameter to be used for authorization.

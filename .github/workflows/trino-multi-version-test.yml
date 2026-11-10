@@ -1,0 +1,8 @@
+name: Trino Multi-Version Integration Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  TrinoMultiVersionIT:
+    uses: ./.github/workflows/trino-multi-version-test-action.yml

@@ -117,4 +117,79 @@ public class TestPolicyEntity {
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
   }
+
+  @Test
+  public void testBuiltInPolicyContentTypeValidation() {
+    Namespace namespace = Namespace.of("m1", "c1", "s1");
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+
+    PolicyContent icebergCompactionContent =
+        PolicyContents.icebergDataCompaction(
+            1000L, 1L, Map.of("target-file-size-bytes", "1048576"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            PolicyEntity.builder()
+                .withId(1L)
+                .withName("iceberg-compaction")
+                .withNamespace(namespace)
+                .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+                .withEnabled(true)
+                .withContent(icebergCompactionContent)
+                .withAuditInfo(auditInfo)
+                .build());
+
+    PolicyContent customContent =
+        PolicyContents.custom(
+            ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TABLE), Map.of());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PolicyEntity.builder()
+                .withId(1L)
+                .withName("iceberg-compaction")
+                .withNamespace(namespace)
+                .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+                .withEnabled(true)
+                .withContent(customContent)
+                .withAuditInfo(auditInfo)
+                .build());
+  }
+
+  @Test
+  public void testReadRestrictionPolicyContentTypes() {
+    PolicyContent rowFilter = PolicyContents.rowFilter("() RETURNS BOOLEAN -> TRUE");
+    PolicyContent columnMask = PolicyContents.columnMask("(value STRING) RETURNS STRING -> NULL");
+
+    Assertions.assertDoesNotThrow(
+        () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, rowFilter));
+    Assertions.assertDoesNotThrow(
+        () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, columnMask));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> readRestrictionPolicy(Policy.BuiltInType.ROW_FILTER, columnMask));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> readRestrictionPolicy(Policy.BuiltInType.COLUMN_MASK, rowFilter));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            readRestrictionPolicy(
+                Policy.BuiltInType.ROW_FILTER,
+                PolicyContents.rowFilter("previously-stored-expression")));
+  }
+
+  private static PolicyEntity readRestrictionPolicy(
+      Policy.BuiltInType type, PolicyContent content) {
+    return PolicyEntity.builder()
+        .withId(1L)
+        .withName("read-restriction")
+        .withNamespace(Namespace.of("m1", "c1", "s1"))
+        .withPolicyType(type)
+        .withEnabled(true)
+        .withContent(content)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
 }

@@ -19,13 +19,17 @@
 package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -106,5 +110,215 @@ public class TestPolicyDTO {
     serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO4);
     PolicyDTO deserPolicyDTO4 = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
     Assertions.assertEquals(Optional.of(true), deserPolicyDTO4.inherited());
+  }
+
+  @Test
+  public void testIcebergCompactionPolicySerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withMinDataFileMse(1000L)
+            .withMinDeleteFileNumber(1L)
+            .withDataFileMseWeight(2L)
+            .withDeleteFileNumberWeight(150L)
+            .withMaxPartitionNum(99L)
+            .withRewriteStrategy("sort")
+            .withSortOrder("zorder(c1,c2)")
+            .withRewriteOptions(
+                ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction")
+            .withComment("typed policy")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.IcebergCompactionContentDTO.class, deserPolicyDTO.content());
+  }
+
+  @Test
+  public void testIcebergCompactionPolicyDefaultValues() throws JsonProcessingException {
+    String json =
+        "{"
+            + "\"name\":\"iceberg-compaction-default\","
+            + "\"comment\":\"typed policy\","
+            + "\"policyType\":\"system_iceberg_compaction\","
+            + "\"enabled\":true,"
+            + "\"content\":{}"
+            + "}";
+
+    PolicyDTO policyDTO = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    PolicyContentDTO.IcebergCompactionContentDTO contentDTO =
+        (PolicyContentDTO.IcebergCompactionContentDTO) policyDTO.content();
+
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE, contentDTO.minDataFileMse());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        contentDTO.minDeleteFileNumber());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT, contentDTO.dataFileMseWeight());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        contentDTO.deleteFileNumberWeight());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM, contentDTO.maxPartitionNum());
+    Assertions.assertTrue(contentDTO.rewriteOptions().isEmpty());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY, contentDTO.rewriteStrategy());
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.DEFAULT_SORT_ORDER, contentDTO.sortOrder());
+    Assertions.assertDoesNotThrow(contentDTO::validate);
+  }
+
+  @Test
+  public void testAccessControlPolicySerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.AccessControlContentDTO typedContent =
+        PolicyContentDTO.AccessControlContentDTO.builder()
+            .withPrivileges(
+                ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.PROBE_TABLE_LIKE))
+            .withApplicableRoles(ImmutableList.of("analyst", "auditor"))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("pii-read")
+            .withComment("typed policy")
+            .withPolicyType("system_access_control")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+    Assertions.assertInstanceOf(
+        PolicyContentDTO.AccessControlContentDTO.class, deserPolicyDTO.content());
+
+    PolicyContentDTO.AccessControlContentDTO deserContent =
+        (PolicyContentDTO.AccessControlContentDTO) deserPolicyDTO.content();
+    Assertions.assertEquals(
+        ImmutableList.of(Privilege.Name.SELECT_TABLE, Privilege.Name.PROBE_TABLE_LIKE),
+        deserContent.privileges());
+    Assertions.assertEquals(ImmutableList.of("analyst", "auditor"), deserContent.applicableRoles());
+  }
+
+  @Test
+  public void testAccessControlPolicyDeserializesPrivilegeNames() throws JsonProcessingException {
+    // Privileges travel as enum names on the wire; a change to that encoding would break every
+    // existing policy stored against this type.
+    String json =
+        "{"
+            + "\"name\":\"pii-read\","
+            + "\"comment\":\"typed policy\","
+            + "\"policyType\":\"system_access_control\","
+            + "\"enabled\":true,"
+            + "\"content\":{"
+            + "\"privileges\":[\"SELECT_TABLE\"],"
+            + "\"applicableRoles\":[\"analyst\"]"
+            + "}"
+            + "}";
+
+    PolicyDTO policyDTO = JsonUtils.objectMapper().readValue(json, PolicyDTO.class);
+    PolicyContentDTO.AccessControlContentDTO contentDTO =
+        (PolicyContentDTO.AccessControlContentDTO) policyDTO.content();
+
+    Assertions.assertEquals(ImmutableList.of(Privilege.Name.SELECT_TABLE), contentDTO.privileges());
+    Assertions.assertEquals(ImmutableList.of("analyst"), contentDTO.applicableRoles());
+    Assertions.assertDoesNotThrow(contentDTO::validate);
+  }
+
+  @Test
+  public void testIcebergCompactionMaintenancePeerFieldsSerDe() throws JsonProcessingException {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    PolicyContentDTO.IcebergCompactionContentDTO typedContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    "0 0 2 * * ?",
+                    true,
+                    3_600_000L,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
+            .build();
+
+    PolicyDTO policyDTO =
+        PolicyDTO.builder()
+            .withName("iceberg-compaction-tms")
+            .withComment("tms peers")
+            .withPolicyType("system_iceberg_compaction")
+            .withEnabled(true)
+            .withContent(typedContent)
+            .withAudit(audit)
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(policyDTO);
+    Assertions.assertTrue(serJson.contains("\"timeTrigger\""));
+    Assertions.assertFalse(serJson.contains("\"executionSpec\""));
+    PolicyDTO deserPolicyDTO = JsonUtils.objectMapper().readValue(serJson, PolicyDTO.class);
+    Assertions.assertEquals(policyDTO, deserPolicyDTO);
+
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        (PolicyContentDTO.IcebergCompactionContentDTO) deserPolicyDTO.content();
+    Assertions.assertEquals("0 0 2 * * ?", content.timeTrigger());
+    Assertions.assertEquals(Boolean.TRUE, content.commitTrigger());
+    Assertions.assertEquals(3_600_000L, content.minIntervalMs());
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
+    Assertions.assertDoesNotThrow(content::validate);
+  }
+
+  @Test
+  public void testExecutionPeerOptionMapsAreUnmodifiableCopies() {
+    PolicyContentDTO.IcebergCompactionContentDTO content =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(
+                PolicyExecutionSpec.of(
+                    null,
+                    null,
+                    null,
+                    ImmutableMap.of("spark.executor.memory", "4g"),
+                    ImmutableMap.of("metalake", "ml")))
+            .build();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.jobOptions().put("spark.executor.memory", "8g"));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> content.updaterOptions().put("metalake", "other"));
+    Assertions.assertEquals("4g", content.jobOptions().get("spark.executor.memory"));
+    Assertions.assertEquals("ml", content.updaterOptions().get("metalake"));
+  }
+
+  @Test
+  public void testMaintenancePeerValidateOnDto() {
+    PolicyContentDTO.IcebergOrphanFileRemovalContentDTO orphanOnCommit =
+        PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+            .withExecutionSpec(PolicyExecutionSpec.of(null, true, null, null, null))
+            .build();
+    IllegalArgumentException orphanEx =
+        Assertions.assertThrows(IllegalArgumentException.class, orphanOnCommit::validate);
+    Assertions.assertTrue(orphanEx.getMessage().contains("commitTrigger"));
+
+    // Cron syntax is not validated on the policy API; scheduler registration parses it.
+    PolicyContentDTO.IcebergCompactionContentDTO opaqueCron =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder()
+            .withExecutionSpec(PolicyExecutionSpec.of("a a a a a a", null, null, null, null))
+            .build();
+    Assertions.assertDoesNotThrow(opaqueCron::validate);
   }
 }

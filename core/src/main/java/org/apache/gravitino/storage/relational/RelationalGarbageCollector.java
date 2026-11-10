@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational;
 
+import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
@@ -31,6 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +73,29 @@ public final class RelationalGarbageCollector implements Closeable {
   @VisibleForTesting
   public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
-    LOG.debug("Thread {} start to collect garbage...", threadId);
+    LOG.debug("Thread {} starting garbage collection", threadId);
 
     try {
       LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
+      if (backend instanceof SupportsOrphanedRelationCleanup) {
+        SupportsOrphanedRelationCleanup orphanedRelationCleanup =
+            (SupportsOrphanedRelationCleanup) backend;
+        for (MetadataObject.Type metadataObjectType : MetadataObject.Type.values()) {
+          long deletedCount = Long.MAX_VALUE;
+          LOG.debug("Try to softly delete orphaned {} relations", metadataObjectType);
+          try {
+            while (deletedCount > 0) {
+              deletedCount =
+                  orphanedRelationCleanup.softDeleteOrphanedRelations(
+                      metadataObjectType, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            }
+          } catch (RuntimeException e) {
+            LOG.error("Failed to softly delete orphaned " + metadataObjectType + " relations: ", e);
+          }
+        }
+      }
+
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
         LOG.debug(
@@ -103,13 +123,14 @@ public final class RelationalGarbageCollector implements Closeable {
             deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
           }
         } catch (RuntimeException e) {
-          LOG.error("Failed to softly delete type of " + entityType + "'s old version data: ", e);
+          LOG.error(
+              "Failed to soft-delete old version data for entity type " + entityType + ": ", e);
         }
       }
     } catch (Exception e) {
-      LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
+      LOG.error("Thread {} failed to collect and clean garbage", threadId, e);
     } finally {
-      LOG.debug("Thread {} finish to collect garbage.", threadId);
+      LOG.debug("Thread {} finished collecting garbage", threadId);
     }
   }
 

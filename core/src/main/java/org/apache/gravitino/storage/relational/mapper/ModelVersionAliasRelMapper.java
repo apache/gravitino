@@ -59,11 +59,16 @@ public interface ModelVersionAliasRelMapper {
   List<ModelVersionAliasRelPO> selectModelVersionAliasRelsByModelIdAndAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias);
 
+  /**
+   * Soft-deletes every active alias row for a model ID.
+   *
+   * @param modelId the model ID
+   * @return the number of changed rows
+   */
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsBySchemaIdAndModelName")
-  Integer softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
+      method = "softDeleteModelVersionAliasRelsByModelId")
+  Integer softDeleteModelVersionAliasRelsByModelId(@Param("modelId") Long modelId);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
@@ -73,14 +78,8 @@ public interface ModelVersionAliasRelMapper {
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsByModelIdAndAlias")
-  Integer softDeleteModelVersionAliasRelsByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias);
-
-  @UpdateProvider(
-      type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsBySchemaId")
-  Integer softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteModelVersionAliasRelsBySchemaIds")
+  Integer softDeleteModelVersionAliasRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,

@@ -15,6 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.utils.http_client import Response, HTTPClient, unpack
+from gravitino.utils.http_client import HTTPClient, Response, unpack
+from gravitino.utils.string_utils import StringUtils
 
-__all__ = ["Response", "HTTPClient", "unpack"]
+__all__ = [
+    "Response",
+    "HTTPClient",
+    "unpack",
+    "StringUtils",
+]

@@ -1,0 +1,688 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+"""Tests that user-supplied identifiers are URL-encoded before being embedded
+in request paths, preventing path traversal and query injection attacks."""
+
+import asyncio
+import unittest
+from unittest.mock import AsyncMock, MagicMock
+
+import httpx
+
+from mcp_server.client.plain.plain_rest_client_catalog_operation import (
+    PlainRESTClientCatalogOperation,
+)
+from mcp_server.client.plain.plain_rest_client_fileset_operation import (
+    PlainRESTClientFilesetOperation,
+)
+from mcp_server.client.plain.plain_rest_client_job_operation import (
+    PlainRESTClientJobOperation,
+)
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
+)
+from mcp_server.client.plain.plain_rest_client_model_operation import (
+    PlainRESTClientModelOperation,
+)
+from mcp_server.client.plain.plain_rest_client_partition_operation import (
+    PlainRESTClientPartitionOperation,
+)
+from mcp_server.client.plain.plain_rest_client_policy_operation import (
+    PlainRESTClientPolicyOperation,
+)
+from mcp_server.client.plain.plain_rest_client_schema_operation import (
+    PlainRESTClientSchemaOperation,
+)
+from mcp_server.client.plain.plain_rest_client_statistic_operation import (
+    PlainRESTClientStatisticOperation,
+)
+from mcp_server.client.plain.plain_rest_client_table_operation import (
+    PlainRESTClientTableOperation,
+)
+from mcp_server.client.plain.plain_rest_client_tag_operation import (
+    PlainRESTClientTagOperation,
+)
+from mcp_server.client.plain.plain_rest_client_topic_operation import (
+    PlainRESTClientTopicOperation,
+)
+from mcp_server.client.plain.plain_rest_client_view_operation import (
+    PlainRESTClientViewOperation,
+)
+from mcp_server.client.plain.utils import encode_path_segment
+
+
+def _make_mock_client(response_json: dict):
+    """Return a mock httpx.AsyncClient whose HTTP methods return a fake response."""
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = response_json
+
+    client = MagicMock()
+    client.get = AsyncMock(return_value=response)
+    client.post = AsyncMock(return_value=response)
+    client.put = AsyncMock(return_value=response)
+    client.delete = AsyncMock(return_value=response)
+    client.patch = AsyncMock(return_value=response)
+    return client
+
+
+def _called_url(mock_method):
+    """Extract the positional URL argument from the first call of a mock method."""
+    return mock_method.call_args[0][0]
+
+
+def _called_params(mock_method):
+    """Extract the 'params' keyword argument from the first call of a mock method."""
+    return mock_method.call_args[1].get("params", {})
+
+
+# Payloads that must be encoded to prevent injection
+_PATH_TRAVERSAL = "../../admin/users"
+_QUERY_INJECTION = "name?admin=true#"
+_SLASH = "cat/schema"
+_ENCODED_PATH_TRAVERSAL = "..%2F..%2Fadmin%2Fusers"
+_ENCODED_QUERY_INJECTION = "name%3Fadmin%3Dtrue%23"
+_ENCODED_SLASH = "cat%2Fschema"
+
+METALAKE = "my_metalake"
+
+
+class TestEncodePathSegment(unittest.TestCase):
+    def test_rejects_empty_and_dot_segments(self):
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    encode_path_segment(name)
+
+    def test_preserves_encoding_and_string_conversion(self):
+        for value, expected in (
+            (_PATH_TRAVERSAL, _ENCODED_PATH_TRAVERSAL),
+            (_QUERY_INJECTION, _ENCODED_QUERY_INJECTION),
+            (_SLASH, _ENCODED_SLASH),
+            ("sales.v2", "sales.v2"),
+            ("%2e%2e", "%252e%252e"),
+            (1, "1"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(encode_path_segment(value), expected)
+
+
+class TestPathNameValidation(unittest.IsolatedAsyncioTestCase):
+    """Invalid names must fail before httpx can normalize the request path."""
+
+    async def asyncSetUp(self):
+        self.requests = []
+
+        def respond(request):
+            self.requests.append(request)
+            return httpx.Response(
+                200, json={"code": 0, "dropped": True, "identifiers": []}
+            )
+
+        self.client = httpx.AsyncClient(
+            base_url="http://localhost:8090",
+            transport=httpx.MockTransport(respond),
+        )
+        self.addAsyncCleanup(self.client.aclose)
+
+    async def test_drop_table_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientTableOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.drop_table("catalog", "schema", name, False)
+                self.assertEqual(self.requests, [])
+
+    async def test_load_model_rejects_invalid_names_before_request(self):
+        op = PlainRESTClientModelOperation(METALAKE, self.client)
+        for name in ("", ".", ".."):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "REST path names"):
+                    await op.load_model("catalog", "schema", name)
+                self.assertEqual(self.requests, [])
+
+
+class TestMetalakeOperation(unittest.TestCase):
+    """The one operation that is not scoped to a metalake.
+
+    Everything else in the test suite reaches list_metalakes through
+    MockOperation, so without this the real endpoint path and the response key
+    the server actually returns are never executed.
+    """
+
+    def test_lists_metalakes_from_the_top_level_endpoint(self):
+        client = _make_mock_client(
+            {"metalakes": [{"name": "ml_a"}, {"name": "ml_b"}]}
+        )
+        op = PlainRESTClientMetalakeOperation(client)
+
+        result = asyncio.run(op.get_list_of_metalakes())
+
+        # Not under /api/metalakes/{metalake}/... - it must not be scoped.
+        self.assertEqual(_called_url(client.get), "/api/metalakes")
+        self.assertIn("ml_a", result)
+        self.assertIn("ml_b", result)
+
+    def test_returns_the_default_when_the_response_has_no_metalakes_key(self):
+        """Guards the response key: a typo here would silently return nothing
+        rather than failing, and every mock-based test would still pass."""
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientMetalakeOperation(client)
+
+        self.assertEqual(asyncio.run(op.get_list_of_metalakes()), "[]")
+
+
+class TestCatalogOperationUrlEncoding(unittest.TestCase):
+    def test_get_list_of_catalogs_encodes_metalake(self):
+        client = _make_mock_client({"catalogs": []})
+        op = PlainRESTClientCatalogOperation(_PATH_TRAVERSAL, client)
+        asyncio.run(op.get_list_of_catalogs())
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_drop_catalog_passes_force_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientCatalogOperation(METALAKE, client)
+        result = asyncio.run(op.drop_catalog("catalog", True))
+        self.assertEqual("true", result)
+        self.assertTrue(_called_params(client.delete)["force"])
+
+    def test_set_catalog_in_use_sends_patch_with_in_use(self):
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientCatalogOperation(METALAKE, client)
+        result = asyncio.run(op.set_catalog_in_use("catalog", False))
+        self.assertEqual('{"code": 0}', result)
+        self.assertEqual({"inUse": False}, client.patch.call_args[1]["json"])
+
+
+class TestSchemaOperationUrlEncoding(unittest.TestCase):
+    def test_get_list_of_schemas_encodes_catalog_name(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientSchemaOperation(METALAKE, client)
+        asyncio.run(op.get_list_of_schemas(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_get_list_of_schemas_encodes_query_injection(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientSchemaOperation(METALAKE, client)
+        asyncio.run(op.get_list_of_schemas(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_drop_schema_passes_cascade_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientSchemaOperation(METALAKE, client)
+        asyncio.run(op.drop_schema("catalog", "schema", True))
+        self.assertTrue(_called_params(client.delete)["cascade"])
+
+
+class TestTableOperationUrlEncoding(unittest.TestCase):
+    def test_get_list_of_tables_encodes_path_traversal(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.get_list_of_tables(_PATH_TRAVERSAL, "schema"))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_table_encodes_all_segments(self):
+        client = _make_mock_client({"table": {}})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.load_table(_SLASH, _SLASH, _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertEqual(url.count(_ENCODED_SLASH), 2)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_create_table_omits_unset_optional_fields(self):
+        client = _make_mock_client({"table": {}})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.create_table("catalog", "schema", "t", "", [], {}))
+        request = client.post.call_args[1]["json"]
+        self.assertNotIn("partitioning", request)
+        self.assertNotIn("distribution", request)
+        self.assertNotIn("sortOrders", request)
+        self.assertNotIn("indexes", request)
+
+    def test_create_table_includes_partitioning_when_set(self):
+        client = _make_mock_client({"table": {}})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        partitioning = [{"strategy": "identity", "fieldName": ["dt"]}]
+        asyncio.run(
+            op.create_table("catalog", "schema", "t", "", [], {}, partitioning)
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertEqual(partitioning, request["partitioning"])
+
+    def test_drop_table_passes_purge_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.drop_table("catalog", "schema", "t", True))
+        self.assertTrue(_called_params(client.delete)["purge"])
+
+
+class TestModelOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_models_encodes_path_traversal(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(op.list_of_models(_PATH_TRAVERSAL, "schema"))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_model_encodes_model_name(self):
+        client = _make_mock_client({"model": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(op.load_model("catalog", "schema", _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_load_model_version_by_alias_encodes_alias(self):
+        client = _make_mock_client({"modelVersion": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(
+            op.load_model_version_by_alias(
+                "catalog", "schema", "model", _PATH_TRAVERSAL
+            )
+        )
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_delete_model_reads_dropped_response(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(op.delete_model("catalog", "schema", "model"))
+        self.assertEqual("true", result)
+
+    def test_link_model_version_returns_base_response(self):
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.link_model_version(
+                "catalog", "schema", "model", "s3://bucket/model", [], "", {}
+            )
+        )
+        self.assertEqual('{"code": 0}', result)
+
+    def test_delete_model_version_reads_dropped_response(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.delete_model_version("catalog", "schema", "model", 1)
+        )
+        self.assertEqual("true", result)
+
+    def test_delete_model_version_by_alias_encodes_alias(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.delete_model_version_by_alias(
+                "catalog", "schema", "model", _PATH_TRAVERSAL
+            )
+        )
+        self.assertEqual("true", result)
+        url = _called_url(client.delete)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_alter_model_encodes_model_name(self):
+        client = _make_mock_client({"model": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(op.alter_model("catalog", "schema", _QUERY_INJECTION, []))
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_alter_model_version_reads_model_version_response(self):
+        client = _make_mock_client({"modelVersion": {"version": 1}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.alter_model_version("catalog", "schema", "model", 1, [])
+        )
+        self.assertEqual('{"version": 1}', result)
+
+    def test_alter_model_version_by_alias_encodes_alias(self):
+        client = _make_mock_client({"modelVersion": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(
+            op.alter_model_version_by_alias(
+                "catalog", "schema", "model", _PATH_TRAVERSAL, []
+            )
+        )
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+
+class TestTopicOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_topics_encodes_path_traversal(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientTopicOperation(METALAKE, client)
+        asyncio.run(op.list_of_topics(_PATH_TRAVERSAL, "schema"))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_topic_encodes_topic_name(self):
+        client = _make_mock_client({"topic": {}})
+        op = PlainRESTClientTopicOperation(METALAKE, client)
+        asyncio.run(op.load_topic("catalog", "schema", _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestFilesetOperationUrlEncoding(unittest.TestCase):
+    def test_create_fileset_omits_empty_storage_location(self):
+        client = _make_mock_client({"fileset": {}})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        asyncio.run(
+            op.create_fileset("catalog", "schema", "fs", "managed", "", "", {})
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertNotIn("storageLocation", request)
+        self.assertNotIn("storageLocations", request)
+
+    def test_create_fileset_includes_storage_locations_when_set(self):
+        client = _make_mock_client({"fileset": {}})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        locations = {"loc1": "file:/tmp/fs1", "loc2": "file:/tmp/fs2"}
+        asyncio.run(
+            op.create_fileset(
+                "catalog", "schema", "fs", "managed", "", "", {}, locations
+            )
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertEqual(locations, request["storageLocations"])
+
+    def test_list_of_filesets_encodes_path_traversal(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        asyncio.run(op.list_of_filesets(_PATH_TRAVERSAL, "schema"))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_fileset_encodes_fileset_name(self):
+        client = _make_mock_client({"fileset": {}})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        asyncio.run(op.load_fileset("catalog", "schema", _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_list_files_in_fileset_uses_params_for_query_args(self):
+        """sub_path and location_name must go through params=, not be concatenated."""
+        client = _make_mock_client({"files": []})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        asyncio.run(
+            op.list_files_in_fileset(
+                "catalog",
+                "schema",
+                "fileset",
+                location_name="loc?inject=1",
+                sub_path="/some/path?inject=2",
+            )
+        )
+        url = _called_url(client.get)
+        params = _called_params(client.get)
+        # Injection payloads must NOT appear raw in the path
+        self.assertNotIn("inject=1", url)
+        self.assertNotIn("inject=2", url)
+        # They must be passed as structured params so httpx encodes them
+        self.assertIn("location_name", params)
+        self.assertIn("sub_path", params)
+
+
+class TestTagOperationUrlEncoding(unittest.TestCase):
+    def test_get_tag_by_name_encodes_tag_name(self):
+        client = _make_mock_client({"tag": {}})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        asyncio.run(op.get_tag_by_name(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_alter_tag_encodes_tag_name(self):
+        client = _make_mock_client({"tag": {}})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        asyncio.run(op.alter_tag(_QUERY_INJECTION, []))
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_delete_tag_encodes_tag_name(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        result = asyncio.run(op.delete_tag(_PATH_TRAVERSAL))
+        self.assertEqual("true", result)
+        url = _called_url(client.delete)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_associate_tag_encodes_metadata_full_name_and_type(self):
+        client = _make_mock_client({"names": []})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        asyncio.run(
+            op.associate_tag_with_metadata(_QUERY_INJECTION, _SLASH, [], [])
+        )
+        url = _called_url(client.post)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertIn(_ENCODED_SLASH, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_list_tags_for_metadata_encodes_metadata_full_name(self):
+        client = _make_mock_client({"names": []})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        asyncio.run(op.list_tags_for_metadata(_PATH_TRAVERSAL, "table"))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_list_metadata_by_tag_encodes_tag_name(self):
+        client = _make_mock_client({"metadataObjects": []})
+        op = PlainRESTClientTagOperation(METALAKE, client)
+        asyncio.run(op.list_metadata_by_tag(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestJobOperationUrlEncoding(unittest.TestCase):
+    def test_get_job_by_id_encodes_job_id(self):
+        client = _make_mock_client({"job": {}})
+        op = PlainRESTClientJobOperation(METALAKE, client)
+        asyncio.run(op.get_job_by_id(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_get_job_template_by_name_encodes_name(self):
+        client = _make_mock_client({"jobTemplate": {}})
+        op = PlainRESTClientJobOperation(METALAKE, client)
+        asyncio.run(op.get_job_template_by_name(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_list_of_jobs_uses_params_for_template_name(self):
+        """job_template_name is a query parameter and must not be concatenated into the path."""
+        client = _make_mock_client({"jobs": []})
+        op = PlainRESTClientJobOperation(METALAKE, client)
+        asyncio.run(op.list_of_jobs(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        params = _called_params(client.get)
+        self.assertNotIn("?admin=true", url)
+        self.assertIn("jobTemplateName", params)
+
+    def test_cancel_job_encodes_job_id(self):
+        client = _make_mock_client({"job": {}})
+        op = PlainRESTClientJobOperation(METALAKE, client)
+        asyncio.run(op.cancel_job(_PATH_TRAVERSAL))
+        url = _called_url(client.post)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+
+class TestPolicyOperationUrlEncoding(unittest.TestCase):
+    def test_load_policy_encodes_policy_name(self):
+        client = _make_mock_client({"policy": {}})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        asyncio.run(op.load_policy(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_list_policies_for_tag_encodes_tag_name(self):
+        client = _make_mock_client({"associations": [{"policy": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_policies_for_tag(_PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertEqual('[{"policy": {}}]', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("../../", url)
+
+    def test_associate_policy_with_tag_encodes_names_and_sends_selector(self):
+        client = _make_mock_client(
+            {
+                "code": 0,
+                "policy": _QUERY_INJECTION,
+                "tag": _PATH_TRAVERSAL,
+                "selector": {"type": "ALL_VALUES"},
+            }
+        )
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.associate_policy_with_tag(
+                _PATH_TRAVERSAL,
+                _QUERY_INJECTION,
+                {"type": "ALL_VALUES"},
+            )
+        )
+        url = _called_url(client.post)
+        self.assertIn('"selector": {"type": "ALL_VALUES"}', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertEqual(
+            {"selector": {"type": "ALL_VALUES"}},
+            client.post.call_args.kwargs["json"],
+        )
+
+    def test_disassociate_policy_from_tag_handles_no_content_response(self):
+        client = _make_mock_client({})
+        client.delete.return_value.status_code = 204
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(
+            op.disassociate_policy_from_tag(_PATH_TRAVERSAL, _QUERY_INJECTION)
+        )
+        url = _called_url(client.delete)
+        self.assertIn('"removed": true', result)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+
+    def test_list_tags_for_policy_encodes_policy_name(self):
+        client = _make_mock_client({"associations": [{"tag": {}}]})
+        op = PlainRESTClientPolicyOperation(METALAKE, client)
+        result = asyncio.run(op.list_tags_for_policy(_QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertEqual('[{"tag": {}}]', result)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertIn("details=true", url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestStatisticOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_statistics_encodes_metadata_fullname(self):
+        client = _make_mock_client({"statistics": []})
+        op = PlainRESTClientStatisticOperation(METALAKE, client)
+        asyncio.run(op.list_of_statistics("table", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_list_statistic_for_partition_uses_params_for_partition_names(self):
+        """Partition names are query parameters and must not be concatenated into the path."""
+        client = _make_mock_client({"partitionStatistics": []})
+        op = PlainRESTClientStatisticOperation(METALAKE, client)
+        asyncio.run(
+            op.list_statistic_for_partition(
+                "table",
+                "catalog.schema.table",
+                from_partition_name=_QUERY_INJECTION,
+                to_partition_name=_PATH_TRAVERSAL,
+            )
+        )
+        url = _called_url(client.get)
+        params = _called_params(client.get)
+        self.assertNotIn("?admin=true", url)
+        self.assertNotIn("../../", url)
+        self.assertIn("from", params)
+        self.assertIn("to", params)
+
+
+class TestPartitionOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_partitions_encodes_table_name(self):
+        client = _make_mock_client({"names": []})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(op.list_of_partitions("catalog", "schema", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_list_of_partitions_passes_details_as_query_param(self):
+        client = _make_mock_client({"partitions": []})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(
+            op.list_of_partitions("catalog", "schema", "table", details=True)
+        )
+        self.assertTrue(_called_params(client.get)["details"])
+
+    def test_get_partition_encodes_partition_name(self):
+        client = _make_mock_client({"partition": {}})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(
+            op.get_partition("catalog", "schema", "table", _QUERY_INJECTION)
+        )
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestViewOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_views_encodes_schema_name(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.list_of_views("catalog", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_view_encodes_view_name(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.load_view("catalog", "schema", _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)

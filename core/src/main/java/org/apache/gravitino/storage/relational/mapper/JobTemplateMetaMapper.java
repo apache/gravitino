@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -51,12 +52,6 @@ public interface JobTemplateMetaMapper {
 
   @UpdateProvider(
       type = JobTemplateMetaSQLProviderFactory.class,
-      method = "softDeleteJobTemplateMetaByMetalakeAndName")
-  Integer softDeleteJobTemplateMetaByMetalakeAndName(
-      @Param("metalakeName") String metalakeName, @Param("jobTemplateName") String jobTemplateName);
-
-  @UpdateProvider(
-      type = JobTemplateMetaSQLProviderFactory.class,
       method = "softDeleteJobTemplateMetasByMetalakeId")
   void softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
@@ -78,7 +73,13 @@ public interface JobTemplateMetaMapper {
       @Param("metalakeId") long metalakeId, @Param("jobTemplateName") String jobTemplateName);
 
   @SelectProvider(type = JobTemplateMetaSQLProviderFactory.class, method = "selectJobTemplateById")
-  JobTemplatePO selectJobTemplateById(Long jobTemplateId);
+  JobTemplatePO selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId);
+
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "listJobTemplatePOsByJobTemplateIds")
+  List<JobTemplatePO> listJobTemplatePOsByJobTemplateIds(
+      @Param("jobTemplateIds") List<Long> jobTemplateIds);
 
   @SelectProvider(
       type = JobTemplateMetaSQLProviderFactory.class,
@@ -86,4 +87,40 @@ public interface JobTemplateMetaMapper {
   List<JobTemplatePO> batchSelectJobTemplateByIdentifier(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateNames") List<String> jobTemplateNames);
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the active row identity, or null if missing
+   */
+  @Nullable
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "selectJobTemplateByIdForUpdate")
+  JobTemplatePO selectJobTemplateByIdForUpdate(@Param("jobTemplateId") Long jobTemplateId);
+
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the active row identity, or null if missing
+   */
+  @Nullable
+  @SelectProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "selectJobTemplateByIdForShare")
+  JobTemplatePO selectJobTemplateByIdForShare(@Param("jobTemplateId") Long jobTemplateId);
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobTemplateId the stable template ID
+   * @param currentVersion the expected OCC version
+   * @return the affected row count
+   */
+  @UpdateProvider(
+      type = JobTemplateMetaSQLProviderFactory.class,
+      method = "softDeleteJobTemplateById")
+  int softDeleteJobTemplateById(
+      @Param("jobTemplateId") Long jobTemplateId, @Param("currentVersion") Long currentVersion);
 }

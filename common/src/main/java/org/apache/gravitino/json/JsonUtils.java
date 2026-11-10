@@ -49,11 +49,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
@@ -81,6 +82,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -168,6 +170,9 @@ public class JsonUtils {
               Types.TimestampType.withoutTimeZone(),
               Types.StringType.get(),
               Types.UUIDType.get(),
+              Types.VariantType.get(),
+              Types.GeometryType.crs84(),
+              Types.GeographyType.crs84(),
               Types.BinaryType.get(),
               Types.IntervalYearType.get(),
               Types.IntervalDayType.get()),
@@ -177,6 +182,10 @@ public class JsonUtils {
   private static final Pattern VARCHAR = Pattern.compile("varchar\\(\\s*(\\d+)\\s*\\)");
   private static final Pattern DECIMAL =
       Pattern.compile("decimal\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
+  private static final Pattern GEOMETRY =
+      Pattern.compile("geometry\\(\\s*(.+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern GEOGRAPHY =
+      Pattern.compile("geography\\(\\s*(.+?)\\s*,\\s*(.+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TIME = Pattern.compile("time\\((\\d+)\\)");
   private static final Pattern TIMESTAMP_TZ = Pattern.compile("timestamp_tz\\((\\d+)\\)");
   private static final Pattern TIMESTAMP = Pattern.compile("timestamp\\((\\d+)\\)");
@@ -304,16 +313,28 @@ public class JsonUtils {
             .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
             .registerModule(new JavaTimeModule())
             .registerModule(new Jdk8Module())
-            .registerModule(
-                new SimpleModule()
-                    .addDeserializer(Type.class, new TypeDeserializer())
-                    .addSerializer(Type.class, new TypeSerializer())
-                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
-                    .addSerializer(Partitioning.class, new PartitioningSerializer())
-                    .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
-                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
-                    .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
-                    .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
+            .registerModule(anyFieldModule());
+  }
+
+  private static SimpleModule anyFieldModule() {
+    SimpleModule module =
+        new SimpleModule()
+            .addDeserializer(Type.class, new TypeDeserializer())
+            .addSerializer(Type.class, new TypeSerializer())
+            .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+            .addSerializer(Partitioning.class, new PartitioningSerializer())
+            .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
+            .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
+            .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
+            .addSerializer(StatisticValue.class, new StatisticValueSerializer())
+            .addSerializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer())
+            .addDeserializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer());
+    ExecutablePolicyContentSerde.registerDomainSerdes(module);
+    return module;
   }
 
   /**
@@ -678,6 +699,9 @@ public class JsonUtils {
       case INTERVAL_DAY:
       case INTERVAL_YEAR:
       case UUID:
+      case VARIANT:
+      case GEOMETRY:
+      case GEOGRAPHY:
       case FIXED:
       case BINARY:
       case NULL:
@@ -865,6 +889,17 @@ public class JsonUtils {
     if (decimal.matches()) {
       return Types.DecimalType.of(
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
+    }
+
+    // Match against the original string, not the lowercased one, so the CRS keeps its case.
+    Matcher geometry = GEOMETRY.matcher(orignalTypeString);
+    if (geometry.matches()) {
+      return Types.GeometryType.of(geometry.group(1));
+    }
+
+    Matcher geography = GEOGRAPHY.matcher(orignalTypeString);
+    if (geography.matches()) {
+      return Types.GeographyType.of(geography.group(1), geography.group(2));
     }
 
     Matcher time = TIME.matcher(lowerTypeString);
@@ -1287,6 +1322,22 @@ public class JsonUtils {
     }
   }
 
+  /**
+   * Custom JSON serializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer
+   */
+  public static class PolicyExecutionSpecSerializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer {}
+
+  /**
+   * Custom JSON deserializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer
+   */
+  public static class PolicyExecutionSpecDeserializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer {}
+
   /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {
     @Override
@@ -1331,7 +1382,9 @@ public class JsonUtils {
     @Override
     public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      if (value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      if (value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET)) {
         return;
       }
       writeFunctionArg((FunctionArg) value, gen);
@@ -1339,7 +1392,9 @@ public class JsonUtils {
 
     @Override
     public boolean isEmpty(SerializerProvider provider, Expression value) {
-      return value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET);
+      return value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
     }
   }
 
@@ -1355,6 +1410,18 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Column initial default value. */
+  public static class ColumnInitialDefaultValueDeserializer extends JsonDeserializer<Expression> {
+    @Override
+    public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return Column.INITIAL_DEFAULT_VALUE_NOT_SET;
+      }
+      return readFunctionArg(node);
+    }
+  }
+
   /** Custom JSON deserializer for StatisticValue objects. */
   public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
     @Override
@@ -1365,13 +1432,27 @@ public class JsonUtils {
     }
   }
 
-  private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
+  private static StatisticValue<?> getStatisticValue(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
     if (node.isIntegralNumber()) {
+      // BigInteger nodes are integral as well, and asLong() would wrap them around silently.
+      Preconditions.checkArgument(
+          node.canConvertToLong(),
+          "Statistic value is out of the range of a 64-bit signed integer: %s",
+          node);
       return StatisticValues.longValue(node.asLong());
     } else if (node.isFloatingPointNumber()) {
-      return StatisticValues.doubleValue(node.asDouble());
+      // Jackson parses a literal past the double range into a DoubleNode that already holds
+      // infinity (USE_BIG_DECIMAL_FOR_FLOATS is off), and the serializer would write that back
+      // out as the JSON string "Infinity", so the value would come back as a string.
+      double doubleValue = node.asDouble();
+      Preconditions.checkArgument(
+          Double.isFinite(doubleValue),
+          "Statistic value is out of the range of a 64-bit floating point number, the literal"
+              + " parsed to %s",
+          doubleValue);
+      return StatisticValues.doubleValue(doubleValue);
     } else if (node.isTextual()) {
       return StatisticValues.stringValue(node.asText());
     } else if (node.isBoolean()) {
@@ -1380,10 +1461,7 @@ public class JsonUtils {
       ArrayNode arrayNode = (ArrayNode) node;
       List<StatisticValue<Object>> values = Lists.newArrayListWithCapacity(arrayNode.size());
       for (JsonNode arrayElement : arrayNode) {
-        StatisticValue<?> value = getStatisticValue(arrayElement);
-        if (value != null) {
-          values.add((StatisticValue<Object>) value);
-        }
+        values.add((StatisticValue<Object>) getStatisticValue(arrayElement));
       }
       return StatisticValues.listValue(values);
     } else if (node.isObject()) {
@@ -1391,20 +1469,10 @@ public class JsonUtils {
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
           .fields()
-          .forEachRemaining(
-              entry -> {
-                try {
-                  StatisticValue<?> value = getStatisticValue(entry.getValue());
-                  if (value != null) {
-                    map.put(entry.getKey(), value);
-                  }
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
-                }
-              });
+          .forEachRemaining(entry -> map.put(entry.getKey(), getStatisticValue(entry.getValue())));
       return StatisticValues.objectValue(map);
     } else {
-      throw new UnsupportedEncodingException(
+      throw new IllegalArgumentException(
           String.format("Don't support json node type %s", node.getNodeType()));
     }
   }
@@ -1473,14 +1541,18 @@ public class JsonUtils {
       }
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
+      Map<String, String> props = value.properties();
+      gen.writeFieldName("properties");
+      Map<String, String> sortedProps = new TreeMap<>(props);
+      gen.writeObject(sortedProps);
       gen.writeEndObject();
     }
   }
 
   /** Custom JSON deserializer for Index objects. */
-  public static class IndexDeserializer extends JsonDeserializer<Index> {
+  public static class IndexDeserializer extends JsonDeserializer<IndexDTO> {
     @Override
-    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public IndexDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       Preconditions.checkArgument(
           node != null && !node.isNull() && node.isObject(),
@@ -1501,6 +1573,20 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      Map<String, String> properties = ImmutableMap.of();
+
+      if (node.has("properties") && node.get("properties").isObject()) {
+
+        Map<String, String> props = new HashMap<>();
+
+        node.get("properties")
+            .fields()
+            .forEachRemaining(entry -> props.put(entry.getKey(), entry.getValue().asText()));
+
+        properties = props;
+      }
+
+      builder.withProperties(properties);
       return builder.build();
     }
   }

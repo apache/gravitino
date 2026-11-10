@@ -1,0 +1,179 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.flink.connector.utils;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialInfos;
+import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.options.Options;
+import org.apache.paimon.utils.HadoopUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/** Utility methods for Flink connector properties. */
+public class PropertyUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PropertyUtils.class);
+
+  public static final String HIVE_PREFIX = "hive.";
+  public static final String HADOOP_PREFIX = "hadoop.";
+  public static final String FS_PREFIX = "fs.";
+  public static final String DFS_PREFIX = "dfs.";
+
+  /**
+   * Merges masked entity {@code properties} with plaintext from {@link
+   * SupportsSecrets#getSecrets()} and {@link Credential#credentialInfo()} from {@link
+   * SupportsCredentials#getCredentials()}.
+   *
+   * <p>When secrets are unavailable — stubs that do not implement {@link SupportsSecrets}, or older
+   * Gravitino servers that return {@link NotFoundException} — returns a mutable copy of {@code
+   * properties}. Transport failures ({@link RESTException}) from {@code getSecrets} are not
+   * swallowed: connectors must not start with masked {@code ******} values. Credential overlays
+   * still tolerate {@link RESTException} for older servers that lack {@code /credentials}.
+   *
+   * @param properties masked or raw properties (may be null)
+   * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}, typically {@code
+   *     entity::supportsSecrets}
+   * @return a new mutable map with secrets and credential info overlaid when available
+   */
+  public static Map<String, String> propertiesWithSecrets(
+      Map<String, String> properties, Supplier<SupportsSecrets> supportsSecretsSupplier) {
+    return propertiesWithSecretsAndCredentials(properties, supportsSecretsSupplier, null);
+  }
+
+  /**
+   * Merges masked entity {@code properties} with {@code getSecrets()} and static ({@code
+   * expireTimeInMs == 0}) {@code getCredentials().credentialInfo()}.
+   *
+   * @param properties masked or raw properties (may be null)
+   * @param supportsSecretsSupplier supplier of {@link SupportsSecrets}
+   * @param supportsCredentialsSupplier supplier of {@link SupportsCredentials}, or null to skip
+   * @return a new mutable map with overlays when available
+   */
+  public static Map<String, String> propertiesWithSecretsAndCredentials(
+      Map<String, String> properties,
+      Supplier<SupportsSecrets> supportsSecretsSupplier,
+      @Nullable Supplier<SupportsCredentials> supportsCredentialsSupplier) {
+    Map<String, String> merged =
+        new HashMap<>(properties == null ? Collections.emptyMap() : properties);
+    if (supportsSecretsSupplier != null) {
+      try {
+        SupportsSecrets supportsSecrets = supportsSecretsSupplier.get();
+        if (supportsSecrets != null) {
+          Map<String, String> secrets = supportsSecrets.getSecrets();
+          if (secrets != null && !secrets.isEmpty()) {
+            merged.putAll(secrets);
+          }
+        }
+      } catch (UnsupportedOperationException | NotFoundException e) {
+        // Stubs may not implement SupportsSecrets; older servers lack /secrets.
+        LOG.debug("Skipping getSecrets while resolving Flink catalog properties: {}", e.toString());
+      }
+    }
+    if (supportsCredentialsSupplier != null) {
+      try {
+        SupportsCredentials supportsCredentials = supportsCredentialsSupplier.get();
+        if (supportsCredentials != null) {
+          Credential[] credentials = supportsCredentials.getCredentials();
+          merged.putAll(CredentialInfos.nonExpiringCredentialInfo(credentials));
+        }
+      } catch (UnsupportedOperationException | NotFoundException e) {
+        // Stubs may not implement SupportsCredentials; older servers lack /credentials.
+        LOG.debug(
+            "Skipping getCredentials while resolving Flink catalog properties: {}", e.toString());
+      } catch (RESTException e) {
+        LOG.warn(
+            "Failed to resolve getCredentials while building Flink catalog properties; continuing"
+                + " without static credential info: {}",
+            e.toString());
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Gets Hadoop and Hive properties.
+   *
+   * @param properties the source properties
+   * @return Hadoop and Hive properties
+   */
+  public static Map<String, String> getHadoopAndHiveProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return Collections.emptyMap();
+    }
+
+    return properties.entrySet().stream()
+        .filter(
+            entry ->
+                entry.getKey().startsWith(HADOOP_PREFIX)
+                    || entry.getKey().startsWith(FS_PREFIX)
+                    || entry.getKey().startsWith(DFS_PREFIX)
+                    || entry.getKey().startsWith(HIVE_PREFIX))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  /**
+   * Extracts Hadoop configuration from the given options and removes Hadoop-prefixed options.
+   *
+   * <p>Options with the {@code hadoop.} prefix are written to Hadoop configuration without the
+   * prefix. Options with the {@code fs.} or {@code dfs.} prefix are written as-is.
+   *
+   * @param options mutable options to extract Hadoop configuration from
+   * @return Hadoop configuration containing extracted Hadoop options
+   */
+  public static Configuration extractHadoopConfiguration(Map<String, String> options) {
+    Map<String, String> hadoopProps = new HashMap<>();
+    options
+        .entrySet()
+        .removeIf(
+            entry -> {
+              String hadoopKey = toHadoopConfKey(entry.getKey());
+              if (hadoopKey == null) {
+                return false;
+              }
+
+              hadoopProps.put(hadoopKey, entry.getValue());
+              return true;
+            });
+
+    Configuration conf = HadoopUtils.getHadoopConfiguration(Options.fromMap(options));
+    hadoopProps.forEach(conf::set);
+    return conf;
+  }
+
+  private static String toHadoopConfKey(String key) {
+    if (key.startsWith(HADOOP_PREFIX)) {
+      return key.substring(HADOOP_PREFIX.length());
+    } else if (key.startsWith(FS_PREFIX) || key.startsWith(DFS_PREFIX)) {
+      return key;
+    }
+
+    return null;
+  }
+}

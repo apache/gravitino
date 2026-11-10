@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization.expression;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_FUNCTION_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION;
@@ -26,9 +27,11 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TOPICS_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -110,7 +113,8 @@ public class AuthorizationExpressionConverter {
             } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
               replacement =
                   String.format(
-                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
+                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,"
+                          + "%s_NAME_IDENT,authorizationContext)",
                       type, type);
             } else {
               replacement =
@@ -168,9 +172,10 @@ public class AuthorizationExpressionConverter {
     return expression.replaceAll(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         """
-              ( entityType == 'CATALOG' && (%s)) ||
+              (( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
               ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'VIEW' && (%s)) ||
               ( entityType == 'MODEL' && (%s)) ||
               ( entityType == 'FILESET' && (%s)) ||
               ( entityType == 'TOPIC' && (%s)) ||
@@ -180,12 +185,15 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'TAG' && (%s)) ||
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
-              ( entityType == 'COLUMN' && (%s))
+              ( entityType == 'COLUMN' && (%s)) ||
+              ( entityType == 'FUNCTION' && (%s)) ||
+              ( entityType == 'SEMANTIC_MODEL' && (%s)))
               """
             .formatted(
                 LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
                 LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
                 LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+                LOAD_VIEW_AUTHORIZATION_EXPRESSION,
                 LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                 LOAD_FILESET_AUTHORIZATION_EXPRESSION,
                 LOAD_TOPICS_AUTHORIZATION_EXPRESSION,
@@ -195,7 +203,9 @@ public class AuthorizationExpressionConverter {
                 LOAD_TAG_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
-                LOAD_TABLE_AUTHORIZATION_EXPRESSION));
+                LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+                LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
+                LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -206,7 +216,9 @@ public class AuthorizationExpressionConverter {
    */
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
-    expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
+    expression =
+        expression.replaceAll(
+            "METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME,authorizationContext)");
 
     // A single privilege (e.g., SELECT_TABLE) can be granted or denied at multiple namespace
     // levels: metalake, catalog, schema, and table.
@@ -235,8 +247,8 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CREATE_SCHEMA",
-            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG)) "
-                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG)))");
+            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_SELECT_TABLE",
@@ -252,6 +264,21 @@ public class AuthorizationExpressionConverter {
             "ANY_CREATE_TABLE",
             "((ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
                 + "&& !(ANY(DENY_CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
+    expression =
+        expression.replaceAll(
+            "ANY_PROBE_TABLE_LIKE",
+            "((ANY(PROBE_TABLE_LIKE, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_PROBE_TABLE_LIKE, METALAKE, CATALOG, SCHEMA, TABLE)))");
+    expression =
+        expression.replaceAll(
+            "ANY_SELECT_VIEW",
+            "((ANY(SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)) "
+                + "&& !(ANY(DENY_SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_VIEW",
+            "((ANY(CREATE_VIEW, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_VIEW, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_FILESET",
@@ -270,6 +297,18 @@ public class AuthorizationExpressionConverter {
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
+            "ANY_USE_SECRETS",
+            "((ANY(USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL))"
+                + " && !(ANY(DENY_USE_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL)))");
+    expression =
+        expression.replaceAll(
+            "ANY_INCLUDE_CREDENTIAL_SECRETS",
+            "((ANY(INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG, SCHEMA, TABLE, VIEW, TOPIC,"
+                + " FILESET, MODEL)) && !(ANY(DENY_INCLUDE_CREDENTIAL_SECRETS, METALAKE, CATALOG,"
+                + " SCHEMA, TABLE, VIEW, TOPIC, FILESET, MODEL)))");
+    expression =
+        expression.replaceAll(
             "ANY_LINK_MODEL_VERSION",
             "((ANY(LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
                 + "&& !(ANY(DENY_LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
@@ -278,6 +317,36 @@ public class AuthorizationExpressionConverter {
             "ANY_REGISTER_MODEL",
             "((ANY(REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)) "
                 + "&& !(ANY(DENY_REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_REGISTER_FUNCTION",
+            "((ANY(REGISTER_FUNCTION, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_REGISTER_FUNCTION, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_EXECUTE_FUNCTION",
+            "((ANY(EXECUTE_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)) "
+                + "&& !(ANY(DENY_EXECUTE_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_FUNCTION",
+            "((ANY(MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)) "
+                + "&& !(ANY(DENY_MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_SEMANTIC_MODEL",
+            "((ANY(CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_SEMANTIC_MODEL",
+            "((ANY(USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_USE_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_SEMANTIC_MODEL",
+            "((ANY(MODIFY_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)) "
+                + "&& !(ANY(DENY_MODIFY_SEMANTIC_MODEL, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",
@@ -303,6 +372,15 @@ public class AuthorizationExpressionConverter {
             "ANY_WRITE_FILESET",
             "((ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
+    expression =
+        expression.replaceAll(
+            "ANY_VIEW_TAG",
+            "((ANY(VIEW_TAG, METALAKE, TAG))" + " && !(ANY(DENY_VIEW_TAG, METALAKE, TAG)))");
+    expression =
+        expression.replaceAll(
+            "ANY_VIEW_POLICY",
+            "((ANY(VIEW_POLICY, METALAKE, POLICY))"
+                + " && !(ANY(DENY_VIEW_POLICY, METALAKE, POLICY)))");
     expression =
         expression.replaceAll(
             "ANY_APPLY_TAG",

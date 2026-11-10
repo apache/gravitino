@@ -21,7 +21,7 @@ from typing import Dict
 
 import docker
 from docker import types as tp
-from docker.errors import NotFound
+from docker.errors import DockerException, NotFound
 
 from gravitino.exceptions.base import GravitinoRuntimeException
 
@@ -130,25 +130,38 @@ class BaseContainer:
             ) from e
 
     def close(self):
+        if self._container is None:
+            return
+
         try:
             self._container.kill()
-        except RuntimeError as e:
+        except DockerException as e:
             logger.warning(
                 "Exception occurred while killing container %s : %s",
                 self._container_name,
                 e,
             )
         try:
-            self._container.remove()
-        except RuntimeError as e:
+            self._network.disconnect(self._container, force=True)
+        except DockerException as e:
+            logger.warning(
+                "Exception occurred while disconnecting container %s from network %s : %s",
+                self._container_name,
+                self._network_name,
+                e,
+            )
+        try:
+            self._container.remove(force=True)
+        except DockerException as e:
             logger.warning(
                 "Exception occurred while removing container %s : %s",
                 self._container_name,
                 e,
             )
         try:
+            self._network.reload()
             self._network.remove()
-        except RuntimeError as e:
+        except DockerException as e:
             logger.warning(
                 "Exception occurred while removing network %s : %s",
                 self._network_name,

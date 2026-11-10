@@ -131,6 +131,6 @@ public class S3TokenCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sessionToken), "S3 session token should not be empty");
     Preconditions.checkArgument(
-        expireTimeInMs > 0, "The expire time of S3TokenCredential should great than 0");
+        expireTimeInMs > 0, "The expiration time of S3TokenCredential should be greater than 0");
   }
 }

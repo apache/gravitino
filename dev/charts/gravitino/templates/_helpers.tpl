@@ -67,10 +67,32 @@ Define the gravitino.namespace
 {{- end -}}
 
 {{/*
+Return an image reference for the provided image root and global values.
+*/}}
+{{- define "gravitino.imageReference" -}}
+{{- $registry := coalesce .global.imageRegistry .imageRoot.registry -}}
+{{- $repository := required "image repository is required" .imageRoot.repository -}}
+{{- if .imageRoot.digest -}}
+{{- if $registry -}}
+{{- printf "%s/%s@%s" $registry $repository .imageRoot.digest -}}
+{{- else -}}
+{{- printf "%s@%s" $repository .imageRoot.digest -}}
+{{- end -}}
+{{- else -}}
+{{- $tag := required "image tag is required" .imageRoot.tag -}}
+{{- if $registry -}}
+{{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repository $tag -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Return the proper Gravitino image name
 */}}
 {{- define "gravitino.image" -}}
-  {{- include "common.images.image" (dict "imageRoot" .Values.image "global" .Values.global) -}}
+  {{- include "gravitino.imageReference" (dict "imageRoot" .Values.image "global" .Values.global) -}}
 {{- end -}}
 
 {{/*
@@ -78,7 +100,7 @@ Return the proper MySQL image name for the init-mysql initContainer
 */}}
 {{- define "init-mysql.image" -}}
 {{- if .Values.mysql.enabled -}}
-  {{- include "common.images.image" (dict "imageRoot" .Values.mysql.image "global" .Values.global) -}}
+  {{- include "gravitino.imageReference" (dict "imageRoot" .Values.mysql.image "global" .Values.global) -}}
 {{- end -}}
 {{- end -}}
 
@@ -87,6 +109,6 @@ Return the proper Postgresql image name for the init-postgresql initContainer
 */}}
 {{- define "init-postgresql.image" -}}
 {{- if .Values.postgresql.enabled -}}
-  {{- include "common.images.image" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
+  {{- include "gravitino.imageReference" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
 {{- end -}}
 {{- end -}}

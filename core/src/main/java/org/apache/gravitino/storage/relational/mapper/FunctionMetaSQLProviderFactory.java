@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionMetaBaseSQLProvider;
@@ -55,13 +56,12 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().insertFunctionMeta(functionPO);
   }
 
-  public static String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return getProvider().insertFunctionMetaOnDuplicateKeyUpdate(functionPO);
-  }
-
   public static String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFunctionPOsBySchemaId(schemaId);
+  }
+
+  public static String listFunctionPOsByFunctionIds(@Param("functionIds") List<Long> functionIds) {
+    return getProvider().listFunctionPOsByFunctionIds(functionIds);
   }
 
   public static String listFunctionPOsByFullQualifiedName(
@@ -85,8 +85,37 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().selectFunctionMetaBySchemaIdAndName(schemaId, functionName);
   }
 
-  public static String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
-    return getProvider().softDeleteFunctionMetaByFunctionId(functionId);
+  /** Delegates a root-only locking lookup by function natural key. */
+  public static String selectFunctionMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return getProvider().selectFunctionMetaBySchemaIdAndNameForUpdate(schemaId, functionName);
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks an active function metadata row.
+   *
+   * @param functionId the function ID
+   * @return the locking select SQL
+   */
+  public static String selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId) {
+    return getProvider().selectFunctionMetaByIdForUpdate(functionId);
+  }
+
+  public static String selectFunctionIdBySchemaIdAndFunctionName(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return getProvider().selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName);
+  }
+
+  /**
+   * Returns SQL that soft-deletes a function with a version check.
+   *
+   * @param functionId the function ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion) {
+    return getProvider().softDeleteFunctionMetaByFunctionId(functionId, currentVersion);
   }
 
   public static String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {
@@ -97,8 +126,9 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().softDeleteFunctionMetasByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFunctionMetasBySchemaId(schemaId);
+  public static String softDeleteFunctionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFunctionMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteFunctionMetasByLegacyTimeline(

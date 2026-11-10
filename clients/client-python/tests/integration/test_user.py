@@ -1,0 +1,100 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from random import randint
+
+from gravitino import GravitinoAdminClient, GravitinoClient
+from gravitino.exceptions.base import (
+    NoSuchUserException,
+    UserAlreadyExistsException,
+)
+
+from tests.integration.integration_test_env import IntegrationTestEnv, MetalakeTestMixin
+
+
+class TestUser(MetalakeTestMixin, IntegrationTestEnv):
+    metalake_name: str = "test_user_metalake" + str(randint(1, 10000))
+
+    gravitino_admin_client: GravitinoAdminClient = None
+    gravitino_client: GravitinoClient = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.gravitino_admin_client = cls.set_up_authorization_test_env()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tear_down_authorization_test_env()
+
+    def test_add_user(self):
+        user = self.gravitino_client.add_user("test_add_user")
+
+        self.assertIsNotNone(user)
+        self.assertEqual("test_add_user", user.name())
+        self.assertIsNotNone(user.audit_info())
+
+    def test_get_user(self):
+        self.gravitino_client.add_user("test_get_user")
+
+        user = self.gravitino_client.get_user("test_get_user")
+
+        self.assertIsNotNone(user)
+        self.assertEqual("test_get_user", user.name())
+
+    def test_list_users(self):
+        self.gravitino_client.add_user("test_list_user_1")
+        self.gravitino_client.add_user("test_list_user_2")
+
+        users = self.gravitino_client.list_users()
+
+        self.assertIsNotNone(users)
+        user_names = [u.name() for u in users]
+        self.assertIn("test_list_user_1", user_names)
+        self.assertIn("test_list_user_2", user_names)
+
+    def test_list_user_names(self):
+        self.gravitino_client.add_user("test_list_names_1")
+        self.gravitino_client.add_user("test_list_names_2")
+
+        names = self.gravitino_client.list_user_names()
+
+        self.assertIsNotNone(names)
+        self.assertIn("test_list_names_1", names)
+        self.assertIn("test_list_names_2", names)
+
+    def test_remove_user(self):
+        self.gravitino_client.add_user("test_remove_user")
+
+        removed = self.gravitino_client.remove_user("test_remove_user")
+        self.assertTrue(removed)
+
+        with self.assertRaises(NoSuchUserException):
+            self.gravitino_client.get_user("test_remove_user")
+
+    def test_get_nonexistent_user(self):
+        with self.assertRaises(NoSuchUserException):
+            self.gravitino_client.get_user("nonexistent_user")
+
+    def test_add_duplicate_user(self):
+        self.gravitino_client.add_user("test_duplicate_user")
+
+        with self.assertRaises(UserAlreadyExistsException):
+            self.gravitino_client.add_user("test_duplicate_user")
+
+    def test_remove_nonexistent_user(self):
+        removed = self.gravitino_client.remove_user("nonexistent_user")
+        self.assertFalse(removed)

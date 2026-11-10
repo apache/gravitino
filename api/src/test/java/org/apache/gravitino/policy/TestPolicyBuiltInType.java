@@ -1,0 +1,98 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.policy;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+public class TestPolicyBuiltInType {
+
+  @Test
+  void testFromPolicyTypeWithBuiltInTypeValue() {
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_COMPACTION,
+        Policy.BuiltInType.fromPolicyType("system_iceberg_compaction"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS,
+        Policy.BuiltInType.fromPolicyType("system_iceberg_rewrite_manifests"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION,
+        Policy.BuiltInType.fromPolicyType("system_iceberg_snapshot_expiration"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.ROW_FILTER, Policy.BuiltInType.fromPolicyType("system_row_filter"));
+    Assertions.assertEquals(
+        Policy.BuiltInType.COLUMN_MASK, Policy.BuiltInType.fromPolicyType("system_column_mask"));
+  }
+
+  @Test
+  void testFromPolicyTypeWithEnumName() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Policy.BuiltInType.fromPolicyType("ICEBERG_COMPACTION"));
+    Assertions.assertTrue(exception.getMessage().contains("Unknown policy type"));
+  }
+
+  @Test
+  void testSingleReadRestrictionTypeIsUnsupported() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> Policy.BuiltInType.fromPolicyType("system_read_restriction"));
+  }
+
+  @Test
+  void testBuiltInTypePolicyTypeValue() {
+    Assertions.assertEquals(
+        "system_iceberg_compaction", Policy.BuiltInType.ICEBERG_COMPACTION.policyType());
+    Assertions.assertEquals(
+        "system_iceberg_rewrite_manifests",
+        Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS.policyType());
+    Assertions.assertEquals(
+        "system_iceberg_snapshot_expiration",
+        Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION.policyType());
+    Assertions.assertEquals("system_row_filter", Policy.BuiltInType.ROW_FILTER.policyType());
+    Assertions.assertEquals("system_column_mask", Policy.BuiltInType.COLUMN_MASK.policyType());
+  }
+
+  @Test
+  void testBuiltInTypeContentClass() {
+    Assertions.assertEquals(
+        IcebergDataCompactionContent.class, Policy.BuiltInType.ICEBERG_COMPACTION.contentClass());
+    Assertions.assertEquals(
+        IcebergRewriteManifestsContent.class,
+        Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS.contentClass());
+    Assertions.assertEquals(
+        IcebergSnapshotExpirationContent.class,
+        Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION.contentClass());
+    Assertions.assertEquals(RowFilterContent.class, Policy.BuiltInType.ROW_FILTER.contentClass());
+    Assertions.assertEquals(ColumnMaskContent.class, Policy.BuiltInType.COLUMN_MASK.contentClass());
+  }
+
+  @Test
+  void testAccessControlPolicyType() {
+    Assertions.assertEquals(
+        Policy.BuiltInType.ACCESS_CONTROL,
+        Policy.BuiltInType.fromPolicyType("system_access_control"));
+    Assertions.assertEquals(
+        "system_access_control", Policy.BuiltInType.ACCESS_CONTROL.policyType());
+    Assertions.assertEquals(
+        AccessControlContent.class, Policy.BuiltInType.ACCESS_CONTROL.contentClass());
+  }
+}

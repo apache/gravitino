@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
@@ -36,8 +38,10 @@ public class EntityCombinedTopic implements Topic {
   private final Topic topic;
   private final TopicEntity topicEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties;
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -68,8 +72,10 @@ public class EntityCombinedTopic implements Topic {
     return new EntityCombinedTopic(topic, null);
   }
 
-  public EntityCombinedTopic withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedTopic withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -90,10 +96,7 @@ public class EntityCombinedTopic implements Topic {
 
   @Override
   public Map<String, String> properties() {
-    return topic.properties().entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(topic.properties(), keysToMask, keysToOmit);
   }
 
   @Override

@@ -43,13 +43,41 @@ public interface HiveClient extends AutoCloseable {
 
   List<String> getAllTables(String catalogName, String databaseName);
 
+  List<String> listTablesByType(
+      String catalogName, String databaseName, String tablePattern, String tableType);
+
   List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize);
 
   HiveTable getTable(String catalogName, String databaseName, String tableName);
 
+  default void alterTable(
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+    alterTable(catalogName, databaseName, tableName, alteredHiveTable, false);
+  }
+
+  /**
+   * Alters a table in the Hive metastore.
+   *
+   * <p>When {@code skipStatsUpdate} is {@code true}, the metastore is instructed (via the {@code
+   * DO_NOT_UPDATE_STATS} environment context) not to recompute table statistics for this alter.
+   * This avoids the metastore accessing the table's storage location (for example an {@code
+   * getFileInfo} call against the NameNode), which is unnecessary for property-only or comment-only
+   * changes and can otherwise make a lightweight alter hang when the underlying filesystem is slow
+   * or unavailable.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param tableName The table name.
+   * @param alteredHiveTable The altered table definition.
+   * @param skipStatsUpdate Whether to skip metastore statistics recomputation for this alter.
+   */
   void alterTable(
-      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      HiveTable alteredHiveTable,
+      boolean skipStatsUpdate);
 
   void dropTable(
       String catalogName,
@@ -83,6 +111,20 @@ public interface HiveClient extends AutoCloseable {
   List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables);
 
+  /**
+   * Returns names of tables whose storage input format starts with the supplied prefix.
+   *
+   * <p>This metadata-only operation does not resolve column schemas or load constraints.
+   *
+   * @param catalogName The Hive catalog name.
+   * @param databaseName The database name.
+   * @param allTables The table names to inspect.
+   * @param inputFormatPrefix The required input format prefix.
+   * @return Matching table names.
+   */
+  List<String> getTableNamesByInputFormatPrefix(
+      String catalogName, String databaseName, List<String> allTables, String inputFormatPrefix);
+
   List<String> getCatalogs();
 
   default void createCatalog(String catalogName, String location) {
@@ -94,4 +136,11 @@ public interface HiveClient extends AutoCloseable {
   void close();
 
   UserGroupInformation getUser();
+
+  /**
+   * Returns the Hive version of the metastore backend this client is connected to.
+   *
+   * @return The resolved Hive version.
+   */
+  HiveClientClassLoader.HiveVersion hiveVersion();
 }

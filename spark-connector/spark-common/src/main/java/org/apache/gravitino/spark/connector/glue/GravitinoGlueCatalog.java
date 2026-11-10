@@ -1,0 +1,415 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.spark.connector.glue;
+
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.credential.AwsSecretKeyCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
+import org.apache.gravitino.spark.connector.SparkTransformConverter;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
+import org.apache.gravitino.spark.connector.hive.SparkHiveTable;
+import org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter;
+import org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable;
+import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.SparkTable;
+import org.apache.kyuubi.spark.connector.hive.HiveTable;
+import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.Table;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
+import org.apache.spark.sql.types.ArrayType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.MapType;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.TimestampType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Gravitino Glue catalog implementation for Apache Spark.
+ *
+ * <p>This catalog handles mixed table types stored in AWS Glue Data Catalog:
+ *
+ * <ul>
+ *   <li>Non-Iceberg tables (Hive, Delta, Parquet): routed to {@link HiveTableCatalog} backed by the
+ *       AWS Glue Data Catalog Hive client ({@code AWSGlueDataCatalogHiveClientFactory})
+ *   <li>Iceberg tables: routed to Iceberg's {@link SparkCatalog} (GlueCatalog) for I/O
+ * </ul>
+ *
+ * <p>Table routing is based on the {@code table-format} property in Glue table parameters. Tables
+ * with {@code table-format=ICEBERG} are delegated to the Iceberg backend.
+ *
+ * <p>{@link HiveTableCatalog} is configured with {@code hive.metastore.client.factory.class} set to
+ * {@code AWSGlueDataCatalogHiveClientFactory}, which replaces the embedded Derby metastore with a
+ * direct AWS Glue API connection. This means no local Derby sync is required and the catalog works
+ * correctly across multiple concurrent Spark applications sharing the same Glue catalog.
+ */
+public class GravitinoGlueCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
+
+  /**
+   * Iceberg tables follow Iceberg type semantics: a Spark {@code timestamp} is an Iceberg {@code
+   * timestamptz} and a Spark {@code timestamp_ntz} an Iceberg {@code timestamp}, as with the
+   * Iceberg catalog. The Hive rules of {@link SparkHiveTypeConverter} apply to the other tables.
+   */
+  private static final SparkTypeConverter ICEBERG_TYPE_CONVERTER = new SparkTypeConverter();
+
+  // Lazily initialized Iceberg GlueCatalog for Iceberg tables
+  volatile SparkCatalog icebergGlueCatalog;
+
+  // Store original config for Iceberg catalog initialization
+  private String catalogName;
+  private Map<String, String> catalogProperties;
+
+  /**
+   * AWS credentials obtained via Gravitino credential vending at init time. Keyed by Gravitino
+   * catalog property names (e.g. "aws-access-key-id") so they can be merged directly into catalog
+   * properties before being passed to {@link GluePropertiesConverter#toIcebergCatalogProperties}.
+   * Null when credential vending returns no S3 credentials.
+   */
+  private Map<String, String> vendedAwsCredentials;
+
+  /** Creates a new GravitinoGlueCatalog. */
+  public GravitinoGlueCatalog() {}
+
+  /**
+   * Creates a new HiveTableCatalog instance. Override in tests to inject mock instances.
+   *
+   * @return a new HiveTableCatalog
+   */
+  protected HiveTableCatalog createHiveTableCatalog() {
+    return new HiveTableCatalog();
+  }
+
+  @Override
+  protected TableCatalog createAndInitSparkCatalog(
+      String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    this.catalogName = name;
+    this.catalogProperties = properties;
+
+    TableCatalog hiveCatalog = createHiveTableCatalog();
+    Map<String, String> all =
+        getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    this.vendedAwsCredentials = applyS3Credential(gravitinoCatalogClient, all);
+    hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
+    return hiveCatalog;
+  }
+
+  /**
+   * Obtains credentials via Gravitino credential vending. {@link AwsSecretKeyCredential} supplies
+   * Glue API keys (returned for the Iceberg path). {@link S3SecretKeyCredential} supplies {@code
+   * hadoop.fs.s3a.*} for Hive-path S3 data access. When only {@link S3SecretKeyCredential} is
+   * present (legacy remap), it also fills Glue API keys for backward compatibility.
+   *
+   * @return map of vended AWS credentials (Gravitino key names), or empty map if none vended
+   */
+  static Map<String, String> applyS3Credential(
+      org.apache.gravitino.Catalog catalog, Map<String, String> props) {
+    Map<String, String> vended = new HashMap<>();
+    Credential[] credentials;
+    try {
+      credentials = CredentialPropertyUtils.getCredentials(catalog);
+    } catch (RuntimeException e) {
+      LOG.debug(
+          "Failed to obtain credentials from Glue catalog, S3 credential injection skipped", e);
+      return vended;
+    }
+    S3SecretKeyCredential s3SecretKey = null;
+    for (Credential credential : credentials) {
+      if (credential instanceof AwsSecretKeyCredential) {
+        AwsSecretKeyCredential aws = (AwsSecretKeyCredential) credential;
+        vended.put(GluePropertiesConverter.AWS_ACCESS_KEY_ID, aws.accessKeyId());
+        vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, aws.secretAccessKey());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        s3SecretKey = (S3SecretKeyCredential) credential;
+        props.put("hadoop.fs.s3a.access.key", s3SecretKey.accessKeyId());
+        props.put("hadoop.fs.s3a.secret.key", s3SecretKey.secretAccessKey());
+      } else {
+        LOG.warn(
+            "Received unrecognized credential type '{}' for Glue catalog, skipping",
+            credential.getClass().getName());
+      }
+    }
+    // Legacy catalogs that only vend remapped S3SecretKeyCredential still need Glue API keys.
+    if (vended.isEmpty() && s3SecretKey != null) {
+      vended.put(GluePropertiesConverter.AWS_ACCESS_KEY_ID, s3SecretKey.accessKeyId());
+      vended.put(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, s3SecretKey.secretAccessKey());
+    }
+    return vended;
+  }
+
+  /**
+   * Routes Spark table loading to the correct backend.
+   *
+   * <p>Iceberg tables are loaded from the Iceberg GlueCatalog. Non-Iceberg tables are loaded
+   * directly from {@link HiveTableCatalog}, which reads from Glue via the factory client.
+   */
+  @Override
+  protected Table loadSparkTable(Identifier ident) {
+    try {
+      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
+      if (isIcebergTable(gravitinoTable)) {
+        return getOrCreateIcebergGlueCatalog().loadTable(ident);
+      }
+      return sparkCatalog.loadTable(ident);
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(
+          String.format("Failed to load spark table: %s.%s", getDatabase(ident), ident.name()), e);
+    }
+  }
+
+  /**
+   * Routes table creation to the appropriate Spark wrapper based on the Gravitino table type.
+   * Iceberg tables are wrapped in {@link SparkIcebergTable}; all others in {@link SparkHiveTable}.
+   */
+  @Override
+  protected Table createSparkTable(
+      Identifier identifier,
+      org.apache.gravitino.rel.Table gravitinoTable,
+      Table sparkTable,
+      TableCatalog sparkHiveCatalog,
+      PropertiesConverter propertiesConverter,
+      SparkTransformConverter sparkTransformConverter,
+      SparkTypeConverter sparkTypeConverter) {
+
+    if (isIcebergTable(gravitinoTable)) {
+      Preconditions.checkArgument(
+          sparkTable instanceof SparkTable,
+          "Iceberg table %s expected SparkTable from Iceberg backend, got %s",
+          identifier,
+          sparkTable.getClass().getName());
+      return new SparkIcebergTable(
+          identifier,
+          gravitinoTable,
+          (SparkTable) sparkTable,
+          getOrCreateIcebergGlueCatalog(),
+          propertiesConverter,
+          sparkTransformConverter,
+          ICEBERG_TYPE_CONVERTER);
+    }
+
+    return new SparkHiveTable(
+        identifier,
+        gravitinoTable,
+        (HiveTable) sparkTable,
+        (HiveTableCatalog) sparkHiveCatalog,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter);
+  }
+
+  /** {@inheritDoc} Returns the Glue-specific properties converter singleton. */
+  @Override
+  protected PropertiesConverter getPropertiesConverter() {
+    return GluePropertiesConverter.getInstance();
+  }
+
+  /** {@inheritDoc} Returns a transform converter with identity partition support disabled. */
+  @Override
+  protected SparkTransformConverter getSparkTransformConverter() {
+    return new SparkTransformConverter(false);
+  }
+
+  /** {@inheritDoc} Returns the Hive-compatible type converter used for Glue tables. */
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter() {
+    return new SparkHiveTypeConverter();
+  }
+
+  /**
+   * {@inheritDoc} A table created without {@code table-format} gets the catalog's default table
+   * format.
+   */
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter(Map<String, String> gravitinoTableProperties) {
+    String tableFormat =
+        gravitinoTableProperties.getOrDefault(
+            GlueConstants.TABLE_FORMAT,
+            catalogProperties == null
+                ? null
+                : catalogProperties.get(GlueConstants.DEFAULT_TABLE_FORMAT));
+    return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)
+        ? ICEBERG_TYPE_CONVERTER
+        : super.getSparkTypeConverter(gravitinoTableProperties);
+  }
+
+  /**
+   * {@inheritDoc} Changes of an Iceberg table follow Iceberg type semantics. Hive and Iceberg
+   * differ on timestamp types only, so the table is loaded just for changes that set one.
+   */
+  @Override
+  protected SparkTableChangeConverter getSparkTableChangeConverter(
+      Identifier ident, TableChange[] changes) {
+    if (Arrays.stream(changes).noneMatch(GravitinoGlueCatalog::setsTimestampType)) {
+      return super.getSparkTableChangeConverter(ident, changes);
+    }
+    try {
+      if (isIcebergTable(loadGravitinoTable(ident))) {
+        return getSparkTableChangeConverter(ICEBERG_TYPE_CONVERTER);
+      }
+    } catch (NoSuchTableException e) {
+      // The alter reports the missing table.
+    }
+    return super.getSparkTableChangeConverter(ident, changes);
+  }
+
+  private static boolean setsTimestampType(TableChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      return containsTimestampType(((TableChange.AddColumn) change).dataType());
+    }
+    return change instanceof TableChange.UpdateColumnType
+        && containsTimestampType(((TableChange.UpdateColumnType) change).newDataType());
+  }
+
+  private static boolean containsTimestampType(DataType type) {
+    if (type instanceof ArrayType) {
+      return containsTimestampType(((ArrayType) type).elementType());
+    }
+    if (type instanceof MapType) {
+      return containsTimestampType(((MapType) type).keyType())
+          || containsTimestampType(((MapType) type).valueType());
+    }
+    if (type instanceof StructType) {
+      return Arrays.stream(((StructType) type).fields())
+          .anyMatch(field -> containsTimestampType(field.dataType()));
+    }
+    return type instanceof TimestampType || type instanceof TimestampNTZType;
+  }
+
+  /**
+   * Delegates function lookup to the Iceberg {@link SparkCatalog}, which registers Iceberg built-in
+   * partition functions ({@code days}, {@code hours}, {@code months}, {@code years}, etc.). Falls
+   * back to the Gravitino function registry for non-Iceberg functions.
+   *
+   * <p>Without this override, {@link org.apache.gravitino.spark.connector.catalog.BaseCatalog}
+   * would only query the Gravitino server's function registry, which does not include Iceberg
+   * built-ins. This causes {@code INSERT} into Iceberg tables partitioned by time-based transforms
+   * to fail with {@code AnalysisException: days(col) is not currently supported}.
+   */
+  @Override
+  public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
+    try {
+      return getOrCreateIcebergGlueCatalog().loadFunction(ident);
+    } catch (NoSuchFunctionException e) {
+      return super.loadFunction(ident);
+    }
+  }
+
+  /**
+   * Invalidates both the Hive backend and the Iceberg backend caches for the given table.
+   *
+   * <p>{@link BaseCatalog} only calls {@code sparkCatalog.invalidateTable}, which clears the {@link
+   * HiveTableCatalog} cache. The Iceberg {@link SparkCatalog} maintains its own {@code
+   * CachingCatalog} that must be invalidated separately after any table mutation (ALTER, DROP,
+   * PURGE, RENAME) to avoid stale schema errors on subsequent reads.
+   */
+  @Override
+  public void invalidateTable(Identifier ident) {
+    super.invalidateTable(ident);
+    if (icebergGlueCatalog != null) {
+      icebergGlueCatalog.invalidateTable(ident);
+    }
+  }
+
+  /**
+   * Returns true if the Gravitino table is an Iceberg-format table based on its properties.
+   *
+   * @param gravitinoTable the Gravitino table to inspect
+   * @return true for Iceberg tables, false otherwise
+   */
+  static boolean isIcebergTable(org.apache.gravitino.rel.Table gravitinoTable) {
+    Map<String, String> properties = gravitinoTable.properties();
+    if (properties == null) {
+      return false;
+    }
+    // Gravitino convention: table-format=ICEBERG
+    String tableFormat = properties.get(GlueConstants.TABLE_FORMAT);
+    if (GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat)) {
+      return true;
+    }
+    // Iceberg Glue catalog convention: table_type=ICEBERG stored in Glue table parameters
+    return GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+        properties.get(GlueConstants.TABLE_TYPE_PARAM));
+  }
+
+  /**
+   * Gets or creates the Iceberg GlueCatalog using double-checked locking.
+   *
+   * @return the Iceberg SparkCatalog
+   */
+  private SparkCatalog getOrCreateIcebergGlueCatalog() {
+    if (icebergGlueCatalog == null) {
+      synchronized (this) {
+        if (icebergGlueCatalog == null) {
+          Preconditions.checkArgument(
+              catalogName != null && catalogProperties != null,
+              "Catalog name and properties must be set before accessing Iceberg catalog");
+          try {
+            icebergGlueCatalog = createIcebergGlueCatalog();
+          } catch (Exception e) {
+            throw new RuntimeException(
+                String.format(
+                    "Failed to initialize Iceberg GlueCatalog for catalog '%s'. "
+                        + "Check aws-region, aws-access-key-id, and aws-secret-access-key properties.",
+                    catalogName),
+                e);
+          }
+        }
+      }
+    }
+    return icebergGlueCatalog;
+  }
+
+  /**
+   * Creates a new Iceberg GlueCatalog with appropriate configuration.
+   *
+   * @return the configured Iceberg SparkCatalog
+   */
+  private SparkCatalog createIcebergGlueCatalog() {
+    GluePropertiesConverter converter = GluePropertiesConverter.getInstance();
+    Map<String, String> effectiveProperties = new HashMap<>(catalogProperties);
+    // Vended credentials take precedence over static catalog properties so that
+    // GluePropertiesConverter sets up GravitinoGlueCredentialsProvider with the vended AK/SK.
+    if (vendedAwsCredentials != null && !vendedAwsCredentials.isEmpty()) {
+      effectiveProperties.putAll(vendedAwsCredentials);
+    }
+    Map<String, String> icebergProperties =
+        converter.toIcebergCatalogProperties(effectiveProperties);
+    SparkCatalog catalog = new SparkCatalog();
+    catalog.initialize(catalogName + "_iceberg", new CaseInsensitiveStringMap(icebergProperties));
+    return catalog;
+  }
+}

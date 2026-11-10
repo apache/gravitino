@@ -114,7 +114,10 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               LIST_ALL_TABLES,
               PropertyEntry.booleanPropertyEntry(
                   LIST_ALL_TABLES,
-                  "Lists all tables in a database, including non-Hive tables, such as Iceberg, etc.",
+                  "Whether to list all tables in a database, including non-Hive tables such as "
+                      + "Iceberg, Paimon and Hudi. When false, non-Hive tables are filtered out "
+                      + "on a best-effort basis; see the Hive catalog documentation for known "
+                      + "limitations.",
                   false /* required */,
                   false /* immutable */,
                   DEFAULT_LIST_ALL_TABLES,

@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
+import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -36,6 +37,7 @@ import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -67,7 +69,9 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.TOPIC,
           Entity.EntityType.MODEL,
           Entity.EntityType.COLUMN,
-          Entity.EntityType.VIEW);
+          Entity.EntityType.FUNCTION,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.SEMANTIC_MODEL);
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
@@ -232,6 +236,28 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getViewIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new NamespacedEntityId(
             viewId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
+      case SEMANTIC_MODEL:
+        long semanticModelId =
+            SemanticModelMetaService.getInstance()
+                .getSemanticModelIdBySchemaIdAndName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            semanticModelId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
+
+      case FUNCTION:
+        long functionId =
+            FunctionMetaService.getInstance()
+                .getFunctionIdBySchemaIdAndFunctionName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            functionId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
 
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);

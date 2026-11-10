@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDa
 
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -32,17 +33,120 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.types.Types.ByteType;
 import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.DateTimeUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Test class for {@link ConvertUtil}. */
 public class TestConvertUtil extends TestBaseConvert {
+
+  private static final int NANO_PRECISION = 9;
+  private static final int MICRO_PRECISION = 6;
+  private static final int UNSUPPORTED_PRECISION = 3;
+
+  @Test
+  public void testVariantType() {
+    Assertions.assertTrue(
+        CONVERTER.toGravitino(Types.VariantType.get())
+            instanceof org.apache.gravitino.rel.types.Types.VariantType);
+    Assertions.assertTrue(
+        CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.VariantType.get())
+            instanceof Types.VariantType);
+  }
+
+  @Test
+  public void testUnknownType() {
+    // Iceberg V3 unknown <-> Gravitino NullType, in both directions.
+    Assertions.assertTrue(
+        CONVERTER.toGravitino(Types.UnknownType.get())
+            instanceof org.apache.gravitino.rel.types.Types.NullType);
+    Assertions.assertTrue(
+        CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.NullType.get())
+            instanceof Types.UnknownType);
+  }
+
+  @Test
+  public void testUnknownColumnToIcebergSchema() {
+    // Write path: a nullable null-typed column becomes an optional Iceberg unknown field
+    // (exercises ConvertUtil.toIcebergSchema -> ToIcebergType.struct and the nullType dispatch).
+    Column nullableColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(true)
+            .withComment(TEST_COMMENT)
+            .build();
+    Schema schema = ConvertUtil.toIcebergSchema(new Column[] {nullableColumn});
+    Types.NestedField field = schema.findField("c_unknown");
+    Assertions.assertNotNull(field);
+    Assertions.assertTrue(field.isOptional());
+    Assertions.assertTrue(field.type() instanceof Types.UnknownType);
+
+    // A required null-typed column is rejected: Iceberg unknown must be optional.
+    Column requiredColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown_required")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(false)
+            .withComment(TEST_COMMENT)
+            .build();
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ConvertUtil.toIcebergSchema(new Column[] {requiredColumn}));
+    Assertions.assertTrue(exception.getMessage().contains("must be optional"));
+  }
+
+  @Test
+  public void testGeometryType() {
+    // Iceberg V3 geometry <-> Gravitino GeometryType, preserving the CRS in both directions.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeometryType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeometryType.class, defaultFromIceberg);
+    Assertions.assertEquals(
+        "OGC:CRS84",
+        ((org.apache.gravitino.rel.types.Types.GeometryType) defaultFromIceberg).crs());
+
+    org.apache.gravitino.rel.types.Types.GeometryType customCrs =
+        org.apache.gravitino.rel.types.Types.GeometryType.of("srid:3857");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(customCrs);
+    Assertions.assertInstanceOf(Types.GeometryType.class, icebergCustom);
+    Assertions.assertEquals("srid:3857", ((Types.GeometryType) icebergCustom).crs());
+    Assertions.assertEquals(customCrs, CONVERTER.toGravitino(icebergCustom));
+  }
+
+  @Test
+  public void testGeographyType() {
+    // Iceberg V3 geography <-> Gravitino GeographyType, preserving CRS and algorithm both ways.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeographyType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeographyType.class, defaultFromIceberg);
+    org.apache.gravitino.rel.types.Types.GeographyType defaultGeography =
+        (org.apache.gravitino.rel.types.Types.GeographyType) defaultFromIceberg;
+    Assertions.assertEquals("OGC:CRS84", defaultGeography.crs());
+    Assertions.assertEquals("spherical", defaultGeography.algorithm());
+
+    org.apache.gravitino.rel.types.Types.GeographyType custom =
+        org.apache.gravitino.rel.types.Types.GeographyType.of("EPSG:4326", "karney");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(custom);
+    Assertions.assertInstanceOf(Types.GeographyType.class, icebergCustom);
+    Types.GeographyType icebergGeography = (Types.GeographyType) icebergCustom;
+    Assertions.assertEquals("EPSG:4326", icebergGeography.crs());
+    Assertions.assertEquals(EdgeAlgorithm.KARNEY, icebergGeography.algorithm());
+    Assertions.assertEquals(custom, CONVERTER.toGravitino(icebergCustom));
+  }
+
   @Test
   public void testToIcebergSchema() {
     Column[] columns = createColumns("col_1", "col_2", "col_3", "col_4");
@@ -98,6 +202,14 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(mapType.valueType().asMapType().isValueOptional());
     Assertions.assertTrue(mapType.valueType().asMapType().keyType().isPrimitiveType());
     Assertions.assertTrue(mapType.valueType().asMapType().valueType().isPrimitiveType());
+  }
+
+  @Test
+  public void testToIcebergSchemaWithNullColumns() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergSchema((Column[]) null));
+    Assertions.assertEquals("columns must not be null", exception.getMessage());
   }
 
   @Test
@@ -451,9 +563,60 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testNanosecondTimestamp() {
+    // Iceberg -> Gravitino
+    org.apache.gravitino.rel.types.Type nanoWithoutZone =
+        CONVERTER.toGravitino(Types.TimestampNanoType.withoutZone());
+    Assertions.assertTrue(
+        nanoWithoutZone instanceof org.apache.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertFalse(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithoutZone).hasTimeZone());
+    Assertions.assertEquals(
+        NANO_PRECISION,
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithoutZone).precision());
+
+    org.apache.gravitino.rel.types.Type nanoWithZone =
+        CONVERTER.toGravitino(Types.TimestampNanoType.withZone());
+    Assertions.assertTrue(
+        nanoWithZone instanceof org.apache.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertTrue(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithZone).hasTimeZone());
+    Assertions.assertEquals(
+        NANO_PRECISION,
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithZone).precision());
+
+    // Gravitino -> Iceberg
+    Type icebergNanoWithoutZone =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(NANO_PRECISION));
+    Assertions.assertTrue(icebergNanoWithoutZone instanceof Types.TimestampNanoType);
+    Assertions.assertFalse(((Types.TimestampNanoType) icebergNanoWithoutZone).shouldAdjustToUTC());
+
+    Type icebergNanoWithZone =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(NANO_PRECISION));
+    Assertions.assertTrue(icebergNanoWithZone instanceof Types.TimestampNanoType);
+    Assertions.assertTrue(((Types.TimestampNanoType) icebergNanoWithZone).shouldAdjustToUTC());
+
+    // Regression: precision 6 still maps to the microsecond timestamp, not the nanosecond one.
+    Type icebergMicro =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(MICRO_PRECISION));
+    Assertions.assertTrue(icebergMicro instanceof Types.TimestampType);
+
+    // Any precision other than 6 or 9 is not representable in Iceberg and must be rejected.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CONVERTER.fromGravitino(
+                org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+                    UNSUPPORTED_PRECISION)));
+  }
+
+  @Test
   public void testFromNestedField() {
-    String colName = RandomStringUtils.randomAlphabetic(10);
-    String doc = RandomStringUtils.randomAlphabetic(20);
+    String colName = RandomStringUtils.secure().nextAlphabetic(10);
+    String doc = RandomStringUtils.secure().nextAlphabetic(20);
     Types.NestedField colField =
         Types.NestedField.optional(1, colName, Types.IntegerType.get(), doc);
     IcebergColumn icebergColumn = ConvertUtil.fromNestedField(colField);
@@ -463,8 +626,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.IntegerType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField = Types.NestedField.required(1, colName, Types.StringType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
@@ -473,8 +636,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.StringType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField = Types.NestedField.required(1, colName, Types.DateType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
@@ -483,8 +646,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.DateType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField =
         Types.NestedField.required(
             1,
@@ -501,6 +664,170 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertEquals(icebergColumn.comment(), doc);
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.MapType);
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, icebergColumn.defaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldMapsWriteAndInitialDefaults() {
+    Types.NestedField region =
+        Types.NestedField.builder()
+            .withId(2)
+            .withName("region")
+            .asRequired()
+            .ofType(Types.StringType.get())
+            .withInitialDefault(Literal.of("US"))
+            .withWriteDefault(Literal.of("EU"))
+            .build();
+    Types.NestedField n =
+        Types.NestedField.builder()
+            .withId(3)
+            .withName("n")
+            .asRequired()
+            .ofType(Types.IntegerType.get())
+            .withInitialDefault(Literal.of(7))
+            .withWriteDefault(Literal.of(8))
+            .build();
+
+    IcebergColumn regionColumn = ConvertUtil.fromNestedField(region);
+    Assertions.assertEquals(Literals.stringLiteral("EU"), regionColumn.defaultValue());
+    Assertions.assertEquals(Literals.stringLiteral("US"), regionColumn.initialDefaultValue());
+
+    IcebergColumn nColumn = ConvertUtil.fromNestedField(n);
+    Assertions.assertEquals(Literals.integerLiteral(8), nColumn.defaultValue());
+    Assertions.assertEquals(Literals.integerLiteral(7), nColumn.initialDefaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldMapsOnlyInitialDefault() {
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("region")
+            .asRequired()
+            .ofType(Types.StringType.get())
+            .withInitialDefault(Literal.of("US"))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
+    Assertions.assertEquals(Literals.stringLiteral("US"), column.initialDefaultValue());
+  }
+
+  @Test
+  public void testFromNestedFieldTimestamptzDefaultUsesUtcLocalDateTime() {
+    // Iceberg timestamptz stores a UTC instant. ConvertUtil keeps TimestampType.withTimeZone and
+    // materializes the value as that instant's UTC LocalDateTime (offset is not retained on the
+    // literal value).
+    long micros = 1_700_000_000_123_456L;
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("event_ts")
+            .asOptional()
+            .ofType(Types.TimestampType.withZone())
+            .withWriteDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .withInitialDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.TimestampType.class, column.dataType());
+    org.apache.gravitino.rel.types.Types.TimestampType tsType =
+        (org.apache.gravitino.rel.types.Types.TimestampType) column.dataType();
+    Assertions.assertTrue(tsType.hasTimeZone());
+
+    LocalDateTime expectedUtc = DateTimeUtil.timestamptzFromMicros(micros).toLocalDateTime();
+    Assertions.assertEquals(
+        expectedUtc,
+        ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.defaultValue()).value());
+    Assertions.assertEquals(
+        expectedUtc,
+        ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.initialDefaultValue())
+            .value());
+  }
+
+  @Test
+  public void testFromNestedFieldTimestamptzDefaultsRoundTripThroughDtoJson() throws Exception {
+    // UTC LocalDateTime + TimestampType.withTimeZone must survive ColumnDTO JSON: clients that
+    // only see the wire form still get a with-time-zone type and the UTC wall-clock value.
+    long micros = 1_700_000_000_123_456L;
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("event_ts")
+            .asOptional()
+            .ofType(Types.TimestampType.withZone())
+            .withWriteDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .withInitialDefault(Literal.of(micros).to(Types.TimestampType.withZone()))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    LocalDateTime expectedUtc = DateTimeUtil.timestamptzFromMicros(micros).toLocalDateTime();
+
+    org.apache.gravitino.dto.rel.ColumnDTO dto =
+        org.apache.gravitino.dto.util.DTOConverters.toDTO(column);
+    String json = org.apache.gravitino.json.JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains(expectedUtc.toString()), json);
+    Assertions.assertTrue(json.contains("timestamp_tz"), json);
+
+    org.apache.gravitino.dto.rel.ColumnDTO deser =
+        org.apache.gravitino.json.JsonUtils.objectMapper()
+            .readValue(json, org.apache.gravitino.dto.rel.ColumnDTO.class);
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.TimestampType.class, deser.dataType());
+    Assertions.assertTrue(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) deser.dataType()).hasTimeZone());
+    Assertions.assertEquals(
+        expectedUtc.toString(),
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals(
+        expectedUtc.toString(),
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.initialDefaultValue())
+            .value());
+  }
+
+  @Test
+  public void testFromNestedFieldBinaryDefaultsRoundTripThroughDtoJson() throws Exception {
+    byte[] bytes = new byte[] {1, 2, 3};
+    Types.NestedField field =
+        Types.NestedField.builder()
+            .withId(1)
+            .withName("payload")
+            .asOptional()
+            .ofType(Types.BinaryType.get())
+            .withWriteDefault(Literal.of(bytes))
+            .withInitialDefault(Literal.of(bytes))
+            .build();
+
+    IcebergColumn column = ConvertUtil.fromNestedField(field);
+    Assertions.assertArrayEquals(
+        bytes,
+        (byte[])
+            ((org.apache.gravitino.rel.expressions.literals.Literal<?>) column.defaultValue())
+                .value());
+    Assertions.assertArrayEquals(
+        bytes,
+        (byte[])
+            ((org.apache.gravitino.rel.expressions.literals.Literal<?>)
+                    column.initialDefaultValue())
+                .value());
+
+    org.apache.gravitino.dto.rel.ColumnDTO dto =
+        org.apache.gravitino.dto.util.DTOConverters.toDTO(column);
+    String json = org.apache.gravitino.json.JsonUtils.objectMapper().writeValueAsString(dto);
+    Assertions.assertTrue(json.contains("\"0x010203\""));
+    Assertions.assertFalse(json.contains("[B@"));
+
+    org.apache.gravitino.dto.rel.ColumnDTO deser =
+        org.apache.gravitino.json.JsonUtils.objectMapper()
+            .readValue(json, org.apache.gravitino.dto.rel.ColumnDTO.class);
+    Assertions.assertEquals(
+        "0x010203",
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals(
+        "0x010203",
+        ((org.apache.gravitino.dto.rel.expressions.LiteralDTO) deser.initialDefaultValue())
+            .value());
   }
 
   private static void checkType(Type type, org.apache.gravitino.rel.types.Type expected) {

@@ -19,8 +19,11 @@
 package org.apache.gravitino.catalog.clickhouse.operations;
 
 import java.sql.SQLException;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseCatalog;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
+import org.apache.gravitino.connector.CatalogInfo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +34,17 @@ public class TestClickHouseCatalogOperations extends TestClickHouse {
   public void testCheckJDBCDriver() throws SQLException {
     JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
-    catalogOperations.initialize(getClickHouseCatalogProperties(), null, new ClickHouseCatalog());
+    CatalogInfo catalogInfo =
+        new CatalogInfo(
+            1L,
+            "clickhouse_catalog",
+            Catalog.Type.RELATIONAL,
+            "clickhouse",
+            "",
+            getClickHouseCatalogProperties(),
+            null,
+            Namespace.of("default"));
+    catalogOperations.initialize(
+        getClickHouseCatalogProperties(), catalogInfo, new ClickHouseCatalog());
   }
 }

@@ -20,6 +20,67 @@
 import { BaseOAuthProvider } from './base'
 import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
 
+function getOidcAppBasePath() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
+
+  if (!basePath || basePath === '/') {
+    return ''
+  }
+
+  return basePath.replace(/\/$/, '')
+}
+
+function buildOidcUrl(pathname) {
+  return `${window.location.origin}${getOidcAppBasePath()}${pathname}`
+}
+
+function parseLocationFromUrl(rawUrl) {
+  if (!rawUrl) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(rawUrl)
+
+    return {
+      protocol: parsed.protocol,
+      hostname: parsed.hostname
+    }
+  } catch (error) {
+    return null
+  }
+}
+
+function getLocationProtocolAndHostname() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const { protocol, hostname, origin, href } = window.location
+
+  if (protocol && hostname) {
+    return { protocol, hostname }
+  }
+
+  return parseLocationFromUrl(origin) || parseLocationFromUrl(href)
+}
+
+function isOidcSecureOrigin() {
+  if (typeof window === 'undefined') {
+    return true
+  }
+
+  const locationInfo = getLocationProtocolAndHostname()
+  if (!locationInfo) {
+    return false
+  }
+
+  const { protocol, hostname } = locationInfo
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+
+  return protocol === 'https:' || isLocalhost
+}
+
 export class OidcOAuthProvider extends BaseOAuthProvider {
   constructor() {
     super()
@@ -30,6 +91,16 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
 
   async initialize(config) {
     this.config = config
+
+    if (typeof window === 'undefined') {
+      throw new Error('OIDC provider requires a browser environment')
+    }
+
+    if (!isOidcSecureOrigin()) {
+      throw new Error(
+        `OIDC login requires the UI to run on HTTPS or localhost. Current origin: ${window.location.origin}`
+      )
+    }
 
     const authority = config['gravitino.authenticator.oauth.authority']
     const clientId = config['gravitino.authenticator.oauth.clientId']
@@ -45,9 +116,9 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
       client_id: clientId,
       response_type: 'code', // Use Authorization Code flow with PKCE
       scope: scope,
-      redirect_uri: `${window.location.origin}/ui/oauth/callback`,
-      post_logout_redirect_uri: `${window.location.origin}/ui/oauth/logout`,
-      silent_redirect_uri: `${window.location.origin}/ui/oauth/silent-callback`,
+      redirect_uri: buildOidcUrl('/oauth/callback'),
+      post_logout_redirect_uri: buildOidcUrl('/oauth/logout'),
+      silent_redirect_uri: buildOidcUrl('/oauth/silent-callback'),
       automaticSilentRenew: true,
       silentRequestTimeout: 10000,
       userStore: new WebStorageStateStore({ store: window.localStorage })
@@ -67,8 +138,8 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
       let user = await this.userManager.getUser()
 
       if (user && !user.expired) {
-        // For JWKS validation, we need the ID token (JWT format), not the access token
-        return user.id_token || user.access_token
+        // Use access token for API requests per OAuth2 spec
+        return user.access_token || user.id_token
       }
 
       if (user && user.expired) {
@@ -76,8 +147,8 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
           // Attempt silent refresh
           const refreshedUser = await this.userManager.signinSilent()
 
-          // Return ID token for JWKS validation
-          return refreshedUser.id_token || refreshedUser.access_token
+          // Use access token for API requests per OAuth2 spec
+          return refreshedUser.access_token || refreshedUser.id_token
         } catch (refreshError) {
           // Clear expired tokens
           await this.userManager.removeUser()

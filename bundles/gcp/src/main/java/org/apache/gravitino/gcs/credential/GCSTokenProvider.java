@@ -29,6 +29,11 @@ import org.apache.gravitino.credential.GCSTokenCredential;
 public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCredential> {
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "gs".equalsIgnoreCase(scheme) || "gcs".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE;
   }

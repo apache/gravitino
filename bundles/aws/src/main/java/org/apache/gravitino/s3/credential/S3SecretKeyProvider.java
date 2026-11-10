@@ -43,6 +43,13 @@ public class S3SecretKeyProvider implements CredentialProvider {
   public void close() {}
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "s3".equalsIgnoreCase(scheme)
+        || "s3a".equalsIgnoreCase(scheme)
+        || "s3n".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE;
   }

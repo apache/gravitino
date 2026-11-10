@@ -80,3 +80,27 @@ CREATE TABLE IF NOT EXISTS `partition_statistic_meta` (
     PRIMARY KEY (`table_id`, `partition_name`(255), `statistic_name`),
     KEY `idx_table_partition` (`table_id`, `partition_name`(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'partition statistics metadata';
+
+-- Add optimizer metrics storage tables
+CREATE TABLE IF NOT EXISTS `table_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `table_identifier` VARCHAR(1024) NOT NULL COMMENT 'normalized table identifier',
+    `metric_name` VARCHAR(1024) NOT NULL COMMENT 'metric name',
+    `table_partition` VARCHAR(1024) DEFAULT NULL COMMENT 'normalized partition identifier',
+    `metric_ts` BIGINT(20) NOT NULL COMMENT 'metric timestamp in epoch seconds',
+    `metric_value` VARCHAR(1024) NOT NULL COMMENT 'metric value payload',
+    PRIMARY KEY (`id`),
+    KEY `idx_table_metrics_metric_ts` (`metric_ts`),
+    KEY `idx_table_metrics_composite` (`table_identifier`(255), `table_partition`(255), `metric_ts`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'optimizer table metrics';
+
+CREATE TABLE IF NOT EXISTS `job_metrics` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `job_identifier` VARCHAR(1024) NOT NULL COMMENT 'normalized job identifier',
+    `metric_name` VARCHAR(1024) NOT NULL COMMENT 'metric name',
+    `metric_ts` BIGINT(20) NOT NULL COMMENT 'metric timestamp in epoch seconds',
+    `metric_value` VARCHAR(1024) NOT NULL COMMENT 'metric value payload',
+    PRIMARY KEY (`id`),
+    KEY `idx_job_metrics_metric_ts` (`metric_ts`),
+    KEY `idx_job_metrics_identifier_metric_ts` (`job_identifier`(255), `metric_ts`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'optimizer job metrics';

@@ -21,21 +21,50 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
+import org.apache.iceberg.rest.responses.GetNamespaceResponse;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 public class TestIcebergNamespaceOperationExecutor {
@@ -49,7 +78,7 @@ public class TestIcebergNamespaceOperationExecutor {
   public void setUp() {
     mockWrapperManager = mock(IcebergCatalogWrapperManager.class);
     mockCatalogWrapper = mock(CatalogWrapperForREST.class);
-    executor = new IcebergNamespaceOperationExecutor(mockWrapperManager);
+    executor = new IcebergNamespaceOperationExecutor(mockWrapperManager, Optional.empty());
 
     mockContext = mock(IcebergRequestContext.class);
     when(mockContext.catalogName()).thenReturn("test_catalog");
@@ -133,5 +162,346 @@ public class TestIcebergNamespaceOperationExecutor {
 
     String actualOwner = requestCaptor.getValue().properties().get(IcebergConstants.OWNER);
     Assertions.assertEquals(clientProvidedOwner, actualOwner);
+  }
+
+  @Test
+  public void testCreateMultiLevelNamespacePassesCorrectNamespace() {
+    String authenticatedUser = "user@example.com";
+    Namespace multiLevelNs = Namespace.of("team", "sales");
+
+    CreateNamespaceRequest originalRequest =
+        CreateNamespaceRequest.builder().withNamespace(multiLevelNs).build();
+
+    when(mockContext.userName()).thenReturn(authenticatedUser);
+    CreateNamespaceResponse mockResponse = mock(CreateNamespaceResponse.class);
+    when(mockCatalogWrapper.createNamespace(any())).thenReturn(mockResponse);
+
+    executor.createNamespace(mockContext, originalRequest);
+
+    ArgumentCaptor<CreateNamespaceRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateNamespaceRequest.class);
+    verify(mockCatalogWrapper).createNamespace(requestCaptor.capture());
+
+    CreateNamespaceRequest capturedRequest = requestCaptor.getValue();
+    Assertions.assertEquals(multiLevelNs, capturedRequest.namespace());
+    Assertions.assertEquals(
+        authenticatedUser, capturedRequest.properties().get(IcebergConstants.OWNER));
+  }
+
+  @Test
+  public void testLoadNamespaceDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("A", "B");
+    GetNamespaceResponse mockResponse = mock(GetNamespaceResponse.class);
+    when(mockCatalogWrapper.loadNamespace(ns)).thenReturn(mockResponse);
+
+    GetNamespaceResponse result = executor.loadNamespace(mockContext, ns);
+
+    verify(mockCatalogWrapper).loadNamespace(ns);
+    Assertions.assertEquals(mockResponse, result);
+  }
+
+  @Test
+  public void testRegisterViewDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("test_ns");
+    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockCatalogWrapper.registerView(ns, mockRequest)).thenReturn(mockResponse);
+
+    LoadViewResponse result = executor.registerView(mockContext, ns, mockRequest);
+
+    verify(mockCatalogWrapper).registerView(ns, mockRequest);
+    Assertions.assertEquals(mockResponse, result);
+  }
+
+  @Test
+  public void testRejectsOversizedTableNameBeforeRegister() {
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, Namespace.of("test_namespace"), request));
+
+    Assertions.assertEquals(
+        "The name of the table must not exceed 128 characters", exception.getMessage());
+    verifyNoInteractions(mockCatalogWrapper);
+  }
+
+  @Test
+  public void testRegisterTablePropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/missing/v1.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation))
+        .thenThrow(
+            new BadRequestException("Metadata location %s does not exist", metadataLocation));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(any(), any(), any(Boolean.class));
+  }
+
+  @Test
+  public void testRegisterViewPropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    RegisterViewRequest request = mock(RegisterViewRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn("file:/tmp/missing/v1.metadata.json");
+    when(mockCatalogWrapper.registerView(namespace, request))
+        .thenThrow(
+            new BadRequestException(
+                "Cannot register view ghost: metadata location file:/tmp/missing/v1.metadata.json"
+                    + " does not exist"));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerView(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).registerView(namespace, request);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      ints = {EntityFieldLimits.MAX_NAME_LENGTH + 1, EntityFieldLimits.MAX_COLUMN_NAME_LENGTH})
+  void testExpandedColumnNamesReachRegister(int length) {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/test.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("test_table");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    Schema schema = new Schema(NestedField.required(1, "a".repeat(length), StringType.get()));
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation)).thenReturn(metadata);
+
+    executor.registerTable(mockContext, namespace, request);
+
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper).registerTable(namespace, request, false);
+  }
+
+  @Test
+  public void testRejectsOversizedColumnNameBeforeRegister() {
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, oversizedName, StringType.get()));
+    assertRegisterRejectsSchema(
+        schema,
+        "The name of the column must not exceed "
+            + EntityFieldLimits.MAX_COLUMN_NAME_LENGTH
+            + " characters");
+  }
+
+  @Test
+  public void testRejectsOversizedColumnCommentBeforeRegister() {
+    String oversizedComment = "a".repeat(EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH + 1);
+    Schema schema = new Schema(NestedField.required(1, "col1", StringType.get(), oversizedComment));
+    assertRegisterRejectsSchema(
+        schema, "The comment of the column must not exceed 4096 characters");
+  }
+
+  @Test
+  public void testInvalidRegisterOverwriteLeavesMetadataUnchanged(@TempDir Path tempDir)
+      throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "jdbc",
+                IcebergConstants.URI,
+                "jdbc:sqlite:" + tempDir.resolve("catalog.db"),
+                IcebergConstants.WAREHOUSE,
+                tempDir.resolve("warehouse").toString(),
+                IcebergConstants.GRAVITINO_JDBC_DRIVER,
+                "org.sqlite.JDBC",
+                IcebergConstants.ICEBERG_JDBC_USER,
+                "test",
+                IcebergConstants.ICEBERG_JDBC_PASSWORD,
+                "test",
+                IcebergConstants.ICEBERG_JDBC_INITIALIZE,
+                "true"));
+    CatalogWrapperForREST catalogWrapper = new CatalogWrapperForREST("test_catalog", config);
+    try {
+      when(mockWrapperManager.getCatalogWrapper("test_catalog")).thenReturn(catalogWrapper);
+      Namespace namespace = Namespace.of("test_namespace");
+      catalogWrapper.createNamespace(
+          CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      String originalMetadataLocation =
+          writeMetadata(
+              tempDir.resolve("v1.metadata.json"),
+              new Schema(
+                  NestedField.required(
+                      1, "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH), StringType.get())));
+      RegisterTableRequest originalRequest =
+          ImmutableRegisterTableRequest.builder()
+              .name("test_table")
+              .metadataLocation(originalMetadataLocation)
+              .build();
+      executor.registerTable(mockContext, namespace, originalRequest);
+
+      String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
+      String invalidMetadataLocation =
+          writeMetadata(
+              tempDir.resolve("v2.metadata.json"),
+              new Schema(NestedField.required(1, oversizedName, StringType.get())));
+      RegisterTableRequest invalidOverwriteRequest =
+          ImmutableRegisterTableRequest.builder()
+              .name("test_table")
+              .metadataLocation(invalidMetadataLocation)
+              .overwrite(true)
+              .build();
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> executor.registerTable(mockContext, namespace, invalidOverwriteRequest));
+
+      Assertions.assertEquals(
+          Optional.of(originalMetadataLocation),
+          catalogWrapper.getTableMetadataLocation(
+              TableIdentifier.of(namespace, originalRequest.name())));
+    } finally {
+      catalogWrapper.close();
+    }
+  }
+
+  @Test
+  public void testDropNestedNamespacePassesCorrectLevels() {
+    Namespace nestedNs = Namespace.of("A", "B", "C");
+
+    executor.dropNamespace(mockContext, nestedNs);
+
+    verify(mockCatalogWrapper).dropNamespace(nestedNs);
+  }
+
+  @Test
+  public void testDropFlatNamespaceDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("mydb");
+
+    executor.dropNamespace(mockContext, ns);
+
+    verify(mockCatalogWrapper).dropNamespace(ns);
+  }
+
+  @Test
+  public void testListNamespacesWithParentDelegatesToCatalogWrapper() {
+    Namespace parent = Namespace.of("A", "B");
+    Namespace child = Namespace.of("A", "B", "C");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Collections.singletonList(child)).build();
+    when(mockCatalogWrapper.listNamespace(parent)).thenReturn(mockResponse);
+
+    ListNamespacesResponse result = executor.listNamespaces(mockContext, parent);
+
+    verify(mockCatalogWrapper).listNamespace(parent);
+    Assertions.assertEquals(mockResponse, result);
+    Assertions.assertEquals(Arrays.asList(child), result.namespaces());
+  }
+
+  @Test
+  public void testListNamespacesAtRootLevelDelegatesToCatalogWrapper() {
+    Namespace root = Namespace.empty();
+    Namespace ns1 = Namespace.of("A");
+    Namespace ns2 = Namespace.of("B");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Arrays.asList(ns1, ns2)).build();
+    when(mockCatalogWrapper.listNamespace(root)).thenReturn(mockResponse);
+
+    ListNamespacesResponse result = executor.listNamespaces(mockContext, root);
+
+    verify(mockCatalogWrapper).listNamespace(root);
+    Assertions.assertEquals(2, result.namespaces().size());
+  }
+
+  @Test
+  public void testNamespaceExistsDelegatesToCatalogWrapper() {
+    Namespace nestedNs = Namespace.of("A", "B");
+    when(mockCatalogWrapper.namespaceExists(nestedNs)).thenReturn(true);
+
+    boolean exists = executor.namespaceExists(mockContext, nestedNs);
+
+    verify(mockCatalogWrapper).namespaceExists(nestedNs);
+    Assertions.assertTrue(exists);
+  }
+
+  @Test
+  public void testNamespaceNotExistsDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("nonexistent");
+    when(mockCatalogWrapper.namespaceExists(ns)).thenReturn(false);
+
+    boolean exists = executor.namespaceExists(mockContext, ns);
+
+    verify(mockCatalogWrapper).namespaceExists(ns);
+    Assertions.assertFalse(exists);
+  }
+
+  private void assertRegisterRejectsSchema(Schema schema, String expectedMessage) {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/test.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("test_table");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation)).thenReturn(metadata);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(namespace, request, false);
+  }
+
+  private static String writeMetadata(Path metadataFile, Schema schema) throws Exception {
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema,
+            PartitionSpec.unpartitioned(),
+            metadataFile.getParent().resolve("table").toUri().toString(),
+            Collections.emptyMap());
+    Files.writeString(metadataFile, TableMetadataParser.toJson(metadata), StandardCharsets.UTF_8);
+    return metadataFile.toUri().toString();
+  }
+
+  @Test
+  public void testCreateNamespaceRefusesSchemaSeparatorInLevelWithAuthorization() {
+    IcebergConfigProvider provider = mock(IcebergConfigProvider.class);
+    when(provider.getMetalakeName()).thenReturn("metalake");
+    when(provider.getDefaultCatalogName()).thenReturn("test_catalog");
+    when(mockContext.userName()).thenReturn("user");
+    when(mockCatalogWrapper.createNamespace(any())).thenReturn(mock(CreateNamespaceResponse.class));
+    try {
+      IcebergRESTServerContext.create(provider, true, false, false, mockWrapperManager);
+      CreateNamespaceRequest colliding =
+          CreateNamespaceRequest.builder().withNamespace(Namespace.of("x:y")).build();
+      Assertions.assertThrows(
+          BadRequestException.class, () -> executor.createNamespace(mockContext, colliding));
+      verify(mockCatalogWrapper, never()).createNamespace(any());
+
+      // The nested namespace the level would collide with is still accepted.
+      executor.createNamespace(
+          mockContext,
+          CreateNamespaceRequest.builder().withNamespace(Namespace.of("x", "y")).build());
+      verify(mockCatalogWrapper).createNamespace(any());
+
+      // Without authorization there is no Gravitino schema to collide with.
+      IcebergRESTServerContext.create(provider, false, false, false, mockWrapperManager);
+      Assertions.assertDoesNotThrow(() -> executor.createNamespace(mockContext, colliding));
+    } finally {
+      IcebergRESTServerContext.create(provider, false, false, false, null);
+    }
   }
 }

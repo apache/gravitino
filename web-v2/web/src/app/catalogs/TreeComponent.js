@@ -21,10 +21,10 @@
 
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { semanticModelNodeKey } from '@/lib/utils/semanticModel'
 
 import { Empty, Input, Spin, Tabs, Tooltip, Tree } from 'antd'
-import { useTheme } from 'next-themes'
 
 import Icons from '@/components/Icons'
 import { checkCatalogIcon } from '@/config/catalog'
@@ -34,7 +34,6 @@ import {
   setExpanded,
   setExpandedNodes,
   setIntoTreeNodeWithFetch,
-  removeExpandedNode,
   setSelectedNodes,
   setLoadedNodes,
   getTableDetails,
@@ -52,18 +51,12 @@ const { Search } = Input
 export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
   const [treeData, setTreeData] = useState([])
   const [searchValue, setSearchValue] = useState('')
-  const [expandedKeys, setExpandedKeys] = useState([])
-  const [loadedKeys, setLoadedKeys] = useState([])
   const [autoExpandParent, setAutoExpandParent] = useState(false)
-  const [selectedKeys, setSelectedKeys] = useState([])
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
   const [currentCatalogType, setCatalogType] = useState(searchParams.get('catalogType') || 'relational')
-  const [, locale, , catalog, schema, entity] = pathname.split('/')
   const treeRef = useRef(null)
-  const { theme } = useTheme()
   const [isHover, setIsHover] = useState('')
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
@@ -74,26 +67,6 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
     { label: 'Fileset', key: 'fileset' },
     { label: 'Model', key: 'model' }
   ]
-
-  const updateTreeData = (list, key, children) =>
-    list.map(node => {
-      if (node.key === key) {
-        return {
-          ...node,
-          isLeaf: children?.length === 0,
-          children
-        }
-      }
-      if (node.children) {
-        return {
-          ...node,
-          isLeaf: node.children.length === 0,
-          children: updateTreeData(node.children, key, children)
-        }
-      }
-
-      return node
-    })
 
   const handleDoubleClick = event => {
     event.preventDefault()
@@ -179,6 +152,22 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
               )}
             </span>
           )
+        case 'custom-icons-hologres':
+          return (
+            <span
+              role='img'
+              className='anticon'
+              onMouseEnter={e => onMouseEnter(e, catalog)}
+              onMouseLeave={e => onMouseLeave(e, catalog)}
+              onClick={e => handleClickIcon(e, catalog)}
+            >
+              {isHover !== key ? (
+                <Icons.hologres className='size-4'></Icons.hologres>
+              ) : (
+                <Icons.RotateCw className='h-4 w-3'></Icons.RotateCw>
+              )}
+            </span>
+          )
         case 'custom-icons-oceanbase':
           return (
             <span
@@ -222,6 +211,38 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             >
               {isHover !== key ? (
                 <Icons.lakehouse className='size-4'></Icons.lakehouse>
+              ) : (
+                <Icons.RotateCw className='h-4 w-3'></Icons.RotateCw>
+              )}
+            </span>
+          )
+        case 'custom-icons-clickhouse':
+          return (
+            <span
+              role='img'
+              className='anticon'
+              onMouseEnter={e => onMouseEnter(e, catalog)}
+              onMouseLeave={e => onMouseLeave(e, catalog)}
+              onClick={e => handleClickIcon(e, catalog)}
+            >
+              {isHover !== key ? (
+                <Icons.clickhouse className='size-4'></Icons.clickhouse>
+              ) : (
+                <Icons.RotateCw className='h-4 w-3'></Icons.RotateCw>
+              )}
+            </span>
+          )
+        case 'custom-icons-glue':
+          return (
+            <span
+              role='img'
+              className='anticon'
+              onMouseEnter={e => onMouseEnter(e, catalog)}
+              onMouseLeave={e => onMouseLeave(e, catalog)}
+              onClick={e => handleClickIcon(e, catalog)}
+            >
+              {isHover !== key ? (
+                <Icons.glue className='size-4'></Icons.glue>
               ) : (
                 <Icons.RotateCw className='h-4 w-3'></Icons.RotateCw>
               )}
@@ -298,6 +319,18 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             <Icons.iconify icon='material-symbols:function' className='my-icon-small' />
           </span>
         )
+      case 'view':
+        return (
+          <span role='img' aria-label='view' className='anticon anticon-frown'>
+            <Icons.iconify icon='ic:outline-table-view' className='my-icon-small' />
+          </span>
+        )
+      case 'semanticModel':
+        return (
+          <span role='img' aria-label='semantic model' className='anticon anticon-frown'>
+            <Icons.iconify icon='mdi:graph-outline' className='my-icon-small' />
+          </span>
+        )
       default:
         return <></>
     }
@@ -307,29 +340,66 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
     if (searchParams.get('catalogType')) {
       setCatalogType(searchParams.get('catalogType'))
     } else {
-      setExpandedKeys([])
+      dispatch(setExpanded([]))
       setCatalogType('relational')
     }
-  }, [searchParams.get('catalogType')])
+  }, [dispatch, searchParams])
 
   useEffect(() => {
-    setTimeout(() => {
-      if (entity) {
-        setExpandedKeys(
-          Array.from(new Set([...expandedKeys, catalog, `${catalog}/${schema}`, `${catalog}/${schema}/${entity}`]))
-        )
-        setSelectedKeys([`${catalog}/${schema}/${entity}`])
-      } else if (schema && !entity) {
-        setExpandedKeys(Array.from(new Set([...expandedKeys, catalog, `${catalog}/${schema}`])))
-        setSelectedKeys([`${catalog}/${schema}`])
-      } else if (catalog && !schema && !entity) {
-        setExpandedKeys(Array.from(new Set([...expandedKeys, catalog])))
-        setSelectedKeys([catalog])
-      } else if (!catalog && !schema && !entity) {
-        setExpandedKeys(Array.from(new Set([...expandedKeys])))
+    const timerId = setTimeout(() => {
+      const metalake = searchParams.get('metalake')
+      const catalog = searchParams.get('catalog')
+      const catalogType = searchParams.get('catalogType')
+      const schema = searchParams.get('schema')
+      const table = searchParams.get('table')
+      const view = searchParams.get('view')
+      const fileset = searchParams.get('fileset')
+      const topic = searchParams.get('topic')
+      const model = searchParams.get('model')
+      const func = searchParams.get('function')
+      const semanticModel = searchParams.get('semanticModel')
+      const entity = table || view || semanticModel || fileset || topic || model || func
+
+      if (!metalake) {
+        dispatch(setExpanded([]))
+        dispatch(setSelectedNodes([]))
+
+        return
+      }
+
+      const metalakeKey = `{{${metalake}}}`
+      const nextExpandedKeys = [metalakeKey]
+      let nextSelectedKey = ''
+
+      if (catalog && catalogType) {
+        const catalogKey = `${metalakeKey}{{${catalog}}}{{${catalogType}}}`
+        nextExpandedKeys.push(catalogKey)
+        nextSelectedKey = catalogKey
+
+        if (schema) {
+          const schemaKey = `${catalogKey}{{${schema}}}`
+          nextExpandedKeys.push(schemaKey)
+          nextSelectedKey = schemaKey
+
+          if (entity) {
+            nextSelectedKey = semanticModel
+              ? semanticModelNodeKey({ metalake, catalog, schema, semanticModel })
+              : `${schemaKey}{{${entity}}}`
+          }
+        }
+      }
+
+      dispatch(setExpandedNodes(Array.from(new Set(nextExpandedKeys))))
+
+      if (nextSelectedKey) {
+        dispatch(setSelectedNodes([nextSelectedKey]))
       }
     }, 1000)
-  }, [pathname])
+
+    return () => {
+      clearTimeout(timerId)
+    }
+  }, [dispatch, searchParams])
 
   const renderTitle = title => {
     return (
@@ -424,20 +494,20 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
     setIsHover(null)
   }
 
-  const onLoadData = node => {
+  const onLoadData = (node, reload = false) => {
     if (node.inUse === 'false') return new Promise(resolve => resolve())
     const { key, children } = node
 
     dispatch(setLoadedNodes([...store.loadedNodes, key]))
 
     return new Promise(resolve => {
-      if (children && children.length !== 0) {
+      if (!reload && children && children.length !== 0) {
         resolve()
 
         return
       }
 
-      dispatch(setIntoTreeNodeWithFetch({ key }))
+      dispatch(setIntoTreeNodeWithFetch({ key, reload }))
 
       resolve()
     })
@@ -477,12 +547,16 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       }
     }
     if (inUseStr === 'false') {
+      const catalogPrefix = `{{${currentMetalake}}}{{${name}}}{{${currentCatalogType}}}`
+
       // Remove from expanded and loaded nodes
-      dispatch(setExpandedNodes([...store.expandedNodes.filter(key => !key.includes(name))]))
-      dispatch(setLoadedNodes([...store.loadedNodes.filter(key => !key.includes(name))]))
+      dispatch(setExpandedNodes([...store.expandedNodes.filter(key => !key.startsWith(catalogPrefix))]))
+      dispatch(setLoadedNodes([...store.loadedNodes.filter(key => !key.startsWith(catalogPrefix))]))
     } else {
+      const catalogKey = `{{${currentMetalake}}}{{${name}}}{{${currentCatalogType}}}`
+
       // Remove from loaded nodes to allow re-fetching children when expanded
-      dispatch(setLoadedNodes([...store.loadedNodes.filter(key => key !== name)]))
+      dispatch(setLoadedNodes([...store.loadedNodes.filter(key => key !== catalogKey)]))
     }
     setTreeData(tree)
   }
@@ -598,9 +672,9 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
 
   const onChangeType = key => {
     setCatalogType(key)
-    setExpandedKeys([])
-    setLoadedKeys([])
-    setSelectedKeys([])
+    dispatch(setExpanded([]))
+    dispatch(setLoadedNodes([]))
+    dispatch(setSelectedNodes([]))
     setTreeData([])
     router.push(`/catalogs?metalake=${currentMetalake}&catalogType=${key}`)
   }

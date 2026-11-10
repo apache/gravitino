@@ -17,6 +17,7 @@
 
 import json
 import unittest
+from datetime import datetime
 
 from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
@@ -34,139 +35,15 @@ from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
 from gravitino.dto.rel.partitioning.partitioning import SingleFieldPartitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.table_response import TableResponse
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.fixtures.table_fixtures import TABLE_DTO_JSON_STRING
 
 
 class TestTableDTO(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.complete_json = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "Apache Gravitino",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "age" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
+        cls.complete_json = TABLE_DTO_JSON_STRING
 
     def test_table_dto_complete_deserialize(self):
         dto = TableDTO.from_json(self.complete_json)
@@ -189,6 +66,29 @@ class TestTableDTO(unittest.TestCase):
         self.assertListEqual(index_dto.field_names(), [["id"]])
 
         self.assertDictEqual(dto.properties(), {"format": "ORC"})
+
+    def test_table_response_with_text_index(self):
+        table_json = json.loads(self.complete_json)
+        table_json["indexes"] = [
+            {
+                "indexType": "DATA_SKIPPING_TEXT",
+                "name": "idx_text",
+                "fieldNames": [["name"]],
+                "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+            }
+        ]
+
+        response = TableResponse.from_json(
+            json.dumps({"code": 0, "table": table_json}), infer_missing=True
+        )
+        response.validate()
+        index = response.table().index()[0]
+        self.assertIs(index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(index.properties(), {"tokenizer": "ngrams", "ngram_size": "3"})
+        self.assertEqual(
+            json.loads(response.table().to_json())["indexes"][0]["properties"],
+            index.properties(),
+        )
 
     def test_table_dto_deserialize_required_fields_success(self):
         json_string = """
@@ -218,7 +118,7 @@ class TestTableDTO(unittest.TestCase):
         dto = TableDTO.from_json(json_string)
         self.assertEqual(dto.name(), "example_table")
         self.assertEqual(dto.audit_info().creator(), "Apache Gravitino")
-        self.assertEqual(dto.audit_info().create_time(), "2025-10-10T00:00:00")
+        self.assertEqual(dto.audit_info().create_time(), datetime(2025, 10, 10))
         self.assertEqual(len(dto.columns()), 1)
         self.assertIsInstance(dto.columns()[0], ColumnDTO)
 

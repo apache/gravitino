@@ -2,9 +2,9 @@ call gravitino.system.create_catalog(
     'gt_iceberg_mysql',
     'lakehouse-iceberg',
     map(
-        array['uri', 'catalog-backend', 'warehouse', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
+        array['uri', 'catalog-backend', 'warehouse', 'jdbc-user', 'jdbc-password', 'jdbc-driver', 'jdbc-schema-version'],
         array['${mysql_uri}/iceberg_db?createDatabaseIfNotExist=true&useSSL=false', 'jdbc',
-            '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
+            '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver', 'V1']
     )
 );
 

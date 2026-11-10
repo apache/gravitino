@@ -18,17 +18,21 @@
  */
 package org.apache.gravitino.catalog.clickhouse;
 
+import java.util.Map;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
+import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseCatalogOperations;
 import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseDatabaseOperations;
 import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseTableOperations;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
+import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
@@ -37,6 +41,19 @@ public class ClickHouseCatalog extends JdbcCatalog {
   @Override
   public String shortName() {
     return "jdbc-clickhouse";
+  }
+
+  @Override
+  protected CatalogOperations newOps(Map<String, String> config) {
+    JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
+    JdbcCatalogOperations ops =
+        new ClickHouseCatalogOperations(
+            createExceptionConverter(),
+            jdbcTypeConverter,
+            createJdbcDatabaseOperations(),
+            createJdbcTableOperations(),
+            createJdbcColumnDefaultValueConverter());
+    return ops;
   }
 
   @Override

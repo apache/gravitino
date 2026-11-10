@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.rel.expressions;
 
+import java.util.Arrays;
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -62,6 +63,22 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
   @Override
   public ArgType argType() {
     return ArgType.FUNCTION;
+  }
+
+  /**
+   * @return The string representation of the function expression.
+   */
+  @Override
+  public String toString() {
+    if (functionArgs.length == 0) {
+      return functionName + "()";
+    }
+
+    return functionName
+        + "("
+        + String.join(
+            ", ", Arrays.stream(functionArgs).map(Object::toString).toArray(String[]::new))
+        + ")";
   }
 
   /** Builder for {@link FuncExpressionDTO}. */

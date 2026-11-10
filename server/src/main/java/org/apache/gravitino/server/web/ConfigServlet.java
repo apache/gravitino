@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServlet;
@@ -49,7 +53,11 @@ public class ConfigServlet extends HttpServlet {
           OAuthConfig.SCOPE);
 
   private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
-      ImmutableSet.of(Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION);
+      ImmutableSet.of(
+          Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION, Configs.SCHEMA_SEPARATOR);
+
+  private static final ImmutableMap<String, ConfigEntry<?>> visibleConfigEntries =
+      buildVisibleConfigEntries();
 
   private final Map<String, Object> configs = Maps.newHashMap();
 
@@ -70,9 +78,12 @@ public class ConfigServlet extends HttpServlet {
 
     for (String config : visibleConfigs) {
       String configValue = serverConfig.getRawString(config);
-      if (configValue != null) {
-        configs.put(config, configValue);
+      if (configValue == null) {
+        continue;
       }
+
+      ConfigEntry<?> configEntry = visibleConfigEntries.get(config);
+      configs.put(config, configEntry == null ? configValue : serverConfig.get(configEntry));
     }
   }
 
@@ -83,11 +94,53 @@ public class ConfigServlet extends HttpServlet {
       res.setContentType("application/json;charset=utf-8");
       writer.write(ObjectMapperProvider.objectMapper().writeValueAsString(configs));
     } catch (IllegalStateException exception) {
-      LOG.error("Illegal state occurred when calling getWriter()");
+      LOG.error("Illegal state occurred when calling getWriter()", exception);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "Failed to get response writer");
     } catch (IOException exception) {
-      LOG.error("Failed to perform IO");
+      LOG.error("Failed to perform IO", exception);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "IO error occurred");
     } catch (Exception e) {
-      LOG.error(e.getMessage());
+      LOG.error("Unexpected error: {}", e.getMessage(), e);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "Internal server error");
+    }
+  }
+
+  private static ImmutableMap<String, ConfigEntry<?>> buildVisibleConfigEntries() {
+    ImmutableMap.Builder<String, ConfigEntry<?>> builder = ImmutableMap.builder();
+    for (Class<?> configClass :
+        ImmutableList.of(
+            Configs.class, ServerConfig.class, OAuthConfig.class, JettyServerConfig.class)) {
+      for (Field field : configClass.getFields()) {
+        if (!Modifier.isStatic(field.getModifiers())
+            || !ConfigEntry.class.isAssignableFrom(field.getType())) {
+          continue;
+        }
+
+        try {
+          ConfigEntry<?> configEntry = (ConfigEntry<?>) field.get(null);
+          builder.put(configEntry.getKey(), configEntry);
+        } catch (IllegalAccessException e) {
+          throw new IllegalStateException(
+              "Failed to access config entry " + configClass.getName() + "." + field.getName(), e);
+        }
+      }
+    }
+
+    return builder.build();
+  }
+
+  private void sendErrorResponse(HttpServletResponse res, String message) {
+    try (PrintWriter writer = res.getWriter()) {
+      res.setContentType("application/json;charset=utf-8");
+      Map<String, String> error = Map.of("error", message);
+      writer.write(ObjectMapperProvider.objectMapper().writeValueAsString(error));
+    } catch (IOException e) {
+      LOG.error("Failed to send error response", e);
+    } catch (IllegalStateException e) {
+      LOG.error("Failed to send error response: illegal state", e);
     }
   }
 }

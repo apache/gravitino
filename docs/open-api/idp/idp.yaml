@@ -1,0 +1,872 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /idp/users:
+    post:
+      tags:
+        - IDP
+      summary: Add local user store user
+      description: >
+        Creates a local user store user with the given username and password.
+        Requires the `idp-basic` plugin and local user store Basic authentication. Local user store is
+        incompatible with the `simple` authenticator (the default), `gravitino.authenticators` must
+        include `basic` and must not include `simple`.
+      operationId: addIdpUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddUserRequest"
+            examples:
+              AddUserRequest:
+                $ref: "#/components/examples/AddUserRequest"
+      responses:
+        "200":
+          description: Returns the added local user store user
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserAddResponse:
+                  $ref: "#/components/examples/IdpUserAddResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpAddUserIllegalArgumentException"
+        "409":
+          description: Conflict - The local user store user already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                AlreadyExistsException:
+                  $ref: "#/components/examples/IdpAlreadyExistsException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
+    get:
+      tags:
+        - IDP
+      summary: Get local user store user
+      description: >
+        Returns the specified local user store user, including group membership (empty if none; the
+        example shows a user who already belongs to groups). Service admins may get any user.
+        Authenticated non-admin users may get only their own user.
+      operationId: getIdpUser
+      responses:
+        "200":
+          description: Returns the local user store user object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserGetResponse:
+                  $ref: "#/components/examples/IdpUserGetResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "404":
+          description: Not Found - The specified local user store user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - IDP
+      summary: Remove local user store user
+      description: Removes the specified local user store user.
+      operationId: removeIdpUser
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}/password:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
+    put:
+      tags:
+        - IDP
+      summary: Change local user store user password
+      description: >
+        Changes the password of the specified local user store user and returns the user object.
+        Service admins may reset any user's password. Authenticated non-admin users may change only
+        their own password. Changing your own password requires `oldPassword` and verifies it
+        against the stored hash. A service admin resetting another user's password must omit
+        `oldPassword`.
+      operationId: changeIdpUserPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+            examples:
+              ChangeUserPasswordRequest:
+                $ref: "#/components/examples/ChangeUserPasswordRequest"
+              ChangeOwnUserPasswordRequest:
+                $ref: "#/components/examples/ChangeOwnUserPasswordRequest"
+      responses:
+        "200":
+          description: Returns the local user store user after the password change
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserUpdateResponse:
+                  $ref: "#/components/examples/IdpUserUpdateResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpChangePasswordIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "404":
+          description: Not Found - The specified local user store user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpUserUpdateNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}/enabled:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
+    put:
+      tags:
+        - IDP
+      summary: Update local user store user enabled flag
+      description: >
+        Updates the enabled flag of the specified local user store user and returns the user object.
+        Disabled users cannot authenticate. Users listed in `gravitino.authorization.serviceAdmins`
+        cannot have their enabled flag changed. Only service admins may call this API.
+      operationId: updateIdpUserEnabled
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserEnabledRequest"
+            examples:
+              UpdateUserEnabledRequest:
+                $ref: "#/components/examples/UpdateUserEnabledRequest"
+      responses:
+        "200":
+          description: Returns the local user store user after the enabled-flag update
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserUpdateResponse:
+                  $ref: "#/components/examples/IdpUserUpdateResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpUpdateEnabledIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "404":
+          description: Not Found - The specified local user store user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpUserUpdateNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups:
+    post:
+      tags:
+        - IDP
+      summary: Add local user store group
+      description: Creates a local user store group with the given name.
+      operationId: addIdpGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddGroupRequest"
+            examples:
+              AddGroupRequest:
+                $ref: "#/components/examples/AddGroupRequest"
+      responses:
+        "200":
+          description: Returns the added local user store group
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupAddResponse:
+                  $ref: "#/components/examples/IdpGroupAddResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpAddGroupIllegalArgumentException"
+        "409":
+          description: Conflict - The local user store group already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                AlreadyExistsException:
+                  $ref: "#/components/examples/IdpGroupAlreadyExistsException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups/{group}:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/group"
+
+    get:
+      tags:
+        - IDP
+      summary: Get local user store group
+      description: Returns the specified local user store group, including member usernames (empty if none; the example shows a group that already has members).
+      operationId: getIdpGroup
+      responses:
+        "200":
+          description: Returns the local user store group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupGetResponse:
+                  $ref: "#/components/examples/IdpGroupGetResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "404":
+          description: Not Found - The specified local user store group does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpGroupNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - IDP
+      summary: Remove local user store group
+      description: Removes the specified local user store group.
+      operationId: removeIdpGroup
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/force"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "409":
+          description: Conflict - The group is not empty and force is false
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupNotEmptyException:
+                  $ref: "#/components/examples/IdpGroupNotEmptyException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups/{group}/users:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/group"
+
+    put:
+      tags:
+        - IDP
+      summary: Change local user store group membership
+      description: Adds and/or removes users from the specified local user store group.
+      operationId: changeIdpGroupMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupMembershipChangeRequest"
+            examples:
+              GroupMembershipChangeRequest:
+                $ref: "#/components/examples/GroupMembershipChangeRequest"
+      responses:
+        "200":
+          description: Returns the local user store group after membership changes
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupMembershipResponse:
+                  $ref: "#/components/examples/IdpGroupMembershipResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpGroupMembershipIllegalArgumentException"
+        "401":
+          $ref: "#/components/responses/IdpUnauthorizedErrorResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "406":
+          $ref: "#/components/responses/IdpNotAcceptableErrorResponse"
+        "404":
+          description: Not Found - The specified local user store group or user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupNotFoundException:
+                  $ref: "#/components/examples/IdpGroupUpdateNotFoundException"
+                UserNotFoundException:
+                  $ref: "#/components/examples/IdpMembershipUserNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  schemas:
+    IdpUser:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The username of the local user store user
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the local user store user is enabled. Disabled users cannot authenticate.
+        groups:
+          type: array
+          items:
+            type: string
+            maxLength: 128
+          description: The local user store groups the user belongs to
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
+
+    IdpGroup:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The name of the local user store group
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the local user store group
+        users:
+          type: array
+          items:
+            type: string
+            maxLength: 128
+          description: The usernames of members in the local user store group
+        audit:
+          $ref: "../openapi.yaml#/components/schemas/Audit"
+
+    AddUserRequest:
+      type: object
+      required:
+        - user
+        - password
+      properties:
+        user:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[^:]*$"
+          description: The username to add.
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 64
+          description: The password of the local user store user to add.
+          writeOnly: true
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the user is enabled. Disabled users cannot authenticate.
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - newPassword
+      properties:
+        newPassword:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 64
+          description: The new password of the local user store user.
+          writeOnly: true
+        oldPassword:
+          type: string
+          format: password
+          description: >
+            The caller's current password. Required when changing your own password; must be
+            omitted when a service admin resets another user's password.
+          writeOnly: true
+
+    UpdateUserEnabledRequest:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether the local user store user should be enabled.
+
+    AddGroupRequest:
+      type: object
+      required:
+        - group
+      properties:
+        group:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The group name to add.
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the group.
+
+    GroupMembershipChangeRequest:
+      type: object
+      anyOf:
+        - required:
+            - usersToAdd
+        - required:
+            - usersToRemove
+      properties:
+        usersToAdd:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          description: The usernames to add to the local user store group
+        usersToRemove:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          description: The usernames to remove from the local user store group
+
+    IdpUserResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        user:
+          $ref: "#/components/schemas/IdpUser"
+
+    IdpGroupResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        group:
+          $ref: "#/components/schemas/IdpGroup"
+
+  responses:
+    IdpUnauthorizedErrorResponse:
+      description: Unauthorized - Authentication credentials are missing or invalid
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            UnauthorizedException:
+              $ref: "#/components/examples/IdpUnauthorizedException"
+
+    IdpForbiddenErrorResponse:
+      description:
+        Forbidden - Callers listed in `gravitino.authorization.serviceAdmins` may manage local
+        user store users and groups. Authenticated non-admin users may only `GET`
+        `/idp/users/{user}` or `PUT` `/idp/users/{user}/password` for their own username.
+        Other authenticated non-admin IdP management calls receive this response. Missing or
+        invalid credentials return 401 instead.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            ForbiddenException:
+              $ref: "#/components/examples/IdpForbiddenException"
+
+    IdpNotAcceptableErrorResponse:
+      description: >
+        Not Acceptable - Returned when `Accept` (or a versioned `Content-Type`) declares an
+        unsupported Gravitino API version, for example `application/vnd.gravitino.v99+json`.
+        Missing Accept, `*/*`, or `application/json` alone are rewritten to the default
+        `application/vnd.gravitino.v1+json` and do not produce this response.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedApiVersion:
+              $ref: "#/components/examples/IdpUnsupportedApiVersionException"
+
+  examples:
+    AddUserRequest:
+      value: {
+        "user": "alice",
+        "password": "Passw0rd-1234"
+      }
+
+    ChangeUserPasswordRequest:
+      value: {
+        "newPassword": "Passw0rd-5678"
+      }
+
+    ChangeOwnUserPasswordRequest:
+      value: {
+        "newPassword": "Passw0rd-5678",
+        "oldPassword": "Passw0rd-1234"
+      }
+
+    UpdateUserEnabledRequest:
+      value: {
+        "enabled": false
+      }
+
+    AddGroupRequest:
+      value: {
+        "group": "engineers",
+        "comment": "Platform engineering"
+      }
+
+    GroupMembershipChangeRequest:
+      value: {
+        "usersToAdd": ["alice", "bob"],
+        "usersToRemove": ["carol"]
+      }
+
+    IdpUserAddResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "enabled": true,
+          "groups": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
+        }
+      }
+
+    IdpUserGetResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "enabled": true,
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
+        }
+      }
+
+    IdpUserUpdateResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "enabled": true,
+          "groups": ["engineers"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z",
+            "lastModifier": "gravitino",
+            "lastModifiedTime": "2023-12-08T07:10:11.123Z"
+          }
+        }
+      }
+
+    IdpGroupAddResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "comment": "Platform engineering",
+          "users": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
+        }
+      }
+
+    IdpGroupGetResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "comment": "Platform engineering",
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
+        }
+      }
+
+    IdpGroupMembershipResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "comment": "Platform engineering",
+          "users": ["alice", "bob"],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          }
+        }
+      }
+
+    IdpAddUserIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
+      }
+
+    IdpChangePasswordIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"newPassword\" field is required]"
+      }
+
+    IdpUpdateEnabledIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"enabled\" field is required]"
+      }
+
+    IdpAddGroupIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store group [] operation [ADD], reason [\"group\" field is required and cannot be empty]"
+      }
+
+    IdpGroupMembershipIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate local user store group [engineers] operation [UPDATE], reason [usersToAdd and usersToRemove cannot both be null]"
+      }
+
+    IdpNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate local user store user [missing-user] operation [GET], reason [IdP user not found: missing-user]"
+      }
+
+    IdpAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "AlreadyExistsException",
+        "message": "Failed to operate local user store user [alice] operation [ADD], reason [IdP user alice already exists]"
+      }
+
+    IdpUserUpdateNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate local user store user [missing-user] operation [UPDATE], reason [IdP user not found: missing-user]"
+      }
+
+    IdpGroupNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate local user store group [missing-group] operation [GET], reason [IdP group not found: missing-group]"
+      }
+
+    IdpGroupUpdateNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate local user store group [missing-group] operation [UPDATE], reason [IdP group not found: missing-group]"
+      }
+
+    IdpMembershipUserNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate local user store group [engineers] operation [UPDATE], reason [IdP user not found: missing-user]"
+      }
+
+    IdpGroupAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "AlreadyExistsException",
+        "message": "Failed to operate local user store group [engineers] operation [ADD], reason [IdP group engineers already exists]"
+      }
+
+    IdpGroupNotEmptyException:
+      value: {
+        "code": 1005,
+        "type": "NonEmptyEntityException",
+        "message": "Failed to operate local user store group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
+      }
+
+    IdpUnauthorizedException:
+      value: {
+        "code": 1011,
+        "type": "UnauthorizedException",
+        "message": "The provided credentials did not support"
+      }
+
+    IdpForbiddenException:
+      value: {
+        "code": 1008,
+        "type": "ForbiddenException",
+        "message": "Only service admins can manage built-in IdP users and groups."
+      }
+
+    IdpUnsupportedApiVersionException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Unsupported version v99 in request header"
+      }

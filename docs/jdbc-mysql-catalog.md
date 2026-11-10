@@ -1,6 +1,6 @@
 ---
-title: "MySQL catalog"
-slug: /jdbc-mysql-catalog
+title: "MySQL Catalog"
+slug: "/jdbc-mysql-catalog"
 keywords:
 - jdbc
 - MySQL
@@ -16,104 +16,111 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage MySQL metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the MySQL instance.
 - Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
+Pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino. You can pass the Trino MySQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
+When using Gravitino with Trino, pass the Trino MySQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the MySQL catalog has the following properties:
 
-| Configuration item      | Description                                                                                            | Default value | Required | Since Version |
-|-------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`             | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`         | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       | 1.1.0         |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                                                                                                      | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.                                                                                   | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                                                                      | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                                                                       | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
+Gravitino does not package the MySQL JDBC driver, because MySQL Connector/J is
+GPLv2 and cannot be redistributed. You must supply it yourself.
+
+Download MySQL Connector/J (`com.mysql:mysql-connector-j`, 8.0.16 or later; the
+`com.mysql.cj.jdbc.Driver` class) from
+[Maven Central](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/) and
+place the JAR in the `catalogs/jdbc-mysql/libs` directory.
+
+For container or Kubernetes deployments where you cannot copy into that
+directory directly, supply the driver through your deployment's mechanism for
+adding catalog libraries. The catalog fails fast at creation time with a clear
+message if the driver is absent.
 :::
 
 ### Driver Version Compatibility
 
-The MySQL catalog includes driver version compatibility checks for datetime precision calculation:
-
-- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
-- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
-
-This limitation affects the following datetime types:
-- `TIME(p)` - time precision
-- `TIMESTAMP(p)` - timestamp precision  
-- `DATETIME(p)` - datetime precision
-
-When using an unsupported driver version, the system will:
-1. Continue to work normally with default precision (0)
-2. Log a warning message indicating the driver version limitation
-3. Return `null` for precision calculations to avoid incorrect results
+The fractional seconds precision of `TIME(p)`, `DATETIME(p)` and `TIMESTAMP(p)` columns is derived from the
+JDBC metadata, whose `COLUMN_SIZE` is only accurate with MySQL Connector/J 8.0.16 or later. With an older
+driver the catalog logs a warning and falls back to `information_schema.columns` for the precision.
 
 **Example warning log:**
 ```
-WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
-columnSize may not be accurate for precision calculation. 
-Returning null for TIMESTAMP type precision. Driver version: mysql-connector-java-8.0.11
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, columnSize may not be accurate
+for precision calculation. Falling back to information_schema for the TIMESTAMP precision.
 ```
 
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
+:::
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the MySQL database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
+- Supports [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment)..
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type       | MySQL Type          |
 |----------------------|---------------------|
@@ -140,17 +147,17 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 :::info
 MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
 :::
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -189,14 +196,14 @@ Column[] cols = new Column[] {
     Column.of("name", Types.VarCharType.of(500), "Name of the user", true, false, null)
 };
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
 };
 ```
 
 </TabItem>
 </Tabs>
 
-### Table properties
+### Table Properties
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
@@ -207,13 +214,15 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 :::
 
 :::caution
-- Doesn't support remove table properties. You can only add or modify properties, not delete properties.
+For MySQL table options, use the Gravitino property names listed below. Unknown properties, including SQL option names such as `ENGINE` or `ROW_FORMAT`, are rejected. Use the Gravitino property name `engine` instead. Metadata keys shared by every entity, such as the credential-vending settings, are accepted but not applied to MySQL tables.
+
+These properties can only be specified when creating a table; they cannot be changed or removed afterwards. Values are validated against their declared types before DDL is executed.
 :::
 
-| Property Name           | Description                                                                                                                                              | Default Value | Required  | Reserved   | Immutable | Since version |
-|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
-| `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
+| Property Name           | Description                                                                                                                                                                                                        | Default Value | Required | Reserved | Immutable |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`.                                                           | `InnoDB`      | No       | No       | Yes       |
+| `auto-increment-offset` | The starting value of the auto-increment field when the table is created. Loading the table returns the next auto-increment value reported by the database, which can differ from the value specified at creation. | (none)        | No       | No       | Yes       |
 
 
 :::note
@@ -221,7 +230,7 @@ Some MySQL storage engines, such as FEDERATED, are not enabled by default and re
 refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
 :::
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
@@ -231,7 +240,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -255,19 +264,19 @@ The index name of the PRIMARY_KEY must be PRIMARY
 
 ```java
 Index[] indexes = new Index[] {
-    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}),
-    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of()),
+    Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}, Map.of()),
 };
 ```
 
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":common")) {
     exclude("*")
@@ -41,8 +42,9 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.jaxrs.json.provider)
+  implementation(libs.arrow.vector)
   implementation(libs.lance.namespace.core) {
-    exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "org.lance", module = "lance-core")
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino

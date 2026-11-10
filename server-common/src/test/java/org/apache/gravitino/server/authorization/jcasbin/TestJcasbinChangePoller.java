@@ -1,0 +1,384 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.server.authorization.jcasbin;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+/** Tests for {@link JcasbinChangeListener} static helpers. */
+public class TestJcasbinChangePoller {
+
+  @Test
+  void testReplayOptInAcceptsRepeatedInvalidations() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+    JcasbinChangeListener listener = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    Assertions.assertTrue(listener.supportsReplay());
+    List<EntityChangeRecord> batch =
+        List.of(change(1L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"));
+    listener.onEntityChange(batch);
+    listener.onEntityChange(batch);
+    String tableKey = key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "");
+    Assertions.assertEquals(List.of(tableKey, tableKey), metadataIdCache.invalidatedPrefixes);
+  }
+
+  @Test
+  void testRejectsNonPositivePollInterval() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, 0));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, -1));
+  }
+
+  @Test
+  void testChangeLogFullNameStripsLeadingMetalakeForChildTypes() {
+    MetadataObject catalog =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1.cat1", MetadataObject.Type.CATALOG);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", ""),
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", catalog));
+
+    MetadataObject schema =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1.cat1.sch1", MetadataObject.Type.SCHEMA);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", ""),
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", schema));
+
+    MetadataObject table =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1.cat1.sch1.tbl1", MetadataObject.Type.TABLE);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", ""),
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", table));
+  }
+
+  @Test
+  void testChangeLogFullNameForMetalakeKeepsItself() {
+    MetadataObject metalake =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1", MetadataObject.Type.METALAKE);
+    Assertions.assertEquals(
+        key("ml1", "METALAKE", ""),
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
+  }
+
+  @Test
+  void testChangeLogFullNamePreservesDotsInsideNameLevels() {
+    NameIdentifier ident =
+        NameIdentifier.of("ml1", "cat.with.dot", "schema.with.dot", "table.with.dot");
+
+    MetadataObject metadataObject =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", EntityChangeLogNameIdentifierCodec.encode(ident), MetadataObject.Type.TABLE);
+
+    Assertions.assertEquals("cat.with.dot.schema.with.dot", metadataObject.parent());
+    Assertions.assertEquals("table.with.dot", metadataObject.name());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, metadataObject.type());
+  }
+
+  @Test
+  void testPollEntityChangesCoalescesContainerPrefixes() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.SCHEMA, "ml1.cat1.sch1"),
+            change(3L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"),
+            change(4L, MetadataObject.Type.TABLE, "ml1.cat2.sch1.tbl1")));
+
+    Assertions.assertEquals(
+        List.of(
+            key("ml1", "CATALOG", "cat1", ""),
+            key("ml1", "CATALOG", "cat2", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
+        metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testVirtualNamespaceTypesInvalidateLookupKeys() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // TAG/POLICY/JOB/JOB_TEMPLATE live in a virtual namespace (<metalake>.system.<kind>.<name>).
+    // Authorization caches their ids by leaf name, so a peer must drop exactly that key.
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.TAG, "ml1.system.tag.pii"),
+            change(2L, MetadataObject.Type.POLICY, "ml1.system.policy.retention"),
+            change(3L, MetadataObject.Type.JOB, "ml1.system.job.job1"),
+            change(4L, MetadataObject.Type.JOB_TEMPLATE, "ml1.system.job_template.tpl1"),
+            change(5L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1")));
+
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
+        metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(
+        List.of(
+            lookupKey("pii", MetadataObject.Type.TAG),
+            lookupKey("retention", MetadataObject.Type.POLICY),
+            lookupKey("job1", MetadataObject.Type.JOB),
+            lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE)),
+        metadataIdCache.invalidatedKeys);
+  }
+
+  // The key JcasbinAuthorizationLookups builds when authorizing a metalake-level object by name.
+  private static String lookupKey(String name, MetadataObject.Type type) {
+    return JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
+        "ml1", MetadataObjects.of(null, name, type));
+  }
+
+  @Test
+  void testUnmappableRecordDoesNotFailTheBatch() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // If the full name does not match the type in the record, we cannot build a cache key from it.
+    // Log it, skip it, and keep handling the rest of the batch.
+    Assertions.assertDoesNotThrow(
+        () ->
+            poller.onEntityChange(
+                List.of(
+                    change(1L, MetadataObject.Type.TABLE, "ml1.cat1"),
+                    change(2L, MetadataObject.Type.TABLE, "gravitino:v1:9:1:a"),
+                    change(3L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"))));
+
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
+        metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testLeafTypesAreInvalidatedByExactKey() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1"),
+            change(2L, MetadataObject.Type.FUNCTION, "ml1.cat1.sch1.func1")));
+
+    // Leaf objects have nothing nested under them, so they are removed by exact key, not prefix.
+    Assertions.assertEquals(
+        List.of(
+            key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FILESET", "fs1"),
+            key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FUNCTION", "func1")),
+        metadataIdCache.invalidatedKeys);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testSuccessfulBatchDoesNotClearTheCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.FILESET, "ml1.cat2.sch1.fs1")));
+
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testFailedPrefixInvalidationClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failPrefixInvalidation = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // The batch is handed out once and never sent again, so the listener has to fix things here.
+    Assertions.assertDoesNotThrow(
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
+    // The owner cache has its own poller, so a change-log failure must not wipe it as well.
+    Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testFailedLeafInvalidationClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failKeyInvalidation = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            poller.onEntityChange(
+                List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
+  }
+
+  @Test
+  void testFailedInvalidationBatchClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failInvalidationBatch = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // The failure can also happen while taking the cache's batch lock, before any key is touched.
+    Assertions.assertDoesNotThrow(
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllInsideBatchCalls);
+  }
+
+  @Test
+  void testFailedClearPropagatesToThePoller() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failPrefixInvalidation = true;
+    metadataIdCache.failInvalidateAll = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // There is nothing else to try here, so the poller just logs it and keeps reading.
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testPollCursorAdvancementIsSynchronized() throws NoSuchMethodException {
+    Method pollOwnerChanges = JcasbinChangeListener.class.getDeclaredMethod("pollOwnerChanges");
+    Method onEntityChange =
+        JcasbinChangeListener.class.getDeclaredMethod("onEntityChange", List.class);
+
+    Assertions.assertTrue(Modifier.isSynchronized(pollOwnerChanges.getModifiers()));
+    Assertions.assertTrue(Modifier.isSynchronized(onEntityChange.getModifiers()));
+  }
+
+  private static String key(String... parts) {
+    return JcasbinAuthorizationCacheKeys.joinKeyParts(parts);
+  }
+
+  private static EntityChangeRecord change(long id, MetadataObject.Type type, String fullName) {
+    return new EntityChangeRecord(id, "ml1", type.name(), fullName, OperateType.ALTER, 0L);
+  }
+
+  private static class RecordingCache<K, V> implements GravitinoCache<K, V> {
+    private final List<K> invalidatedKeys = new ArrayList<>();
+    private final List<String> invalidatedPrefixes = new ArrayList<>();
+
+    private int invalidateAllCalls;
+    private int invalidateAllInsideBatchCalls;
+    private boolean invalidationBatchActive;
+    private boolean failKeyInvalidation;
+    private boolean failPrefixInvalidation;
+    private boolean failInvalidationBatch;
+    private boolean failInvalidateAll;
+
+    @Override
+    public Optional<V> getIfPresent(K key) {
+      return Optional.empty();
+    }
+
+    @Override
+    public void put(K key, V value) {}
+
+    @Override
+    public void invalidate(K key) {
+      if (failKeyInvalidation) {
+        throw new RuntimeException("invalidate failed");
+      }
+      invalidatedKeys.add(key);
+    }
+
+    @Override
+    public void invalidateAll() {
+      invalidateAllCalls++;
+      if (invalidationBatchActive) {
+        invalidateAllInsideBatchCalls++;
+      }
+      if (failInvalidateAll) {
+        throw new RuntimeException("invalidateAll failed");
+      }
+    }
+
+    @Override
+    public void invalidateByPrefix(String prefix) {
+      if (failPrefixInvalidation) {
+        throw new RuntimeException("invalidateByPrefix failed");
+      }
+      invalidatedPrefixes.add(prefix);
+    }
+
+    @Override
+    public void runInvalidationBatch(Runnable batch) {
+      if (failInvalidationBatch) {
+        throw new RuntimeException("invalidation batch failed");
+      }
+      invalidationBatchActive = true;
+      try {
+        batch.run();
+      } finally {
+        invalidationBatchActive = false;
+      }
+    }
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public void close() {}
+  }
+}

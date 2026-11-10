@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.longOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
@@ -31,8 +33,10 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.utils.MapUtils;
 
 public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   private static final List<String> JDBC_PROPERTIES =
@@ -44,7 +48,11 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
           JdbcConfig.PASSWORD.getKey(),
           JdbcConfig.POOL_MIN_SIZE.getKey(),
           JdbcConfig.POOL_MAX_SIZE.getKey(),
-          JdbcConfig.TEST_ON_BORROW.getKey());
+          JdbcConfig.POOL_MAX_IDLE.getKey(),
+          JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
+          JdbcConfig.TEST_ON_BORROW.getKey(),
+          JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
+          JdbcConfig.VERIFY_ON_CREATE.getKey());
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -85,7 +93,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */,
+                true /* hidden */,
                 false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
@@ -93,7 +101,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.POOL_MIN_SIZE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MAX_SIZE.getKey(),
@@ -101,15 +109,43 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
+            integerPropertyEntry(
+                JdbcConfig.POOL_MAX_IDLE.getKey(),
+                JdbcConfig.POOL_MAX_IDLE.getDoc(),
+                false /* required */,
+                false /* immutable */,
+                JdbcConfig.POOL_MAX_IDLE.getDefaultValue(),
+                false /* hidden */,
+                false /* reserved */),
+            longOptionalPropertyEntry(
+                JdbcConfig.POOL_MAX_WAIT_MS.getKey(),
+                JdbcConfig.POOL_MAX_WAIT_MS.getDoc(),
+                false /* immutable */,
+                JdbcConfig.POOL_MAX_WAIT_MS.getDefaultValue(),
+                false /* hidden */),
             booleanPropertyEntry(
                 JdbcConfig.TEST_ON_BORROW.getKey(),
                 JdbcConfig.TEST_ON_BORROW.getDoc(),
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.TEST_ON_BORROW.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
+                false /* reserved */),
+            longOptionalPropertyEntry(
+                JdbcConfig.CONNECT_TIMEOUT_MS.getKey(),
+                JdbcConfig.CONNECT_TIMEOUT_MS.getDoc(),
+                false /* immutable */,
+                JdbcConfig.CONNECT_TIMEOUT_MS.getDefaultValue(),
+                false /* hidden */),
+            booleanPropertyEntry(
+                JdbcConfig.VERIFY_ON_CREATE.getKey(),
+                JdbcConfig.VERIFY_ON_CREATE.getDoc(),
+                false /* required */,
+                false /* immutable */,
+                JdbcConfig.VERIFY_ON_CREATE.getDefaultValue(),
+                false /* hidden */,
                 false /* reserved */));
     PROPERTIES_METADATA =
         ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -120,6 +156,19 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  /**
+   * Returns the effective JDBC settings used by validation and operation initialization.
+   *
+   * @param properties the catalog configuration
+   * @return a new map with bypass prefixes removed and canonical JDBC properties taking precedence
+   */
+  public Map<String, String> jdbcProperties(Map<String, String> properties) {
+    Map<String, String> result =
+        Maps.newHashMap(MapUtils.getPrefixMap(properties, CATALOG_BYPASS_PREFIX));
+    result.putAll(transformProperties(properties));
+    return result;
   }
 
   public Map<String, String> transformProperties(Map<String, String> properties) {

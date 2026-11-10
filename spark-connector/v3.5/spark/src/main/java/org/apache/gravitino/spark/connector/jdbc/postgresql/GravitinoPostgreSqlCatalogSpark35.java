@@ -25,6 +25,6 @@ import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConverter;
 public class GravitinoPostgreSqlCatalogSpark35 extends GravitinoJdbcCatalog {
   @Override
   protected PropertiesConverter getPropertiesConverter() {
-    return JdbcPropertiesConverter.getPGInstance();
+    return JdbcPropertiesConverter.getNoTablePropertiesInstance();
   }
 }

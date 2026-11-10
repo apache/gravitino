@@ -6,7 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+ *
  *  http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -26,7 +28,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.JobRunRequest;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
@@ -36,6 +40,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   private final AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
   private final Map<String, Object> pathParams;
   private final Optional<String> entityType;
+  private final String expression;
 
   public RunJobAuthorizationExecutor(
       Parameter[] parameters,
@@ -46,6 +51,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
       Optional<String> entityType) {
     this.parameters = parameters;
     this.args = args;
+    this.expression = expression;
     this.metadataContext = metadataContext;
     this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(expression);
     this.pathParams = pathParams;
@@ -53,19 +59,20 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute(AuthorizationRequestContext context) throws Exception {
     Object request = extractFromParameters(parameters, args);
     if (request == null) {
-      return false;
+      // Match JobOperations.runJob: a missing body is a client error, not an auth denial.
+      throw new BadRequestException("Request body cannot be null");
     }
 
-    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setOriginalAuthorizationExpression(expression);
     Preconditions.checkArgument(
         request instanceof JobRunRequest,
         "Expected JobRunRequest but found %s",
         request.getClass().getSimpleName());
     JobRunRequest jobRunRequest = (JobRunRequest) request;
-    jobRunRequest.validate();
+    RequestValidation.validate(jobRunRequest::validate);
     String jobTemplateName = jobRunRequest.getJobTemplateName();
     NameIdentifier metalake = metadataContext.get(Entity.EntityType.METALAKE);
     NameIdentifier jobTemplateNameIdentifier =

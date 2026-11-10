@@ -235,8 +235,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
   }
 
   private static void submitCompactionJob(GravitinoMetalake metalake, Map<String, String> jobConf) {
-    JobHandle jobHandle = metalake.runJob(JOB_TEMPLATE_NAME, jobConf);
-    System.out.println("Submitted job id: " + jobHandle.jobId());
+    submitJob(metalake, JOB_TEMPLATE_NAME, jobConf);
+  }
+
+  private static void submitJob(
+      GravitinoMetalake metalake, String jobTemplateName, Map<String, String> jobConf) {
+    JobHandle jobHandle = metalake.runJob(jobTemplateName, jobConf);
     Assertions.assertTrue(StringUtils.isNotBlank(jobHandle.jobId()), "Job id should not be blank");
 
     Awaitility.await()
@@ -277,6 +281,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
             NameIdentifier.of(SPARK_CATALOG_NAME, "db", tableName),
             jobOptions,
             JOB_TEMPLATE_NAME,
+            "binpack",
+            "",
             columns,
             partitioning,
             partitions);

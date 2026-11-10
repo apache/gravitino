@@ -20,23 +20,30 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
   private boolean isAuthorizationEnabled;
   private boolean auxMode;
+  private boolean skipAuthorizationForRestBackend;
   private String metalakeName;
   private String defaultCatalogName;
+  private IcebergCatalogWrapperManager catalogWrapperManager;
 
   private IcebergRESTServerContext(
       Boolean isAuthorizationEnabled,
       Boolean auxMode,
+      Boolean skipAuthorizationForRestBackend,
       String metalakeName,
-      String defaultCatalogName) {
+      String defaultCatalogName,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     this.isAuthorizationEnabled = isAuthorizationEnabled;
     this.auxMode = auxMode;
+    this.skipAuthorizationForRestBackend = skipAuthorizationForRestBackend;
     this.metalakeName = metalakeName;
     this.defaultCatalogName = defaultCatalogName;
+    this.catalogWrapperManager = catalogWrapperManager;
   }
 
   private static class InstanceHolder {
@@ -44,13 +51,19 @@ public class IcebergRESTServerContext {
   }
 
   public static IcebergRESTServerContext create(
-      IcebergConfigProvider configProvider, Boolean enableAuth, Boolean auxMode) {
+      IcebergConfigProvider configProvider,
+      Boolean enableAuth,
+      Boolean auxMode,
+      Boolean skipAuthorizationForRestBackend,
+      IcebergCatalogWrapperManager catalogWrapperManager) {
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
             enableAuth,
             auxMode,
+            skipAuthorizationForRestBackend,
             configProvider.getMetalakeName(),
-            configProvider.getDefaultCatalogName());
+            configProvider.getDefaultCatalogName(),
+            catalogWrapperManager);
     return InstanceHolder.INSTANCE;
   }
 
@@ -67,11 +80,19 @@ public class IcebergRESTServerContext {
     return auxMode;
   }
 
+  public boolean skipAuthorizationForRestBackend() {
+    return skipAuthorizationForRestBackend;
+  }
+
   public String metalakeName() {
     return metalakeName;
   }
 
   public String defaultCatalogName() {
     return defaultCatalogName;
+  }
+
+  public IcebergCatalogWrapperManager catalogWrapperManager() {
+    return catalogWrapperManager;
   }
 }

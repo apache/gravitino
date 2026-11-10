@@ -37,7 +37,6 @@ import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
-import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -51,7 +50,7 @@ public class TestOwnerEvent {
   private OwnerManager innerOwnerManager;
   private DummyEventListener dummyEventListener;
 
-  interface TestEntityStore extends EntityStore, RelationalBackend, SupportsRelationOperations {
+  interface TestEntityStore extends EntityStore, SupportsRelationOperations {
     // This interface is used to mock the EntityStore for testing purposes.
   }
 

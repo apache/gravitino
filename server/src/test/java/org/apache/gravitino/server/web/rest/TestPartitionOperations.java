@@ -137,6 +137,28 @@ public class TestPartitionOperations extends JerseyTest {
   }
 
   @Test
+  public void testRejectUnresolvedNullPartitionLiteralBeforeDispatch() {
+    String request =
+        """
+        {"partitions":[{"type":"identity","name":"p","fieldNames":[["c"]],
+          "values":[{"type":"literal","dataType":"future_type","value":null}]}]}
+        """;
+    try (Response response =
+        target(partitionPath(metalake, catalog, schema, table))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          response
+              .readEntity(ErrorResponse.class)
+              .getMessage()
+              .contains("partitions[0].values[0].dataType"));
+    }
+    Mockito.verifyNoInteractions(dispatcher);
+  }
+
+  @Test
   public void testListPartitionNames() {
     when(dispatcher.listPartitionNames(any())).thenReturn(partitionNames);
 
@@ -247,6 +269,25 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp2.getCode());
     Assertions.assertEquals(NoSuchPartitionException.class.getSimpleName(), errorResp2.getType());
     Assertions.assertTrue(errorResp2.getMessage().contains("p3"));
+  }
+
+  @Test
+  public void testGetPartitionExceptionMessageContainsPartitionName() {
+    doThrow(new NoSuchPartitionException("missing partition"))
+        .when(dispatcher)
+        .getPartition(any(), any());
+
+    Response resp =
+        target(partitionPath(metalake, catalog, schema, table) + "p3")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertTrue(errorResponse.getMessage().contains("[p3]"));
   }
 
   @Test

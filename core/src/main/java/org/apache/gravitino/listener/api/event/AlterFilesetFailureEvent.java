@@ -45,7 +45,7 @@ public final class AlterFilesetFailureEvent extends FilesetFailureEvent {
   public AlterFilesetFailureEvent(
       String user, NameIdentifier identifier, Exception exception, FilesetChange[] filesetChanges) {
     super(user, identifier, exception);
-    this.filesetChanges = filesetChanges.clone();
+    this.filesetChanges = filesetChanges == null ? null : filesetChanges.clone();
   }
 
   /**

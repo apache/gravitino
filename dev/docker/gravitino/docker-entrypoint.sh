@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Docker container entrypoint for the Gravitino server image.
+# This script performs container-specific initialization before starting the server:
+#   1. Rewrites gravitino.conf from environment variables (skipped if SKIP_CONFIG_REWRITE=true).
+#   2. Creates symlinks for optional JDBC drivers placed in /opt/gravitino/jdbc-drivers/.
+#   3. Creates symlinks for optional Iceberg bundle jars placed in /opt/gravitino/iceberg-bundles/.
+#   4. Starts the Gravitino server in the foreground (replacing this shell process).
+#
+# This script is NOT intended to be called directly. It is set as the Docker ENTRYPOINT and
+# is invoked automatically when the container starts.
+# For non-Docker deployments, use bin/gravitino.sh {start|stop|restart|status} instead.
+
+set -ex
+bin_dir="$(dirname "${BASH_SOURCE-$0}")"
+gravitino_dir="$(cd "${bin_dir}/../" > /dev/null; pwd)"
+
+cd "${gravitino_dir}"
+
+# Skip config rewrite if SKIP_CONFIG_REWRITE is set (e.g., in Kubernetes where config
+# is mounted via ConfigMap and should not be overwritten by environment variables).
+if [ "${SKIP_CONFIG_REWRITE}" != "true" ]; then
+  python docker/rewrite_gravitino_server_config.py
+fi
+
+# Create soft links for JDBC drivers
+jdbc_driver_dir="${gravitino_dir}/jdbc-drivers"
+
+if [ -d "${jdbc_driver_dir}" ]; then
+  mkdir -p "${gravitino_dir}/libs"
+  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+fi
+
+# Create soft links for Iceberg bundle jars
+iceberg_bundle_dir="${gravitino_dir}/iceberg-bundles"
+lakehouse_iceberg_lib_dir="${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
+iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
+
+if [ -d "${iceberg_bundle_dir}" ]; then
+  mkdir -p "${lakehouse_iceberg_lib_dir}"
+  mkdir -p "${iceberg_rest_lib_dir}"
+  find "${iceberg_bundle_dir}" -name '*.jar' \
+    -exec ln -sfv {} "${lakehouse_iceberg_lib_dir}" \; \
+    -exec ln -sfv {} "${iceberg_rest_lib_dir}" \;
+fi
+
+JAVA_OPTS+=" -XX:-UseContainerSupport"
+export JAVA_OPTS
+
+# Run the server in the foreground so this process (PID 1) is the JVM.
+# This ensures SIGTERM is forwarded correctly for graceful shutdown.
+exec ./bin/gravitino.sh run

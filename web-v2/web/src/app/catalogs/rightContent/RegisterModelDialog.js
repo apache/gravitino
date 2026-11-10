@@ -45,7 +45,7 @@ const defaultValues = {
 }
 
 export default function RegisterModelDialog({ ...props }) {
-  const { open, setOpen, metalake, catalog, catalogType, schema, editModel, init } = props
+  const { open, setOpen, metalake, catalog, catalogType, schema, editModel, version, init } = props
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [cacheData, setCacheData] = useState()
@@ -136,7 +136,9 @@ export default function RegisterModelDialog({ ...props }) {
           // update model
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
-            await dispatch(updateModel({ metalake, catalog, catalogType, schema, model: editModel, data: reqData }))
+            await dispatch(
+              updateModel({ init, metalake, catalog, catalogType, schema, model: editModel, version, data: reqData })
+            )
           }
         } else {
           await dispatch(registerModel({ data: submitData, metalake, catalog, schema, catalogType }))

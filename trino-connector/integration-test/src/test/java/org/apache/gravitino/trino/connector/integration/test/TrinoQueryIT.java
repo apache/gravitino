@@ -18,14 +18,17 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -37,21 +40,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
@@ -64,23 +62,36 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Map<String, TestStatus> allTestStatus = new TreeMap<>();
 
   private static final int testParallelism = 2;
+  private static final String RETRY_FLAG = "<RETRY_UNTIL_MATCH>";
+  private static final Pattern RESULT_PATTERN =
+      Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL);
+  private static final Pattern PARAM_PATTERN = Pattern.compile("\\$\\{(\\??[\\w_]+)\\}");
+  private static final Pattern QUERY_FAILED_PATTERN = Pattern.compile("^Query \\w+ failed:");
 
   static Map<String, String> queryParams = new HashMap<>();
 
   static Set<String> ciTestsets = new HashSet<>();
 
+  static Set<String> skipTestsets = new HashSet<>(Arrays.asList("glue"));
+
   static TrinoQueryITBase trinoQueryITBase;
 
-  static int trinoWorkerNum = 0;
+  static Integer trinoWorkerNum;
+
+  static Integer trinoVersion;
+
+  static String trinoConnectorDir;
+
+  static String testContainers;
 
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
     testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
   }
 
-  @BeforeAll
   public void setup() throws Exception {
-    trinoQueryITBase = new TrinoQueryITBase(trinoWorkerNum);
+    trinoQueryITBase =
+        new TrinoQueryITBase(trinoWorkerNum, trinoVersion, trinoConnectorDir, testContainers);
     trinoQueryITBase.setup();
     cleanupTestEnv();
 
@@ -119,7 +130,6 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
   }
 
-  @AfterAll
   public static void cleanup() {
     TrinoQueryITBase.cleanup();
   }
@@ -194,22 +204,28 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   private static String resolveParameters(String sql) throws Exception {
-    Matcher sqlMatcher = Pattern.compile("\\$\\{([\\w_]+)\\}").matcher(sql);
+    // ${?param} is optional (resolves to empty string when not provided); ${param} is required.
+    Matcher sqlMatcher = PARAM_PATTERN.matcher(sql);
     StringBuffer replacedString = new StringBuffer();
     while (sqlMatcher.find()) {
-      String parameter = sqlMatcher.group(1);
+      String token = sqlMatcher.group(1);
+      boolean optional = token.startsWith("?");
+      String parameter = optional ? token.substring(1) : token;
       String value = queryParams.get(parameter);
       if (Strings.isEmpty(value)) {
-        throw new Exception("Parameter " + parameter + " is not defined in test parameters");
+        if (!optional) {
+          throw new Exception("Parameter " + parameter + " is not defined in test parameters");
+        }
+        value = "";
       }
-      sqlMatcher.appendReplacement(replacedString, queryParams.get(parameter));
+      sqlMatcher.appendReplacement(replacedString, Matcher.quoteReplacement(value));
     }
     sqlMatcher.appendTail(replacedString);
     return replacedString.toString();
   }
 
   private static boolean isQueryFailed(String result) {
-    return Pattern.compile("^Query \\w+ failed:").matcher(result).find();
+    return QUERY_FAILED_PATTERN.matcher(result).find();
   }
 
   void executeSqlFileWithCheckResult(
@@ -224,26 +240,16 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
     Matcher sqlMatcher =
         Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
-    Matcher resultMatcher =
-        Pattern.compile("((\".*?\")\\n{2,})|((\\S.*?)\\n{2,})", Pattern.DOTALL | Pattern.UNIX_LINES)
-            .matcher(testResults);
+    Matcher resultMatcher = RESULT_PATTERN.matcher(testResults);
 
     TestStatus testStatus = allTestStatus.get(TestStatus.testName(path, catalog));
     testStatus.startTime = System.currentTimeMillis();
     while (sqlMatcher.find()) {
       String sql = sqlMatcher.group(1);
       sql = resolveParameters(sql);
-      String expectResult = "";
-      if (resultMatcher.find()) {
-        if (resultMatcher.group(2) != null) {
-          expectResult = resultMatcher.group(2).trim();
-        } else {
-          expectResult = resultMatcher.group(4).trim();
-        }
-      }
+      String expectResult = nextExpectedResult(resultMatcher);
 
-      String result = queryRunner.runQuery(sql).trim();
-      result = result.replaceAll("WARNING:.*?\\n", "");
+      String result = executeQuery(queryRunner, sql, expectResult, Duration.ofSeconds(30));
       boolean match = match(expectResult, result);
 
       if (match) {
@@ -271,6 +277,31 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     LOG.info("Test progress {}/{}", passCount.get(), totalCount.get());
   }
 
+  // Only explicitly marked read queries wait for asynchronous connector cleanup. Keep the last
+  // result on timeout so the caller reports the expected/actual mismatch instead of hiding a leak.
+  static String executeQuery(
+      TrinoQueryRunner runner, String sql, String expected, Duration timeout) {
+    if (!sql.startsWith(RETRY_FLAG)) {
+      return runner.runQuery(sql).trim().replaceAll("WARNING:.*?\\n", "");
+    }
+    String query = retryQuery(sql);
+    AtomicReference<String> result = new AtomicReference<>("");
+    try {
+      Awaitility.await()
+          .atMost(timeout)
+          .pollDelay(Duration.ZERO)
+          .pollInterval(Duration.ofMillis(100))
+          .until(
+              () -> {
+                result.set(runner.runQuery(query).trim().replaceAll("WARNING:.*?\\n", ""));
+                return match(expected, result.get());
+              });
+    } catch (ConditionTimeoutException e) {
+      // The existing result check will fail with the final query output.
+    }
+    return result.get();
+  }
+
   /**
    * * This method is used to match the result of the query. There are three cases: 1. The expected
    * result is equal to the actual result. 2. The expected result is a query failed result, and the
@@ -281,7 +312,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
    * @param result the actual result
    * @return false if the expected result is empty or the actual result does not match the expected.
    *     For {@literal <BLANK_LINE>} case, return true if the actual result is empty. For {@literal
-   *     <QUERY_FAILED>} case, replace the placeholder with "^Query \\w+ failed.*: " and do match.
+   *     <QUERY_FAILED>} case, match the query failure prefix and the remaining expected result.
    */
   static boolean match(String expectResult, String result) {
     if (expectResult.isEmpty()) {
@@ -306,11 +337,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     // expectResult:
     // <QUERY_FAILED> Schema must be specified when session schema is not set
     if (expectResult.startsWith("<QUERY_FAILED>")) {
-      return Pattern.compile(
-              "^Query \\w+ failed.*: "
-                  + Pattern.quote(expectResult.replace("<QUERY_FAILED>", "").trim()))
-          .matcher(result)
-          .find();
+      String failureMessage = expectResult.replace("<QUERY_FAILED>", "").trim();
+      return wildcardMatch(
+          "^Query \\w+ failed.*: " + wildcardPattern(failureMessage), result, false);
     }
 
     // match text
@@ -330,21 +359,31 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     //
     //    location = 'hdfs://%:9000/user/hive/warehouse/gt_db1.db/tb01',
     //    ...
-    expectResult = expectResult.replace("\n", "");
-    expectResult = "^\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E$";
-    result = result.replace("\n", "");
-    match = Pattern.compile(expectResult).matcher(result).find();
-    return match;
+    return wildcardMatch("^" + wildcardPattern(expectResult), result, true);
   }
 
-  @Test
+  private static boolean wildcardMatch(String expectPattern, String result, boolean matchEnd) {
+    expectPattern = expectPattern.replace("\n", "");
+    if (matchEnd) {
+      expectPattern += "$";
+    }
+    result = result.replace("\n", "");
+    return Pattern.compile(expectPattern).matcher(result).find();
+  }
+
+  private static String wildcardPattern(String expectResult) {
+    return "\\Q" + expectResult.replace("%", "\\E.*?\\Q") + "\\E";
+  }
+
   public void testSql() throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(testParallelism);
     CompletionService<Integer> completionService = new ExecutorCompletionService<>(executor);
 
     String[] testSetNames =
-        Arrays.stream(TrinoQueryITBase.listDirectory(testsetsDir))
+        Arrays.stream(TrinoQueryITBase.listTestSetDirectory(testsetsDir))
+            .filter(s -> new File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
             .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
+            .filter(s -> !skipTestsets.contains(s))
             .toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
     for (String testSetName : testSetNames) {
@@ -454,7 +493,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
     catalog = catalogNames[0];
 
-    String catalogPrefix = catalog.replace("prepare.sql", "");
+    String catalogPrefix = "catalog_" + catalog + "_";
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
@@ -468,39 +507,59 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   void executeSqlFileWithGenOutput(
-      String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws IOException {
+      String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws Exception {
+    executeSqlFileWithGenOutput(testSetDirName, filename, queryRunner, Duration.ofSeconds(30));
+  }
+
+  void executeSqlFileWithGenOutput(
+      String testSetDirName, String filename, TrinoQueryRunner queryRunner, Duration timeout)
+      throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
-    String sqls = TrinoQueryITBase.readFileToString(path);
-    String resultFileName = path.replace(".sql", ".txt");
-    FileOutputStream outputStream = new FileOutputStream(resultFileName);
-
+    String sqls = removeSqlComments(TrinoQueryITBase.readFileToString(path));
+    Path resultFile = Path.of(path.replace(".sql", ".txt"));
+    // Read the trusted baseline before opening the output. A transient staging table must never
+    // become its own expected result, nor may a failed regeneration damage the old golden file.
+    String previousResults = Files.exists(resultFile) ? Files.readString(resultFile) : "";
+    // Match the check path's EOF normalization, including files written by this generator.
+    Matcher resultMatcher = RESULT_PATTERN.matcher(previousResults + "\n\n");
     Matcher sqlMatcher =
-        Pattern.compile("(\\w.*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
-
-    boolean firstLine = true;
+        Pattern.compile("([<\\w].*?);", Pattern.DOTALL | Pattern.UNIX_LINES).matcher(sqls);
+    List<String> queries = new ArrayList<>();
+    List<String> expectations = new ArrayList<>();
     while (sqlMatcher.find()) {
-      if (!firstLine) {
-        outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
+      String sql = resolveParameters(sqlMatcher.group(1));
+      String expected = nextExpectedResult(resultMatcher);
+      if (sql.startsWith(RETRY_FLAG)) {
+        retryQuery(sql);
+        if (expected.isEmpty()) {
+          throw new IllegalArgumentException(
+              "RETRY_UNTIL_MATCH requires an existing expected result in " + resultFile);
+        }
       }
-      firstLine = false;
-
-      String sql = sqlMatcher.group(1);
-      String result = queryRunner.runQuery(sql).trim();
-      LOG.info("Execute sql:\n{}\nResult:\n{}", sql, result);
-      if (isQueryFailed(result)) {
-        throw new RuntimeException(
-            "Failed to execute sql in the test set. "
-                + simpleTesterName(path)
-                + ":\n"
-                + sql
-                + "\nresult:\n"
-                + result);
-      }
-      outputStream.write(result.getBytes(StandardCharsets.UTF_8));
-      outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
+      queries.add(sql);
+      expectations.add(expected);
     }
 
-    outputStream.close();
+    StringBuilder output = new StringBuilder();
+    for (int i = 0; i < queries.size(); i++) {
+      String sql = queries.get(i);
+      String result;
+      if (sql.startsWith(RETRY_FLAG)) {
+        result = executeQuery(queryRunner, sql, expectations.get(i), timeout);
+        if (!match(expectations.get(i), result)) {
+          throw new IllegalStateException(
+              "Timed out waiting for " + sql + "; golden file unchanged: " + resultFile);
+        }
+      } else {
+        result = queryRunner.runQuery(sql).trim();
+      }
+      LOG.info("Execute sql:\n{}\nResult:\n{}", sql, result);
+      if (i > 0) {
+        output.append('\n');
+      }
+      output.append(result).append('\n');
+    }
+    Files.writeString(resultFile, output, StandardCharsets.UTF_8);
   }
 
   static int getTesterCount(String testSetDirName, String catalog, String testFilterPrefix)
@@ -533,14 +592,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   static String[] getTesterNames(String testSetDirName, String testFilterPrefix) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> !s.endsWith("prepare.sql") && !s.endsWith("cleanup.sql") && s.endsWith(".sql"))
         .filter(s -> testFilterPrefix.isEmpty() || s.startsWith(testFilterPrefix))
         .toArray(String[]::new);
   }
 
   static String[] getTesterCatalogNames(String testSetDirName, String catalog) throws Exception {
-    return Arrays.stream(listDirectory(testSetDirName))
+    return Arrays.stream(listTestSetDirectory(testSetDirName))
         .filter(s -> s.matches("catalog_.*_prepare.sql"))
         .filter(s -> catalog.isEmpty() || s.equals("catalog_" + catalog + "_prepare.sql"))
         .map(s -> s.replace("catalog_", "").replace("_prepare.sql", ""))
@@ -565,5 +624,20 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     public static String testName(String filename, String catalog) {
       return catalog + ":" + simpleTesterName(filename);
     }
+  }
+
+  private static String nextExpectedResult(Matcher matcher) {
+    if (!matcher.find()) {
+      return "";
+    }
+    return (matcher.group(2) != null ? matcher.group(2) : matcher.group(4)).trim();
+  }
+
+  private static String retryQuery(String sql) {
+    String query = sql.substring(RETRY_FLAG.length()).trim();
+    if (!query.toUpperCase(Locale.ROOT).startsWith("SHOW ")) {
+      throw new IllegalArgumentException("RETRY_UNTIL_MATCH only supports SHOW queries");
+    }
+    return query;
   }
 }

@@ -1,0 +1,255 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.storage.relational.mapper.provider.base;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.EntityChangeLogPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+public class TestEntityChangeLogMapper {
+
+  private static Path jdbcStorePath;
+  private static String dbDir;
+  private static JDBCBackend backend;
+  private static EntityChangeLogMapper entityChangeLogMapper;
+  private static SqlSession sharedSession;
+
+  @BeforeAll
+  public static void setup() throws Exception {
+    jdbcStorePath = Files.createTempDirectory("gravitino_jdbc_entityChangeLog_");
+    Path dbPath = jdbcStorePath.resolve("testdb");
+    Files.createDirectories(dbPath);
+    dbDir = dbPath.toString();
+
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.ENTITY_STORE)).thenReturn("relational");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_STORE)).thenReturn("h2");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", dbDir));
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
+        .thenReturn("gravitino");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+        .thenReturn("org.h2.Driver");
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(20);
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS))
+        .thenReturn(10);
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
+        .thenReturn(1000L);
+
+    backend = new JDBCBackend();
+    backend.initialize(config);
+
+    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    entityChangeLogMapper = sharedSession.getMapper(EntityChangeLogMapper.class);
+  }
+
+  @AfterAll
+  public static void tearDown() throws IOException {
+    if (sharedSession != null) {
+      sharedSession.close();
+    }
+    if (backend != null) {
+      backend.close();
+    }
+    if (jdbcStorePath != null) {
+      FileUtils.deleteDirectory(jdbcStorePath.toFile());
+    }
+  }
+
+  @BeforeEach
+  void truncate() throws SQLException {
+    try (Statement statement = sharedSession.getConnection().createStatement()) {
+      statement.execute("DELETE FROM entity_change_log");
+    }
+    sharedSession.clearCache();
+  }
+
+  @Test
+  void testRecentReplayUsesWindowCeilingAndTimestampIdPagination() throws SQLException {
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "expired", OperateType.ALTER);
+    forceCreatedAt("expired", 1000);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "recent-a", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "recent-b", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("ml", "TABLE", "above-ceiling", OperateType.ALTER);
+    List<EntityChangeRecord> all = entityChangeLogMapper.selectEntityChanges(0, 10);
+    long timestamp = all.get(1).getCreatedAt();
+    forceCreatedAt("recent-b", timestamp);
+    long ceiling = all.get(2).getId();
+    List<EntityChangeRecord> page =
+        entityChangeLogMapper.selectRecentEntityChanges(-1, 0, ceiling, 60000, 1);
+    Assertions.assertEquals(
+        List.of("recent-a"), page.stream().map(EntityChangeRecord::getFullName).toList());
+    EntityChangeRecord first = page.get(0);
+    List<EntityChangeRecord> second =
+        entityChangeLogMapper.selectRecentEntityChanges(
+            first.getCreatedAt(), first.getId(), ceiling, 60000, 10);
+    Assertions.assertEquals(
+        List.of("recent-b"), second.stream().map(EntityChangeRecord::getFullName).toList());
+    EntityChangeRecord last = second.get(0);
+    Assertions.assertTrue(
+        entityChangeLogMapper
+            .selectRecentEntityChanges(last.getCreatedAt(), last.getId(), ceiling, 60000, 10)
+            .isEmpty());
+  }
+
+  @Test
+  void testRecentReplayUsesBackendDatabaseClock() {
+    String mysql =
+        new EntityChangeLogBaseSQLProvider().selectRecentEntityChanges(-1, 0, 10, 60000, 2);
+    String postgres =
+        new EntityChangeLogPostgreSQLProvider().selectRecentEntityChanges(-1, 0, 10, 60000, 2);
+    Assertions.assertTrue(mysql.contains("UNIX_TIMESTAMP"));
+    Assertions.assertTrue(postgres.contains("EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)"));
+    Assertions.assertFalse(postgres.contains("UNIX_TIMESTAMP"));
+    Assertions.assertTrue(mysql.contains("ORDER BY created_at, id LIMIT #{maxRows}"));
+    Assertions.assertTrue(postgres.contains("#{windowMs}"));
+  }
+
+  @Test
+  void testEntityChangeLogInsertAndSelect() {
+    long jvmBefore = System.currentTimeMillis();
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER);
+    long jvmAfter = System.currentTimeMillis();
+
+    List<EntityChangeRecord> records = entityChangeLogMapper.selectEntityChanges(0L, 10);
+    Assertions.assertEquals(1, records.size());
+    EntityChangeRecord record = records.get(0);
+    Assertions.assertEquals("metalake1", record.getMetalakeName());
+    Assertions.assertEquals("TABLE", record.getEntityType());
+    Assertions.assertEquals("metalake1.cat.schema.tbl", record.getFullName());
+    Assertions.assertEquals(OperateType.ALTER, record.getOperateType());
+    // created_at is set by the DB, so it should be close to JVM time but not exactly equal.
+    Assertions.assertTrue(
+        record.getCreatedAt() >= jvmBefore - 1000L && record.getCreatedAt() <= jvmAfter + 1000L,
+        "expected DB-time created_at within 1s of JVM clock, got " + record.getCreatedAt());
+    Assertions.assertTrue(record.getId() > 0L);
+  }
+
+  @Test
+  void testEntityChangeLogPruneOldEntries() throws SQLException {
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.ALTER);
+    forceCreatedAt("metalake1.cat.schema", 1000L);
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP);
+    long recent =
+        entityChangeLogMapper.selectEntityChanges(0L, 100).stream()
+            .filter(r -> r.getFullName().equals("metalake1.cat.schema.tbl"))
+            .mapToLong(EntityChangeRecord::getCreatedAt)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("recent row missing"));
+
+    int prunedRows =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30)));
+    Assertions.assertEquals(1, prunedRows);
+
+    try (SqlSession verificationSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      List<EntityChangeRecord> after =
+          verificationSession.getMapper(EntityChangeLogMapper.class).selectEntityChanges(0L, 100);
+      Assertions.assertEquals(1, after.size());
+      Assertions.assertEquals(recent, after.get(0).getCreatedAt());
+    }
+  }
+
+  @Test
+  void testEntityChangeLogSameTimestampOrderedById() throws SQLException {
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "a", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "b", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "c", OperateType.ALTER);
+    forceCreatedAt("a", 5_000_000L);
+    forceCreatedAt("b", 5_000_000L);
+    forceCreatedAt("c", 5_000_000L);
+
+    List<EntityChangeRecord> rows = entityChangeLogMapper.selectEntityChanges(0L, 100);
+    Assertions.assertEquals(3, rows.size());
+    Assertions.assertTrue(rows.get(0).getId() < rows.get(1).getId());
+    Assertions.assertTrue(rows.get(1).getId() < rows.get(2).getId());
+  }
+
+  @Test
+  void testEntityChangeLogPruneUsesDatabaseTime() {
+    String baseSql =
+        new EntityChangeLogBaseSQLProvider().pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30));
+    String postgreSql =
+        new EntityChangeLogPostgreSQLProvider().pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30));
+
+    // The cutoff must be derived from the DB clock, never from a JVM timestamp bound into the SQL.
+    Assertions.assertTrue(baseSql.contains("CURRENT_TIMESTAMP"), baseSql);
+    Assertions.assertTrue(baseSql.contains("#{retentionMs}"), baseSql);
+    Assertions.assertFalse(baseSql.contains("#{before}"), baseSql);
+    Assertions.assertTrue(postgreSql.contains("CURRENT_TIMESTAMP"), postgreSql);
+    Assertions.assertTrue(postgreSql.contains("#{retentionMs}"), postgreSql);
+    Assertions.assertFalse(postgreSql.contains("#{before}"), postgreSql);
+  }
+
+  @Test
+  void testEntityChangeLogPruneKeepsRowsInsideRetention() {
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "TABLE", "metalake1.cat.schema.recent", OperateType.ALTER);
+
+    int prunedRows =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30)));
+
+    Assertions.assertEquals(0, prunedRows);
+    Assertions.assertEquals(1, entityChangeLogMapper.selectEntityChanges(0L, 100).size());
+  }
+
+  private void forceCreatedAt(String fullName, long createdAt) throws SQLException {
+    try (PreparedStatement statement =
+        sharedSession
+            .getConnection()
+            .prepareStatement(
+                "UPDATE entity_change_log SET created_at = ? WHERE entity_full_name = ?")) {
+      statement.setLong(1, createdAt);
+      statement.setString(2, fullName);
+      statement.executeUpdate();
+    }
+    sharedSession.clearCache();
+  }
+}

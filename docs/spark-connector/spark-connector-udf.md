@@ -1,7 +1,7 @@
 ---
-title: "Spark connector - User-defined functions"
-slug: /spark-connector/spark-connector-udf
-keyword: spark connector UDF user-defined function
+title: "Spark Connector: User-Defined Functions"
+slug: "/spark-connector/spark-connector-udf"
+keyword: "spark connector UDF user-defined function"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -13,7 +13,7 @@ in the Gravitino function registry. Once a function is
 invoke it through standard Spark SQL syntax — no additional `CREATE FUNCTION` statement is needed.
 
 :::note
-Currently, only **Java implementations** with `RuntimeType.SPARK` are supported in the Spark
+Only **Java implementations** with `RuntimeType.SPARK` are supported in the Spark
 connector. SQL and Python implementations registered in Gravitino cannot yet be invoked
 directly from Spark. Support for additional languages is planned for future releases.
 :::
@@ -30,7 +30,7 @@ Before using Gravitino UDFs in Spark, ensure the following:
 3. The **JAR containing the UDF class** is available on the Spark classpath (e.g. via
    `--jars` or `spark.jars` configuration).
 
-## Java UDF requirements
+## Java UDF Requirements
 
 The Java class specified in `className` of the function implementation must implement Spark's
 `org.apache.spark.sql.connector.catalog.functions.UnboundFunction` interface. For details on
@@ -44,7 +44,7 @@ Key points:
 - Only functions with `RuntimeType.SPARK` are visible to the Spark connector; implementations
   targeting other runtimes (e.g. `TRINO`) are filtered out.
 
-## Calling functions in Spark SQL
+## Call Functions in Spark SQL
 
 Use the fully qualified three-part name `catalog.schema.function_name` to call a
 Gravitino-registered function:
@@ -59,7 +59,7 @@ FROM my_catalog.my_schema.my_table;
 ```
 
 :::tip
-You can simplify the syntax by setting the default catalog and schema first:
+Simplify the syntax by setting the default catalog and schema first:
 
 ```sql
 USE my_catalog;
@@ -68,7 +68,7 @@ SELECT add_one(42);
 ```
 :::
 
-## Discovering functions
+## Discover Functions
 
 The Spark connector only exposes functions that have at least one Java implementation with
 `RuntimeType.SPARK`. Functions with only non-Spark implementations (e.g. `TRINO`) are not

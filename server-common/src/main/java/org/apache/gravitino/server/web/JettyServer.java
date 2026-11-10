@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.servlets.MetricsServlet;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
@@ -38,7 +39,6 @@ import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.eclipse.jetty.server.ConnectionFactory;
@@ -64,12 +64,22 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class JettyServer {
+public class JettyServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JettyServer.class);
 
   private static final String HTTPS = "https";
   private static final String HTTP_PROTOCOL = "http/1.1";
+
+  /**
+   * The pathSpecs {@link #addMetricsServlets} registers directly on the shared servlet context,
+   * outside of whatever pathspec the caller itself filters. Callers that need request-context
+   * tracking or audit coverage on these paths (see GH-12760) must apply their own filters to them
+   * explicitly, using this constant rather than re-declaring the literal path strings, so the two
+   * can never drift apart.
+   */
+  public static final ImmutableList<String> METRICS_PATH_SPECS =
+      ImmutableList.of("/metrics", "/prometheus/metrics");
 
   private Server server;
 
@@ -79,7 +89,13 @@ public final class JettyServer {
 
   private String serverName;
 
+  private boolean webUiEnabled;
+
   public JettyServer() {}
+
+  public synchronized void initialize(JettyServerConfig serverConfig, String serverName) {
+    initialize(serverConfig, serverName, true);
+  }
 
   public synchronized void initialize(
       JettyServerConfig serverConfig, String serverName, boolean shouldEnableUI) {
@@ -99,7 +115,7 @@ public final class JettyServer {
 
     // Set error handler for Jetty Server
     ErrorHandler errorHandler = new ErrorHandler();
-    errorHandler.setShowStacks(true);
+    errorHandler.setShowStacks(serverConfig.isIncludeErrorStackTrace());
     errorHandler.setServer(server);
     server.addBean(errorHandler);
 
@@ -154,24 +170,16 @@ public final class JettyServer {
       server.addConnector(httpConnector);
     }
 
-    // Initialize ServletContextHandler or WebAppContext
+    // Initialize ServletContextHandler or WebAppContext.
     if (shouldEnableUI) {
-      initializeWebAppServletContextHandler();
+      webUiEnabled = initializeServletContextHandler();
     } else {
       initializeBasicServletContextHandler();
+      webUiEnabled = false;
     }
 
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    // Metrics System could be null in UT.
-    if (metricsSystem != null) {
-      MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
-      servletContextHandler.setAttribute(
-          "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-      servletContextHandler.addServlet(MetricsServlet.class, "/metrics");
-
-      servletContextHandler.addServlet(
-          new ServletHolder(metricsSystem.getPrometheusServlet()), "/prometheus/metrics");
-    }
+    // Install before authentication, custom filters, and servlet mappings on every service.
+    addFilter(new OutOfMemoryErrorFilter(), "/*");
 
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);
@@ -183,20 +191,20 @@ public final class JettyServer {
       server.start();
     } catch (BindException e) {
       LOG.error(
-          "Failed to start {} web server on host {} port {}, which is already in use.",
+          "Failed to start {} web server on host {} port {}, which is already in use",
           serverName,
           serverConfig.getHost(),
           serverConfig.getHttpPort(),
           e);
-      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
+      throw new RuntimeException("Failed to start " + serverName + " web server", e);
 
     } catch (Exception e) {
-      LOG.error("Failed to start {} web server.", serverName, e);
-      throw new RuntimeException("Failed to start " + serverName + " web server.", e);
+      LOG.error("Failed to start {} web server", serverName, e);
+      throw new RuntimeException("Failed to start " + serverName + " web server", e);
     }
 
     if (!serverConfig.isEnableHttps()) {
-      LOG.warn("Users would better use HTTPS to avoid token data leak.");
+      LOG.warn("Users should use HTTPS to avoid exposing tokens");
     }
 
     LOG.info(
@@ -207,7 +215,7 @@ public final class JettyServer {
     try {
       server.join();
     } catch (InterruptedException e) {
-      LOG.info("Interrupted while {} web server is joining.", serverName);
+      LOG.info("Interrupted while {} web server is joining", serverName);
       Thread.currentThread().interrupt();
     }
   }
@@ -234,7 +242,7 @@ public final class JettyServer {
             getPort());
       } catch (Exception e) {
         // Swallow the exception.
-        LOG.warn("Failed to stop {} web server.", serverName, e);
+        LOG.warn("Failed to stop {} web server", serverName, e);
       }
 
       server = null;
@@ -250,52 +258,106 @@ public final class JettyServer {
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
   }
 
+  /**
+   * Adds Dropwizard and Prometheus metrics endpoints to this server.
+   *
+   * <p>Metrics endpoints are opt-in because some {@code JettyServer} instances listen on ports
+   * exposed directly to external query engines. Call this only for a listener intended for metrics
+   * scraping.
+   *
+   * @param metricsSystem the metrics system exported by the endpoints
+   */
+  public void addMetricsServlets(MetricsSystem metricsSystem) {
+    MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
+    servletContextHandler.setAttribute(
+        "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
+    servletContextHandler.addServlet(MetricsServlet.class, METRICS_PATH_SPECS.get(0));
+    servletContextHandler.addServlet(
+        new ServletHolder(metricsSystem.getPrometheusServlet()), METRICS_PATH_SPECS.get(1));
+  }
+
+  public boolean isWebUiEnabled() {
+    return webUiEnabled;
+  }
+
   private void initializeBasicServletContextHandler() {
     servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
   }
 
-  private void initializeWebAppServletContextHandler() {
-    servletContextHandler = new WebAppContext();
-
-    boolean isUnitTest = System.getenv("GRAVITINO_TEST") != null;
-
-    // If in development/test mode, you can set `war` file or `web/dist` directory in the
-    // `GRAVITINO_WAR` environment variable.
-    String warPath = System.getenv("GRAVITINO_WAR") != null ? System.getenv("GRAVITINO_WAR") : "";
-    if (warPath.isEmpty()) {
-      // Default deploy mode, read from `gravitino-${version}/web/gravitino-web.war`
-      String webPath = String.join(File.separator, System.getenv("GRAVITINO_HOME"), "web");
-
-      try (DirectoryStream<Path> paths =
-          Files.newDirectoryStream(Paths.get(webPath), "gravitino-web-*.war")) {
-        int warCount = 0;
-        for (Path path : paths) {
-          warPath = path.toString();
-          warCount++;
-        }
-        if (warCount != 1 && !isUnitTest) {
-          throw new RuntimeException("Found multiple or no war files in the web path : " + webPath);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to find war file in the web path : " + webPath, e);
-      }
+  private boolean initializeServletContextHandler() {
+    Optional<String> warPath = resolveWebUiWarPath();
+    if (warPath.isPresent()) {
+      initializeWebAppServletContextHandler(warPath.get());
+      return true;
     }
+
+    LOG.info("Web UI WAR is not found, start server without Web UI.");
+    initializeBasicServletContextHandler();
+    return false;
+  }
+
+  private Optional<String> resolveWebUiWarPath() {
+    String warPathFromEnv = System.getenv("GRAVITINO_WAR");
+    if (StringUtils.isNotBlank(warPathFromEnv)) {
+      File warFile = new File(warPathFromEnv);
+      if (warFile.exists()) {
+        return Optional.of(warPathFromEnv);
+      }
+
+      LOG.warn("GRAVITINO_WAR path {} does not exist, Web UI is disabled.", warPathFromEnv);
+      return Optional.empty();
+    }
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (StringUtils.isBlank(gravitinoHome)) {
+      LOG.warn("GRAVITINO_HOME is not set, Web UI is disabled.");
+      return Optional.empty();
+    }
+
+    Optional<String> webWarPath =
+        findSingleWarInDirectory(String.join(File.separator, gravitinoHome, "web"));
+    if (webWarPath.isPresent()) {
+      return webWarPath;
+    }
+
+    return findSingleWarInDirectory(String.join(File.separator, gravitinoHome, "web-v2"));
+  }
+
+  private Optional<String> findSingleWarInDirectory(String webPath) {
+    int warCount = 0;
+    String warPath = null;
+    try (DirectoryStream<Path> paths =
+        Files.newDirectoryStream(Paths.get(webPath), "gravitino-web-*.war")) {
+      for (Path path : paths) {
+        warPath = path.toString();
+        warCount++;
+      }
+    } catch (IOException e) {
+      LOG.debug("Failed to read web path {}, ignore and disable Web UI.", webPath, e);
+      return Optional.empty();
+    }
+
+    if (warCount == 1) {
+      return Optional.of(warPath);
+    }
+
+    if (warCount > 1) {
+      LOG.warn("Found multiple war files in {}, Web UI is disabled.", webPath);
+    }
+    return Optional.empty();
+  }
+
+  private void initializeWebAppServletContextHandler(String warPath) {
+    servletContextHandler = new WebAppContext();
 
     File warFile = new File(warPath);
     if (!warFile.exists()) {
-      // Check war file if exists
-      if (isUnitTest) {
-        // In development/test mode, We don't have web files in the unit test, so only RESTful API
-        // are supported
-        servletContextHandler.setResourceBase("/");
-      } else {
-        // In deployment mode, war files must be available or an exception is thrown
-        throw new RuntimeException("Gravitino web path not found in " + warPath);
-      }
+      throw new RuntimeException("Gravitino web path not found in " + warPath);
     }
 
+    servletContextHandler = new WebAppContext();
     if (warFile.isDirectory()) {
       // Development mode, read from FS
       servletContextHandler.setResourceBase(warFile.getPath());
@@ -430,6 +492,7 @@ public final class JettyServer {
                     thread.setName(getName() + "-" + thread.getId());
                     thread.setUncaughtExceptionHandler(
                         (t, throwable) -> {
+                          ServerHealth.getInstance().recordFailure(throwable);
                           LOG.error("{} uncaught exception:", t.getName(), throwable);
                         });
                     // JettyServer maybe used by Gravitino server and Iceberg REST server with
@@ -450,7 +513,14 @@ public final class JettyServer {
     return server.getThreadPool();
   }
 
-  public void addCustomFilters(String pathSpec) {
+  /**
+   * Registers every configured custom filter, binding each one's single {@link FilterHolder} to all
+   * of {@code pathSpecs} in one pass — so a filter whose {@code init()} isn't safe to run more than
+   * once per JVM only runs it once, regardless of how many paths it's bound to.
+   *
+   * @param pathSpecs the pathSpecs to bind each configured custom filter to
+   */
+  public void addCustomFilters(String... pathSpecs) {
     for (String filterName : serverConfig.getCustomFilters()) {
       if (StringUtils.isBlank(filterName)) {
         continue;
@@ -461,7 +531,10 @@ public final class JettyServer {
           serverConfig.getAllWithPrefix(String.format("%s.param.", filterName)).entrySet()) {
         filterHolder.setInitParameter(entry.getKey(), entry.getValue());
       }
-      servletContextHandler.addFilter(filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      for (String pathSpec : pathSpecs) {
+        servletContextHandler.addFilter(
+            filterHolder, pathSpec, EnumSet.allOf(DispatcherType.class));
+      }
     }
   }
 
@@ -470,6 +543,18 @@ public final class JettyServer {
       servletContextHandler.addFilter(
           CorsFilterHolder.create(serverConfig), pathSpec, EnumSet.allOf(DispatcherType.class));
     }
-    addFilter(new AuthenticationFilter(), pathSpec);
+    addFilter(createAuthenticationFilter(serverConfig.isIncludeErrorStackTrace()), pathSpec);
+  }
+
+  /**
+   * Creates the authentication filter for this server. Subclasses can override this to provide a
+   * custom authentication filter (e.g., one that returns Iceberg-spec JSON error responses).
+   *
+   * @param includeErrorStackTrace whether the filter's error responses may include server-side
+   *     stack traces; implementations must not include them when this is {@code false}
+   * @return the authentication filter
+   */
+  protected Filter createAuthenticationFilter(boolean includeErrorStackTrace) {
+    return new AuthenticationFilter(includeErrorStackTrace);
   }
 }

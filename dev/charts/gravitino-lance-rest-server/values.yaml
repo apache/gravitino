@@ -27,7 +27,7 @@ image:
   repository: apache/gravitino-lance-rest
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 1.2.0-SNAPSHOT
+  tag: 2.0.0-SNAPSHOT
 
 imagePullSecrets: []
 nameOverride: ""
@@ -40,6 +40,8 @@ lanceRest:
   shutdownTimeout: 3000
   host: 0.0.0.0
   httpPort: 9101
+  # Enable unauthenticated metrics endpoints only on a trusted network.
+  metricsEnabled: false
   minThreads: 24
   maxThreads: 200
   stopTimeout: 30000
@@ -58,6 +60,11 @@ additionalConfigItems: {}
 ## Log4j2 configuration items
 log4j2Properties:
   status: warn
+  ## Log retention. Rolled archives are kept for logMaxAge. Their total size is also capped: when the
+  ## cap is exceeded, the oldest archives are deleted first.
+  # logMaxAge: 30d
+  # serverLogMaxTotalSize: 1GB
+
 additionalLog4j2Properties:
   appender.console.type: Console
   appender.console.name: consoleLogger
@@ -69,7 +76,7 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Lance Rest Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-lance-rest-server.sh
 
 ## Optional volumes for logs
 volumes:
@@ -78,11 +85,9 @@ volumes:
 
 volumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-lance-rest-server/logs
+    mountPath: /opt/gravitino-lance-rest-server/logs
 
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-lance-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
@@ -105,13 +110,12 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 service:
   name: gravitino-lance-rest-server
@@ -143,6 +147,10 @@ readinessProbe:
 
 ingress:
   enabled: false
+  # Resource type to render when ingress is enabled.
+  # "ingress"  renders a Kubernetes Ingress (apiVersion selected by cluster version; default, backward compatible).
+  # "gateway"  renders a Gateway API gateway.networking.k8s.io HTTPRoute instead.
+  type: ingress
   className: "nginx"
   annotations: {}
     # kubernetes.io/ingress.class: nginx
@@ -156,6 +164,21 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
+  # Gateway API (HTTPRoute) settings. Used only when type is "gateway".
+  # hosts (above) become the HTTPRoute hostnames and rule paths; annotations are reused.
+  # In gateway mode each path's pathType is mapped to a Gateway API match type:
+  #   Exact                  -> Exact
+  #   Prefix                 -> PathPrefix
+  #   ImplementationSpecific -> PathPrefix (Gateway API has no equivalent; treated as a prefix match)
+  # Any other value fails template rendering (RegularExpression is not supported).
+  gateway:
+    # Only gateway.networking.k8s.io/v1 (the GA version) is supported and tested.
+    apiVersion: gateway.networking.k8s.io/v1
+    # Parent Gateway(s) this HTTPRoute attaches to.
+    parentRefs: []
+    #  - name: gateway
+    #    namespace: gateway-system
+    #    sectionName: http
 
 ## PodDisruptionBudget settings
 podDisruptionBudget:
@@ -182,3 +205,5 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+topologySpreadConstraints: []

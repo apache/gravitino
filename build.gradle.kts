@@ -18,20 +18,34 @@
  */
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.NodePlugin
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import com.github.jengelman.gradle.plugins.shadow.transformers.CacheableTransformer
+import com.github.jengelman.gradle.plugins.shadow.transformers.Transformer
+import com.github.jengelman.gradle.plugins.shadow.transformers.TransformerContext
 import com.github.jk1.license.filter.DependencyFilter
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
+import org.apache.tools.zip.ZipEntry
+import org.apache.tools.zip.ZipOutputStream
+import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.util.Locale
+import java.util.Properties
+import java.util.zip.ZipFile
 
 Locale.setDefault(Locale.US)
+
+abstract class SharedTestEnvironmentLock : BuildService<BuildServiceParameters.None>
 
 plugins {
   `maven-publish`
@@ -40,6 +54,7 @@ plugins {
   id("jacoco")
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.node) apply false
+  alias(libs.plugins.shadow) apply false
 
   // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue running against JDK21.
   if (JavaVersion.current() == JavaVersion.VERSION_17) {
@@ -60,10 +75,337 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
+val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
+  "sharedTestEnvironmentLock",
+  SharedTestEnvironmentLock::class
+) {
+  maxParallelUsages.set(1)
+}
+
+/** Packages the legal documents for one Maven artifact, retaining dependency provenance. */
+@CacheableTask
+abstract class GenerateJarLegalFiles : DefaultTask() {
+  companion object {
+    private const val LICENSE_INVENTORY = "\nBundled component licensing:\n"
+    private const val NOTICE_INVENTORY = "\nBundled component notices:\n"
+    private val noticeFileName = Regex("(?i)([A-Za-z0-9_]+-)*NOTICES?([.-].*)?")
+    private val legalFileName = Regex(
+      "(?i)([A-Za-z0-9_]+-)*(LICENSE|LICENCE|NOTICES?|COPYING|COPYRIGHT)(-[A-Za-z0-9_-]+)?(\\.(txt|md|markdown|adoc))?"
+    )
+
+    /** Selects legal resources without mistaking SDK models such as license-manager.json for licenses. */
+    fun isLegalResource(path: String): Boolean =
+      path == "about.html" || path.startsWith("about_files/") ||
+        path.startsWith("licenses/") || path.startsWith("license/") ||
+        path.startsWith("META-INF/licenses/") || path.startsWith("META-INF/license/") ||
+        path.startsWith("META-INF/licenses-binary/") ||
+        legalFileName.matches(path.substringAfterLast('/'))
+  }
+
+  @get:Internal
+  abstract val templates: DirectoryProperty
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  val templateFiles: FileTree
+    get() = templates.get().asFileTree
+
+  @get:Input
+  abstract val sourceNotices: ListProperty<String>
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.NONE)
+  abstract val dependencyJars: ConfigurableFileCollection
+
+  @get:Input
+  abstract val dependencyIds: MapProperty<String, String>
+
+  @get:Input
+  abstract val excludedGroups: SetProperty<String>
+
+  @get:InputFiles
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val javadocFiles: ConfigurableFileCollection
+
+  @get:OutputFile
+  abstract val outputArchive: RegularFileProperty
+
+  init {
+    sourceNotices.convention(emptyList())
+    dependencyIds.convention(emptyMap())
+    excludedGroups.convention(emptySet())
+  }
+
+  @TaskAction
+  fun generate() {
+    val directory = templates.get().asFile
+    val ids = dependencyIds.get()
+    val excluded = excludedGroups.get()
+    // ByteBuffer compares byte contents, so identical documents are retained only once.
+    val documents = sortedMapOf<String, LinkedHashSet<ByteBuffer>>()
+    fun add(path: String, bytes: ByteArray) {
+      require(!path.startsWith('/') && path.split('/').none { it == ".." }) {
+        "Invalid legal resource path: $path"
+      }
+      val group = path.removePrefix("META-INF/licenses/").substringBefore('/')
+      if (path.startsWith("META-INF/licenses/") && group in excluded) return
+      documents.getOrPut(path) { linkedSetOf() }.add(ByteBuffer.wrap(bytes))
+    }
+    val overrides = mutableMapOf<String, String>()
+    directory.resolve("dependencies.txt").readLines()
+      .filter { it.isNotBlank() && !it.startsWith('#') }
+      .forEach { line ->
+        val fields = line.split('=', limit = 2)
+        require(fields.size == 2) { "Invalid Maven legal supplement: $line" }
+        require(overrides.put(fields[0], fields[1]) == null) { "Duplicate Maven legal supplement: ${fields[0]}" }
+      }
+    fun supplement(id: String): String {
+      val parts = id.split('/')
+      val coordinate = "${parts[0]}:${parts[1]}"
+      val selected = overrides["$coordinate:${parts[2]}"] ?: overrides[coordinate]
+      require(selected != null || overrides.keys.none { it.startsWith("$coordinate:") }) {
+        "Unaudited Maven legal supplement version: $coordinate:${parts[2]} in $path. Review dependencies.txt and upstream legal documents."
+      }
+      return selected ?: overrides["${parts[0]}:*"] ?: ""
+    }
+    val dependencies = dependencyJars.files.map { jar ->
+      val id = requireNotNull(ids[jar.name]) { "Missing Maven coordinate for bundled artifact: $jar" }
+      id to jar
+    }
+    dependencies.sortedBy { it.first }.forEach { (id, jar) ->
+      val coordinate = id.split('/').take(2).joinToString(":")
+      val group = id.substringBefore('/')
+      if (group in excluded) return@forEach
+      val prefix = "META-INF/licenses/$id/"
+      var hasContent = false
+      ZipFile(jar).use { archive ->
+        hasContent = archive.entries().asSequence().any {
+          !it.isDirectory && (
+            (!it.name.startsWith("META-INF/") && !GenerateJarLegalFiles.isLegalResource(it.name)) ||
+              it.name.startsWith("META-INF/native/") || it.name.startsWith("META-INF/versions/")
+            )
+        }
+        archive.entries().asSequence().filter { !it.isDirectory && GenerateJarLegalFiles.isLegalResource(it.name) }
+          .sortedBy { it.name }.forEach { entry ->
+            // Do not nest documents again when shading an already assembled Gravitino runtime.
+            val path = if (group == "org.apache.gravitino" && entry.name.startsWith("META-INF/licenses/")) {
+              entry.name
+            } else {
+              prefix + entry.name
+            }
+            archive.getInputStream(entry).use { input ->
+              val bytes = input.readBytes()
+              // Regenerate nested inventories after exclusions instead of propagating stale entries.
+              val content = when {
+                group == "org.apache.gravitino" && entry.name == "META-INF/LICENSE" ->
+                  bytes.toString(Charsets.UTF_8).substringBefore(LICENSE_INVENTORY).toByteArray(Charsets.UTF_8)
+                group == "org.apache.gravitino" && entry.name == "META-INF/NOTICE" ->
+                  bytes.toString(Charsets.UTF_8).substringBefore(NOTICE_INVENTORY).toByteArray(Charsets.UTF_8)
+                else -> bytes
+              }
+              add(path, content)
+            }
+          }
+      }
+      if (hasContent) {
+        val selected = supplement(id)
+        selected.substringBefore('|').split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
+          val supplement = directory.resolve(name)
+          require(supplement.isFile) { "Missing Maven legal supplement for $coordinate: $name" }
+          add(prefix + name, supplement.readBytes())
+        }
+        require(selected.isEmpty() || documents.keys.any { it.startsWith(prefix) }) {
+          "No legal documents for mapped bundled component $coordinate:${id.split('/')[2]}. " +
+            "Supply the required upstream texts in dependencies.txt; a license label alone is insufficient."
+        }
+      }
+    }
+    var license = directory.resolve("LICENSE").readText()
+    var notice = directory.resolve("NOTICE").readText()
+    sourceNotices.get().forEach { name -> notice += "\n" + directory.resolve("NOTICE.$name").readText() }
+    // Each entry names the bundled component/version and its exact license locations.
+    val components = documents.keys.groupBy { it.split('/').take(5).joinToString("/") }
+    if (components.isNotEmpty()) {
+      license += LICENSE_INVENTORY
+      components.forEach { (prefix, paths) ->
+        val parts = prefix.split('/')
+        val coordinate = "${parts[2]}:${parts[3]}"
+        val selected = supplement(parts.drop(2).joinToString("/"))
+        val label = selected.substringAfter('|', "").trim()
+        license += "\n$coordinate:${parts[4]}" + if (label.isEmpty()) "\n" else " - $label\n"
+        license += "Licensing and attribution documents:\n" + paths.joinToString("\n") { "  $it" } + "\n"
+      }
+    }
+    // Preserve leaf notices once; a nested runtime's generated inventory was stripped above.
+    val dependencyNotices = linkedMapOf<String, MutableList<String>>()
+    documents.forEach { (path, contents) ->
+      if (noticeFileName.matches(path.substringAfterLast('/'))) {
+        contents.forEach {
+          dependencyNotices.getOrPut(it.array().toString(Charsets.UTF_8).trim()) { mutableListOf() }.add(path)
+        }
+      }
+    }
+    if (dependencyNotices.isNotEmpty()) {
+      notice += NOTICE_INVENTORY + "\n" + dependencyNotices.entries.joinToString("\n\n-----\n\n") { (text, paths) ->
+        "From: " + paths.joinToString("\n      ") +
+          "\nRelative file references below refer to the original document's directory.\n\n$text"
+      } + "\n"
+    }
+    // The JDK doclet supplies its own legal/ directory alongside the generated JavaScript/CSS.
+    if (javadocFiles.files.any { it.name == "jquery.md" || it.name == "jqueryUI.md" }) {
+      license += "\nLicense texts for generated Javadoc assets are in the legal/ directory at the root of this JAR.\n"
+    }
+    add("META-INF/LICENSE", license.toByteArray(Charsets.UTF_8))
+    add("META-INF/NOTICE", notice.toByteArray(Charsets.UTF_8))
+    val output = outputArchive.get().asFile
+    output.parentFile.mkdirs()
+    // ZIP paths remain case-sensitive even on hosts where LICENSE and license/ would collide.
+    ZipOutputStream(output).use { stream ->
+      documents.forEach { (path, contents) ->
+        val entry = ZipEntry(path)
+        entry.time = 0L
+        stream.putNextEntry(entry)
+        contents.forEachIndexed { index, content ->
+          if (index > 0) stream.write('\n'.code)
+          stream.write(content.array())
+        }
+        stream.closeEntry()
+      }
+    }
+  }
+}
+
+/** Replaces dependency legal resources with the artifact-specific documents generated above. */
+@CacheableTransformer
+class LegalFilesTransformer(
+  @get:InputFile
+  @get:PathSensitive(PathSensitivity.NONE)
+  val legalArchive: File
+) : Transformer {
+  @Internal
+  override fun getName(): String = javaClass.simpleName
+
+  override fun canTransformResource(element: FileTreeElement): Boolean = GenerateJarLegalFiles.isLegalResource(element.relativePath.pathString)
+
+  override fun transform(context: TransformerContext) {
+    context.`is`.close()
+  }
+
+  override fun hasTransformedResource(): Boolean = true
+
+  override fun modifyOutputStream(output: ZipOutputStream, preserveFileTimestamps: Boolean) {
+    ZipFile(legalArchive).use { archive ->
+      archive.entries().asSequence().forEach { resource ->
+        val entry = ZipEntry(resource.name)
+        entry.time = TransformerContext.getEntryTimestamp(preserveFileTimestamps, resource.time)
+        output.putNextEntry(entry)
+        archive.getInputStream(resource).use { it.copyTo(output) }
+        output.closeEntry()
+      }
+    }
+  }
+}
+
+/**
+ * Removes the Apache Avro copy that hadoop-client-runtime shades under
+ * org/apache/hadoop/shaded/org/apache/avro when it is older than 1.11.4.
+ *
+ * Hadoop 3.3.6 shades Avro 1.7.7, and a dependency constraint cannot replace classes that live inside
+ * another jar. Within Hadoop the shaded Avro only backs Avro serialization (SequenceFile, MapReduce job
+ * history, `hadoop fs -text`), which Gravitino does not use; the FileSystem, HDFS and Kerberos code
+ * paths do not load it. Other jars pass through unchanged. Remove this transform once Hadoop is
+ * upgraded to a release that shades Avro 1.11.4 or later (Hadoop 3.4.2+).
+ */
+@CacheableTransform
+abstract class StripShadedAvroTransform : TransformAction<TransformParameters.None> {
+  companion object {
+    val STRIPPED: Attribute<Boolean> =
+      Attribute.of("org.apache.gravitino.shaded-avro-stripped", Boolean::class.javaObjectType)
+    const val SHADED_AVRO_PREFIX = "org/apache/hadoop/shaded/org/apache/avro/"
+    const val AVRO_METADATA_PREFIX = "META-INF/maven/org.apache.avro/"
+    const val AVRO_POM_PROPERTIES = "META-INF/maven/org.apache.avro/avro/pom.properties"
+    private val MIN_AVRO_VERSION = listOf(1, 11, 4)
+
+    /** Returns true if the dotted [version] is lower than 1.11.4. */
+    fun isOutdatedAvro(version: String): Boolean {
+      val parts = version.split('.', '-').map { it.toIntOrNull() ?: 0 }
+      for (i in MIN_AVRO_VERSION.indices) {
+        val part = parts.getOrElse(i) { 0 }
+        if (part != MIN_AVRO_VERSION[i]) {
+          return part < MIN_AVRO_VERSION[i]
+        }
+      }
+      return false
+    }
+  }
+
+  @get:InputArtifact
+  @get:PathSensitive(PathSensitivity.NAME_ONLY)
+  abstract val inputArtifact: Provider<FileSystemLocation>
+
+  override fun transform(outputs: TransformOutputs) {
+    val input = inputArtifact.get().asFile
+    if (!input.isFile || !input.name.startsWith("hadoop-client-runtime-") || !input.name.endsWith(".jar")) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    val avroVersion = ZipFile(input).use { jar ->
+      jar.getEntry(AVRO_POM_PROPERTIES)?.let { entry ->
+        Properties().apply { jar.getInputStream(entry).use { load(it) } }.getProperty("version")
+      }
+    }
+    if (avroVersion == null || !isOutdatedAvro(avroVersion)) {
+      outputs.file(inputArtifact)
+      return
+    }
+
+    // Keep the original file name so that the distribution layout and license reports do not change.
+    val output = outputs.file(input.name)
+    var removed = 0
+    ZipFile(input).use { jar ->
+      ZipOutputStream(output).use { out ->
+        jar.entries().asSequence().forEach { source ->
+          if (source.name.startsWith(SHADED_AVRO_PREFIX) || source.name.startsWith(AVRO_METADATA_PREFIX)) {
+            removed++
+            return@forEach
+          }
+          val entry = ZipEntry(source.name)
+          entry.time = source.time
+          out.putNextEntry(entry)
+          if (!source.isDirectory) {
+            jar.getInputStream(source).use { it.copyTo(out) }
+          }
+          out.closeEntry()
+        }
+      }
+    }
+    if (removed == 0) {
+      throw GradleException("Expected shaded Avro $avroVersion entries in ${input.name}, found none")
+    }
+  }
+}
+
+// Projects whose runtime libraries ship hadoop-client-runtime in the distribution.
+val shadedAvroStrippedProjects = setOf(
+  ":authorizations:authorization-ranger",
+  ":catalogs:catalog-fileset",
+  ":catalogs:catalog-lakehouse-iceberg",
+  ":iceberg:iceberg-rest-server",
+  ":iceberg:iceberg-rest-server-experiment"
+)
+
+val snappyJavaVersion: String = libs.versions.snappy.java.get()
+
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+
+val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
+val distributionPackageDir = layout.projectDirectory.dir("distribution/package")
+val distributionPackageAllDir = layout.projectDirectory.dir("distribution/package-all")
+val subprojectJarOutputDirs = subprojects.map { it.layout.buildDirectory.dir("libs") }
 
 project.extra["extraJvmArgs"] =
   listOf(
@@ -149,11 +491,21 @@ allprojects {
           "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
           "import org.apache.commons.io.${'$'}1;"
         )
-        replaceRegex(
-          "Use SLF4J Logger instead of other logging frameworks",
-          "import\\s+.*\\.(Logger|LoggerFactory);",
-          "import org.slf4j.${'$'}1;"
-        )
+        // The trino-connector module logs via io.airlift.log.Logger to match Trino's own
+        // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
+        // integration-test is intentionally excluded from this carve-out: it runs outside
+        // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
+        // The :trino-connector project itself formats the shared common-* source trees.
+        val isTrinoPluginSource =
+          project.path == ":trino-connector" ||
+            project.path.startsWith(":trino-connector:trino-connector")
+        if (!isTrinoPluginSource) {
+          replaceRegex(
+            "Use SLF4J Logger instead of other logging frameworks",
+            "import\\s+.*\\.(Logger|LoggerFactory);",
+            "import org.slf4j.${'$'}1;"
+          )
+        }
         replaceRegex(
           "Remove Testcontainers shading",
           "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
@@ -187,12 +539,14 @@ allprojects {
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.7")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
+      param.environment("GRAVITINO_CI_DORIS_FE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_FE_IMAGE") ?: "")
+      param.environment("GRAVITINO_CI_DORIS_BE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_BE_IMAGE") ?: "")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.2")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
+      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:4.14.0")
 
       // Disable Ryuk for integration tests
       // Ryuk need privileged mode, if we want to rootless or run non-privileged mode, we need to disable it.
@@ -219,7 +573,7 @@ allprojects {
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
-        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        param.environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package-all")
         val useWebV2 = System.getenv("GRAVITINO_USE_WEB_V2")?.toBoolean() == true
         val webWarPath = if (useWebV2) {
           project.rootDir.path + "/distribution/package/web-v2/gravitino-web-${project.version}.war"
@@ -254,9 +608,21 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      // Must stay inside doFirst: tasks such as :core's database lanes set this flag in their own
+      // configuration action, which may run after this configureEach action registers.
+      val includeDockerTaggedTests =
+        param.extensions.extraProperties.properties["includeDockerTaggedTests"] as? Boolean
+          ?: dockerTest
+      val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
-        if (!dockerTest) {
+        if (!includeDockerTaggedTests) {
           excludeTags("gravitino-docker-test")
+        }
+        if (!dorisMultiVersion) {
+          // Running multiple Doris versions in one CI runner exhausts memory.
+          // CI runs only the default 1.2.x suite; run all versions locally with
+          // -PdorisMultiVersionTest.
+          excludeTags("doris-multi-version")
         }
       }
     }
@@ -310,53 +676,100 @@ fun excludePackagesForSparkConnector(project: Project) {
   }
 }
 
+val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+val httpcore5Version: String = libs.versions.httpcore5.get()
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
     return@subprojects
   }
 
-  if (project.path == ":catalogs:hive-metastore2-libs" ||
-    project.path == ":catalogs:hive-metastore3-libs"
-  ) {
-    return@subprojects
-  }
+  val isHiveMetastoreLib = project.path in setOf(
+    ":catalogs:hive-metastore2-libs",
+    ":catalogs:hive-metastore3-libs"
+  )
 
   apply(plugin = "jacoco")
-  apply(plugin = "maven-publish")
   apply(plugin = "java")
+  if (!isHiveMetastoreLib) {
+    apply(plugin = "maven-publish")
+  }
+
+  // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
+  // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
+  // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
+  // httpcore5/httpcore5-h2: pulled by httpclient5 (directly and via Iceberg), whose POM still
+  // manages them on the 5.3/5.4.0 line; force the 5.4.4 patch so every module uses the same,
+  // latest 5.4 patch. It stays API-compatible with the httpclient5 versions on the classpath.
+  configurations.all {
+    resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
+    resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5:$httpcore5Version")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5-h2:$httpcore5Version")
+
+    // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
+    // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
+    exclude(group = "log4j", module = "log4j")
+  }
+  // Strip the outdated Avro shaded into hadoop-client-runtime, see StripShadedAvroTransform.
+  // The test classpaths use the same jar so that tests run against what the distribution ships.
+  if (project.path in shadedAvroStrippedProjects) {
+    dependencies {
+      attributesSchema {
+        attribute(StripShadedAvroTransform.STRIPPED)
+      }
+      artifactTypes.getByName(ArtifactTypeDefinition.JAR_TYPE) {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, false)
+      }
+      // The source is not restricted to the "jar" artifact type: with that restriction, artifacts
+      // such as hadoop-yarn-server-tests on the test classpaths had no matching variant. The
+      // transform passes every artifact other than hadoop-client-runtime through unchanged.
+      registerTransform(StripShadedAvroTransform::class) {
+        from.attribute(StripShadedAvroTransform.STRIPPED, false)
+        to.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
+    }
+    configurations.matching { it.name == "runtimeClasspath" || it.name == "testRuntimeClasspath" }
+      .configureEach {
+        attributes.attribute(StripShadedAvroTransform.STRIPPED, true)
+      }
+  }
 
   repositories {
     mavenCentral()
     mavenLocal()
   }
 
-  fun compatibleWithJDK8(project: Project): Boolean {
-    val name = project.name.lowercase()
-    val path = project.path.lowercase()
-    if (path.startsWith(":maintenance:jobs") ||
-      name == "api" ||
-      name == "common" ||
-      name == "catalog-common" ||
-      name == "hadoop-common"
-    ) {
-      return true
-    }
+  val jdk8CompatibleProjectPathPrefixes = setOf(
+    ":api",
+    ":common",
+    ":catalogs:catalog-common",
+    ":catalogs:hadoop-auth",
+    ":catalogs:hadoop-common",
+    ":maintenance:jobs",
+    ":maintenance:maintenance-common",
+    ":maintenance:optimizer-api",
+    ":maintenance:updaters",
+    ":clients",
+    ":bundles",
+    ":spark-connector",
+    ":flink-connector"
+  )
 
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
-    if (!isReleaseRun) {
+  // Spark 4 requires JDK 17, so the Spark 4 connector modules opt out of the JDK 8 target even
+  // though the rest of :spark-connector (3.x) stays on Java 8.
+  val jdk17OnlyProjectPaths = setOf(
+    ":spark-connector:spark-4.0",
+    ":spark-connector:spark-runtime-4.0"
+  )
+
+  fun compatibleWithJDK8(project: Project): Boolean {
+    val path = project.path.lowercase()
+    if (jdk17OnlyProjectPaths.any { path == it.lowercase() }) {
       return false
     }
-
-    if (path.startsWith(":client") ||
-      path.startsWith(":spark-connector") ||
-      path.startsWith(":flink-connector") ||
-      path.startsWith(":bundles")
-    ) {
-      return true
-    }
-
-    return false
+    return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
@@ -394,16 +807,7 @@ subprojects {
 
   java {
     toolchain {
-      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
-      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
-      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
-      // Trino-connector on macOS.
-      if (project.name == "trino-connector") {
-        if (OperatingSystem.current().isMacOsX) {
-          vendor.set(JvmVendorSpec.AMAZON)
-        }
-        languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (compatibleWithJDK8(project)) {
+      if (compatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -411,6 +815,24 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
+  }
+
+  if (compatibleWithJDK8(project)) {
+    // Keep published/main classes Java 8-compatible for the selected modules.
+    tasks.named<JavaCompile>("compileJava") {
+      options.release.set(8)
+    }
+
+    // Tests still need Java 17 to compile against dependencies that only publish Java 17 variants.
+    tasks.named<JavaCompile>("compileTestJava") {
+      options.release.set(17)
+    }
+
+    val targetJvmVersionAttribute = TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE
+    configurations.matching { it.name in setOf("testCompileClasspath", "testRuntimeClasspath") }
+      .configureEach {
+        attributes.attribute(targetJvmVersionAttribute, 17)
+      }
   }
 
   gradle.projectsEvaluated {
@@ -437,6 +859,8 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // Keep Java compilation independent of the host's default charset.
+    options.encoding = "UTF-8"
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -504,25 +928,109 @@ subprojects {
     from(tasks["javadoc"])
   }
 
-  tasks.withType<Jar> {
-    into("META-INF") {
-      from(rootDir) {
-        if (name == "sourcesJar") {
-          include("LICENSE")
-          include("NOTICE")
-        } else if (project.name == "web") {
-          include("web/web/LICENSE.bin")
-          rename("LICENSE.bin", "LICENSE")
-          include("web/web/NOTICE.bin")
-          rename("NOTICE.bin", "NOTICE")
-        } else {
-          include("LICENSE.bin")
-          rename("LICENSE.bin", "LICENSE")
-          include("NOTICE.bin")
-          rename("NOTICE.bin", "NOTICE")
+  // These notices cover copied production sources, not dependencies declared only in the POM.
+  val sourceNoticeNames = mapOf(
+    ":api" to listOf("spark", "iceberg"),
+    ":common" to listOf("iceberg", "hadoop"),
+    ":core" to listOf("spark", "iceberg", "kafka", "aws"),
+    ":clients:client-java" to listOf("iceberg"),
+    ":bundles:aws" to listOf("doris"),
+    ":catalogs:hive-metastore-common" to listOf("iceberg"),
+    ":catalogs:catalog-lakehouse-iceberg" to listOf("iceberg"),
+    ":catalogs:catalog-lakehouse-paimon" to listOf("paimon"),
+    ":spark-connector:spark-3.5" to listOf("iceberg"),
+    ":spark-connector:spark-4.0" to listOf("iceberg"),
+    ":server-common" to listOf("hadoop"),
+    ":iceberg:iceberg-common" to listOf("iceberg"),
+    ":iceberg:iceberg-rest-server" to listOf("iceberg"),
+    ":authorizations:authorization-ranger" to listOf("ranger")
+  )[project.path].orEmpty()
+
+  val mavenLegalFiles = tasks.register<GenerateJarLegalFiles>("generateMavenLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    sourceNotices.set(sourceNoticeNames)
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/main.zip"))
+  }
+  val javadocLegalFiles = tasks.register<GenerateJarLegalFiles>("generateJavadocLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    // SparkTransformConverter's Iceberg-derived findWidth method is private and absent from Javadoc.
+    sourceNotices.set(
+      when (project.path) {
+        ":spark-connector:spark-3.5", ":spark-connector:spark-4.0" -> sourceNoticeNames.filterNot { it == "iceberg" }
+        else -> sourceNoticeNames
+      }
+    )
+    javadocFiles.from(tasks.named<Javadoc>("javadoc").map { it.outputs.files.asFileTree.matching { include("legal/**") } })
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/javadoc.zip"))
+  }
+  val bundledLegalFiles = tasks.register<GenerateJarLegalFiles>("generateBundledLegalFiles") {
+    templates.set(rootProject.layout.projectDirectory.dir("dev/release/maven"))
+    sourceNotices.set(sourceNoticeNames)
+    outputArchive.set(layout.buildDirectory.file("generated/maven-legal/bundled.zip"))
+  }
+
+  fun configureBundledLegalFiles(configurations: Provider<List<Configuration>>, jars: Provider<FileCollection>) {
+    bundledLegalFiles.configure {
+      dependencyJars.from(jars)
+      dependencyJars.builtBy(configurations)
+      dependencyIds.set(
+        configurations.map { configs ->
+          val artifacts = configs.flatMap { it.resolvedConfiguration.resolvedArtifacts }.groupBy { it.file.name }
+          artifacts.mapValues { (name, entries) ->
+            val coordinates = entries.map { artifact ->
+              val id = artifact.moduleVersion.id
+              "${id.group}/${id.name}/${id.version}${artifact.classifier?.let { "/$it" } ?: ""}"
+            }.distinct()
+            require(coordinates.size == 1) { "Ambiguous Maven artifact filename $name: $coordinates" }
+            coordinates.single()
+          }
         }
+      )
+    }
+  }
+
+  plugins.withId("com.github.johnrengelman.shadow") {
+    val shadowJar = tasks.named<ShadowJar>("shadowJar")
+    configureBundledLegalFiles(
+      provider { shadowJar.get().configurations.map { it as Configuration } },
+      provider { shadowJar.get().includedDependencies }
+    )
+    bundledLegalFiles.configure {
+      // Connector runtimes strip the unrelocated SLF4J classes from client-java-runtime.
+      excludedGroups.set(provider { if ("org/slf4j/**" in shadowJar.get().excludes) setOf("org.slf4j") else emptySet() })
+    }
+    shadowJar.configure {
+      dependsOn(bundledLegalFiles)
+      transform(LegalFilesTransformer(bundledLegalFiles.get().outputArchive.get().asFile))
+    }
+  }
+  if (project.path == ":clients:cli") {
+    configureBundledLegalFiles(provider { listOf(configurations.runtimeClasspath.get()) }, provider { configurations.runtimeClasspath.get() })
+    tasks.named<Jar>("jar") {
+      from(provider { configurations.runtimeClasspath.get().map { zipTree(it) } }) {
+        exclude { GenerateJarLegalFiles.isLegalResource(it.relativePath.pathString) }
       }
     }
+  }
+
+  tasks.withType<Jar> {
+    if (this is ShadowJar) return@withType
+    if (this is War && project.path in listOf(":web:web", ":web-v2:web")) {
+      // Web archives contain npm dependencies, not the Maven module inventory.
+      from(project.layout.projectDirectory) {
+        include("LICENSE.bin", "NOTICE.bin")
+        into("META-INF")
+        rename { it.removeSuffix(".bin") }
+      }
+      return@withType
+    }
+    val legalFiles = when {
+      name == "javadocJar" -> javadocLegalFiles
+      name == "jar" && project.path == ":clients:cli" -> bundledLegalFiles
+      else -> mavenLegalFiles
+    }
+    dependsOn(legalFiles)
+    from(provider { zipTree(legalFiles.get().outputArchive.get().asFile) })
   }
 
   if (project.name in listOf("web", "web-v2", "docs")) {
@@ -535,61 +1043,63 @@ subprojects {
     }
   }
 
-  apply(plugin = "signing")
-  publishing {
-    publications {
-      create<MavenPublication>("MavenJava") {
-        if (project.name == "docs" ||
-          project.name == "integration-test" ||
-          project.name == "integration-test-common" ||
-          project.name == "web"
-        ) {
-          setArtifacts(emptyList<Any>())
-        } else {
-          from(components["java"])
-          artifact(sourcesJar)
-          artifact(javadocJar)
-        }
-
-        artifactId = "${rootProject.name.lowercase()}-${project.name}"
-
-        pom {
-          name.set("Gravitino")
-          description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
-          url.set("https://gravitino.apache.org")
-          licenses {
-            license {
-              name.set("The Apache Software License, Version 2.0")
-              url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
-            }
+  if (!isHiveMetastoreLib) {
+    apply(plugin = "signing")
+    publishing {
+      publications {
+        create<MavenPublication>("MavenJava") {
+          if (project.name == "docs" ||
+            project.name == "integration-test" ||
+            project.name == "integration-test-common" ||
+            project.name == "web"
+          ) {
+            setArtifacts(emptyList<Any>())
+          } else {
+            from(components["java"])
+            artifact(sourcesJar)
+            artifact(javadocJar)
           }
-          developers {
-            developer {
-              id.set("The Gravitino community")
-              name.set("support")
-              email.set("dev@gravitino.apache.org")
+
+          artifactId = "${rootProject.name.lowercase()}-${project.name}"
+
+          pom {
+            name.set("Gravitino")
+            description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
+            url.set("https://gravitino.apache.org")
+            licenses {
+              license {
+                name.set("The Apache Software License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+              }
             }
-          }
-          scm {
-            url.set("https://github.com/apache/gravitino")
-            connection.set("scm:git:git://github.com/apache/gravitino.git")
+            developers {
+              developer {
+                id.set("The Gravitino community")
+                name.set("support")
+                email.set("dev@gravitino.apache.org")
+              }
+            }
+            scm {
+              url.set("https://github.com/apache/gravitino")
+              connection.set("scm:git:git://github.com/apache/gravitino.git")
+            }
           }
         }
       }
     }
-  }
 
-  configure<SigningExtension> {
-    val taskNames = gradle.getStartParameter().getTaskNames()
-    taskNames.forEach() {
-      if (it.contains("publishToMavenLocal")) setRequired(false)
+    configure<SigningExtension> {
+      val taskNames = gradle.getStartParameter().getTaskNames()
+      taskNames.forEach() {
+        if (it.contains("publishToMavenLocal")) setRequired(false)
+      }
+
+      val gpgId = System.getenv("GPG_ID")
+      val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
+      val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
+      useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
+      sign(publishing.publications)
     }
-
-    val gpgId = System.getenv("GPG_ID")
-    val gpgSecretKey = System.getenv("GPG_PRIVATE_KEY")
-    val gpgKeyPassword = System.getenv("GPG_PASSPHRASE")
-    useInMemoryPgpKeys(gpgId, gpgSecretKey, gpgKeyPassword)
-    sign(publishing.publications)
   }
 
   tasks.configureEach<Test> {
@@ -598,19 +1108,57 @@ subprojects {
       initTest(this)
     }
 
+    val testTaskStartTimeMsKey = "testTaskStartTimeMs"
+    doFirst {
+      extensions.extraProperties[testTaskStartTimeMsKey] = System.currentTimeMillis()
+      logger.lifecycle(
+        "[TEST-TIMING] START module={} task={} at={}",
+        project.path,
+        path,
+        extensions.extraProperties[testTaskStartTimeMsKey]
+      )
+    }
+
+    doLast {
+      val endTimeMs = System.currentTimeMillis()
+      val startTimeMs = extensions.extraProperties[testTaskStartTimeMsKey] as? Long ?: endTimeMs
+      logger.lifecycle(
+        "[TEST-TIMING] END module={} task={} startMs={} endMs={} durationMs={}",
+        project.path,
+        path,
+        startTimeMs,
+        endTimeMs,
+        endTimeMs - startTimeMs
+      )
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
       showCauses = true
       showStackTraces = true
     }
-    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
+    // Distinct outputs let Gradle execute independent test tasks in parallel.
+    val testReportPath = path.removePrefix(":").replace(':', '/')
+    reports.html.outputLocation.set(
+      rootProject.layout.buildDirectory.dir("reports/tests/$testReportPath")
+    )
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       val extraArgs = project.property("extraJvmArgs") as List<String>
       jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+      val isCoreSuiteTask =
+        project.path == ":core" &&
+          name in setOf(
+          "coreUnitTest",
+          "coreH2Test",
+          "coreMySQLTest",
+          "corePostgreSQLTest"
+        )
+      if (!isCoreSuiteTask) {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
@@ -678,10 +1226,14 @@ tasks.rat {
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*",
     "clients/filesystem-fuse/Cargo.lock",
+    "dev/charts/gravitino/README.md",
+    "dev/charts/gravitino-iceberg-rest-server/README.md",
+    "dev/charts/gravitino-lance-rest-server/README.md",
     "dev/docker/**/*.xml",
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
+    ".claude/**",
     "gradle/wrapper/gradle-wrapper.properties",
     "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
@@ -725,6 +1277,8 @@ tasks.rat {
 
 tasks.check.get().dependsOn(tasks.rat)
 
+apply(from = "dev/release/maven/test-legal-files.gradle")
+
 tasks.cyclonedxBom {
   setIncludeConfigs(listOf("runtimeClasspath"))
 }
@@ -737,30 +1291,51 @@ jacoco {
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
+  val cleanDistributionPackage by registering(Delete::class) {
+    group = "gravitino distribution"
+    delete(distributionPackageDir, distributionPackageAllDir)
+    delete(subprojectJarOutputDirs)
+  }
 
   val compileDistribution by registering {
-    dependsOn(
-      "copyCatalogLibAndConfigs",
-      "copySubprojectDependencies",
-      "copySubprojectLib",
-      "copyCliLib",
-      "copyJobsLib",
-      ":authorizations:copyLibAndConfig",
-      ":iceberg:iceberg-rest-server:copyLibAndConfigs",
-      ":lance:lance-rest-server:copyLibAndConfigs",
-      ":maintenance:optimizer:copyLibAndConfigs",
-      ":web:web:build",
-      ":web-v2:web:build"
-    )
+    val dependencies =
+      mutableListOf(
+        "copyCatalogLibAndConfigs",
+        "copySubprojectDependencies",
+        "copySubprojectLib",
+        "copyCliLib",
+        "copyJobsLib",
+        ":authorizations:copyLibAndConfig",
+        ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+        ":iceberg:iceberg-rest-server-experiment:copyLibAndConfigs",
+        ":lance:lance-rest-server:copyLibAndConfigs",
+        ":maintenance:optimizer:copyLibAndConfigs",
+        ":plugins:idp-basic:copyLibAndConfigs",
+        ":plugins:maintenance:copyLibAndConfigs",
+        ":plugins:k8s-job-executor:copyLibAndConfigs"
+      )
+    if (!skipWeb) {
+      dependencies.add(":web:web:build")
+      dependencies.add(":web-v2:web:build")
+    }
+    dependsOn(cleanDistributionPackage)
+    dependsOn(dependencies)
 
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/package"))
+    outputs.dir(distributionPackageDir)
+    outputs.dir(distributionPackageAllDir)
     doLast {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web")
+          }
+          from(projectDir.dir("web-v2/web/build/libs/${rootProject.name}-web-$version.war")) {
+            into("package/web-v2")
+          }
+        }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -780,16 +1355,22 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
-        from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
-        from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
-        from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
-        from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
-        from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        if (!skipWeb) {
+          from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
+          from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
+          from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+          from(projectDir.dir("web-v2/web/licenses")) { into("package/web-v2/licenses") }
+          from(projectDir.dir("web-v2/web/LICENSE.bin")) { into("package/web-v2") }
+          from(projectDir.dir("web-v2/web/NOTICE.bin")) { into("package/web-v2") }
+        }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
         }
+      }
+
+      if (skipWeb) {
+        delete(projectDir.dir("distribution/package/web"), projectDir.dir("distribution/package/web-v2"))
       }
 
       // Create the directory 'data' for storage.
@@ -798,8 +1379,8 @@ tasks {
 
       // Copy the all directory distribution/package to distribution/package-all
       copy {
-        from(projectDir.dir("distribution/package"))
-        into(projectDir.dir("distribution/package-all"))
+        from(distributionPackageDir)
+        into(distributionPackageAllDir)
       }
 
       // remove catalogs-contrib modules from distribution/package
@@ -822,7 +1403,7 @@ tasks {
           include(
             "${rootProject.name}-iceberg-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-iceberg-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
@@ -867,7 +1448,7 @@ tasks {
           include(
             "${rootProject.name}-lance-rest-server.conf.template",
             "${rootProject.name}-env.sh.template",
-            "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
@@ -903,29 +1484,26 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:trino-connector:copyLibs")
+    dependsOn("trino-connector:trino-connector-482-483:copyLibs")
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
-    doLast {
-      copy {
-        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
-        from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        into(outputDir)
-        rename { fileName ->
-          fileName.replace(".trino", "")
-        }
-      }
-    }
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer", "assembleDistributionAll")
+    dependsOn(
+      compileDistribution,
+      ":trino-connector:trino-connector-469-472:assembleTrinoConnector",
+      ":trino-connector:trino-connector-473-477:assembleTrinoConnector",
+      ":trino-connector:trino-connector-478-479:assembleTrinoConnector",
+      ":trino-connector:trino-connector-480:assembleTrinoConnector",
+      ":trino-connector:trino-connector-481:assembleTrinoConnector",
+      ":trino-connector:trino-connector-482-483:assembleTrinoConnector",
+      "assembleIcebergRESTServer",
+      "assembleLanceRESTServer"
+    )
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
-    from(compileDistribution.map { it.outputs.files.single() })
+    from(distributionPackageDir)
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
@@ -956,17 +1534,6 @@ tasks {
         serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
       )
     }
-  }
-
-  val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("compileTrinoConnector")
-    group = "gravitino distribution"
-    finalizedBy("checksumTrinoConnector")
-    into("${rootProject.name}-trino-connector-$version")
-    from(compileTrinoConnector.map { it.outputs.files.single() })
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
   }
 
   val assembleLanceRESTServer by registering(Tar::class) {
@@ -1025,24 +1592,8 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(assembleDistribution, "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
-    val checksumFile = archiveFile.map { archive ->
-      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
-    }
-    inputs.file(archiveFile)
-    outputs.file(checksumFile)
-    doLast {
-      checksumFile.get().writeText(
-        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
-      )
-    }
-  }
-
-  register("checksumTrinoConnector") {
-    group = "gravitino distribution"
-    dependsOn(assembleTrinoConnector)
-    val archiveFile = assembleTrinoConnector.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
     }
@@ -1073,17 +1624,21 @@ tasks {
         !it.name.startsWith("optimizer") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("hive-metastore") &&
+        !it.name.startsWith("trino-connector") &&
         it.name != "hadoop-common" &&
         it.name != "integration-test" &&
-        it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
+        it.parent?.name != "plugins" &&
         it.name != "mcp-server"
       ) {
-        from(it.configurations.runtimeClasspath)
+        from(it.configurations.runtimeClasspath) {
+          exclude("error_prone_annotations-*.jar")
+        }
         into("distribution/package/libs")
       }
     }
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
   register("copyCliLib", Copy::class) {
@@ -1121,17 +1676,19 @@ tasks {
         !it.name.startsWith("optimizer") &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
+        it.name != "hadoop-auth" &&
         it.name != "hadoop-common" &&
         it.name != "web" &&
         it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "plugins" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar", "*-jmh.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
@@ -1142,6 +1699,7 @@ tasks {
   register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
       ":catalogs:catalog-fileset:copyLibAndConfig",
+      ":catalogs:catalog-glue:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
@@ -1155,6 +1713,7 @@ tasks {
       ":catalogs:hive-metastore2-libs:copyLibs",
       ":catalogs:hive-metastore3-libs:copyLibs",
       ":catalogs:catalog-lakehouse-generic:copyLibAndConfig",
+      ":catalogs-contrib:catalog-jdbc-hologres:copyLibAndConfig",
       ":catalogs-contrib:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs-contrib:catalog-jdbc-clickhouse:copyLibAndConfig"
     )
@@ -1162,6 +1721,48 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
+  }
+}
+
+gradle.projectsEvaluated {
+  val cleanDistributionPackageTask = rootProject.tasks.named("cleanDistributionPackage")
+  val distributionPackagePaths =
+    listOf(distributionPackageDir, distributionPackageAllDir)
+      .map { it.asFile.toPath().toAbsolutePath().normalize() }
+  val subprojectJarOutputPaths =
+    subprojectJarOutputDirs.map { it.get().asFile.toPath().toAbsolutePath().normalize() }
+
+  allprojects {
+    val runsIntegrationTestsOnly = rootProject.hasProperty("skipTests")
+    val hasDockerTests =
+      rootProject.extra["dockerTest"] == true && fileTree("src/test") {
+        include("**/*.java", "**/*.kt")
+      }.any { it.readText().contains("gravitino-docker-test") }
+
+    // Integration tests in different projects share the same Gravitino server, database,
+    // containers, and configuration files. Running them together lets one test stop or reset
+    // resources while another test is still using them. Normal builds keep independent unit tests
+    // parallel and serialize only projects that contain Docker-tagged tests.
+    if (runsIntegrationTestsOnly || hasDockerTests) {
+      tasks.withType<Test>().configureEach {
+        usesService(sharedTestEnvironmentLock)
+      }
+    }
+
+    tasks.withType<Jar>().configureEach {
+      mustRunAfter(cleanDistributionPackageTask)
+    }
+
+    tasks.withType<Copy>().configureEach {
+      val copyDestinationDir = destinationDir ?: return@configureEach
+      val destinationPath = copyDestinationDir.toPath().toAbsolutePath().normalize()
+      if (distributionPackagePaths.any { destinationPath.startsWith(it) }) {
+        dependsOn(cleanDistributionPackageTask)
+      }
+      if (subprojectJarOutputPaths.any { destinationPath.startsWith(it) }) {
+        mustRunAfter(cleanDistributionPackageTask)
+      }
+    }
   }
 }
 
@@ -1303,21 +1904,3 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
-
-tasks.register("release") {
-  group = "release"
-  description = "Builds and package a release version."
-  doFirst {
-    println("Releasing project...")
-  }
-
-  // Use 'assemble' instead of 'build' to skip tests during release
-  // Tests have JDK version conflicts (some need JDK 8, some need JDK 17)
-  // and should be run separately in CI/CD with appropriate JDK configurations
-  // Only include subprojects that apply the Java plugin (exclude client-python)
-  dependsOn(
-    subprojects
-      .filter { it.name != "client-python" }
-      .map { it.tasks.named("assemble") }
-  )
-}

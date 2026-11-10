@@ -18,4 +18,5 @@
  */
 package org.apache.gravitino.spark.connector.paimon;
 
-public class GravitinoPaimonCatalogSpark35 extends GravitinoPaimonCatalogSpark34 {}
+/** Spark 3.5 specific Gravitino Paimon catalog implementation. */
+public class GravitinoPaimonCatalogSpark35 extends GravitinoPaimonCatalog {}

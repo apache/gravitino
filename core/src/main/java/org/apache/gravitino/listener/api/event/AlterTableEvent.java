@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
@@ -46,7 +47,26 @@ public final class AlterTableEvent extends TableEvent {
       NameIdentifier identifier,
       TableChange[] tableChanges,
       TableInfo updatedTableInfo) {
-    super(user, identifier);
+    this(user, identifier, tableChanges, updatedTableInfo, null);
+  }
+
+  /**
+   * Constructs an instance of {@code AlterTableEvent} with optional audit extras.
+   *
+   * @param user The username of the individual responsible for initiating the table alteration.
+   * @param identifier The unique identifier of the altered table.
+   * @param tableChanges An array of {@link TableChange} objects representing the specific changes
+   *     applied to the table during the alteration process.
+   * @param updatedTableInfo The post-alteration state of the table.
+   * @param customInfo optional audit facts contributed by an inner dispatcher
+   */
+  public AlterTableEvent(
+      String user,
+      NameIdentifier identifier,
+      TableChange[] tableChanges,
+      TableInfo updatedTableInfo,
+      Map<String, String> customInfo) {
+    super(user, identifier, customInfo);
     this.tableChanges = tableChanges.clone();
     this.updatedTableInfo = updatedTableInfo;
   }

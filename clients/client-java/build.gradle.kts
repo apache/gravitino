@@ -46,18 +46,22 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":server-common", "testArtifacts"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
+  testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.hadoop3.client)
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
@@ -70,6 +74,12 @@ tasks.build {
 }
 
 tasks.test {
+  javaLauncher.set(
+    javaToolchains.launcherFor {
+      languageVersion.set(JavaLanguageVersion.of(17))
+    }
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
@@ -78,6 +88,10 @@ tasks.test {
     dependsOn(":catalogs:catalog-model:jar", ":catalogs:catalog-model:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+    dependsOn(
+      ":catalogs:catalog-lakehouse-iceberg:jar",
+      ":catalogs:catalog-lakehouse-iceberg:runtimeJars"
+    )
   }
 }
 
@@ -90,7 +104,7 @@ tasks.javadoc {
 
   classpath = configurations["compileClasspath"] +
     project(":api").configurations["runtimeClasspath"] +
-    project(":common").configurations["runtimeClasspath"]
+    project(":common").configurations["compileClasspath"]
 }
 
 tasks.clean {

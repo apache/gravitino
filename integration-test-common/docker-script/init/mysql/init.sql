@@ -18,6 +18,23 @@
  */
 GRANT ALL PRIVILEGES on *.* to 'trino'@'%';
 FLUSH PRIVILEGES;
+CREATE DATABASE IF NOT EXISTS iceberg_db;
+CREATE TABLE IF NOT EXISTS iceberg_db.iceberg_tables(
+    catalog_name VARCHAR(255) NOT NULL,
+    table_namespace VARCHAR(255) NOT NULL,
+    table_name VARCHAR(255) NOT NULL,
+    metadata_location VARCHAR(1000),
+    previous_metadata_location VARCHAR(1000),
+    iceberg_type VARCHAR(5),
+    PRIMARY KEY (catalog_name, table_namespace, table_name)
+);
+CREATE TABLE IF NOT EXISTS iceberg_db.iceberg_namespace_properties(
+    catalog_name VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL,
+    property_key VARCHAR(255) NOT NULL,
+    property_value VARCHAR(1000),
+    PRIMARY KEY (catalog_name, namespace, property_key)
+);
 CREATE DATABASE gt_mysql_test_all_type;
 CREATE TABLE gt_mysql_test_all_type.demo
 (
@@ -118,6 +135,27 @@ INSERT INTO gt_mysql_test_all_type.demo (
     ST_GeomFromText('POINT(10 20)'),        -- point_col
     ST_GeomFromText('LINESTRING(0 0, 10 10)') -- geometry_col
 );
+CREATE TABLE gt_mysql_test_all_type.demo_datetime_precision
+(
+    id                  INT NOT NULL PRIMARY KEY,
+    time_col_3          TIME(3),
+    time_col_6          TIME(6),
+    datetime_col_3      DATETIME(3),
+    datetime_col_6      DATETIME(6),
+    timestamp_col_3     TIMESTAMP(3) NULL,
+    timestamp_col_6     TIMESTAMP(6) NULL
+);
+
+INSERT INTO gt_mysql_test_all_type.demo_datetime_precision VALUES (
+    1,
+    '14:30:00.123',
+    '14:30:00.123456',
+    '2025-07-04 14:30:00.123',
+    '2025-07-04 14:30:00.123456',
+    '2025-07-04 14:30:00.123',
+    '2025-07-04 14:30:00.123456'
+);
+
 CREATE DATABASE gt_mysql_test_column_properties;
 /*
 +----------------+-------------------------------------+------+-----+---------------------+-------------------+

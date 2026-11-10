@@ -23,18 +23,26 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
 
   implementation(libs.cglib)
-  implementation(libs.commons.lang3)
   implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
+  implementation(libs.guava)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
-  implementation(libs.guava)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

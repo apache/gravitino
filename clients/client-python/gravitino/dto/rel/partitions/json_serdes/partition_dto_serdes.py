@@ -24,8 +24,8 @@ from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
 class PartitionDTOSerdes(JsonSerializable[PartitionDTO]):
     @classmethod
-    def serialize(cls, data_type: PartitionDTO) -> Dict[str, Any]:
-        return SerdesUtils.write_partition(data_type)
+    def serialize(cls, value: PartitionDTO) -> Dict[str, Any]:
+        return SerdesUtils.write_partition(value)
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any]) -> PartitionDTO:

@@ -24,6 +24,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ExclamationCircleFilled, PlusOutlined, StopOutlined } from '@ant-design/icons'
 import {
   Button,
+  Descriptions,
   Drawer,
   Dropdown,
   Empty,
@@ -43,6 +44,7 @@ import { useAntdColumnResize } from 'react-antd-column-resize'
 import ConfirmInput from '@/components/ConfirmInput'
 import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
+import AssociatedTable from '@/components/AssociatedTable'
 import CreatePolicyDialog from './CreatePolicyDialog'
 import { formatToDateTime } from '@/lib/utils'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -66,6 +68,8 @@ export default function PoliciesPage() {
   const searchParams = useSearchParams()
   const currentMetalake = searchParams.get('metalake')
   const [detailsLoading, setDetailsLoading] = useState(false)
+  const auth = useAppSelector(state => state.auth)
+  const { anthEnable } = auth
 
   useEffect(() => {
     currentMetalake && dispatch(fetchPolicies({ metalake: currentMetalake, details: true }))
@@ -277,95 +281,112 @@ export default function PoliciesPage() {
       </Spin>
       {openPolicy && (
         <Drawer
-          title={`View ${currentPolicy?.name} details`}
+          title={`View Policy "${currentPolicy?.name}" Details`}
           loading={detailsLoading}
           onClose={onClose}
           open={openPolicy}
+          width={'40%'}
         >
-          <>
-            <div className='my-4'>
-              <div className='text-sm text-slate-400'>Policy Name</div>
-              <span className='break-words text-base'>{currentPolicy?.name}</span>
-            </div>
-            <div className='my-4'>
-              <div className='text-sm text-slate-400'>Enabled</div>
-              <span className='break-words text-base'>
-                <Switch checked={currentPolicy?.enabled} disabled size='small' />
-              </span>
-            </div>
-            <div className='my-4'>
-              <div className='text-sm text-slate-400'>Policy Type</div>
-              <span className='break-words text-base'>{currentPolicy?.policyType}</span>
-            </div>
-            <div className='my-4'>
-              <div className='text-sm text-slate-400'>Supported Object Types</div>
-              <span className='break-words text-base'>
-                {currentPolicy?.content?.supportedObjectTypes.length === 1
-                  ? currentPolicy?.content?.supportedObjectTypes[0]
-                  : currentPolicy?.content?.supportedObjectTypes.length
-                    ? currentPolicy?.content?.supportedObjectTypes.join(', ')
-                    : '-'}
-              </span>
-            </div>
-            <div className='my-4'>
-              <div className='mb-1 text-sm text-slate-400'>Rule(s)</div>
-              <Space.Compact className='max-h-80 w-full overflow-auto'>
-                <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                  <span className='bg-gray-100 p-1'>Rule Name</span>
-                  {currentPolicy?.content?.customRules
-                    ? Object.keys(currentPolicy?.content?.customRules).map(rule => (
-                        <span key={rule} className='truncate p-1' title={rule}>
-                          {rule}
-                        </span>
-                      ))
-                    : null}
-                </Space.Compact>
-                <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                  <span className='bg-gray-100 p-1'>Rule Content</span>
-                  {currentPolicy?.content?.customRules
-                    ? Object.values(currentPolicy?.content?.customRules).map(ruleContent => (
-                        <span key={ruleContent} className='truncate p-1' title={ruleContent}>
-                          {ruleContent || '-'}
-                        </span>
-                      ))
-                    : null}
-                </Space.Compact>
-              </Space.Compact>
-            </div>
-            <div className='my-4'>
-              <div className='text-sm text-slate-400'>Comment</div>
-              <span className='break-words text-base'>{currentPolicy?.comment || '-'}</span>
-            </div>
-            <div className='my-4'>
-              <div className='mb-1 text-sm text-slate-400'>Properties</div>
-              {currentPolicy?.content?.properties && Object.keys(currentPolicy?.content?.properties).length > 0 ? (
-                <Space.Compact className='max-h-80 w-full overflow-auto'>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Key</span>
-                    {currentPolicy?.content?.properties
-                      ? Object.keys(currentPolicy?.content?.properties).map(key => (
-                          <span key={key} className='truncate p-1' title={key}>
-                            {key}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                  <Space.Compact direction='vertical' className='w-1/2 divide-y border-gray-100'>
-                    <span className='bg-gray-100 p-1'>Value</span>
-                    {currentPolicy?.content?.properties
-                      ? Object.values(currentPolicy?.content?.properties).map(value => (
-                          <span key={value} className='truncate p-1' title={value}>
-                            {value || '-'}
-                          </span>
-                        ))
-                      : null}
-                  </Space.Compact>
-                </Space.Compact>
-              ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              )}
-            </div>
-          </>
+          <Title level={5} className='mb-2'>
+            Basic Information
+          </Title>
+          <Descriptions column={1} bordered size='small'>
+            <Descriptions.Item label='Policy Name'>{currentPolicy?.name}</Descriptions.Item>
+            <Descriptions.Item label='Enabled'>
+              <Switch checked={currentPolicy?.enabled} disabled size='small' />
+            </Descriptions.Item>
+            <Descriptions.Item label='Policy Type'>{currentPolicy?.policyType}</Descriptions.Item>
+            <Descriptions.Item label='Supported Object Types'>
+              {currentPolicy?.content?.supportedObjectTypes?.length === 1
+                ? currentPolicy?.content?.supportedObjectTypes[0]
+                : currentPolicy?.content?.supportedObjectTypes?.length
+                  ? currentPolicy?.content?.supportedObjectTypes.join(', ')
+                  : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label='Comment'>{currentPolicy?.comment || '-'}</Descriptions.Item>
+            <Descriptions.Item label='Creator'>{currentPolicy?.audit?.creator || '-'}</Descriptions.Item>
+            <Descriptions.Item label='Created At'>
+              {currentPolicy?.audit?.createTime ? formatToDateTime(currentPolicy.audit.createTime) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label='Last Modified At'>
+              {currentPolicy?.audit?.lastModifiedTime ? formatToDateTime(currentPolicy.audit.lastModifiedTime) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label='Last Modifier'>{currentPolicy?.audit?.lastModifier || '-'}</Descriptions.Item>
+          </Descriptions>
+          <Title level={5} className='mt-4 mb-2'>
+            Rule(s)
+          </Title>
+          <Table
+            size='small'
+            pagination={false}
+            rowKey='name'
+            dataSource={
+              currentPolicy?.content?.customRules && Object.keys(currentPolicy.content.customRules).length > 0
+                ? Object.entries(currentPolicy.content.customRules).map(([name, content]) => ({
+                    name,
+                    content
+                  }))
+                : []
+            }
+            columns={[
+              {
+                title: 'Rule Name',
+                dataIndex: 'name',
+                key: 'name',
+                ellipsis: true
+              },
+              {
+                title: 'Rule Content',
+                dataIndex: 'content',
+                key: 'content',
+                ellipsis: true,
+                render: value => value || '-'
+              }
+            ]}
+          />
+          <Title level={5} className='mt-4 mb-2'>
+            Properties
+          </Title>
+          <Table
+            size='small'
+            pagination={false}
+            rowKey='key'
+            dataSource={
+              currentPolicy?.content?.properties && Object.keys(currentPolicy.content.properties).length > 0
+                ? Object.entries(currentPolicy.content.properties).map(([key, value]) => ({
+                    key,
+                    value
+                  }))
+                : []
+            }
+            columns={[
+              {
+                title: 'Key',
+                dataIndex: 'key',
+                key: 'key',
+                ellipsis: true
+              },
+              {
+                title: 'Value',
+                dataIndex: 'value',
+                key: 'value',
+                ellipsis: true,
+                render: value => value || '-'
+              }
+            ]}
+          />
+          {anthEnable && (
+            <>
+              <Title level={5} className='mt-4 mb-2'>
+                Associated Roles
+              </Title>
+              <AssociatedTable
+                metalake={currentMetalake}
+                metadataObjectType={'policy'}
+                metadataObjectFullName={currentPolicy?.name}
+              />
+            </>
+          )}
         </Drawer>
       )}
       <CreatePolicyDialog open={open} setOpen={setOpen} metalake={currentMetalake} editPolicy={editPolicy} />

@@ -44,7 +44,7 @@ public class IcebergReplaceViewEvent extends IcebergViewEvent {
         IcebergRESTUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
   }
 
-  public UpdateTableRequest renameViewRequest() {
+  public UpdateTableRequest replaceViewRequest() {
     return replaceViewRequest;
   }
 
@@ -54,6 +54,6 @@ public class IcebergReplaceViewEvent extends IcebergViewEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.ALTER_VIEW;
+    return OperationType.REPLACE_VIEW;
   }
 }

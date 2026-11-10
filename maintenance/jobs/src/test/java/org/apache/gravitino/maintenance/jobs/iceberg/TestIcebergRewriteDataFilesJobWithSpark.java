@@ -91,7 +91,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
             catalogName, "db.test_table", null, null, null, null);
 
     assertNotNull(sql);
-    assertTrue(sql.startsWith("CALL " + catalogName + ".system.rewrite_data_files("));
+    assertTrue(sql.startsWith("CALL `" + catalogName + "`.system.rewrite_data_files("));
     assertTrue(sql.contains("table => 'db.test_table'"));
   }
 

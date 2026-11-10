@@ -18,33 +18,46 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 
 /**
  * A View class to represent a view metadata object that combines the metadata both from {@link
- * View} and {@link GenericEntity}.
+ * View} and {@link ViewEntity}.
  */
 public final class EntityCombinedView implements View {
 
   private final View view;
 
-  private final GenericEntity viewEntity;
+  @Nullable private final ViewEntity viewEntity;
+
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
   // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
-  private EntityCombinedView(View view, GenericEntity viewEntity) {
+  private EntityCombinedView(View view, @Nullable ViewEntity viewEntity) {
     this.view = view;
     this.viewEntity = viewEntity;
     this.imported = false;
   }
 
-  public static EntityCombinedView of(View view, GenericEntity viewEntity) {
+  public static EntityCombinedView of(View view, ViewEntity viewEntity) {
     return new EntityCombinedView(view, viewEntity);
   }
 
@@ -55,6 +68,33 @@ public final class EntityCombinedView implements View {
   public EntityCombinedView withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  public EntityCombinedView withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
+    return this;
+  }
+
+  @Override
+  public Column[] columns() {
+    return view.columns();
+  }
+
+  @Override
+  public Representation[] representations() {
+    return view.representations();
+  }
+
+  @Override
+  public String defaultCatalog() {
+    return view.defaultCatalog();
+  }
+
+  @Override
+  public String defaultSchema() {
+    return view.defaultSchema();
   }
 
   @Override
@@ -69,12 +109,26 @@ public final class EntityCombinedView implements View {
 
   @Override
   public Map<String, String> properties() {
-    return view.properties();
+    Map<String, String> props = view.properties();
+    if (props == null) {
+      return Collections.emptyMap();
+    }
+    return HiddenPropertyMaskUtils.maskHiddenProperties(props, keysToMask, keysToOmit);
   }
 
   @Override
   public Audit auditInfo() {
-    return view.auditInfo();
+    if (viewEntity == null) {
+      return view.auditInfo();
+    }
+    AuditInfo mergedAudit =
+        AuditInfo.builder()
+            .withCreator(view.auditInfo().creator())
+            .withCreateTime(view.auditInfo().createTime())
+            .withLastModifier(view.auditInfo().lastModifier())
+            .withLastModifiedTime(view.auditInfo().lastModifiedTime())
+            .build();
+    return mergedAudit.merge(viewEntity.auditInfo(), true /* overwrite */);
   }
 
   public boolean imported() {
@@ -85,7 +139,14 @@ public final class EntityCombinedView implements View {
     return view;
   }
 
-  public GenericEntity viewFromGravitino() {
+  /**
+   * Returns the Gravitino-side view entity when this combined view was built from a full {@link
+   * ViewEntity}, otherwise {@code null}.
+   *
+   * @return The view entity, or {@code null}.
+   */
+  @Nullable
+  public ViewEntity viewEntity() {
     return viewEntity;
   }
 }

@@ -56,7 +56,7 @@ spec:
           fi
       env:
         - name: SERVICE_NAME
-          value: {{ include "gravitino-lance-rest-server.fullname" . | quote }}
+          value: {{ .Values.service.name | quote }}
         - name: SERVICE_PORT
           value: {{ .Values.service.port | quote }}
         - name: TEST_PATH

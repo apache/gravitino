@@ -25,6 +25,9 @@ class GVFSConfig:
 
     AUTH_TYPE = "auth_type"
     SIMPLE_AUTH_TYPE = "simple"
+    BASIC_AUTH_TYPE = "basic"
+    BASIC_USERNAME = "basic_username"
+    BASIC_PASSWORD = "basic_password"
 
     OAUTH2_AUTH_TYPE = "oauth2"
     OAUTH2_SERVER_URI = "oauth2_server_uri"

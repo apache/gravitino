@@ -40,9 +40,9 @@ public class SessionUtils {
       T mapper = SqlSessions.getMapper(mapperClazz);
       consumer.accept(mapper);
       SqlSessions.commitAndCloseSqlSession();
-    } catch (Exception e) {
+    } catch (Throwable t) {
       SqlSessions.rollbackAndCloseSqlSession();
-      throw e;
+      throw t;
     }
   }
 
@@ -56,9 +56,9 @@ public class SessionUtils {
       R result = func.apply(mapper);
       SqlSessions.commitAndCloseSqlSession();
       return result;
-    } catch (Exception e) {
+    } catch (Throwable t) {
       SqlSessions.rollbackAndCloseSqlSession();
-      throw e;
+      throw t;
     }
   }
 
@@ -101,14 +101,23 @@ public class SessionUtils {
     try {
       Arrays.stream(operations).forEach(Runnable::run);
       SqlSessions.commitAndCloseSqlSession();
-    } catch (Exception e) {
+    } catch (Throwable t) {
       SqlSessions.rollbackAndCloseSqlSession();
-      throw e;
+      throw t;
     }
   }
 
   public static void beginTransaction() {
     SqlSessions.getSqlSession();
+  }
+
+  /**
+   * Returns whether the current thread is already participating in a transaction.
+   *
+   * @return {@code true} when the current thread has an active transaction
+   */
+  public static boolean isInTransaction() {
+    return SqlSessions.hasActiveSession();
   }
 
   public static void commitTransaction() {

@@ -202,4 +202,62 @@ describe('OAuth Provider Factory', () => {
       expect(providerType).toBe('oidc')
     })
   })
+
+  describe('reset', () => {
+    it('should clear cached provider and configPromise', async () => {
+      fetchMock.mockResolvedValueOnce(mockSuccessResponse(oidcConfig))
+
+      const provider1 = await factory.getProvider()
+
+      // Verify provider is cached
+      expect(factory.currentProvider).toBe(provider1)
+      expect(factory.configPromise).toBeDefined()
+
+      factory.reset()
+
+      // Verify cache is cleared
+      expect(factory.currentProvider).toBeNull()
+      expect(factory.configPromise).toBeNull()
+    })
+
+    it('should force fresh /configs fetch on next getProvider() call', async () => {
+      fetchMock.mockResolvedValue(mockSuccessResponse(oidcConfig))
+
+      const provider1 = await factory.getProvider()
+
+      // Only one fetch call so far
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      factory.reset()
+
+      const provider2 = await factory.getProvider()
+
+      // Should have fetched configs again
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenLastCalledWith('/configs')
+
+      // Should be a new provider instance
+      expect(provider2).not.toBe(provider1)
+      expect(provider2.getType()).toBe('oidc')
+    })
+
+    it('should allow recovery after fetch error', async () => {
+      // First call fails
+      fetchMock.mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(factory.getProvider()).rejects.toThrow('Network error')
+
+      // configPromise should be cleared on error (existing behavior)
+      // but reset() should also work for explicit cleanup
+      factory.reset()
+
+      // Second call succeeds
+      fetchMock.mockResolvedValueOnce(mockSuccessResponse(oidcConfig))
+
+      const provider = await factory.getProvider()
+
+      expect(provider).toBeDefined()
+      expect(provider.getType()).toBe('oidc')
+    })
+  })
 })

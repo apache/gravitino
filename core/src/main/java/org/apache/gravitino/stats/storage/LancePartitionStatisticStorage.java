@@ -19,24 +19,9 @@
 package org.apache.gravitino.stats.storage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Fragment;
-import com.lancedb.lance.FragmentMetadata;
-import com.lancedb.lance.ReadOptions;
-import com.lancedb.lance.Transaction;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.ipc.LanceScanner;
-import com.lancedb.lance.ipc.ScanOptions;
-import com.lancedb.lance.operation.Append;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,10 +30,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -76,6 +57,16 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
+import org.lance.ReadOptions;
+import org.lance.Session;
+import org.lance.SourcedTransaction;
+import org.lance.WriteParams;
+import org.lance.ipc.LanceScanner;
+import org.lance.ipc.ScanOptions;
+import org.lance.operation.Append;
 
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
@@ -91,12 +82,12 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final int DEFAULT_MAX_ROWS_PER_GROUP = 1000000; // 1M
   private static final String READ_BATCH_SIZE = "readBatchSize";
   private static final int DEFAULT_READ_BATCH_SIZE = 10000; // 10K
-  private static final String DATASET_CACHE_SIZE = "datasetCacheSize";
-  private static final int DEFAULT_DATASET_CACHE_SIZE = 0;
   private static final String METADATA_FILE_CACHE_SIZE = "metadataFileCacheSizeBytes";
   private static final long DEFAULT_METADATA_FILE_CACHE_SIZE = 100L * 1024; // 100KB
   private static final String INDEX_CACHE_SIZE = "indexCacheSizeBytes";
   private static final long DEFAULT_INDEX_CACHE_SIZE = 100L * 1024; // 100KB
+  private static final String MAX_STATISTICS_PER_UPDATE = "maxStatisticsPerUpdate";
+  private static final int DEFAULT_MAX_STATISTICS_PER_UPDATE = 100;
   // The schema is `table_id`, `partition_name`,  `statistic_name`, `statistic_value`, `audit_info`
   private static final String TABLE_ID_COLUMN = "table_id";
   private static final String PARTITION_NAME_COLUMN = "partition_name";
@@ -104,7 +95,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final String STATISTIC_VALUE_COLUMN = "statistic_value";
   private static final String AUDIT_INFO_COLUMN = "audit_info";
 
-  private final Optional<Cache<Long, Dataset>> datasetCache;
+  private final Session session;
 
   private static final Schema SCHEMA =
       new Schema(
@@ -124,7 +115,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final int readBatchSize;
   private final long metadataFileCacheSize;
   private final long indexCacheSize;
-  private final ScheduledThreadPoolExecutor scheduler;
+  private final int maxStatisticsPerUpdate;
 
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
 
@@ -156,13 +147,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             properties.getOrDefault(READ_BATCH_SIZE, String.valueOf(DEFAULT_READ_BATCH_SIZE)));
     Preconditions.checkArgument(
         readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
-    int datasetCacheSize =
-        Integer.parseInt(
-            properties.getOrDefault(
-                DATASET_CACHE_SIZE, String.valueOf(DEFAULT_DATASET_CACHE_SIZE)));
-    Preconditions.checkArgument(
-        datasetCacheSize >= 0,
-        "Lance partition statistics storage datasetCacheSize must be greater than or equal to 0");
     this.metadataFileCacheSize =
         Long.parseLong(
             properties.getOrDefault(
@@ -177,29 +161,24 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         indexCacheSize > 0,
         "Lance partition statistics storage indexCacheSizeBytes must be positive");
 
-    this.properties = properties;
-    if (datasetCacheSize != 0) {
-      this.scheduler =
-          new ScheduledThreadPoolExecutor(
-              1, newDaemonThreadFactory("lance-partition-statistic-storage-cache-cleaner"));
+    this.maxStatisticsPerUpdate =
+        Integer.parseInt(
+            properties.getOrDefault(
+                MAX_STATISTICS_PER_UPDATE, String.valueOf(DEFAULT_MAX_STATISTICS_PER_UPDATE)));
+    Preconditions.checkArgument(
+        maxStatisticsPerUpdate > 0,
+        "Lance partition statistics storage maxStatisticsPerUpdate must be positive");
 
-      this.datasetCache =
-          Optional.of(
-              Caffeine.newBuilder()
-                  .maximumSize(datasetCacheSize)
-                  .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .evictionListener(
-                      (RemovalListener<Long, Dataset>)
-                          (key, value, cause) -> {
-                            if (value != null) {
-                              value.close();
-                            }
-                          })
-                  .build());
-    } else {
-      this.datasetCache = Optional.empty();
-      this.scheduler = null;
-    }
+    this.properties = properties;
+    // Share Lance's index and metadata caches across per-operation datasets through a single
+    // storage-scoped session. Each operation opens and closes its own short-lived dataset, so
+    // there is no cached dataset that a concurrent eviction could close underneath an in-flight
+    // scan.
+    this.session =
+        Session.builder()
+            .indexCacheSizeBytes(indexCacheSize)
+            .metadataCacheSizeBytes(metadataFileCacheSize)
+            .build();
   }
 
   @Override
@@ -234,6 +213,17 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   @Override
   public void updateStatistics(
       String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate) throws IOException {
+    int totalStatisticsCount =
+        statisticsToUpdate.stream()
+            .flatMap(update -> update.partitionUpdates().stream())
+            .mapToInt(partitionUpdate -> partitionUpdate.statistics().size())
+            .sum();
+    Preconditions.checkArgument(
+        totalStatisticsCount <= maxStatisticsPerUpdate,
+        "Total statistics count %s exceeds the maximum limit %s",
+        totalStatisticsCount,
+        maxStatisticsPerUpdate);
+
     try {
       //  TODO: The small updates and deletion may cause performance issues. The storage need to add
       // compaction operations.
@@ -268,33 +258,28 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     Dataset datasetRead = null;
     Dataset newDataset = null;
     try {
-      datasetRead = getDataset(tableId);
+      datasetRead = open(getFilePath(tableId));
       List<FragmentMetadata> fragmentMetas = createFragmentMetadata(tableId, updates);
 
-      Transaction appendTxn =
+      SourcedTransaction appendTxn =
           datasetRead
               .newTransactionBuilder()
               .operation(Append.builder().fragments(fragmentMetas).build())
               .transactionProperties(Collections.emptyMap())
               .build();
       newDataset = appendTxn.commit();
-
-      Dataset finalNewDataset = newDataset;
-      datasetCache.ifPresent(cache -> cache.put(tableId, finalNewDataset));
     } finally {
-      if (!datasetCache.isPresent()) {
-        if (datasetRead != null) {
-          datasetRead.close();
-        }
-        if (newDataset != null) {
-          newDataset.close();
-        }
+      if (datasetRead != null) {
+        datasetRead.close();
+      }
+      if (newDataset != null) {
+        newDataset.close();
       }
     }
   }
 
   private void dropStatisticsImpl(Long tableId, List<PartitionStatisticsDrop> drops) {
-    Dataset dataset = getDataset(tableId);
+    Dataset dataset = open(getFilePath(tableId));
     try {
       List<String> partitionSQLs = Lists.newArrayList();
       for (PartitionStatisticsDrop drop : drops) {
@@ -304,9 +289,11 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             "table_id = "
                 + tableId
                 + " AND partition_name = '"
-                + partition
+                + escapeSqlLiteral(partition)
                 + "' AND statistic_name IN ("
-                + statistics.stream().map(str -> "'" + str + "'").collect(Collectors.joining(", "))
+                + statistics.stream()
+                    .map(str -> "'" + escapeSqlLiteral(str) + "'")
+                    .collect(Collectors.joining(", "))
                 + ")");
       }
 
@@ -318,7 +305,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         dataset.delete(filterSQL);
       }
     } finally {
-      if (!datasetCache.isPresent() && dataset != null) {
+      if (dataset != null) {
         dataset.close();
       }
     }
@@ -326,20 +313,12 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   @Override
   public void close() throws IOException {
+    if (session != null) {
+      session.close();
+    }
     if (allocator != null) {
       allocator.close();
     }
-
-    datasetCache.ifPresent(Cache::invalidateAll);
-
-    if (scheduler != null) {
-      scheduler.shutdown();
-    }
-  }
-
-  @VisibleForTesting
-  Cache<Long, Dataset> getDatasetCache() {
-    return datasetCache.orElse(null);
   }
 
   private String getFilePath(Long tableId) {
@@ -400,16 +379,18 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       root.setRowCount(index);
 
       fragmentMetas =
-          Fragment.create(
-              getFilePath(tableId),
-              allocator,
-              root,
-              new WriteParams.Builder()
-                  .withMaxRowsPerFile(maxRowsPerFile)
-                  .withMaxBytesPerFile(maxBytesPerFile)
-                  .withMaxRowsPerGroup(maxRowsPerGroup)
-                  .withStorageOptions(properties)
-                  .build());
+          Fragment.write()
+              .datasetUri(getFilePath(tableId))
+              .allocator(allocator)
+              .data(root)
+              .writeParams(
+                  new WriteParams.Builder()
+                      .withMaxRowsPerFile(maxRowsPerFile)
+                      .withMaxBytesPerFile(maxBytesPerFile)
+                      .withMaxRowsPerGroup(maxRowsPerGroup)
+                      .withStorageOptions(properties)
+                      .build())
+              .execute();
       return fragmentMetas;
     }
   }
@@ -427,7 +408,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                                 "AND partition_name "
                                     + (type == PartitionRange.BoundType.CLOSED ? ">= " : "> ")
                                     + "'"
-                                    + name
+                                    + escapeSqlLiteral(name)
                                     + "'"))
             .orElse("");
     String toPartitionNameFilter =
@@ -442,18 +423,24 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                                 "AND partition_name "
                                     + (type == PartitionRange.BoundType.CLOSED ? "<= " : "< ")
                                     + "'"
-                                    + name
+                                    + escapeSqlLiteral(name)
                                     + "'"))
             .orElse("");
 
     return fromPartitionNameFilter + toPartitionNameFilter;
   }
 
+  private static String escapeSqlLiteral(String value) {
+    return value.replace("'", "''");
+  }
+
   private List<PersistedPartitionStatistics> listStatisticsImpl(
       Long tableId, String partitionFilter) {
+    return listStatisticsWith(open(getFilePath(tableId)), tableId, partitionFilter);
+  }
 
-    Dataset dataset = getDataset(tableId);
-
+  private List<PersistedPartitionStatistics> listStatisticsWith(
+      Dataset dataset, Long tableId, String partitionFilter) {
     String filter = "table_id = " + tableId + partitionFilter;
 
     try (LanceScanner scanner =
@@ -508,54 +495,30 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {
-      if (!datasetCache.isPresent() && dataset != null) {
+      if (dataset != null) {
         dataset.close();
       }
     }
   }
 
-  private Dataset getDataset(Long tableId) {
-    AtomicBoolean newlyCreated = new AtomicBoolean(false);
-    return datasetCache
-        .map(
-            cache -> {
-              Dataset cachedDataset =
-                  cache.get(
-                      tableId,
-                      id -> {
-                        newlyCreated.set(true);
-                        return open(getFilePath(id));
-                      });
-
-              // Ensure dataset uses the latest version
-              if (!newlyCreated.get()) {
-                cachedDataset.checkoutLatest();
-              }
-
-              return cachedDataset;
-            })
-        .orElse(open(getFilePath(tableId)));
-  }
-
   private Dataset open(String fileName) {
     try {
-      return Dataset.open(
-          allocator,
-          fileName,
-          new ReadOptions.Builder()
-              .setMetadataCacheSizeBytes(metadataFileCacheSize)
-              .setIndexCacheSizeBytes(indexCacheSize)
-              .build());
+      return Dataset.open()
+          .allocator(allocator)
+          .uri(fileName)
+          .readOptions(new ReadOptions.Builder().setSession(session).build())
+          .build();
     } catch (IllegalArgumentException illegalArgumentException) {
       if (illegalArgumentException.getMessage().contains("was not found")) {
-        return Dataset.create(allocator, fileName, SCHEMA, new WriteParams.Builder().build());
+        return Dataset.write()
+            .allocator(allocator)
+            .schema(SCHEMA)
+            .uri(fileName)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute();
       } else {
         throw illegalArgumentException;
       }
     }
-  }
-
-  private ThreadFactory newDaemonThreadFactory(String name) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
   }
 }

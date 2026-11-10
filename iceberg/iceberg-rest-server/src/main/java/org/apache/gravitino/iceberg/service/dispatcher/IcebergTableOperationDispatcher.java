@@ -19,13 +19,20 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.Optional;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.metrics.CommitReport;
+import org.apache.iceberg.metrics.MetricsReport;
+import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -99,6 +106,41 @@ public interface IcebergTableOperationDispatcher {
   boolean tableExists(IcebergRequestContext context, TableIdentifier tableIdentifier);
 
   /**
+   * Checks that a metrics report can be recorded for an Iceberg table: the table must exist and the
+   * report must name it.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier from the request path.
+   * @param report The metrics report sent by the client.
+   * @throws NoSuchTableException if the table does not exist.
+   * @throws IllegalArgumentException if the report is of an unsupported type or names another
+   *     table.
+   */
+  default void checkTableMetricsReport(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, MetricsReport report) {
+    if (!tableExists(context, tableIdentifier)) {
+      throw new NoSuchTableException("Table %s not found", tableIdentifier);
+    }
+    String reportedTableName;
+    if (report instanceof CommitReport) {
+      reportedTableName = ((CommitReport) report).tableName();
+    } else if (report instanceof ScanReport) {
+      reportedTableName = ((ScanReport) report).tableName();
+    } else {
+      throw new IllegalArgumentException("Unsupported metrics report type");
+    }
+    String tableName = tableIdentifier.name();
+    String qualifiedTableName = tableIdentifier.toString();
+    if (reportedTableName == null
+        || (!tableName.equals(reportedTableName)
+            && !qualifiedTableName.equals(reportedTableName)
+            && !reportedTableName.endsWith("." + qualifiedTableName))) {
+      throw new IllegalArgumentException(
+          "Metrics report table name does not match the requested table");
+    }
+  }
+
+  /**
    * Rename an Iceberg table.
    *
    * @param context Iceberg REST request context information.
@@ -133,4 +175,30 @@ public interface IcebergTableOperationDispatcher {
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest);
+
+  /**
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior {@link #planTableScan} call,
+   * completing the second step of the Iceberg REST two-step scan planning protocol.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param request The request carrying the {@code plan-task}.
+   * @return A {@link FetchScanTasksResponse} containing the scan tasks for that plan task.
+   */
+  FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request);
+
+  /**
+   * Retrieves the metadata file location for a table without loading full table metadata. This is
+   * an optional fast path for catalogs that support cheap metadata location retrieval.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return an Optional containing the metadata file location, or empty if the catalog doesn't
+   *     support this operation
+   */
+  Optional<String> getTableMetadataLocation(
+      IcebergRequestContext context, TableIdentifier tableIdentifier);
 }

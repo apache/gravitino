@@ -15,8 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 from functools import reduce
-from typing import ClassVar, List, Optional
+from typing import ClassVar, List, Optional, Dict
 
 from gravitino.api.rel.indexes.index import Index
 from gravitino.utils.precondition import Precondition
@@ -36,6 +38,7 @@ class IndexDTO(Index):
         index_type: Index.IndexType,
         name: Optional[str],
         field_names: List[List[str]],
+        properties: Optional[Dict[str, str]] = None,
     ):
         Precondition.check_argument(index_type is not None, "Index type cannot be null")
         Precondition.check_argument(
@@ -46,12 +49,16 @@ class IndexDTO(Index):
         self._index_type = index_type
         self._name = name
         self._field_names = field_names
+        self._properties = properties or {}
 
     def type(self) -> Index.IndexType:
         return self._index_type
 
     def name(self) -> Optional[str]:
         return self._name
+
+    def properties(self) -> Dict[str, str]:
+        return self._properties
 
     def field_names(self) -> List[List[str]]:
         return self._field_names
@@ -63,10 +70,13 @@ class IndexDTO(Index):
             self._index_type is other.type()
             and self._name == other.name()
             and self._field_names == other.field_names()
+            and self._properties == other.properties()
         )
 
     def __hash__(self) -> int:
-        initial_hash = hash((self._index_type, self._name))
+        initial_hash = hash(
+            (self._index_type, self._name, frozenset(self._properties.items()))
+        )
         return reduce(
             lambda result, field_name: 31 * result + hash(tuple(field_name)),
             self._field_names,

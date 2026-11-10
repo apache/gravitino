@@ -68,6 +68,7 @@ public interface Entity extends Serializable {
     SCHEMA,
     TABLE,
     VIEW,
+    SEMANTIC_MODEL,
     COLUMN,
     FILESET,
     TOPIC,
@@ -91,7 +92,7 @@ public interface Entity extends Serializable {
    * @throws IllegalArgumentException If the validation fails.
    */
   default void validate() throws IllegalArgumentException {
-    fields().forEach(Field::validate);
+    fields().forEach((field, value) -> field.validate(value, type()));
   }
 
   /**

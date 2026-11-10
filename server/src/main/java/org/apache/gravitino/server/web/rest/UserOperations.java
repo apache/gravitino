@@ -51,6 +51,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class UserOperations {
   private static final Logger LOG = LoggerFactory.getLogger(UserOperations.class);
 
   private static final String LOAD_USER_PRIVILEGE =
-      "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
+      AuthorizationExpressionConstants.LOAD_USER_AUTHORIZATION_EXPRESSION;
 
   private final AccessControlDispatcher accessControlManager;
   private final OwnerDispatcher ownerManager;
@@ -75,7 +76,7 @@ public class UserOperations {
     // and Jersey injection doesn't support null value. So UserOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
-    this.ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    this.ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
   }
 
   @GET
@@ -153,20 +154,27 @@ public class UserOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       UserAddRequest request) {
+    if (request == null) {
+      LOG.warn("Received add user request with null request body");
+      return ExceptionHandlers.handleUserException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String userName = request.getName();
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            return Utils.ok(
-                new UserResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.addUser(metalake, request.getName()))));
+            User addedUser = accessControlManager.addUser(metalake, request.getName());
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(addedUser)));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(
-          OperationType.ADD, request.getName(), metalake, e);
+      return ExceptionHandlers.handleUserException(OperationType.ADD, userName, metalake, e);
     }
   }
 

@@ -19,10 +19,16 @@
 
 package org.apache.gravitino.maintenance.optimizer.common.util;
 
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.callback.ConsoleMonitorCallback;
+import org.apache.gravitino.maintenance.optimizer.monitor.callback.MonitorCallbackForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
+import org.apache.gravitino.maintenance.optimizer.monitor.job.dummy.DummyTableJobRelationProvider;
+import org.apache.gravitino.maintenance.optimizer.monitor.metrics.MetricsProviderForTest;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.GravitinoJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
 import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
@@ -67,5 +73,30 @@ public class TestProviderUtils {
         ProviderUtils.createTableMetadataProviderInstance(GravitinoTableMetadataProvider.NAME);
     Assertions.assertNotNull(tableMetadataProvider);
     Assertions.assertTrue(tableMetadataProvider instanceof GravitinoTableMetadataProvider);
+  }
+
+  @Test
+  public void testCreateMonitorProviders() {
+    Assertions.assertTrue(
+        ProviderUtils.createMetricsProviderInstance(MetricsProviderForTest.NAME)
+            instanceof MetricsProviderForTest);
+    Assertions.assertTrue(
+        ProviderUtils.createTableJobRelationProviderInstance(TableJobRelationProviderForTest.NAME)
+            instanceof TableJobRelationProviderForTest);
+    DummyTableJobRelationProvider dummyTableJobRelationProvider =
+        (DummyTableJobRelationProvider)
+            ProviderUtils.createTableJobRelationProviderInstance(
+                DummyTableJobRelationProvider.NAME);
+    Assertions.assertNotNull(dummyTableJobRelationProvider);
+    Assertions.assertTrue(
+        dummyTableJobRelationProvider
+            .jobIdentifiers(NameIdentifier.parse("catalog.db.table"))
+            .isEmpty());
+    Assertions.assertTrue(
+        ProviderUtils.createMonitorCallbackInstance(ConsoleMonitorCallback.NAME)
+            instanceof ConsoleMonitorCallback);
+    Assertions.assertTrue(
+        ProviderUtils.createMonitorCallbackInstance(MonitorCallbackForTest.NAME)
+            instanceof MonitorCallbackForTest);
   }
 }

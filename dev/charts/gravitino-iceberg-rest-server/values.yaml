@@ -21,7 +21,7 @@ replicas: 1
 
 image:
   repository: apache/gravitino-iceberg-rest
-  tag: 1.2.0-SNAPSHOT
+  tag: 2.0.0-SNAPSHOT
   pullPolicy: IfNotPresent
   ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -42,6 +42,8 @@ icebergRest:
   host: 0.0.0.0
   # The http port number of the built-in web server
   httpPort: 9001
+  # Enable unauthenticated metrics endpoints only on a trusted network.
+  metricsEnabled: false
   # The min thread size of the built-in web server
   minThreads: 24
   # The max thread size of the built-in web server
@@ -160,29 +162,37 @@ log4j2Properties: {}
   # basePath: "${sys:gravitino.log.path}"
   # serverName: "${sys:gravitino.server.name}"
 
+  ## Log retention. Rolled archives are kept for logMaxAge. Their total size is also capped: when the
+  ## cap is exceeded, the oldest archives are deleted first.
+  # logMaxAge: 30d
+  # serverLogMaxTotalSize: 2GB
+
   ## RollingFileAppender name, pattern, path and rollover policy
   # rollingAppenderType: RollingFile
   # rollingAppenderName: fileLogger
   # rollingAppenderFileName: "${basePath}/${serverName}.log"
-  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.log.gz"
+  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.%i.log.gz"
+  ## When you change the archive name, set rollingAppenderStrategyDeleteIfFileNameGlob to match it.
   # rollingAppenderLayoutType: PatternLayout
   # rollingAppenderLayoutPattern: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n"
   # rollingAppenderPoliciesType: Policies
 
   ## RollingFileAppender rotation policy
   # rollingAppenderPoliciesSizeType: SizeBasedTriggeringPolicy
-  # rollingAppenderPoliciesSizeSize: 10MB
+  # rollingAppenderPoliciesSizeSize: 100MB
   # rollingAppenderPoliciesTimeType: TimeBasedTriggeringPolicy
   # rollingAppenderPoliciesTimeInterval: 1
   # rollingAppenderPoliciesTimeModulate: true
   # rollingAppenderStrategyType: DefaultRolloverStrategy
+  # rollingAppenderStrategyFileIndex: nomax
   # rollingAppenderStrategyDeleteType: Delete
   # rollingAppenderStrategyDeleteBasePath: "${basePath}"
-  # rollingAppenderStrategyDeleteMaxDepth: 10
+  # rollingAppenderStrategyDeleteMaxDepth: 1
+  # rollingAppenderStrategyDeleteIfFileNameGlob: "${serverName}_*.log.gz"
   # rollingAppenderStrategyDeleteIfLastModifiedType: IfLastModified
 
-  ## Delete all files older than 30 days
-  # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
+  ## Delete archives older than this age. Defaults to logMaxAge.
+  # rollingAppenderStrategyDeleteIfLastModifiedAge: "${logMaxAge}"
 
   ## Lineage log appender configurations
   # lineageFileType: RollingFile
@@ -247,20 +257,16 @@ podSecurityContext: {}
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
 securityContext:
-  runAsNonRoot: false
-  runAsUser: 0
+  runAsNonRoot: true
+  runAsUser: 1000
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 ## Container Environment
 ##
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-iceberg-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
@@ -281,7 +287,7 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Iceberg Rest Catalog Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-iceberg-rest-server.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-iceberg-rest-server.sh
 
 ## Readiness probe for the Gravitino deployment
 ##
@@ -323,10 +329,14 @@ extraVolumes:
 ##
 extraVolumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-iceberg-rest-server/logs
+    mountPath: /opt/gravitino-iceberg-rest-server/logs
 
 ingress:
   enabled: false
+  # Resource type to render when ingress is enabled.
+  # "ingress"  renders a Kubernetes Ingress (apiVersion selected by cluster version; default, backward compatible).
+  # "gateway"  renders a Gateway API gateway.networking.k8s.io HTTPRoute instead.
+  type: ingress
   className: "nginx"
   annotations: {}
     # kubernetes.io/ingress.class: nginx
@@ -343,6 +353,21 @@ ingress:
   #  - secretName: chart-gravitino-tls
   #    hosts:
   #      - chart-gravitino.local
+  # Gateway API (HTTPRoute) settings. Used only when type is "gateway".
+  # hosts (above) become the HTTPRoute hostnames and rule paths; annotations are reused.
+  # In gateway mode each path's pathType is mapped to a Gateway API match type:
+  #   Exact                  -> Exact
+  #   Prefix                 -> PathPrefix
+  #   ImplementationSpecific -> PathPrefix (Gateway API has no equivalent; treated as a prefix match)
+  # Any other value fails template rendering (RegularExpression is not supported).
+  gateway:
+    # Only gateway.networking.k8s.io/v1 (the GA version) is supported and tested.
+    apiVersion: gateway.networking.k8s.io/v1
+    # Parent Gateway(s) this HTTPRoute attaches to.
+    parentRefs: []
+    #  - name: gateway
+    #    namespace: gateway-system
+    #    sectionName: http
 
 
 nodeSelector: {}
@@ -350,6 +375,8 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+topologySpreadConstraints: []
 
 ## PodDisruptionBudget configuration
 ## PodDisruptionBudgets limit the number of pods that can be down simultaneously during voluntary disruptions

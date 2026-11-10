@@ -27,6 +27,9 @@ public enum AuthenticatorType {
   /** Simple authentication. */
   SIMPLE,
 
+  /** Built-in IdP HTTP Basic authentication. */
+  BASIC,
+
   /** Authentication that uses OAuth. */
   OAUTH,
 

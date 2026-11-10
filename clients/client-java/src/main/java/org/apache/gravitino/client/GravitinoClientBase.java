@@ -29,10 +29,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -57,7 +59,8 @@ public abstract class GravitinoClientBase implements Closeable {
   protected static final String API_METALAKES_IDENTIFIER_PATH = API_METALAKES_LIST_PATH + "/";
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider, and null
+   * tlsConfigurer.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
@@ -71,27 +74,45 @@ public abstract class GravitinoClientBase implements Closeable {
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
+    this(uri, authDataProvider, checkVersion, headers, properties, null);
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider, and
+   * tlsConfigurer.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param headers The base header of the Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The configurer to apply for the underlying TLS settings
+   */
+  protected GravitinoClientBase(
+      String uri,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers,
+      Map<String, String> properties,
+      TLSConfigurer tlsConfigurer) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
-    if (checkVersion) {
-      this.restClient =
-          HTTPClient.builder(properties)
-              .uri(uri)
-              .withAuthDataProvider(authDataProvider)
-              .withObjectMapper(mapper)
-              .withPreConnectHandler(this::checkVersion)
-              .withHeaders(headers)
-              .build();
+    HTTPClient.Builder httpBuilder =
+        HTTPClient.builder(properties)
+            .uri(uri)
+            .withAuthDataProvider(authDataProvider)
+            .withObjectMapper(mapper)
+            .withHeaders(headers);
 
-    } else {
-      this.restClient =
-          HTTPClient.builder(properties)
-              .uri(uri)
-              .withAuthDataProvider(authDataProvider)
-              .withObjectMapper(mapper)
-              .withHeaders(headers)
-              .build();
+    if (tlsConfigurer != null) {
+      httpBuilder.withTlsConfigurer(tlsConfigurer);
     }
+
+    if (checkVersion) {
+      httpBuilder.withPreConnectHandler(this::checkVersion);
+    }
+
+    this.restClient = httpBuilder.build();
   }
 
   /**
@@ -185,6 +206,27 @@ public abstract class GravitinoClientBase implements Closeable {
     return new GravitinoVersion(resp.getVersion());
   }
 
+  /**
+   * Retrieves the endpoint of the Gravitino Iceberg REST server, if it is running and serves the
+   * given metalake.
+   *
+   * @param metalakeName the metalake the caller intends to route through the Iceberg REST server
+   * @return the Iceberg REST server endpoint, or empty if it is not running or serves a different
+   *     metalake
+   */
+  public Optional<String> icebergRestServiceUri(String metalakeName) {
+    IcebergRESTServiceResponse resp =
+        restClient.get(
+            "api/system/iceberg-rest",
+            ImmutableMap.of("metalake", metalakeName),
+            IcebergRESTServiceResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+    resp.validate();
+
+    return Optional.ofNullable(resp.getUri());
+  }
+
   /** Closes the GravitinoClient and releases any underlying resources. */
   @Override
   public void close() {
@@ -214,6 +256,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected Map<String, String> headers = ImmutableMap.of();
     /** A map of properties (key-value pairs) used to configure the Gravitino client. */
     protected Map<String, String> properties = ImmutableMap.of();
+    /** The configurer to apply for the underlying TLS settings. */
+    protected TLSConfigurer tlsConfigurer;
 
     /**
      * The constructor for the Builder class.
@@ -273,6 +317,20 @@ public abstract class GravitinoClientBase implements Closeable {
     public Builder<T> withSimpleAuth(String userName) {
       Preconditions.checkArgument(StringUtils.isNotBlank(userName), "userName can't be blank");
       this.authDataProvider = new SimpleTokenProvider(userName);
+      return this;
+    }
+
+    /**
+     * Sets HTTP Basic authentication for Gravitino.
+     *
+     * @param username The username for Basic authentication.
+     * @param password The password for Basic authentication.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withBasicAuth(String username, String password) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(username), "username can't be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(password), "password can't be blank");
+      this.authDataProvider = new BasicTokenProvider(username, password);
       return this;
     }
 
@@ -353,6 +411,19 @@ public abstract class GravitinoClientBase implements Closeable {
       if (properties != null) {
         this.properties = ImmutableMap.copyOf(properties);
       }
+      return this;
+    }
+
+    /**
+     * Configures TLS for the Gravitino client.
+     *
+     * @param tlsConfigurer The configurer to apply for the underlying TLS settings
+     * @return this builder instance for method chaining
+     */
+    public Builder<T> withTlsConfigurer(TLSConfigurer tlsConfigurer) {
+      Preconditions.checkArgument(tlsConfigurer != null, "TLS configurer cannot be null");
+
+      this.tlsConfigurer = tlsConfigurer;
       return this;
     }
 

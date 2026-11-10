@@ -1,9 +1,11 @@
 ---
-title: "Spark connector JDBC catalog"
-slug: /spark-connector/spark-catalog-jdbc
-keyword: spark connector jdbc catalog
+title: "Spark Connector: JDBC Catalog"
+slug: "/spark-connector/spark-catalog-jdbc"
+keyword: "spark connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server.
 
@@ -13,9 +15,9 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 ## Capabilities
 
-Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dialects could use Mysql driver and Mysql Dialects as a trackoff way. But for Doris which do not support MySQL Dialects, are not currently supported.
+Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround. Doris, which does not support MySQL dialects, is not supported.
 
-#### Support DML and DDL operations:
+### DML and DDL Operations
 
 - `CREATE TABLE`
 - `DROP TABLE`
@@ -27,13 +29,13 @@ Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dial
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
   :::
 
-#### Not supported operations:
+### Unsupported Operations
 
 - `UPDATE`
 - `DELETE`
 - `TRUNCATE`
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose mysql_a is the mysql catalog name managed by Gravitino
@@ -61,16 +63,16 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark JDBC connector configuration.
 
-| Gravitino catalog property name | Spark JDBC connector configuration | Description                                                                                                                                                                                                         | Since Version |
-|---------------------------------|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `jdbc-url`                      | `url`                              | JDBC URL for connecting to the database. For example, jdbc:mysql://localhost:3306                                                                                                                                   | 0.3.0         |
-| `jdbc-user`                     | `jdbc.user`                        | JDBC user name                                                                                                                                                                                                      | 0.3.0         |
-| `jdbc-password`                 | `jdbc.password`                    | JDBC password                                                                                                                                                                                                       | 0.3.0         |
-| `jdbc-driver`                   | `driver`                           | The driver of the JDBC connection. For example, com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver                                                                                                                   | 0.3.0         |
+| Gravitino catalog property name | Spark JDBC connector configuration | Description                                                                                       |
+|---------------------------------|------------------------------------|---------------------------------------------------------------------------------------------------|
+| `jdbc-url`                      | `url`                              | JDBC URL for connecting to the database. For example, jdbc:mysql://localhost:3306                 |
+| `jdbc-user`                     | `jdbc.user`                        | JDBC user name                                                                                    |
+| `jdbc-password`                 | `jdbc.password`                    | JDBC password                                                                                     |
+| `jdbc-driver`                   | `driver`                           | The driver of the JDBC connection. For example, com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark JDBC connector.
 

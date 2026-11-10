@@ -19,11 +19,13 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
@@ -69,7 +71,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),
@@ -82,7 +84,12 @@ public class ModelHookDispatcher implements ModelDispatcher {
 
   @Override
   public boolean deleteModel(NameIdentifier ident) {
-    return dispatcher.deleteModel(ident);
+    boolean deleted = dispatcher.deleteModel(ident);
+    if (deleted) {
+      // A model registered later under the same name gets a new id, so drop the cached mapping.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.MODEL);
+    }
+    return deleted;
   }
 
   @Override
@@ -157,10 +164,10 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
-          ident.name(),
+          ident.namespace().level(0),
           NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
@@ -181,7 +188,11 @@ public class ModelHookDispatcher implements ModelDispatcher {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    return dispatcher.alterModel(ident, changes);
+    Model alteredModel = dispatcher.alterModel(ident, changes);
+    if (Arrays.stream(changes).anyMatch(change -> change instanceof ModelChange.RenameModel)) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.MODEL);
+    }
+    return alteredModel;
   }
 
   @Override

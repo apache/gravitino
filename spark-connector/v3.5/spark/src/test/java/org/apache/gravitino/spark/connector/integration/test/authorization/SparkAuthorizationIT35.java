@@ -17,4 +17,5 @@
 
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
+/** Spark 3.5 authorization integration tests. */
 public class SparkAuthorizationIT35 extends SparkAuthorizationIT {}

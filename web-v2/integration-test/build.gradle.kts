@@ -53,11 +53,12 @@ dependencies {
 }
 
 tasks.test {
+  val skipWeb = (rootProject.findProperty("skipWeb") as? String)?.toBoolean() ?: false
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("*")
   } else {
-    dependsOn(":trino-connector:trino-connector:jar")
+    dependsOn(":trino-connector:trino-connector-482-483:copyLibs")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-doris:jar", ":catalogs:catalog-jdbc-doris:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
@@ -67,6 +68,8 @@ tasks.test {
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     // Frontend tests depend on the web page, so we need to build the web module first.
-    dependsOn(":web-v2:web:build")
+    if (!skipWeb) {
+      dependsOn(":web-v2:web:build")
+    }
   }
 }

@@ -37,7 +37,7 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
             PropertyEntry.integerOptionalPropertyEntry(
                 PARTITION_COUNT,
                 "The number of partitions for the topic, if not specified, "
-                    + "will use the num.partition property in the broker",
+                    + "will use the num.partitions property in the broker",
                 false /* immutable */,
                 null /* default value */,
                 false /* hidden */),

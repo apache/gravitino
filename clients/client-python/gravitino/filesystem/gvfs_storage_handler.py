@@ -19,6 +19,7 @@ import logging
 import sys
 import time
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Tuple, List, Dict, Any
 
@@ -40,10 +41,33 @@ from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
 
+try:
+    from google.auth.credentials import Credentials
+    from google.auth.exceptions import RefreshError
+
+    GOOGLE_AUTH_AVAILABLE = True
+except ImportError:
+    GOOGLE_AUTH_AVAILABLE = False
+
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 SLASH = "/"
 
 logger = logging.getLogger(__name__)
+
+
+def _import_optional_storage_module(module_name: str, extra_name: str):
+    """Import a provider dependency with an actionable optional-extra error."""
+    try:
+        return importlib.import_module(module_name)
+    except ModuleNotFoundError as error:
+        provider_module = module_name.split(".", maxsplit=1)[0]
+        if error.name != provider_module:
+            raise
+        raise GravitinoRuntimeException(
+            f"Storage provider dependency '{provider_module}' "
+            "is not installed. "
+            f'Install it with `pip install "apache-gravitino[{extra_name}]"`.'
+        ) from error
 
 
 class StorageType(Enum):
@@ -247,7 +271,9 @@ class HDFSStorageHandler(StorageHandler):
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
-        fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
+        fs_class = _import_optional_storage_module(
+            "pyarrow.fs", "hdfs"
+        ).HadoopFileSystem
         return ArrowFSWrapper(fs_class.from_uri(actual_path))
 
     def get_filesystem_with_expiration(
@@ -353,7 +379,8 @@ class S3StorageHandler(StorageHandler):
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
-        return importlib.import_module("s3fs").S3FileSystem(**kwargs)
+        s3fs = _import_optional_storage_module("s3fs", "s3")
+        return s3fs.S3FileSystem(**kwargs)
 
     def _get_actual_prefix(
         self,
@@ -386,7 +413,8 @@ class GCSStorageHandler(StorageHandler):
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
-        return importlib.import_module("gcsfs").GCSFileSystem(**kwargs)
+        gcsfs = _import_optional_storage_module("gcsfs", "gcs")
+        return gcsfs.GCSFileSystem(**kwargs)
 
     def get_filesystem_with_expiration(
         self,
@@ -403,10 +431,51 @@ class GCSStorageHandler(StorageHandler):
                     catalog_props,
                 )
                 if isinstance(credential, GCSTokenCredential):
+                    if not GOOGLE_AUTH_AVAILABLE:
+                        raise GravitinoRuntimeException(
+                            "Failed to import google.auth. "
+                            "Install the GCS extra with "
+                            '`pip install "apache-gravitino[gcs]"`.'
+                        )
+
+                    # gcsfs expects a google.auth.credentials.Credentials object
+                    # We need to create a credentials object from the access token
+                    class StaticCredentials(Credentials):
+                        """A credentials object that uses a static access token."""
+
+                        def __init__(self, token_value, expiry_time_ms):
+                            super().__init__()
+                            self.token = token_value
+                            # Convert milliseconds to datetime
+                            self.expiry = datetime.fromtimestamp(
+                                expiry_time_ms / 1000.0, tz=timezone.utc
+                            )
+
+                        def refresh(self, request):
+                            # Static token cannot be refreshed
+                            raise RefreshError(
+                                "Cannot refresh static access token. "
+                                "Please request a new credential from Gravitino."
+                            )
+
+                        @property
+                        def expired(self):
+                            if not self.expiry:
+                                return False
+                            return datetime.now(timezone.utc) >= self.expiry
+
+                        @property
+                        def valid(self):
+                            return self.token is not None and not self.expired
+
+                    creds = StaticCredentials(
+                        credential.token(), credential.expire_time_in_ms()
+                    )
+
                     return (
                         expire_time,
                         self.get_filesystem(
-                            token=credential.token(),
+                            token=creds,
                             **kwargs,
                         ),
                     )
@@ -460,7 +529,8 @@ class OSSStorageHandler(StorageHandler):
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
-        return importlib.import_module("ossfs").OSSFileSystem(**kwargs)
+        ossfs = _import_optional_storage_module("ossfs", "oss")
+        return ossfs.OSSFileSystem(**kwargs)
 
     def get_filesystem_with_expiration(
         self,
@@ -519,7 +589,7 @@ class OSSStorageHandler(StorageHandler):
 
         return (
             TIME_WITHOUT_EXPIRATION,
-            importlib.import_module("ossfs").OSSFileSystem(
+            self.get_filesystem(
                 key=oss_access_key_id,
                 secret=oss_secret_access_key,
                 endpoint=oss_endpoint,
@@ -564,7 +634,8 @@ class ABSStorageHandler(StorageHandler):
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
-        return importlib.import_module("adlfs").AzureBlobFileSystem(**kwargs)
+        adlfs = _import_optional_storage_module("adlfs", "azure")
+        return adlfs.AzureBlobFileSystem(**kwargs)
 
     def get_filesystem_with_expiration(
         self,

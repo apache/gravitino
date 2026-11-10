@@ -1,6 +1,6 @@
 ---
-title: "Delta Lake table support"
-slug: /delta-table-support
+title: "Delta Lake Tables"
+slug: "/delta-table-support"
 keywords:
 - lakehouse
 - delta
@@ -18,9 +18,9 @@ import TabItem from '@theme/TabItem';
 
 This document describes how to use Apache Gravitino to manage a generic lakehouse catalog using Delta Lake as the underlying table format. Gravitino supports registering and managing metadata for external Delta tables.
 
-:::info Current Support
-Gravitino currently supports **external Delta tables only**. This means:
-- You can register existing Delta tables in Gravitino
+:::info Supported Operations
+Gravitino supports **external Delta tables only**. This means:
+- Register existing Delta tables in Gravitino
 - Gravitino manages metadata only (schema, location, properties)
 - The physical Delta table data remains independent
 - Dropping tables from Gravitino does not delete the underlying Delta data
@@ -55,34 +55,34 @@ For Delta tables in a Generic Lakehouse Catalog, the following table summarizes 
 
 Delta Lake uses Apache Spark data types. The following table shows type mappings between Gravitino and Delta/Spark:
 
-| Gravitino Type      | Delta/Spark Type       | Notes                           |
-|---------------------|------------------------|---------------------------------|
-| `Boolean`           | `BooleanType`          |                                 |
-| `Byte`              | `ByteType`             |                                 |
-| `Short`             | `ShortType`            |                                 |
-| `Integer`           | `IntegerType`          |                                 |
-| `Long`              | `LongType`             |                                 |
-| `Float`             | `FloatType`            |                                 |
-| `Double`            | `DoubleType`           |                                 |
-| `Decimal(p, s)`     | `DecimalType(p, s)`    |                                 |
-| `String`            | `StringType`           |                                 |
-| `Binary`            | `BinaryType`           |                                 |
-| `Date`              | `DateType`             |                                 |
-| `Timestamp`         | `TimestampNTZType`     | No timezone, Spark 3.4+         |
-| `Timestamp_tz`      | `TimestampType`        | With timezone                   |
-| `List`              | `ArrayType`            |                                 |
-| `Map`               | `MapType`              |                                 |
-| `Struct`            | `StructType`           |                                 |
+| Gravitino Type  | Delta/Spark Type    | Notes                   |
+|-----------------|---------------------|-------------------------|
+| `Boolean`       | `BooleanType`       |                         |
+| `Byte`          | `ByteType`          |                         |
+| `Short`         | `ShortType`         |                         |
+| `Integer`       | `IntegerType`       |                         |
+| `Long`          | `LongType`          |                         |
+| `Float`         | `FloatType`         |                         |
+| `Double`        | `DoubleType`        |                         |
+| `Decimal(p, s)` | `DecimalType(p, s)` |                         |
+| `String`        | `StringType`        |                         |
+| `Binary`        | `BinaryType`        |                         |
+| `Date`          | `DateType`          |                         |
+| `Timestamp`     | `TimestampNTZType`  | No timezone, Spark 3.4+ |
+| `Timestamp_tz`  | `TimestampType`     | With timezone           |
+| `List`          | `ArrayType`         |                         |
+| `Map`           | `MapType`           |                         |
+| `Struct`        | `StructType`        |                         |
 
 ### Table Properties
 
 Required and optional properties for Delta tables in a Generic Lakehouse Catalog:
 
-| Property   | Description                                                                                                                                                                                                            | Default | Required | Since Version |
-|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------|---------------|
-| `format`   | Table format: must be `delta`                                                                                                                                                                                          | (none)  | Yes      | 1.2.0         |
-| `location` | Storage path for the Delta table. Must point to a directory containing Delta Lake metadata (_delta_log). Supports file://, s3://, hdfs://, abfs://, gs://, and other Hadoop-compatible file systems.                  | (none)  | Yes      | 1.2.0         |
-| `external` | Must be `true` for Delta tables. Indicates that Gravitino manages metadata only <br/>and will not delete physical data when the table is dropped.                                                                           | (none)  | Yes      | 1.2.0         |
+| Property   | Description                                                                                                                                                                                          | Default | Required |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------|
+| `format`   | Table format: must be `delta`                                                                                                                                                                        | (none)  | Yes      |
+| `location` | Storage path for the Delta table. Must point to a directory containing Delta Lake metadata (_delta_log). Supports file://, s3://, hdfs://, abfs://, gs://, and other Hadoop-compatible file systems. | (none)  | Yes      |
+| `external` | Must be `true` for Delta tables. Indicates that Gravitino manages metadata only <br/>and will not delete physical data when the table is dropped.                                                    | (none)  | Yes      |
 
 **Location Requirement:** Must be specified at table level for external Delta table. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
@@ -92,7 +92,7 @@ Table operations follow standard relational catalog patterns with Delta-specific
 
 The following sections provide examples and important details for working with Delta tables.
 
-#### Registering an External Delta Table
+#### Register an External Delta Table
 
 Register an existing Delta table in Gravitino without moving or modifying the underlying data:
 
@@ -183,7 +183,7 @@ When registering a Delta table in Gravitino, you must provide the schema (column
 **Best Practice:** Ensure the schema you provide matches the actual Delta table schema to avoid inconsistencies.
 :::
 
-#### Loading a Delta Table
+#### Load a Delta Table
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -208,7 +208,7 @@ System.out.println("Columns: " + Arrays.toString(table.columns()));
 </TabItem>
 </Tabs>
 
-#### Dropping a Delta Table
+#### Drop a Delta Table
 
 Dropping a Delta table from Gravitino removes only the metadata entry. The physical Delta table data remains intact.
 
@@ -242,9 +242,9 @@ Since Delta tables are external, dropping them from Gravitino:
 The Delta table can still be accessed directly via Delta Lake APIs, Spark, or other tools.
 :::
 
-## Working with Delta Tables
+## Work with Delta Tables
 
-### Using Spark to Modify Delta Tables
+### Modify Delta Tables with Spark
 
 Since Gravitino does not support ALTER operations for Delta tables, use Apache Spark or other Delta Lake tools to modify table structure:
 
@@ -281,7 +281,7 @@ After modifying the Delta table, you can:
 1. Drop the table from Gravitino
 2. Re-register it with the updated schema
 
-### Reading Delta Tables via Gravitino
+### Read Delta Tables via Gravitino
 
 Once registered in Gravitino, you can query Delta table metadata and use the location to read data:
 
@@ -366,7 +366,7 @@ manually remove files from the storage location
 
 ## Limitations and Future Work
 
-### Current Limitations
+### Limitations
 
 - **Managed Tables**: Not supported; only external tables are available
 - **ALTER Operations**: Cannot modify table schema through Gravitino; use Delta Lake APIs
@@ -382,7 +382,7 @@ Future versions may include:
 - Integration with Delta Lake time travel features
 - Enhanced metadata synchronization
 
-## See Also
+## Related
 
 - [Generic Lakehouse Catalog](./lakehouse-generic-catalog.md)
 - [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations)

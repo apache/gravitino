@@ -198,7 +198,7 @@ public class DeltaTableOperations extends ManagedTableOperations {
     }
 
     Preconditions.checkArgument(
-        distribution == null || distribution.equals(Distributions.NONE),
+        Distributions.isNone(distribution),
         "Delta table doesn't support specifying distribution in CREATE TABLE. "
             + "Distribution is not applicable for external Delta tables.");
 

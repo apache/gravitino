@@ -266,7 +266,7 @@ public class TestTopicEvent {
         .thenReturn(topic);
     when(dispatcher.loadTopic(any(NameIdentifier.class))).thenReturn(topic);
     when(dispatcher.dropTopic(any(NameIdentifier.class))).thenReturn(true);
-    when(dispatcher.listTopics(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listTopics(any(Namespace.class))).thenReturn(new NameIdentifier[0]);
     when(dispatcher.alterTopic(any(NameIdentifier.class), any(TopicChange.class)))
         .thenReturn(topic);
     return dispatcher;

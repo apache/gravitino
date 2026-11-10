@@ -21,6 +21,8 @@ package org.apache.gravitino.audit;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.AddPolicyForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -45,6 +47,10 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
@@ -57,6 +63,10 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
@@ -97,6 +107,41 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionEvent;
+import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewFailureEvent;
 
 /** The interface define unified audit log schema. */
 public interface AuditLog {
@@ -201,6 +246,10 @@ public interface AuditLog {
 
     LIST_METALAKE,
 
+    ENABLE_METALAKE,
+
+    DISABLE_METALAKE,
+
     CREATE_CATALOG,
 
     LOAD_CATALOG,
@@ -210,6 +259,12 @@ public interface AuditLog {
     DROP_CATALOG,
 
     LIST_CATALOG,
+
+    ENABLE_CATALOG,
+
+    DISABLE_CATALOG,
+
+    TEST_CONNECTION_CATALOG,
 
     CREATE_SCHEMA,
 
@@ -221,6 +276,8 @@ public interface AuditLog {
 
     LIST_SCHEMA,
 
+    SCHEMA_EXISTS,
+
     CREATE_TABLE,
 
     ALTER_TABLE,
@@ -229,11 +286,29 @@ public interface AuditLog {
 
     LOAD_TABLE,
 
+    LOAD_TABLE_CREDENTIAL,
+
+    PLAN_TABLE_SCAN,
+
+    FETCH_SCAN_TASKS,
+
     PURGE_TABLE,
 
     LIST_TABLE,
 
+    RENAME_TABLE,
+
+    REGISTER_TABLE,
+
+    TABLE_EXISTS,
+
+    REPORT_TABLE_METRICS,
+
     PARTITION_EXIST,
+
+    ADD_PARTITION,
+
+    DROP_PARTITION,
 
     PURGE_PARTITION,
 
@@ -263,6 +338,236 @@ public interface AuditLog {
 
     LIST_FILESET,
 
+    LIST_FILESET_FILES,
+
+    CREATE_TAG,
+
+    GET_TAG,
+
+    GET_TAG_FOR_METADATA_OBJECT,
+
+    DELETE_TAG,
+
+    ALTER_TAG,
+
+    LIST_TAG,
+
+    ASSOCIATE_TAGS_FOR_METADATA_OBJECT,
+
+    LIST_TAGS_FOR_METADATA_OBJECT,
+
+    LIST_TAGS_INFO_FOR_METADATA_OBJECT,
+
+    LIST_METADATA_OBJECTS_FOR_TAG,
+
+    LIST_TAGS_INFO,
+
+    ADD_POLICY_FOR_TAG,
+
+    REMOVE_POLICY_FROM_TAG,
+
+    CREATE_VIEW,
+
+    ALTER_VIEW,
+
+    REPLACE_VIEW,
+
+    DROP_VIEW,
+
+    LOAD_VIEW,
+
+    VIEW_EXISTS,
+
+    RENAME_VIEW,
+
+    LIST_VIEW,
+
+    REGISTER_VIEW,
+
+    REGISTER_MODEL,
+
+    DELETE_MODEL,
+
+    GET_MODEL,
+
+    LIST_MODEL,
+
+    ALTER_MODEL,
+
+    LINK_MODEL_VERSION,
+
+    DELETE_MODEL_VERSION,
+
+    GET_MODEL_VERSION,
+
+    GET_MODEL_VERSION_URI,
+
+    LIST_MODEL_VERSIONS,
+
+    LIST_MODEL_VERSION_INFOS,
+
+    REGISTER_AND_LINK_MODEL_VERSION,
+
+    ALTER_MODEL_VERSION,
+
+    ADD_USER,
+
+    REMOVE_USER,
+
+    REMOVE_USER_BY_EXTERNAL_ID,
+
+    GET_USER,
+
+    GET_USER_BY_EXTERNAL_ID,
+
+    GET_USER_BY_ID,
+
+    REMOVE_USER_BY_ID,
+
+    ALTER_USER,
+
+    ENABLE_USER,
+
+    DISABLE_USER,
+
+    LIST_USERS,
+
+    LIST_USER_NAMES,
+
+    GRANT_USER_ROLES,
+
+    REVOKE_USER_ROLES,
+
+    ADD_GROUP,
+
+    REMOVE_GROUP,
+
+    REMOVE_GROUP_BY_EXTERNAL_ID,
+
+    GET_GROUP,
+
+    GET_GROUP_BY_EXTERNAL_ID,
+
+    GET_GROUP_BY_ID,
+
+    REMOVE_GROUP_BY_ID,
+
+    ALTER_GROUP,
+
+    LIST_GROUPS,
+
+    LIST_GROUP_NAMES,
+
+    GRANT_GROUP_ROLES,
+
+    REVOKE_GROUP_ROLES,
+
+    CREATE_ROLE,
+
+    DELETE_ROLE,
+
+    GET_ROLE,
+
+    LIST_ROLE_NAMES,
+
+    GRANT_PRIVILEGES,
+
+    REVOKE_PRIVILEGES,
+
+    OVERRIDE_PRIVILEGES,
+
+    GET_OWNER,
+
+    SET_OWNER,
+
+    LIST_JOB_TEMPLATES,
+
+    REGISTER_JOB_TEMPLATE,
+
+    GET_JOB_TEMPLATE,
+
+    ALTER_JOB_TEMPLATE,
+
+    DELETE_JOB_TEMPLATE,
+
+    LIST_JOBS,
+
+    RUN_JOB,
+
+    GET_JOB,
+
+    CANCEL_JOB,
+
+    LIST_STATISTICS,
+
+    LIST_PARTITION_STATISTICS,
+
+    DROP_STATISTICS,
+
+    DROP_PARTITION_STATISTICS,
+
+    UPDATE_STATISTICS,
+
+    UPDATE_PARTITION_STATISTICS,
+
+    CREATE_POLICY,
+
+    GET_POLICY,
+
+    ALTER_POLICY,
+
+    DELETE_POLICY,
+
+    ENABLE_POLICY,
+
+    DISABLE_POLICY,
+
+    LIST_POLICY,
+
+    LIST_POLICY_INFO,
+
+    LIST_METADATA_OBJECTS_FOR_POLICY,
+
+    LIST_POLICY_INFOS_FOR_METADATA_OBJECT,
+
+    ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
+
+    GET_POLICY_FOR_METADATA_OBJECT,
+
+    CREATE_SEMANTIC_MODEL,
+
+    ALTER_SEMANTIC_MODEL,
+
+    DROP_SEMANTIC_MODEL,
+
+    LOAD_SEMANTIC_MODEL,
+
+    LIST_SEMANTIC_MODEL,
+    /** List identifiers of metrics contained in Semantic Models. */
+    LIST_SEMANTIC_MODEL_METRIC,
+    /** Lists datasets associated with a source table or View. */
+    LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+    /** List complete metrics contained in Semantic Models. */
+    LIST_SEMANTIC_MODEL_METRIC_INFOS,
+    /** Import a Semantic Model from an Ossie document. */
+    IMPORT_SEMANTIC_MODEL,
+    /** Export a Semantic Model as an Ossie document. */
+    EXPORT_SEMANTIC_MODEL,
+
+    REGISTER_FUNCTION,
+
+    GET_FUNCTION,
+
+    ALTER_FUNCTION,
+
+    DROP_FUNCTION,
+
+    LIST_FUNCTION,
+
+    LIST_FUNCTION_INFOS,
+
+    AUTHORIZATION_DENIAL,
+
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
@@ -277,6 +582,12 @@ public interface AuditLog {
         return LOAD_METALAKE;
       } else if (event instanceof ListMetalakeEvent || event instanceof ListMetalakeFailureEvent) {
         return LIST_METALAKE;
+      } else if (event instanceof EnableMetalakeEvent
+          || event instanceof EnableMetalakeFailureEvent) {
+        return ENABLE_METALAKE;
+      } else if (event instanceof DisableMetalakeEvent
+          || event instanceof DisableMetalakeFailureEvent) {
+        return DISABLE_METALAKE;
       } else if (event instanceof CreateCatalogEvent
           || event instanceof CreateCatalogFailureEvent) {
         return CREATE_CATALOG;
@@ -288,6 +599,15 @@ public interface AuditLog {
         return LOAD_CATALOG;
       } else if (event instanceof ListCatalogEvent || event instanceof ListCatalogFailureEvent) {
         return LIST_CATALOG;
+      } else if (event instanceof EnableCatalogEvent
+          || event instanceof EnableCatalogFailureEvent) {
+        return ENABLE_CATALOG;
+      } else if (event instanceof DisableCatalogEvent
+          || event instanceof DisableCatalogFailureEvent) {
+        return DISABLE_CATALOG;
+      } else if (event instanceof TestConnectionEvent
+          || event instanceof TestConnectionFailureEvent) {
+        return TEST_CONNECTION_CATALOG;
       } else if (event instanceof CreateSchemaEvent || event instanceof CreateSchemaFailureEvent) {
         return CREATE_SCHEMA;
       } else if (event instanceof AlterSchemaEvent || event instanceof AlterSchemaFailureEvent) {
@@ -331,6 +651,46 @@ public interface AuditLog {
         return LOAD_TOPIC;
       } else if (event instanceof ListTopicEvent || event instanceof ListTopicFailureEvent) {
         return LIST_TOPIC;
+      } else if (event instanceof CreateViewEvent || event instanceof CreateViewFailureEvent) {
+        return CREATE_VIEW;
+      } else if (event instanceof AlterViewEvent || event instanceof AlterViewFailureEvent) {
+        return ALTER_VIEW;
+      } else if (event instanceof DropViewEvent || event instanceof DropViewFailureEvent) {
+        return DROP_VIEW;
+      } else if (event instanceof LoadViewEvent || event instanceof LoadViewFailureEvent) {
+        return LOAD_VIEW;
+      } else if (event instanceof ListViewEvent || event instanceof ListViewFailureEvent) {
+        return LIST_VIEW;
+      } else if (event instanceof CreateSemanticModelEvent
+          || event instanceof CreateSemanticModelFailureEvent) {
+        return CREATE_SEMANTIC_MODEL;
+      } else if (event instanceof AlterSemanticModelEvent
+          || event instanceof AlterSemanticModelFailureEvent) {
+        return ALTER_SEMANTIC_MODEL;
+      } else if (event instanceof DropSemanticModelEvent
+          || event instanceof DropSemanticModelFailureEvent) {
+        return DROP_SEMANTIC_MODEL;
+      } else if (event instanceof LoadSemanticModelEvent
+          || event instanceof LoadSemanticModelFailureEvent) {
+        return LOAD_SEMANTIC_MODEL;
+      } else if (event instanceof ListSemanticModelEvent
+          || event instanceof ListSemanticModelFailureEvent) {
+        return LIST_SEMANTIC_MODEL;
+      } else if (event instanceof ListSemanticModelDatasetsBySourceEvent
+          || event instanceof ListSemanticModelDatasetsBySourceFailureEvent) {
+        return LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE;
+      } else if (event instanceof ListSemanticModelMetricEvent
+          || event instanceof ListSemanticModelMetricFailureEvent) {
+        return LIST_SEMANTIC_MODEL_METRIC;
+      } else if (event instanceof ListSemanticModelMetricInfosEvent
+          || event instanceof ListSemanticModelMetricInfosFailureEvent) {
+        return LIST_SEMANTIC_MODEL_METRIC_INFOS;
+      } else if (event instanceof ImportSemanticModelEvent
+          || event instanceof ImportSemanticModelFailureEvent) {
+        return IMPORT_SEMANTIC_MODEL;
+      } else if (event instanceof ExportSemanticModelEvent
+          || event instanceof ExportSemanticModelFailureEvent) {
+        return EXPORT_SEMANTIC_MODEL;
       } else if (event instanceof CreateFilesetEvent
           || event instanceof CreateFilesetFailureEvent) {
         return CREATE_FILESET;
@@ -345,6 +705,14 @@ public interface AuditLog {
         return LOAD_FILESET;
       } else if (event instanceof ListFilesetEvent || event instanceof ListFilesetFailureEvent) {
         return LIST_FILESET;
+      } else if (event instanceof AddPolicyForTagEvent
+          || event instanceof AddPolicyForTagFailureEvent) {
+        return ADD_POLICY_FOR_TAG;
+      } else if (event instanceof RemovePolicyFromTagEvent
+          || event instanceof RemovePolicyFromTagFailureEvent) {
+        return REMOVE_POLICY_FROM_TAG;
+      } else if (event instanceof AuthorizationDenialFailureEvent) {
+        return AUTHORIZATION_DENIAL;
       } else {
         return UNKNOWN_OPERATION;
       }

@@ -34,6 +34,13 @@ public interface Group extends Auditable {
   String name();
 
   /**
+   * The unique id assigned by Gravitino.
+   *
+   * @return The unique id of the group.
+   */
+  Long id();
+
+  /**
    * The roles of the group.
    *
    * @return The roles of the group.

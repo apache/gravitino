@@ -451,6 +451,19 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
   }
 
+  private static String formatParams(FunctionParam[] params) {
+    if (params == null || params.length == 0) {
+      return "()";
+    }
+    StringBuilder sb = new StringBuilder("(");
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(", ");
+      sb.append(params[i].name()).append(": ").append(params[i].dataType().simpleString());
+    }
+    sb.append(")");
+    return sb.toString();
+  }
+
   private boolean parametersMatch(FunctionParam[] params1, FunctionParam[] params2) {
     if (params1.length != params2.length) {
       return false;
@@ -491,8 +504,13 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
 
     if (!found) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot add implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot add implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     return result;
@@ -506,12 +524,14 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     List<FunctionDefinition> result = new ArrayList<>();
     boolean definitionFound = false;
     boolean runtimeFound = false;
+    List<FunctionImpl.RuntimeType> availableRuntimes = new ArrayList<>();
 
     for (FunctionDefinition def : definitions) {
       if (parametersMatch(def.parameters(), targetParams)) {
         definitionFound = true;
         List<FunctionImpl> impls = new ArrayList<>();
         for (FunctionImpl impl : def.impls()) {
+          availableRuntimes.add(impl.runtime());
           if (impl.runtime() == runtime) {
             runtimeFound = true;
             impls.add(newImpl);
@@ -526,14 +546,21 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
 
     if (!definitionFound) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot update implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot update implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     if (!runtimeFound) {
       throw new IllegalArgumentException(
           String.format(
-              "Cannot update implementation: runtime '%s' not found in the definition", runtime));
+              "Cannot update implementation: runtime '%s' not found in the definition %s. "
+                  + "Available runtimes in that definition: %s",
+              runtime, formatParams(targetParams), availableRuntimes));
     }
 
     return result;
@@ -546,6 +573,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     List<FunctionDefinition> result = new ArrayList<>();
     boolean definitionFound = false;
     boolean runtimeFound = false;
+    List<FunctionImpl.RuntimeType> availableRuntimes = new ArrayList<>();
 
     for (FunctionDefinition def : definitions) {
       if (parametersMatch(def.parameters(), targetParams)) {
@@ -561,6 +589,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
 
         List<FunctionImpl> impls = new ArrayList<>();
         for (FunctionImpl impl : def.impls()) {
+          availableRuntimes.add(impl.runtime());
           if (impl.runtime() == runtime) {
             runtimeFound = true;
           } else {
@@ -574,14 +603,21 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     }
 
     if (!definitionFound) {
+      List<String> availableSignatures =
+          definitions.stream().map(d -> formatParams(d.parameters())).collect(Collectors.toList());
       throw new IllegalArgumentException(
-          "Cannot remove implementation: no definition found with the specified parameters");
+          String.format(
+              "Cannot remove implementation: no definition found with the specified parameters %s. "
+                  + "Available parameter signatures: %s",
+              formatParams(targetParams), availableSignatures));
     }
 
     if (!runtimeFound) {
       throw new IllegalArgumentException(
           String.format(
-              "Cannot remove implementation: runtime '%s' not found in the definition", runtime));
+              "Cannot remove implementation: runtime '%s' not found in the definition %s. "
+                  + "Available runtimes in that definition: %s",
+              runtime, formatParams(targetParams), availableRuntimes));
     }
 
     return result;

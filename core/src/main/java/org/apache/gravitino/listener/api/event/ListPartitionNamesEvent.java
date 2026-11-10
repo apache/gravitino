@@ -22,17 +22,41 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event that is triggered upon the successful list of partitions. */
+/** Represents an event that is triggered upon the successful list of partition names. */
 @DeveloperApi
-public final class ListPartitionNamesEvent extends PartitionEvent {
+public final class ListPartitionNamesEvent extends PartitionEvent implements ListEvent {
+
+  private final int partitionNameCount;
+
   /**
    * Constructs an instance of {@code ListPartitionNamesEvent}.
    *
    * @param user The username of the individual who initiated the partition listing.
    * @param ident The identifier from which partitions were listed.
+   * @param partitionNameCount The number of partition names returned by the list operation.
    */
-  public ListPartitionNamesEvent(String user, NameIdentifier ident) {
+  public ListPartitionNamesEvent(String user, NameIdentifier ident, int partitionNameCount) {
     super(user, ident);
+    this.partitionNameCount = partitionNameCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListPartitionNamesEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the partition listing.
+   * @param ident The identifier from which partitions were listed.
+   * @deprecated Use {@link #ListPartitionNamesEvent(String, NameIdentifier, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListPartitionNamesEvent(String user, NameIdentifier ident) {
+    this(user, ident, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return partitionNameCount;
   }
 
   /**

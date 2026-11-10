@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.catalog.mysql;
 
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.checkValueFormat;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -107,17 +109,23 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   @Override
   public Map<String, String> transformToJdbcProperties(Map<String, String> properties) {
-    return Collections.unmodifiableMap(
-        new HashMap<String, String>() {
-          {
-            properties.forEach(
-                (key, value) -> {
-                  if (GRAVITINO_CONFIG_TO_MYSQL.containsKey(key)) {
-                    put(GRAVITINO_CONFIG_TO_MYSQL.get(key), value);
-                  }
-                });
+    Map<String, String> result = new HashMap<>();
+    properties.forEach(
+        (key, value) -> {
+          Preconditions.checkArgument(
+              containsProperty(key),
+              "Unsupported MySQL table property: %s. Supported properties: %s",
+              key,
+              String.join(", ", GRAVITINO_CONFIG_TO_MYSQL.keySet()));
+          if (GRAVITINO_CONFIG_TO_MYSQL.containsKey(key)) {
+            // A null value represents RemoveProperty in JdbcCatalogOperations. Non-SQL metadata,
+            // such as the internal identifier and credential settings, must not become options.
+            result.put(
+                GRAVITINO_CONFIG_TO_MYSQL.get(key),
+                value == null ? null : validateAndEncode(getPropertyEntry(key), value));
           }
         });
+    return Collections.unmodifiableMap(result);
   }
 
   @Override
@@ -134,5 +142,13 @@ public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                 });
           }
         });
+  }
+
+  private static <T> String validateAndEncode(PropertyEntry<T> entry, String value) {
+    T decoded = checkValueFormat(entry.getName(), value, entry::decode);
+    if (decoded instanceof ENGINE) {
+      return ((ENGINE) decoded).getValue();
+    }
+    return entry.getEncoder().apply(decoded);
   }
 }

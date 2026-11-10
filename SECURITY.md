@@ -21,4 +21,4 @@
 
 The Apache Gravitino project follows the standard processes as set out by the [ASF security team](https://www.apache.org/security/).
 
-Please report any security issues to [private@gravitino.apache.org](mailto:private@gravitino.apache.org) or to (security@apache.org)[mailto:security@apache.org].
+Please report any security issues to [private@gravitino.apache.org](mailto:private@gravitino.apache.org) with Cc to [security@apache.org](mailto:security@apache.org).

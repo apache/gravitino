@@ -20,11 +20,12 @@ package org.apache.gravitino.stats.storage;
 
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.jdbc.JdbcDataSourceConfig;
+import org.apache.gravitino.utils.jdbc.JdbcDataSourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,14 +67,6 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
 
   // Default values
   private static final String DEFAULT_JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
-  private static final int DEFAULT_POOL_MAX_SIZE = 10;
-  private static final int DEFAULT_POOL_MIN_IDLE = 2;
-  private static final long DEFAULT_CONNECTION_TIMEOUT_MS = 30000L;
-  private static final boolean DEFAULT_TEST_ON_BORROW = true;
-  private static final String VALIDATION_QUERY = "SELECT 1";
-
-  // Keep reference to DataSource for cleanup
-  private BasicDataSource dataSource;
 
   @Override
   public PartitionStatisticStorage create(Map<String, String> properties) {
@@ -83,16 +76,20 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
 
     validateRequiredProperties(properties);
 
+    // The created storage owns the DataSource and closes it on its own close().
+    BasicDataSource localDataSource;
     try {
-      dataSource = createDataSource(properties);
-      return new JdbcPartitionStatisticStorage(dataSource);
+      localDataSource = createDataSource(properties);
     } catch (Exception e) {
-      if (dataSource != null) {
-        try {
-          dataSource.close();
-        } catch (SQLException closeException) {
-          LOG.error("Failed to close data source after creation error", closeException);
-        }
+      throw new GravitinoRuntimeException(e, "Failed to create JdbcPartitionStatisticStorage");
+    }
+    try {
+      return new JdbcPartitionStatisticStorage(localDataSource);
+    } catch (Exception e) {
+      try {
+        localDataSource.close();
+      } catch (SQLException closeException) {
+        LOG.error("Failed to close data source after creation error", closeException);
       }
       throw new GravitinoRuntimeException(e, "Failed to create JdbcPartitionStatisticStorage");
     }
@@ -105,45 +102,45 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
    * @return configured DataSource
    */
   private BasicDataSource createDataSource(Map<String, String> properties) {
-    BasicDataSource ds = new BasicDataSource();
-
-    // Required properties
     String jdbcUrl = properties.get(JDBC_URL);
     String jdbcUser = properties.get(JDBC_USER);
     String jdbcPassword = properties.get(JDBC_PASSWORD);
 
-    ds.setUrl(jdbcUrl);
-    ds.setUsername(jdbcUser);
-    ds.setPassword(jdbcPassword);
-
     // Optional properties with defaults
     String driverClassName = properties.getOrDefault(JDBC_DRIVER, DEFAULT_JDBC_DRIVER);
-    ds.setDriverClassName(driverClassName);
 
     int maxSize =
         Integer.parseInt(
-            properties.getOrDefault(POOL_MAX_SIZE, String.valueOf(DEFAULT_POOL_MAX_SIZE)));
-    ds.setMaxTotal(maxSize);
+            properties.getOrDefault(
+                POOL_MAX_SIZE, String.valueOf(JdbcDataSourceFactory.DEFAULT_MAX_TOTAL)));
 
     int minIdle =
         Integer.parseInt(
-            properties.getOrDefault(POOL_MIN_IDLE, String.valueOf(DEFAULT_POOL_MIN_IDLE)));
-    ds.setMinIdle(minIdle);
+            properties.getOrDefault(
+                POOL_MIN_IDLE, String.valueOf(JdbcDataSourceFactory.DEFAULT_MIN_IDLE)));
 
     long timeoutMs =
         Long.parseLong(
             properties.getOrDefault(
-                CONNECTION_TIMEOUT_MS, String.valueOf(DEFAULT_CONNECTION_TIMEOUT_MS)));
-    ds.setMaxWait(Duration.ofMillis(timeoutMs));
+                CONNECTION_TIMEOUT_MS,
+                String.valueOf(JdbcDataSourceFactory.DEFAULT_MAX_WAIT_MILLIS)));
 
     boolean testOnBorrow =
         Boolean.parseBoolean(
-            properties.getOrDefault(TEST_ON_BORROW, String.valueOf(DEFAULT_TEST_ON_BORROW)));
-    ds.setTestOnBorrow(testOnBorrow);
+            properties.getOrDefault(
+                TEST_ON_BORROW, String.valueOf(JdbcDataSourceFactory.DEFAULT_TEST_ON_BORROW)));
 
-    if (testOnBorrow) {
-      ds.setValidationQuery(VALIDATION_QUERY);
-    }
+    JdbcDataSourceConfig config =
+        new JdbcDataSourceConfig(
+            jdbcUrl,
+            jdbcUser,
+            jdbcPassword,
+            driverClassName,
+            maxSize,
+            minIdle,
+            timeoutMs,
+            testOnBorrow,
+            JdbcDataSourceFactory.DEFAULT_VALIDATION_QUERY);
 
     LOG.info(
         "Created JDBC DataSource: url={}, driver={}, maxPoolSize={}, minIdle={}, timeout={}ms",
@@ -153,7 +150,7 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
         minIdle,
         timeoutMs);
 
-    return ds;
+    return JdbcDataSourceFactory.create(config);
   }
 
   /**
@@ -187,18 +184,5 @@ public class JdbcPartitionStatisticStorageFactory implements PartitionStatisticS
       masked.put(JDBC_PASSWORD, "***");
     }
     return masked;
-  }
-
-  /**
-   * Closes the data source if it was created by this factory.
-   *
-   * @throws SQLException if closing fails
-   */
-  public void close() throws SQLException {
-    if (dataSource != null) {
-      LOG.info("Closing JDBC DataSource");
-      dataSource.close();
-      dataSource = null;
-    }
   }
 }

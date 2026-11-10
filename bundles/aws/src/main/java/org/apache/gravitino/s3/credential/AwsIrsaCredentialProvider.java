@@ -59,6 +59,13 @@ import org.apache.gravitino.credential.CredentialProviderDelegator;
 public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIrsaCredential> {
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "s3".equalsIgnoreCase(scheme)
+        || "s3a".equalsIgnoreCase(scheme)
+        || "s3n".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE;
   }

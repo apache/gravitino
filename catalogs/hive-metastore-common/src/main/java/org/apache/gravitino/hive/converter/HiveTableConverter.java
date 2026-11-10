@@ -33,13 +33,16 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.identit
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.hive.HiveColumn;
 import org.apache.gravitino.hive.HivePartition;
@@ -55,6 +58,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -65,6 +69,21 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 public class HiveTableConverter {
 
   public static HiveTable fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
+    return fromHiveTable(table, Collections.emptySet(), Collections.emptyMap());
+  }
+
+  /**
+   * Converts a Hive metastore table together with its column constraints.
+   *
+   * @param table The Hive metastore table.
+   * @param notNullColumns Names of the columns that carry a NOT NULL constraint.
+   * @param defaultValues Column name to Hive SQL default value expression.
+   * @return The converted {@link HiveTable}.
+   */
+  public static HiveTable fromHiveTable(
+      org.apache.hadoop.hive.metastore.api.Table table,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     Preconditions.checkArgument(table != null, "Table cannot be null");
     AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
@@ -72,7 +91,7 @@ public class HiveTableConverter {
 
     SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
 
-    Column[] columns = HiveTableConverter.getColumns(table);
+    Column[] columns = HiveTableConverter.getColumns(table, notNullColumns, defaultValues);
 
     Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
@@ -83,6 +102,9 @@ public class HiveTableConverter {
     } catch (Exception e) {
       // Hive2 doesn't have getCatName method, catalogName will be null
     }
+
+    String viewOriginalText =
+        StringUtils.defaultString(table.getViewOriginalText(), table.getViewExpandedText());
 
     HiveTable hiveTable =
         HiveTable.builder()
@@ -96,6 +118,7 @@ public class HiveTableConverter {
             .withPartitioning(partitioning)
             .withCatalogName(catalogName)
             .withDatabaseName(table.getDbName())
+            .withViewOriginalText(viewOriginalText)
             .build();
     return hiveTable;
   }
@@ -105,6 +128,11 @@ public class HiveTableConverter {
     Map<String, String> properties = Maps.newHashMap(table.getParameters());
 
     Optional.ofNullable(table.getTableType()).ifPresent(t -> properties.put(TABLE_TYPE, t));
+
+    // VIRTUAL_VIEW tables may have a minimal or absent StorageDescriptor — skip SD fields.
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.getTableType())) {
+      return properties;
+    }
 
     StorageDescriptor sd = table.getSd();
     properties.put(LOCATION, sd.getLocation());
@@ -135,13 +163,42 @@ public class HiveTableConverter {
         hiveTable.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
     table.setTableType(tableType.toUpperCase());
 
-    List<FieldSchema> partitionFields =
-        hiveTable.partitionFieldNames().stream()
-            .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
-            .collect(Collectors.toList());
-    table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tableType)) {
+      // Views require a minimal StorageDescriptor (HMS validates its presence), while the output
+      // schema is stored in sd.cols.
+      StorageDescriptor sd = new StorageDescriptor();
+      sd.setCols(buildStorageDescriptor(hiveTable, Collections.emptyList()).getCols());
+      sd.setSerdeInfo(new SerDeInfo());
+      table.setSd(sd);
+      table.setPartitionKeys(new ArrayList<>());
+      String viewOriginalText = hiveTable.viewOriginalText();
+      if (viewOriginalText != null) {
+        table.setViewOriginalText(viewOriginalText);
+        table.setViewExpandedText(viewOriginalText);
+      }
+    } else {
+      List<FieldSchema> partitionFields =
+          hiveTable.partitionFieldNames().stream()
+              .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
+              .collect(Collectors.toList());
+      table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+      table.setPartitionKeys(partitionFields);
+    }
+
+    if (!hiveTable.originalStorageColumns().isEmpty()) {
+      table
+          .getSd()
+          .setCols(
+              hiveTable.originalStorageColumns().stream()
+                  .map(
+                      column ->
+                          new FieldSchema(
+                              column.name(),
+                              ((Types.UnparsedType) column.dataType()).unparsedType(),
+                              column.comment()))
+                  .collect(Collectors.toList()));
+    }
     table.setParameters(buildTableParameters(hiveTable));
-    table.setPartitionKeys(partitionFields);
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
@@ -212,7 +269,7 @@ public class HiveTableConverter {
       }
     }
 
-    if (table.distribution() != null && !Distributions.NONE.equals(table.distribution())) {
+    if (table.distribution() != null && !Distributions.isNone(table.distribution())) {
       strgDesc.setBucketCols(
           Arrays.stream(table.distribution().expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
@@ -282,7 +339,7 @@ public class HiveTableConverter {
   public static Distribution getDistribution(org.apache.hadoop.hive.metastore.api.Table table) {
     StorageDescriptor sd = table.getSd();
     Distribution distribution = Distributions.NONE;
-    if (sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
+    if (sd != null && sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
       // Hive table use hash strategy as bucketing strategy
       distribution =
           Distributions.hash(
@@ -295,7 +352,7 @@ public class HiveTableConverter {
   public static SortOrder[] getSortOrders(org.apache.hadoop.hive.metastore.api.Table table) {
     SortOrder[] sortOrders = SortOrders.NONE;
     StorageDescriptor sd = table.getSd();
-    if (sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
+    if (sd != null && sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
       sortOrders =
           sd.getSortCols().stream()
               .map(
@@ -309,26 +366,48 @@ public class HiveTableConverter {
   }
 
   public static Transform[] getPartitioning(org.apache.hadoop.hive.metastore.api.Table table) {
-    return table.getPartitionKeys().stream()
-        .map(p -> identity(p.getName()))
-        .toArray(Transform[]::new);
+    List<FieldSchema> partitionKeys =
+        table.getPartitionKeys() == null ? Collections.emptyList() : table.getPartitionKeys();
+    return partitionKeys.stream().map(p -> identity(p.getName())).toArray(Transform[]::new);
   }
 
   public static Column[] getColumns(org.apache.hadoop.hive.metastore.api.Table table) {
+    return getColumns(table, Collections.emptySet(), Collections.emptyMap());
+  }
+
+  /**
+   * Converts the storage and partition columns of a Hive metastore table, applying the given column
+   * constraints.
+   *
+   * @param table The Hive metastore table.
+   * @param notNullColumns Names of the columns that carry a NOT NULL constraint.
+   * @param defaultValues Column name to Hive SQL default value expression.
+   * @return The converted columns, storage columns first followed by partition columns.
+   */
+  public static Column[] getColumns(
+      org.apache.hadoop.hive.metastore.api.Table table,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     StorageDescriptor sd = table.getSd();
+    List<FieldSchema> storageColumns =
+        sd == null || sd.getCols() == null ? Collections.emptyList() : sd.getCols();
+    List<FieldSchema> partitionKeys =
+        table.getPartitionKeys() == null ? Collections.emptyList() : table.getPartitionKeys();
     // Collect column names from sd.getCols() to check for duplicates
     Set<String> columnNames =
-        sd.getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+        storageColumns.stream().map(FieldSchema::getName).collect(Collectors.toSet());
 
     return Stream.concat(
-            sd.getCols().stream()
+            storageColumns.stream()
                 .map(
                     f ->
                         buildColumn(
                             f.getName(),
                             HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()),
-                            f.getComment())),
-            table.getPartitionKeys().stream()
+                            f.getComment(),
+                            notNullColumns,
+                            defaultValues)),
+            partitionKeys.stream()
                 // Filter out partition keys that already exist in sd.getCols()
                 .filter(p -> !columnNames.contains(p.getName()))
                 .map(
@@ -336,13 +415,25 @@ public class HiveTableConverter {
                         buildColumn(
                             p.getName(),
                             HiveDataTypeConverter.CONVERTER.toGravitino(p.getType()),
-                            p.getComment())))
+                            p.getComment(),
+                            notNullColumns,
+                            defaultValues)))
         .toArray(Column[]::new);
   }
 
-  private static Column buildColumn(String name, Type type, String comment) {
+  private static Column buildColumn(
+      String name,
+      Type type,
+      String comment,
+      Set<String> notNullColumns,
+      Map<String, String> defaultValues) {
     HiveColumn.Builder builder =
-        HiveColumn.builder().withName(name).withType(type).withNullable(true);
+        HiveColumn.builder()
+            .withName(name)
+            .withType(type)
+            .withNullable(!notNullColumns.contains(name))
+            .withDefaultValue(
+                HiveColumnDefaultValueConverter.toGravitino(type, defaultValues.get(name), name));
     if (comment != null) {
       builder.withComment(comment);
     }

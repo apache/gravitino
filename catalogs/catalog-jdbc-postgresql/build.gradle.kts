@@ -25,17 +25,12 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+  compileOnly(libs.postgresql.driver)
 
-  implementation(project(":api")) {
-    exclude(group = "*")
-  }
   implementation(project(":catalogs:catalog-jdbc-common")) {
-    exclude(group = "*")
-  }
-  implementation(project(":common")) {
-    exclude(group = "*")
-  }
-  implementation(project(":core")) {
     exclude(group = "*")
   }
 
@@ -44,15 +39,20 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
 
+  testImplementation(project(":api"))
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.commons.dbcp2)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
@@ -74,6 +74,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/jdbc-postgresql/libs")
   }

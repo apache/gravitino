@@ -49,17 +49,19 @@ from tests.unittests.auth.mock_base import (
     mock_authentication_invalid_grant_error,
 )
 
-
 # pylint: disable=protected-access,too-many-lines,too-many-locals
 
 
-# pylint: disable=C0302
 def generate_unique_random_string(length):
     characters = string.ascii_letters + string.digits
     random_string = "".join(random.sample(characters, length))
     return random_string
 
 
+@patch(
+    "gravitino.client.fileset_catalog.FilesetCatalog.get_credentials",
+    return_value=[],
+)
 @patch(
     "gravitino.client.generic_fileset.GenericFileset.get_credentials",
     return_value=[],
@@ -197,6 +199,25 @@ class TestLocalFilesystem(unittest.TestCase):
         self.assertEqual(f"{user}:dummy", token_string)
         if current_user is not None:
             os.environ["user.name"] = current_user
+
+    def test_basic_auth(self, *mock_methods):
+        options = {
+            GVFSConfig.AUTH_TYPE: GVFSConfig.BASIC_AUTH_TYPE,
+            GVFSConfig.BASIC_USERNAME: "admin",
+            GVFSConfig.BASIC_PASSWORD: "YourSecureGravitinoPassword",
+        }
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri=self._server_uri,
+            metalake_name=self._metalake_name,
+            options=options,
+            skip_instance_cache=True,
+        )
+        client = fs._operations._get_gravitino_client()
+        token = client._rest_client.auth_data_provider.get_token_data()
+        token_string = base64.b64decode(
+            token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
+        ).decode("utf-8")
+        self.assertEqual("admin:YourSecureGravitinoPassword", token_string)
 
     def test_oauth2_auth(self, *mock_methods):
         fs_options = {

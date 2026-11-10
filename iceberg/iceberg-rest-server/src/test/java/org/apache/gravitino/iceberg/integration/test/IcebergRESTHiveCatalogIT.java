@@ -18,14 +18,24 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.rest.RESTCatalog;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
@@ -70,5 +80,42 @@ public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
                 containerSuite.getHiveContainer().getContainerIpAddress(),
                 HiveContainer.HDFS_DEFAULTFS_PORT)));
     return configMap;
+  }
+
+  @Test
+  void testRegisterTableOverwrite() throws Exception {
+    String namespace = getTestNamespace();
+    sql(
+        "CREATE TABLE %s.register_overwrite_t (id bigint COMMENT 'unique id', data string) USING iceberg",
+        namespace);
+    sql("ALTER TABLE %s.register_overwrite_t SET TBLPROPERTIES ('version' = 'v2')", namespace);
+
+    List<String> metadataLocations =
+        convertToStringList(
+            sql("SELECT file FROM %s.register_overwrite_t.metadata_log_entries", namespace), 0);
+    Assertions.assertTrue(metadataLocations.size() >= 2);
+    String metadataV1 = metadataLocations.get(0);
+    String metadataV2 = metadataLocations.get(metadataLocations.size() - 1);
+
+    Namespace icebergNamespace = Namespace.of(namespace);
+    TableIdentifier tableIdent = TableIdentifier.of(icebergNamespace, "register_overwrite_t");
+
+    try (RESTCatalog catalog = new RESTCatalog()) {
+      catalog.initialize(
+          "rest",
+          ImmutableMap.of(
+              CatalogProperties.URI,
+              String.format("http://127.0.0.1:%d/iceberg/", getServerPort())));
+      catalog.registerTable(tableIdent, metadataV1, true);
+      Table table = catalog.loadTable(tableIdent);
+      Assertions.assertFalse(table.properties().containsKey("version"));
+
+      catalog.registerTable(tableIdent, metadataV2, true);
+      table = catalog.loadTable(tableIdent);
+      Assertions.assertEquals("v2", table.properties().get("version"));
+
+      Assertions.assertThrows(
+          AlreadyExistsException.class, () -> catalog.registerTable(tableIdent, metadataV2, false));
+    }
   }
 }

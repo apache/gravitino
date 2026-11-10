@@ -22,13 +22,15 @@ package org.apache.gravitino.listener.api.event.job;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Represents an event that is triggered upon the successful listing of jobs. */
 @DeveloperApi
-public final class ListJobsEvent extends JobEvent {
+public final class ListJobsEvent extends JobEvent implements ListEvent {
 
   private final Optional<String> jobTemplateName;
+  private final int count;
 
   /**
    * Constructs an instance of {@code ListJobsEvent}.
@@ -36,10 +38,32 @@ public final class ListJobsEvent extends JobEvent {
    * @param user The username of the individual who initiated the job listing.
    * @param metalake The namespace from which jobs were listed.
    * @param jobTemplateName An optional job template name used to filter the listed jobs.
+   * @param count The number of jobs returned by the list operation.
    */
-  public ListJobsEvent(String user, String metalake, Optional<String> jobTemplateName) {
+  public ListJobsEvent(String user, String metalake, Optional<String> jobTemplateName, int count) {
     super(user, NameIdentifier.of(metalake));
     this.jobTemplateName = jobTemplateName;
+    this.count = count;
+  }
+
+  /**
+   * Constructs an instance of {@code ListJobsEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the job listing.
+   * @param metalake The namespace from which jobs were listed.
+   * @param jobTemplateName An optional job template name used to filter the listed jobs.
+   * @deprecated Use {@link #ListJobsEvent(String, String, Optional, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListJobsEvent(String user, String metalake, Optional<String> jobTemplateName) {
+    this(user, metalake, jobTemplateName, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

@@ -15,8 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
+
 from mcp_server.client import PolicyOperation
-from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+    extract_response,
+)
 
 
 class PlainRESTClientPolicyOperation(PolicyOperation):
@@ -30,7 +36,7 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
 
     async def get_list_of_policies(self) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/policies?details=true"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/policies?details=true"
         )
         return extract_content_from_response(response, "policies", [])
 
@@ -39,44 +45,45 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         policy_name: str,
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/policies/{policy_name}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/policies/{encode_path_segment(policy_name)}"
         )
         return extract_content_from_response(response, "policy", {})
 
-    async def associate_policy_with_metadata(
-        self,
-        metadata_full_name: str,
-        metadata_type: str,
-        policies_to_add: list,
-        policies_to_remove: list,
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        response = await self.rest_client.get(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/tags/{encode_path_segment(tag_name)}/policies?details=true"
+        )
+        return extract_content_from_response(response, "associations", [])
+
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
     ) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/policies",
-            json={
-                "policiesToAdd": policies_to_add,
-                "policiesToRemove": policies_to_remove,
-            },
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/tags/{encode_path_segment(tag_name)}"
+            f"/policies/{encode_path_segment(policy_name)}",
+            json={"selector": selector},
         )
-        return extract_content_from_response(response, "names", [])
+        return extract_response(response)
 
-    async def get_policy_for_metadata(
-        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
     ) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/policies/{policy_name}",
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/tags/{encode_path_segment(tag_name)}"
+            f"/policies/{encode_path_segment(policy_name)}"
         )
-        return extract_content_from_response(response, "policy", {})
+        if response.status_code == 204:
+            return json.dumps(
+                {"policy": policy_name, "tag": tag_name, "removed": True}
+            )
+        return extract_response(response)
 
-    async def list_policies_for_metadata(
-        self, metadata_full_name: str, metadata_type: str
-    ) -> str:
+    async def list_tags_for_policy(self, policy_name: str) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/policies?details=true",
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/policies/{encode_path_segment(policy_name)}/tags?details=true"
         )
-        return extract_content_from_response(response, "policies", [])
-
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/policies/{policy_name}/objects"
-        )
-        return extract_content_from_response(response, "metadataObjects", [])
+        return extract_content_from_response(response, "associations", [])

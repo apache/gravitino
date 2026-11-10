@@ -19,13 +19,42 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortOrder;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.StorageCredential;
+import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
+import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -33,6 +62,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 @SuppressWarnings("deprecation")
@@ -45,7 +76,7 @@ public class TestIcebergRESTUtils {
     Mockito.when(icebergConfigProvider.getMetalakeName()).thenReturn("metalake");
     Mockito.when(icebergConfigProvider.getDefaultCatalogName())
         .thenReturn(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
-    IcebergRESTServerContext.create(icebergConfigProvider, false, false);
+    IcebergRESTServerContext.create(icebergConfigProvider, false, false, true, null);
   }
 
   @Test
@@ -57,6 +88,24 @@ public class TestIcebergRESTUtils {
         IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
         NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidNamespaces")
+  void testRejectsDotInAnyNamespaceLevel(Namespace namespace) {
+    BadRequestException error =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> IcebergRESTUtils.checkNamespaceLevels(namespace));
+    Assertions.assertTrue(error.getMessage().contains("contains '.'"));
+  }
+
+  @Test
+  void testAllowsValidNamespaceLevelsWithoutDecodingAgain() {
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.checkNamespaceLevels(Namespace.empty()));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("parent", "child")));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("literal%2Ename")));
   }
 
   @Test
@@ -86,5 +135,417 @@ public class TestIcebergRESTUtils {
       NestedField clonedField = clonedIcebergRESTObject.schema().columns().get(i);
       Assertions.assertEquals(field, clonedField);
     }
+  }
+
+  @Test
+  void testTableCredentialsPath() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    org.apache.iceberg.rest.credentials.Credential credential =
+        IcebergRESTUtils.toRESTCredential(
+            "my_catalog", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata);
+    Assertions.assertEquals(
+        "v1/my_catalog/namespaces/ns/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testToRESTCredential() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    String refreshPath = "v1/cat/namespaces/ns/tables/tbl/credentials";
+    TableMetadata metadataWithSlash = mock(TableMetadata.class);
+    when(metadataWithSlash.location()).thenReturn("s3://bucket/t/");
+    org.apache.iceberg.rest.credentials.Credential credentialWithSlash =
+        IcebergRESTUtils.toRESTCredential(
+            "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithSlash);
+    Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
+    Assertions.assertEquals(
+        "99", credentialWithSlash.config().get("s3.session-token-expires-at-ms"));
+    Assertions.assertEquals(
+        refreshPath, credentialWithSlash.config().get("client.refresh-credentials-endpoint"));
+
+    TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
+    when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
+    org.apache.iceberg.rest.credentials.Credential credentialWithoutSlash =
+        IcebergRESTUtils.toRESTCredential(
+            "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
+    Assertions.assertEquals("s3://bucket/path/to/table", credentialWithoutSlash.prefix());
+  }
+
+  @Test
+  void testToRESTCredentialForS3Token() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "aws", table, new S3TokenCredential("key", "secret", "token", 1234L), tableMetadata)
+            .config();
+
+    Assertions.assertEquals(
+        "v1/aws/namespaces/ns/tables/tbl/credentials",
+        config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("1234", config.get("s3.session-token-expires-at-ms"));
+  }
+
+  @Test
+  void testToRESTCredentialForAwsIrsa() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "aws", table, new AwsIrsaCredential("key", "secret", "token", 4321L), tableMetadata)
+            .config();
+
+    Assertions.assertEquals(
+        "v1/aws/namespaces/ns/tables/tbl/credentials",
+        config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("4321", config.get("s3.session-token-expires-at-ms"));
+  }
+
+  @Test
+  void testToRESTCredentialConfigIsUnmodifiable() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "aws", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata)
+            .config();
+
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> config.put("k", "v"));
+  }
+
+  @Test
+  void testToRESTCredentialForGcsToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("gs://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "gcs", table, new GCSTokenCredential("gcs-token", 5678L), tableMetadata)
+            .config();
+
+    Assertions.assertEquals(
+        "v1/gcs/namespaces/ns/tables/tbl/credentials",
+        config.get("gcs.oauth2.refresh-credentials-endpoint"));
+    Assertions.assertEquals("5678", config.get("gcs.oauth2.token-expires-at"));
+  }
+
+  @Test
+  void testToRESTCredentialForOssToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("oss://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "oss",
+                table,
+                new OSSTokenCredential("key", "secret", "oss-token", 9012L),
+                tableMetadata)
+            .config();
+
+    Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("9012", config.get("client.security-token-expires-at-ms"));
+    Assertions.assertEquals("key", config.get("client.access-key-id"));
+    Assertions.assertEquals("secret", config.get("client.access-key-secret"));
+    Assertions.assertEquals("oss-token", config.get("client.security-token"));
+  }
+
+  @Test
+  void testToRESTCredentialForAdlsToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("abfss://container@account.dfs.core.windows.net/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "adls",
+                table,
+                new ADLSTokenCredential("storageacct", "sas-token", 3456L),
+                tableMetadata)
+            .config();
+
+    Assertions.assertEquals(
+        "v1/adls/namespaces/ns/tables/tbl/credentials",
+        config.get("adls.refresh-credentials-endpoint"));
+    Assertions.assertEquals(
+        "3456", config.get("adls.sas-token-expires-at-ms.storageacct.dfs.core.windows.net"));
+  }
+
+  @Test
+  void testBuildStorageCreds() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO =
+        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
+    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
+    StorageCredential upstreamCredential =
+        StorageCredential.create(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.access-key-id",
+                "upstream-key",
+                "s3.secret-access-key",
+                "upstream-secret",
+                "s3.session-token",
+                "upstream-token",
+                "s3.session-token-expires-at-ms",
+                "123",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+
+    List<Credential> credentials = IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO);
+
+    Assertions.assertEquals(1, credentials.size());
+    Credential credential = credentials.get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertFalse(
+        credential.config().containsValue("v1/upstream/namespaces/db/tables/tbl/credentials"));
+  }
+
+  @Test
+  void testBuildStorageCredsPreservesSchemePrefix() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO =
+        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
+    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
+    StorageCredential upstreamCredential =
+        StorageCredential.create(
+            "s3",
+            ImmutableMap.of(
+                "s3.session-token", "upstream-token",
+                "s3.session-token-expires-at-ms", "123"));
+    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+
+    Credential credential = IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO).get(0);
+
+    Assertions.assertEquals("s3", credential.prefix());
+  }
+
+  @Test
+  void testBuildStorageCredsEmpty() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO = mock(FileIO.class);
+
+    Assertions.assertTrue(IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO).isEmpty());
+  }
+
+  @Test
+  void testToRESTCredentialOmitsStaticSecretKey() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRESTCredential(
+                "aws", table, new S3SecretKeyCredential("key", "secret"), tableMetadata)
+            .config();
+
+    Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteTableCredentials() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    LoadCredentialsResponse upstream =
+        ImmutableLoadCredentialsResponse.builder()
+            .addCredentials(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "s3.session-token-expires-at-ms",
+                        "123",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadCredentialsResponse rewritten =
+        IcebergRESTUtils.rewriteTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Credential credential = rewritten.credentials().get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    // The refresh endpoint is re-scoped to the IRC catalog, dropping the upstream-scoped one.
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteLoadTableCredentials() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(NestedField.required(1, "id", IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+    LoadTableResponse upstream =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "io-impl",
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    "s3.session-token",
+                    "upstream-token",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .addCredential(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadTableResponse rewritten =
+        IcebergRESTUtils.rewriteLoadTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals("s3://bucket/db/tbl", rewritten.tableMetadata().location());
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", rewritten.config().get("io-impl"));
+    Assertions.assertEquals("upstream-token", rewritten.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        rewritten.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Credential credential = rewritten.credentials().get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteLoadTableCredentialsDropsConfigRefreshWithoutTokens() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(NestedField.required(1, "id", IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+    // Upstream put the refresh URL in top-level config while the session token lives only in
+    // storage-credentials. The config refresh key must be dropped, not left pointing upstream.
+    LoadTableResponse upstream =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "io-impl",
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .addCredential(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadTableResponse rewritten =
+        IcebergRESTUtils.rewriteLoadTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", rewritten.config().get("io-impl"));
+    Assertions.assertFalse(
+        rewritten.config().containsKey("client.refresh-credentials-endpoint"),
+        "Top-level config must not keep an upstream refresh endpoint when tokens are absent");
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testErrorResponseStackTraceFollowsSetting() throws Exception {
+    RuntimeException failure = new RuntimeException("failure");
+    try {
+      ErrorResponse withStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      Assertions.assertTrue(
+          IcebergObjectMapper.getInstance().writeValueAsString(withStack).contains("\"stack\""));
+
+      IcebergRESTUtils.setIncludeErrorStackTrace(false);
+      ErrorResponse withoutStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      String json = IcebergObjectMapper.getInstance().writeValueAsString(withoutStack);
+      Assertions.assertFalse(json.contains("\"stack\""), json);
+      Assertions.assertEquals("failure", withoutStack.message());
+    } finally {
+      IcebergRESTUtils.setIncludeErrorStackTrace(true);
+    }
+  }
+
+  @Test
+  void testCloneFallsBackToOriginalWhenIcebergCannotSerialize() throws Exception {
+    // A partition field without its optional field-id parses, but Iceberg cannot write it again.
+    UpdateTableRequest request =
+        IcebergObjectMapper.getInstance()
+            .readValue(
+                "{\"requirements\": [], \"updates\": [{\"action\": \"add-spec\", \"spec\":"
+                    + " {\"spec-id\": 1, \"fields\": [{\"name\": \"id_bucket\", \"transform\": \"bucket[4]\","
+                    + " \"source-id\": 1}]}}]}",
+                UpdateTableRequest.class);
+    UpdateTableRequest copy =
+        Assertions.assertDoesNotThrow(
+            () -> IcebergRESTUtils.cloneIcebergRESTObject(request, UpdateTableRequest.class));
+    Assertions.assertEquals(request.updates().size(), copy.updates().size());
+  }
+
+  @Test
+  void testValidateRequestRejectsMissingOrInvalidBody() {
+    BadRequestException missing =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(null, "CreateTableRequest"));
+    Assertions.assertTrue(missing.getMessage().contains("CreateTableRequest"));
+
+    RESTRequest invalid =
+        () -> {
+          throw new IllegalArgumentException("Invalid name: null");
+        };
+    BadRequestException invalidBody =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(invalid, "CreateTableRequest"));
+    Assertions.assertTrue(invalidBody.getMessage().contains("Invalid name: null"));
+
+    RESTRequest npe =
+        () -> {
+          throw new NullPointerException();
+        };
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> IcebergRESTUtils.validateRequest(npe, "UpdateTableRequest"));
+
+    RESTRequest valid = () -> {};
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.validateRequest(valid, "X"));
+  }
+
+  private static List<Namespace> invalidNamespaces() {
+    return List.of(
+        Namespace.of("a.b"),
+        Namespace.of("."),
+        Namespace.of(".."),
+        Namespace.of("a.b", "child"),
+        Namespace.of("parent", "a.b"));
   }
 }

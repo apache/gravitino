@@ -37,15 +37,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -53,19 +57,40 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 
 class TestUserMetaService extends TestJDBCBackend {
 
   private final String metalakeName = "metalake_for_user_test";
+
+  private long queryUserUpdatedAt(long userId) {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement();
+          ResultSet resultSet =
+              statement.executeQuery(
+                  "SELECT updated_at FROM user_meta WHERE user_id = " + userId)) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1);
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("Query user updated_at failed", se);
+    }
+  }
 
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
@@ -683,6 +708,7 @@ class TestUserMetaService extends TestJDBCBackend {
             auditInfo,
             "catalog");
     roleMetaService.insertRole(role3, false);
+    long updatedAtBeforeGrant = queryUserUpdatedAt(user1.id());
 
     // update user (grant)
     Function<UserEntity, UserEntity> grantUpdater =
@@ -711,6 +737,7 @@ class TestUserMetaService extends TestJDBCBackend {
         };
 
     Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), grantUpdater));
+    Assertions.assertTrue(queryUserUpdatedAt(user1.id()) > updatedAtBeforeGrant);
     UserEntity grantUser =
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
     Assertions.assertEquals(user1.id(), grantUser.id());
@@ -809,7 +836,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
 
-    Function<UserEntity, UserEntity> noUpdater =
+    Function<UserEntity, UserEntity> metadataUpdater =
         user -> {
           AuditInfo updateAuditInfo =
               AuditInfo.builder()
@@ -831,17 +858,17 @@ class TestUserMetaService extends TestJDBCBackend {
               .withAuditInfo(updateAuditInfo)
               .build();
         };
-    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), noUpdater));
-    UserEntity noUpdaterUser =
+    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), metadataUpdater));
+    UserEntity metadataUpdatedUser =
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
-    Assertions.assertEquals(user1.id(), noUpdaterUser.id());
-    Assertions.assertEquals(user1.name(), noUpdaterUser.name());
+    Assertions.assertEquals(user1.id(), metadataUpdatedUser.id());
+    Assertions.assertEquals(user1.name(), metadataUpdatedUser.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterUser.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(metadataUpdatedUser.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterUser.roleIds()));
-    Assertions.assertEquals("creator", noUpdaterUser.auditInfo().creator());
-    Assertions.assertEquals("grantRevokeUser", noUpdaterUser.auditInfo().lastModifier());
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(metadataUpdatedUser.roleIds()));
+    Assertions.assertEquals("creator", metadataUpdatedUser.auditInfo().creator());
+    Assertions.assertEquals("noUpdateUser", metadataUpdatedUser.auditInfo().lastModifier());
 
     // Delete a role, the user entity won't contain this role.
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
@@ -1144,6 +1171,382 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, deletedCount); // no more to delete
   }
 
+  @TestTemplate
+  void batchGetAuthSubjectsForUser() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "batchUser",
+            auditInfo);
+    userMetaService.insertUser(user, false);
+
+    GroupEntity groupA =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "batchGroupA",
+            auditInfo,
+            Collections.emptyList(),
+            Collections.emptyList());
+    GroupEntity groupB =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "batchGroupB",
+            auditInfo,
+            Collections.emptyList(),
+            Collections.emptyList());
+    groupMetaService.insertGroup(groupA, false);
+    groupMetaService.insertGroup(groupB, false);
+
+    // Case 1: user + multiple groups, no role bindings → one row per subject.
+    List<AuthPrefetchRow> rows =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "batchUser", Lists.newArrayList("batchGroupA", "batchGroupB")));
+    assertEquals(3, rows.size());
+    AuthPrefetchRow userRow =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.USER == r.getSubjectType())
+            .findFirst()
+            .orElseThrow();
+    assertEquals(user.id(), userRow.getEntityId());
+    assertEquals("batchUser", userRow.getEntityName());
+    assertTrue(userRow.getUpdatedAt() >= 0);
+    List<AuthPrefetchRow> groupRows =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.GROUP == r.getSubjectType())
+            .sorted(Comparator.comparing(AuthPrefetchRow::getEntityName))
+            .collect(Collectors.toList());
+    assertEquals(2, groupRows.size());
+    assertEquals("batchGroupA", groupRows.get(0).getEntityName());
+    assertEquals(groupA.id(), groupRows.get(0).getEntityId());
+    assertEquals("batchGroupB", groupRows.get(1).getEntityName());
+    assertEquals(groupB.id(), groupRows.get(1).getEntityId());
+
+    // Case 2: empty group list → user-only branch (no GROUP / GROUP_ROLE UNION).
+    List<AuthPrefetchRow> userOnly =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m -> m.batchGetAuthSubjectsForUser(metalakeName, "batchUser", Collections.emptyList()));
+    assertEquals(1, userOnly.size());
+    assertEquals(AuthPrefetchRow.Kind.USER, userOnly.get(0).getSubjectType());
+    assertEquals(user.id(), userOnly.get(0).getEntityId());
+
+    // Case 3: missing user + missing group → only the present group row is returned.
+    List<AuthPrefetchRow> missing =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup", "batchGroupA")));
+    assertEquals(1, missing.size(), "Only the existing group should be returned");
+    assertEquals(AuthPrefetchRow.Kind.GROUP, missing.get(0).getSubjectType());
+    assertEquals("batchGroupA", missing.get(0).getEntityName());
+
+    // Case 4: both user and groups missing → empty result.
+    List<AuthPrefetchRow> none =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
+    assertTrue(none.isEmpty());
+  }
+
+  @TestTemplate
+  void testUserPagination() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService svc = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "page_role",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(role1, false);
+
+    UserEntity u1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u1",
+            auditInfo);
+    UserEntity u2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u2",
+            auditInfo,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserEntity u3 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u3",
+            auditInfo);
+    UserEntity u4 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u4",
+            auditInfo);
+    svc.insertUser(u1, false);
+    svc.insertUser(u2, false);
+    svc.insertUser(u3, false);
+    svc.insertUser(u4, false);
+
+    List<UserEntity> ordered =
+        Lists.newArrayList(u1, u2, u3, u4).stream()
+            .sorted(Comparator.comparing(UserEntity::id))
+            .collect(Collectors.toList());
+
+    Assertions.assertEquals(4, svc.countUsersByMetalake(metalakeName));
+
+    // offset=1, limit=2 exercises JDBC OFFSET and stable ORDER BY user_id ASC.
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+    Assertions.assertEquals(ordered.get(1).name(), page.items().get(0).name());
+    Assertions.assertEquals(ordered.get(2).name(), page.items().get(1).name());
+    Assertions.assertEquals(ordered.get(1).id(), page.items().get(0).id());
+    Assertions.assertEquals(ordered.get(2).id(), page.items().get(1).id());
+
+    UserEntity withRole =
+        ordered.stream().filter(u -> "page_u2".equals(u.name())).findFirst().orElseThrow();
+    int roleUserOffset = ordered.indexOf(withRole);
+    PagedResult<UserEntity> rolePage =
+        svc.listUsersByMetalakePaginated(metalakeName, roleUserOffset, 1);
+    Assertions.assertEquals(1, rolePage.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet("page_role"), Sets.newHashSet(rolePage.items().get(0).roleNames()));
+
+    PagedResult<UserEntity> pageAgain = svc.listUsersByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(
+        page.items().stream().map(UserEntity::name).collect(Collectors.toList()),
+        pageAgain.items().stream().map(UserEntity::name).collect(Collectors.toList()));
+
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
+  }
+
+  @TestTemplate
+  void testUserPaginationWithSpecialRoleNames() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService svc = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    String quotedRole = "role\"quoted";
+    String backslashRole = "back\\slash";
+    RoleEntity roleQuoted =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            quotedRole,
+            auditInfo,
+            "catalog");
+    RoleEntity roleBackslash =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            backslashRole,
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(roleQuoted, false);
+    roleMetaService.insertRole(roleBackslash, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "special_role_user",
+            auditInfo,
+            Lists.newArrayList(quotedRole, backslashRole),
+            Lists.newArrayList(roleQuoted.id(), roleBackslash.id()));
+    svc.insertUser(user, false);
+
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(quotedRole, backslashRole),
+        Sets.newHashSet(page.items().get(0).roleNames()));
+  }
+
+  @TestTemplate
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService service = UserMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    UserEntity user = simpleUser("fenced-user");
+
+    service.insertUser(user, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    UserEntity duplicate = simpleUser(user.name());
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertUser(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = simpleUser("overwrite-user");
+    service.insertUser(user, false);
+    UserPO initialPO = getUserPO(user.name());
+
+    service.insertUser(user, true);
+
+    UserPO overwrittenPO = getUserPO(user.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            UserMetaMapper.class,
+            mapper -> mapper.softDeleteUserMetaByUserId(user.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = simpleUser("stale-delete-user");
+    service.insertUser(user, false);
+    UserPO staleUserPO = getUserPO(user.name());
+    advanceUserVersion(user.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteUserWithVersion(user.nameIdentifier(), staleUserPO));
+    assertEquals(user.id(), service.getUserByIdentifier(user.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "catalog");
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "concurrent-user",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserMetaService.getInstance().insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            UserMetaService.getInstance()
+                .updateUser(
+                    user.nameIdentifier(),
+                    (UserEntity oldUser) -> {
+                      advanceUserVersion(user.id());
+                      List<String> roleNames = Lists.newArrayList(oldUser.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldUser.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return UserEntity.builder()
+                          .withId(oldUser.id())
+                          .withName(oldUser.name())
+                          .withNamespace(oldUser.namespace())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldUser.auditInfo())
+                          .build();
+                    }));
+
+    UserEntity storedUser =
+        UserMetaService.getInstance().getUserByIdentifier(user.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedUser.roleIds()));
+  }
+
+  private UserMetaService userMetaService() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    return UserMetaService.getInstance();
+  }
+
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+  }
+
+  private UserPO getUserPO(String userName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        UserMetaMapper.class,
+        mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), userName));
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
+  }
+
+  private UserEntity simpleUser(String name) {
+    return UserEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  private Namespace userNamespace() {
+    return AuthorizationUtils.ofUserNamespace(metalakeName);
+  }
+
   private Integer countUsers(Long metalakeId) {
     int count = 0;
     try (SqlSession sqlSession =
@@ -1177,5 +1580,20 @@ class TestUserMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceUserVersion(long userId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE user_meta SET current_version = current_version + 1 WHERE user_id = "
+                  + userId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance user version failed", e);
+    }
   }
 }

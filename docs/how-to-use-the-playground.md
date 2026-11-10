@@ -1,11 +1,11 @@
 ---
-title: "How to use the playground"
-slug: /how-to-use-the-playground
-keyword: playground
+title: "Playground"
+slug: "/how-to-use-the-playground"
+keyword: "playground"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Playground introduction
+## Introduction
 
 The playground is a complete Apache Gravitino Docker runtime environment with `Apache Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Apache Gravitino` server.
 
@@ -19,7 +19,7 @@ Install Git (optional), Docker, Docker Compose.
 
 2 CPU cores, 8 GB RAM, 25 GB disk storage, MacOS or Linux OS (Verified Ubuntu22.04 Ubuntu24.04 AmazonLinux).
 
-## TCP ports used
+## TCP Ports
 
 The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
@@ -34,15 +34,15 @@ The playground runs several services. The TCP ports used may clash with existing
 | playground-prometheus | 19090                  |
 | playground-grafana    | 13000                  |
 
-## Playground usage
+## Playground Usage
 
-### Curl command to launch the playground
+### Curl Command to Launch the Playground
 
 ```shell
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
 ```
 
-### Using git to download and launch the playground
+### Launch the Playground with Git
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -55,21 +55,21 @@ cd gravitino-playground
 ./playground.sh start
 ```
 
-#### Check status
+#### Check Status
 
 ```shell 
 ./playground.sh status
 ```
 
-#### Stop playground
+#### Stop Playground
 
 ```shell
 ./playground.sh stop
 ```
 
-## Experiencing Apache Gravitino with Trino SQL
+## Experience Apache Gravitino with Trino SQL
 
-### Using Trino CLI in Docker Container
+### Trino CLI in Docker Container
 
 1. Login to the Gravitino playground Trino Docker container using the following command:
 
@@ -83,7 +83,7 @@ docker exec -it playground-trino bash
 trino@container_id:/$ trino
 ```
 
-## Using Jupyter Notebook
+## Jupyter Notebook
 
 1. Open the Jupyter Notebook in the browser at [http://localhost:18888](http://localhost:18888).
 
@@ -91,7 +91,7 @@ trino@container_id:/$ trino
 
 3. Start the notebook and run the cells.
 
-## Using Spark client
+## Spark Client
 
 1. Login to the Gravitino playground Spark Docker container using the following command:
 
@@ -105,7 +105,7 @@ docker exec -it playground-spark bash
 spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 ```
 
-## Monitoring Gravitino
+## Monitor Gravitino
 
 1. Open the Grafana in the browser at [http://localhost:13000](http://localhost:13000).
 
@@ -115,9 +115,9 @@ spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 
 ## Example
 
-### Simple Trino queries
+### Simple Trino Queries
 
-You can use simple queries to test in the Trino CLI.
+Use simple queries to test in the Trino CLI.
 
 ```SQL
 SHOW CATALOGS;
@@ -147,9 +147,9 @@ DESCRIBE catalog_hive.company.employees;
 SHOW TABLES from catalog_hive.company;
 ```
 
-### Cross-catalog queries
+### Cross-Catalog Queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. Gravitino lets you join the two departments' data together with interesting queries.
 
 To know which employee has the largest sales amount, run this SQL:
 
@@ -186,7 +186,7 @@ WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
 ```
 
-### Using Spark and Trino
+### Spark and Trino
 
 Consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
 
@@ -220,10 +220,10 @@ SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
-### Using Apache Iceberg REST service
+### Apache Iceberg REST Service
 
 Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service. You can use Spark to access the REST catalog to write the table data.
+Gravitino provides an Iceberg REST catalog service. Use Spark to access the REST catalog to write the table data.
 Then, you can use Trino to read the data from the Hive table and join it with the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):
@@ -259,7 +259,7 @@ insert into customers (customer_id, customer_name, customer_email) values (12,'J
 ```
 
 2. Login Trino container and execute the steps.
-You can get all the customers from both the Hive and Iceberg tables.
+Get all the customers from both the Hive and Iceberg tables.
 
 ```shell
 docker exec -it playground-trino bash
@@ -278,7 +278,7 @@ select * from catalog_iceberg.sales.customers;
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
-### Using Gravitino with LlamaIndex
+### Gravitino with LlamaIndex
 
 The Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
 ability to use Gravitino to manage both tabular and non-tabular datasets, connecting to

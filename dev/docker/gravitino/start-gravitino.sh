@@ -17,16 +17,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+# Deprecated: bin/start-gravitino.sh is kept for backward compatibility only and will be
+# removed in a future release. The Docker ENTRYPOINT has moved to docker/docker-entrypoint.sh.
+# If you are overriding the container entrypoint or calling this script directly, please
+# update your configuration to reference docker/docker-entrypoint.sh instead.
 
-set -ex
+echo "WARNING: bin/start-gravitino.sh is deprecated and will be removed in a future release." \
+  "Please use docker/docker-entrypoint.sh instead." >&2
+
 bin_dir="$(dirname "${BASH_SOURCE-$0}")"
-gravitino_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
-
-cd ${gravitino_dir}
-
-python bin/rewrite_gravitino_server_config.py
-
-JAVA_OPTS+=" -XX:-UseContainerSupport"
-export JAVA_OPTS
-
-./bin/gravitino.sh start 
+exec "${bin_dir}/../docker/docker-entrypoint.sh" "$@"

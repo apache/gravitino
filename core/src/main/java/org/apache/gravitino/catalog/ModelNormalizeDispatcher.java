@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -38,6 +37,10 @@ import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listModels(Namespace)}) are
+ * assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class ModelNormalizeDispatcher implements ModelDispatcher {
   private final CatalogManager catalogManager;
   private final ModelDispatcher dispatcher;
@@ -52,8 +55,7 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listModels(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listModels(caseSensitiveNs);
   }
 
   @Override
@@ -152,7 +154,11 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    return dispatcher.alterModel(normalizeCaseSensitive(ident), changes);
+    Capability capability = getCapability(ident, catalogManager);
+    return dispatcher.alterModel(
+        // The constraints of the name spec may be more strict than underlying catalog,
+        // and for compatibility reasons, we only apply case-sensitive capabilities here.
+        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
   }
 
   /** {@inheritDoc} */
@@ -179,15 +185,6 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier ident) {
     Capability capabilities = getCapability(ident, catalogManager);
     return applyCaseSensitive(ident, Capability.Scope.MODEL, capabilities);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] idents) {
-    if (ArrayUtils.isEmpty(idents)) {
-      return idents;
-    }
-
-    Capability capabilities = getCapability(idents[0], catalogManager);
-    return applyCaseSensitive(idents, Capability.Scope.MODEL, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

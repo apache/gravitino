@@ -16,17 +16,43 @@
 # under the License.
 
 import logging
-from typing import Dict, List
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.catalog import Catalog
+from gravitino.api.function.function import Function
+from gravitino.api.function.function_catalog import FunctionCatalog
+from gravitino.api.function.function_change import FunctionChange
+from gravitino.api.function.function_definition import FunctionDefinition
+from gravitino.api.function.function_type import FunctionType
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
+from gravitino.client.function_catalog_operations import FunctionCatalogOperations
+from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
@@ -37,14 +63,25 @@ from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.schema_response import SchemaResponse
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
+from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
-class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
+
+class BaseSchemaCatalog(
+    CatalogDTO,
+    SupportsSchemas,
+    FunctionCatalog,
+    SupportsRoles,
+    SupportsTags,
+    SupportsPolicies,
+):  # pylint: disable=too-many-ancestors,too-many-instance-attributes
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -59,6 +96,11 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
 
     # The metadata object credential operations
     _object_credential_operations: MetadataObjectCredentialOperations
+
+    # The metadata object secret property operations
+    _object_secret_operations: MetadataObjectSecretOperations
+
+    _function_operations: FunctionCatalogOperations
 
     def __init__(
         self,
@@ -86,23 +128,59 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_secret_operations = MetadataObjectSecretOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
+        self._function_operations = FunctionCatalogOperations(
+            rest_client, catalog_namespace, self.name()
+        )
+        self._object_tag_operations = MetadataObjectTagOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_policy_operations = MetadataObjectPolicyOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_role_operations = MetadataObjectRoleOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
 
         self.validate()
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def as_schemas(self):
         return self
 
-    def list_schemas(self) -> List[str]:
-        """List all the schemas under the given catalog namespace.
+    def as_function_catalog(self):
+        return self
+
+    def list_schemas(self, parent_schema: Optional[str] = None) -> List[str]:
+        """List the schemas under the given catalog namespace, or directly under the given parent
+        schema when ``parent_schema`` is provided.
+
+        Args:
+            parent_schema: The parent (possibly hierarchical) schema name whose direct children are
+                listed, e.g. ``"a"`` or ``"a:b"``. When ``None``, all schemas under the catalog are
+                listed. Must not be blank when provided.
 
         Raises:
+            IllegalArgumentException if ``parent_schema`` is provided but blank.
             NoSuchCatalogException if the catalog with specified namespace does not exist.
+            NoSuchSchemaException if ``parent_schema`` is provided but does not exist.
 
         Returns:
-             A list of schema names under the given catalog namespace.
+             A list of schema names under the given catalog namespace or parent schema.
         """
+        params = None
+        if parent_schema is not None:
+            if not parent_schema.strip():
+                raise IllegalArgumentException("parentSchema must not be null or blank")
+            params = {"parentSchema": parent_schema}
+
         resp = self.rest_client.get(
             BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
+            params=params,
             error_handler=SCHEMA_ERROR_HANDLER,
         )
         entity_list_response = EntityListResponse.from_json(
@@ -117,6 +195,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         schema_name: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a new schema with specified identifier, comment and metadata.
 
@@ -124,6 +204,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException if the catalog with specified namespace does not exist.
@@ -132,7 +214,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         Returns:
              The created Schema.
         """
-        req = SchemaCreateRequest(encode_string(schema_name), comment, properties)
+        req = SchemaCreateRequest(
+            encode_string(schema_name),
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
+        )
         req.validate()
 
         resp = self.rest_client.post(
@@ -143,7 +231,12 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def load_schema(self, schema_name: str) -> Schema:
         """Load the schema with specified identifier.
@@ -153,6 +246,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
 
         Raises:
             NoSuchSchemaException if the schema with specified identifier does not exist.
+            SchemaAlreadyExistsException if the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             The Schema with specified identifier.
@@ -166,7 +261,12 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def alter_schema(self, schema_name: str, *changes: SchemaChange) -> Schema:
         """Alter the schema with specified identifier by applying the changes.
@@ -195,17 +295,28 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
-        return schema_response.schema()
+
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
 
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
+
         Args:
             schema_name: The name of the schema.
-            cascade: Whether to drop all the tables under the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Raises:
-            NonEmptySchemaException if the schema is not empty and cascade is false.
+            NonEmptySchemaException if the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
 
         Returns:
              true if the schema is dropped successfully, false otherwise.
@@ -221,6 +332,39 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
         drop_resp.validate()
         return drop_resp.dropped()
+
+    def list_functions(self, namespace: Namespace) -> List[NameIdentifier]:
+        return self._function_operations.list_functions(namespace)
+
+    def list_function_infos(self, namespace: Namespace) -> List[Function]:
+        return self._function_operations.list_function_infos(namespace)
+
+    def get_function(self, ident: NameIdentifier) -> Function:
+        return self._function_operations.get_function(ident)
+
+    def register_function(
+        self,
+        ident: NameIdentifier,
+        comment: Optional[str],
+        function_type: FunctionType,
+        deterministic: bool,
+        definitions: List[FunctionDefinition],
+    ) -> Function:
+        return self._function_operations.register_function(
+            ident,
+            comment,
+            function_type,
+            deterministic,
+            definitions,
+        )
+
+    def alter_function(
+        self, ident: NameIdentifier, *changes: FunctionChange
+    ) -> Function:
+        return self._function_operations.alter_function(ident, *changes)
+
+    def drop_function(self, ident: NameIdentifier) -> bool:
+        return self._function_operations.drop_function(ident)
 
     def _schema_namespace(self) -> Namespace:
         return Namespace.of(self._catalog_namespace.level(0), self.name())
@@ -243,6 +387,16 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             )
         if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
+        if isinstance(change, SchemaChange.SetSecretBinding):
+            binding = change.binding()
+            return SchemaUpdateRequest.SetSchemaSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, SchemaChange.SetSecretReference):
+            reference = change.reference()
+            return SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
+            )
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def validate(self):
@@ -262,3 +416,54 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             raise IllegalArgumentException("provider must not be blank")
         if self.audit_info() is None:
             raise IllegalArgumentException("audit must not be None")
+
+    def list_tags(self) -> List[str]:
+        return self._object_tag_operations.list_tags()
+
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
+    def list_tags_info(self) -> List[Tag]:
+        return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._object_tag_operations.get_tag(name)
+
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._object_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
+    def associate_tags(
+        self, tags_to_add: List[str], tags_to_remove: List[str]
+    ) -> List[str]:
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> List[str]:
+        return self._object_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._object_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> List[Policy]:
+        return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._object_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
+        return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> List[str]:
+        return self._object_role_operations.list_binding_role_names()

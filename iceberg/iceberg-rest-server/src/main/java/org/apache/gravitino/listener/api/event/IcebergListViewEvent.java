@@ -25,15 +25,46 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represent an event after listing Iceberg view successfully.
  *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of views directly within the ListViewEvent, the actual views listed are not maintained in
- * this event.
+ * <p>Only the result count is stored rather than the full list of identifiers to avoid excessive
+ * memory usage in environments with large view listings.
  */
 @DeveloperApi
-public class IcebergListViewEvent extends IcebergViewEvent {
+public class IcebergListViewEvent extends IcebergViewEvent implements ListEvent {
+
+  private final int viewCount;
+
+  /**
+   * Constructs an instance of {@code IcebergListViewEvent}.
+   *
+   * @param icebergRequestContext the request context.
+   * @param viewIdentifier the namespace identifier from which views were listed.
+   * @param viewCount the number of views returned by the list operation.
+   */
+  public IcebergListViewEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier, int viewCount) {
+    super(icebergRequestContext, viewIdentifier);
+    this.viewCount = viewCount;
+  }
+
+  /**
+   * Constructs an instance of {@code IcebergListViewEvent} without a count.
+   *
+   * @param icebergRequestContext the request context.
+   * @param viewIdentifier the namespace identifier from which views were listed.
+   * @deprecated Use {@link #IcebergListViewEvent(IcebergRequestContext, NameIdentifier, int)}
+   *     instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
   public IcebergListViewEvent(
       IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier) {
-    super(icebergRequestContext, viewIdentifier);
+    this(icebergRequestContext, viewIdentifier, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return viewCount;
   }
 
   @Override

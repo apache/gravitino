@@ -20,6 +20,7 @@ package org.apache.gravitino.hive;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,19 @@ public final class HivePartition implements IdentityPartition {
 
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
+
+  // The characters Hive's FileUtils.escapePathName escapes in partition names. Hive classes are
+  // not visible to this class in a deployed server, so the rule is copied.
+  private static final BitSet CHARS_TO_ESCAPE = new BitSet(128);
+
+  static {
+    for (char c = 0; c < ' '; c++) {
+      CHARS_TO_ESCAPE.set(c);
+    }
+    for (char c : "\"#%'*/:=?\\\u007F{[]^".toCharArray()) {
+      CHARS_TO_ESCAPE.set(c);
+    }
+  }
 
   private final String name;
   private final String[][] fieldNames;
@@ -110,8 +124,13 @@ public final class HivePartition implements IdentityPartition {
   }
 
   private String buildPartitionName() {
+    // Escape like HMS does, so the name matches the one HMS and HiveTableConverter return.
     return IntStream.range(0, fieldNames.length)
-        .mapToObj(idx -> fieldNames[idx][0] + PARTITION_VALUE_DELIMITER + values[idx].value())
+        .mapToObj(
+            idx ->
+                escapePathName(fieldNames[idx][0])
+                    + PARTITION_VALUE_DELIMITER
+                    + escapePathName(String.valueOf(values[idx].value())))
         .collect(Collectors.joining(PARTITION_NAME_DELIMITER));
   }
 
@@ -146,7 +165,7 @@ public final class HivePartition implements IdentityPartition {
         .map(
             field -> {
               String[] kv = field.split(PARTITION_VALUE_DELIMITER, 2);
-              return kv.length > 1 ? kv[1] : "";
+              return kv.length > 1 ? unescapePathName(kv[1]) : "";
             })
         .collect(Collectors.toList());
   }
@@ -169,11 +188,12 @@ public final class HivePartition implements IdentityPartition {
                   throw new IllegalArgumentException(
                       String.format("Invalid partition format: %s", partitionSpec));
                 }
-                if (!partitionFieldNames.contains(keyValue[0])) {
+                String fieldName = unescapePathName(keyValue[0]);
+                if (!partitionFieldNames.contains(fieldName)) {
                   throw new NoSuchPartitionException(
                       "Hive partition %s does not exist in Hive Metastore", partitionSpec);
                 }
-                partSpecMap.put(keyValue[0], keyValue[1]);
+                partSpecMap.put(fieldName, unescapePathName(keyValue[1]));
               });
     }
 
@@ -187,7 +207,44 @@ public final class HivePartition implements IdentityPartition {
       return new String[0][0];
     }
     return Arrays.stream(partitionName.split(PARTITION_NAME_DELIMITER))
-        .map(part -> new String[] {part.split(PARTITION_VALUE_DELIMITER, 2)[0]})
+        .map(part -> new String[] {unescapePathName(part.split(PARTITION_VALUE_DELIMITER, 2)[0])})
         .toArray(String[][]::new);
+  }
+
+  /** Escapes a partition column name or value the way Hive's FileUtils.escapePathName does. */
+  static String escapePathName(String path) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < path.length(); i++) {
+      char c = path.charAt(i);
+      if (c < CHARS_TO_ESCAPE.size() && CHARS_TO_ESCAPE.get(c)) {
+        sb.append('%').append(String.format("%1$02X", (int) c));
+      } else {
+        sb.append(c);
+      }
+    }
+    return sb.toString();
+  }
+
+  /** Reverses {@link #escapePathName(String)} the way Hive's FileUtils.unescapePathName does. */
+  static String unescapePathName(String path) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < path.length(); i++) {
+      char c = path.charAt(i);
+      if (c == '%' && i + 2 < path.length()) {
+        int code;
+        try {
+          code = Integer.parseInt(path.substring(i + 1, i + 3), 16);
+        } catch (NumberFormatException e) {
+          code = -1;
+        }
+        if (code >= 0) {
+          sb.append((char) code);
+          i += 2;
+          continue;
+        }
+      }
+      sb.append(c);
+    }
+    return sb.toString();
   }
 }

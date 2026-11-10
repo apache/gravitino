@@ -163,6 +163,7 @@ components:
         name:
           type: string
           description: The name of the user
+          default: true
         roles:
           type: array
           items:
@@ -179,6 +180,7 @@ components:
         name:
           type: string
           description: The name of the user
+          default: true
 
   responses:
     UserResponse:
@@ -211,7 +213,7 @@ components:
   examples:
     UserAddRequest:
       value: {
-        "name": "user1",
+        "name": "user"
       }
 
     NameListResponse:

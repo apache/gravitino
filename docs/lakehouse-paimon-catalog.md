@@ -1,6 +1,6 @@
 ---
-title: "Paimon catalog"
-slug: /lakehouse-paimon-catalog
+title: "Paimon Catalog"
+slug: "/lakehouse-paimon-catalog"
 keywords:
   - lakehouse
   - Paimon
@@ -20,43 +20,44 @@ Builds with Apache Paimon `1.2`.
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Works as a catalog proxy, supporting `FilesystemCatalog`, `JdbcCatalog` and `HiveCatalog`.
 - Supports DDL operations for Paimon schemas and tables.
 
 - Doesn't support alterSchema.
 
-### Catalog properties
+### Catalog Properties
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             | Since Version    |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc`, `hive` and `rest`.                                                                                                              | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
-| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
-| `catalog-backend-name`                             | The catalog name passed to underlying Paimon catalog backend.                                                                                                                                               | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                                                                                                                                   | 0.8.0-incubating |
-| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`                                                                       | No                                                                                                                                                                   | 0.6.0-incubating |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                    | `false`                                                                        | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
-| `oss-endpoint`                                     | The endpoint of the Aliyun OSS.                                                                                                                                                                             | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
-| `oss-access-key-id`                                | The access key of the Aliyun OSS.                                                                                                                                                                           | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
-| `oss-secret-access-key`                            | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
-| `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
-| `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
-| `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
-| `token-provider`                                   | The token provider type for Paimon catalog backend.                                                                                                                                                         | Token provider could be `bear` or `dlf`.                                       | required if the value of `catalog-backend` is `rest`.                                                                                                                | 1.2.0            |
-| `token`                                            | The bear token for Paimon REST catalog authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `token-provider` is `bear`.                                                                                                                 | 1.2.0            |
-| `dlf-access-key-id`                                | The access key ID for Aliyun DLF (Data Lake Formation).                                                                                                                                                     | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
-| `dlf-access-key-secret`                            | The access key secret for Aliyun DLF.                                                                                                                                                                       | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
-| `dlf-security-token`                               | The security token for Aliyun DLF.                                                                                                                                                                          | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
-| `dlf-token-path`                                   | The token path for Aliyun DLF.                                                                                                                                                                              | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
-| `dlf-token-loader`                                 | The token loader for Aliyun DLF.                                                                                                                                                                            | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
+| Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc`, `hive` and `rest`.                                                                                                              | (none)                                                                         | Yes                                                                                                                                                                  |
+| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      |
+| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                                                                         | Yes                                                                                                                                                                  |
+| `catalog-backend-name`                             | The catalog name passed to underlying Paimon catalog backend.                                                                                                                                               | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                                                                                                                                   |
+| `authentication.type`                              | The type of authentication for Paimon catalog backend, Gravitino only supports `Kerberos` and `simple`.                                                                                                     | `simple`                                                                       | No                                                                                                                                                                   |
+| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                    | `false`                                                                        | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                                                                             | No                                                                                                                                                                   |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                                                                             | No                                                                                                                                                                   |
+| `oss-endpoint`                                     | The endpoint of the Aliyun OSS.                                                                                                                                                                             | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   |
+| `oss-access-key-id`                                | The access key of the Aliyun OSS.                                                                                                                                                                           | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   |
+| `oss-secret-access-key`                            | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   |
+| `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    |
+| `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    |
+| `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    |
+| `token-provider`                                   | The token provider type for Paimon catalog backend.                                                                                                                                                         | Token provider could be `bearer` or `dlf`.                                     | required if the value of `catalog-backend` is `rest`.                                                                                                                |
+| `token`                                            | The bearer token for Paimon REST catalog authentication.                                                                                                                                                    | (none)                                                                         | required if the value of `token-provider` is `bearer`.                                                                                                               |
+| `dlf-access-key-id`                                | The access key ID for Aliyun DLF (Data Lake Formation).                                                                                                                                                     | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    |
+| `dlf-access-key-secret`                            | The access key secret for Aliyun DLF.                                                                                                                                                                       | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    |
+| `dlf-security-token`                               | The security token for Aliyun DLF.                                                                                                                                                                          | (none)                                                                         | No                                                                                                                                                                   |
+| `dlf-token-path`                                   | The token path for Aliyun DLF.                                                                                                                                                                              | (none)                                                                         | No                                                                                                                                                                   |
+| `dlf-token-loader`                                 | The token loader for Aliyun DLF.                                                                                                                                                                            | (none)                                                                         | No                                                                                                                                                                   |
 
 :::note
-- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/libs` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- If you use an S3 warehouse, also download [`gravitino-aws-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) and place it in the `catalogs/lakehouse-paimon/libs` directory to enable credential vending. For OSS, use [`gravitino-aliyun-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) instead.
 - If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
 ```
 {
@@ -79,46 +80,93 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
-#### JDBC backend
+#### Hadoop S3A (optional)
+
+Paimon's native S3 filesystem uses an `s3://` warehouse and the `paimon-s3` dependency. As an
+alternative, you can use Hadoop S3A with an `s3a://` warehouse. Gravitino does not package the
+optional S3A dependencies by default. To enable it, add the following JARs to
+`catalogs/lakehouse-paimon/libs` and restart Gravitino:
+
+- `hadoop-aws-<hadoop-version>.jar`, with the same version as the Hadoop libraries packaged by
+  Gravitino.
+- The `aws-java-sdk-bundle` version required by that `hadoop-aws` release.
+
+The following example configures static credentials and a custom HTTP S3 endpoint:
+
+```json
+{
+  "name": "paimon_s3a",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-paimon",
+  "properties": {
+    "catalog-backend": "filesystem",
+    "warehouse": "s3a://bucket/warehouse",
+    "gravitino.bypass.hadoop.fs.s3a.access.key": "<access-key-id>",
+    "gravitino.bypass.hadoop.fs.s3a.secret.key": "<secret-access-key>",
+    "gravitino.bypass.hadoop.fs.s3a.endpoint": "http://s3.example.com",
+    "gravitino.bypass.hadoop.fs.s3a.path.style.access": "true",
+    "gravitino.bypass.hadoop.fs.s3a.connection.ssl.enabled": "false"
+  }
+}
+```
+
+The endpoint-related properties are only needed for a custom endpoint. Omit
+`gravitino.bypass.hadoop.fs.s3a.connection.ssl.enabled` when the endpoint uses HTTPS, and enable
+path-style access only when the S3-compatible service requires it. Hadoop S3A automatically
+discovers `S3AFileSystem` and uses its default credential provider chain, so `fs.s3a.impl` and
+`fs.s3a.aws.credentials.provider` do not need to be configured for this example. You can pass other
+Hadoop S3A properties by prefixing them with `gravitino.bypass.hadoop.`.
+
+#### JDBC Backend
 
 If you are using JDBC backend, you must specify the properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
 
-| Property name   | Description                                                                                               | Default value   | Required                                              | Since Version    |
-|-----------------|-----------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------|------------------|
-| `jdbc-user`     | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                 | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
-| `jdbc-password` | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                             | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
-| `jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL   | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
+| Property name   | Description                                                                                             | Default value | Required                                              |
+|-----------------|---------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------|
+| `jdbc-user`     | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                               | (none)        | required if the value of `catalog-backend` is `jdbc`. |
+| `jdbc-password` | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                           | (none)        | required if the value of `catalog-backend` is `jdbc`. |
+| `jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | required if the value of `catalog-backend` is `jdbc`. |
 
 :::caution
-You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
+Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
 :::
 
-### Catalog operations
+### Catalog Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `jdbc-password` and DLF credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC / DLF credential fields via either path:
+
+- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (requires catalog access plus both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership)
+- `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (DLF cloud access-key pairs also need `INCLUDE_CREDENTIAL_SECRETS`)
+
+Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` only.
+
+:::
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Supporting createSchema, dropSchema, loadSchema and listSchema.
 - Supporting cascade drop schema.
 
 - Doesn't support alterSchema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
 - Doesn't return any schema properties when loadSchema for FilesystemCatalog.
 - Doesn't support store schema comment for FilesystemCatalog.
 
-### Schema operations
+### Schema Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Supporting createTable, purgeTable, alterTable, loadTable and listTable.
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
@@ -134,7 +182,7 @@ Gravitino Paimon Catalog does not support dropTable, because the dropTable in Pa
 Paimon does not support auto increment column.
 :::
 
-### Table changes
+### Table Changes
 
 - RenameTable
 - AddColumn
@@ -148,21 +196,21 @@ Paimon does not support auto increment column.
 - SetProperty
 - RemoveProperty
 
-### Table partitions
+### Table Partitions
 
 - Only supports Identity partitions, such as `day`, `hour`, etc.
 
-Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
+Refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
 
-### Table sort orders
+### Table Sort Orders
 
 - Doesn't support table sort orders.
 
-### Table distributions
+### Table Distributions
 
 - Doesn't support table distributions.
 
-### Table indexes
+### Table Indexes
 
 - Only supports primary key Index.
 
@@ -174,7 +222,7 @@ We cannot specify more than one primary key Index, and a primary key Index can c
 Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
 :::
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type    | Apache Paimon Type           |
 |-------------------|------------------------------|
@@ -203,9 +251,9 @@ Paimon Table primary key constraint should not be same with partition fields, th
 Gravitino doesn't support Paimon `MultisetType` type.
 :::
 
-### Table properties
+### Table Properties
 
-You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
+Pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -216,25 +264,43 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 Bucket settings are defined via Gravitino table distribution (HASH strategy). The `bucket` and
 `bucket-key` options are reserved and derived from the distribution instead of being set directly.
 
-| Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
-|--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
-| `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `sequence.field`   | The table sequence.field. | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `rowkind.field`    | The table rowkind.field.  | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `comment`          | The table comment.        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `owner`            | The table owner.          | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `bucket-key`       | The table bucket-key.     | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `bucket`           | The table bucket number.  | (none)        | No        | Yes      | No        | 1.2.0  |
-| `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| Configuration item | Description               | Default Value | Required | Reserved | Immutable |
+|--------------------|---------------------------|---------------|----------|----------|-----------|
+| `merge-engine`     | The table merge-engine.   | (none)        | No       | No       | Yes       |
+| `sequence.field`   | The table sequence.field. | (none)        | No       | No       | Yes       |
+| `rowkind.field`    | The table rowkind.field.  | (none)        | No       | No       | Yes       |
+| `comment`          | The table comment.        | (none)        | No       | Yes      | No        |
+| `owner`            | The table owner.          | (none)        | No       | Yes      | No        |
+| `bucket-key`       | The table bucket-key.     | (none)        | No       | Yes      | No        |
+| `bucket`           | The table bucket number.  | (none)        | No       | Yes      | No        |
+| `primary-key`      | The table primary-key.    | (none)        | No       | Yes      | No        |
+| `partition`        | The table partition.      | (none)        | No       | Yes      | No        |
 
-### Table operations
+### Table Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-## HDFS configuration
+## View
 
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
+### View Capabilities
+
+- Supports list, create, load, alter, and drop for views stored in the Paimon catalog.
+- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition. At most one representation per dialect is allowed.
+- Additional dialect-specific SQL representations (for example, `flink`, `spark`) can be provided alongside the required `query` representation.
+- The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
+- View support depends on the selected Paimon backend and requires backend view API support.
+
+:::note
+Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
+:::
+
+### View Operations
+
+Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
+
+## HDFS Configuration
+
+Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
 
 :::caution
 When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
