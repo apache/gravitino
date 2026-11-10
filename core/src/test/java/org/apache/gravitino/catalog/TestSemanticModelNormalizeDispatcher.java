@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.semantic.OssieVersion.DEFAULT_VERSION;
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
+import static org.apache.gravitino.semantic.SemanticModelTestUtils.sources;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -47,6 +48,7 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -94,7 +96,8 @@ public class TestSemanticModelNormalizeDispatcher {
   public void testParentUsesCatalogCapabilityButModelUsesStableRules() {
     SemanticModelDefinition definition = definition();
     SemanticModel model = mock(SemanticModel.class);
-    when(delegate.createSemanticModel(NORMALIZED_IDENT, "comment", definition, Map.of()))
+    when(delegate.createSemanticModel(
+            NORMALIZED_IDENT, "comment", definition, Map.of(), sources(definition)))
         .thenReturn(model);
     when(delegate.loadSemanticModel(NORMALIZED_IDENT)).thenReturn(model);
     when(delegate.semanticModelExists(NORMALIZED_IDENT)).thenReturn(true);
@@ -103,13 +106,17 @@ public class TestSemanticModelNormalizeDispatcher {
     when(delegate.dropSemanticModel(NORMALIZED_IDENT)).thenReturn(true);
 
     assertEquals(
-        model, dispatcher.createSemanticModel(INPUT_IDENT, "comment", definition, Map.of()));
+        model,
+        dispatcher.createSemanticModel(
+            INPUT_IDENT, "comment", definition, Map.of(), sources(definition)));
     assertEquals(model, dispatcher.loadSemanticModel(INPUT_IDENT));
     assertTrue(dispatcher.semanticModelExists(INPUT_IDENT));
     assertEquals(NORMALIZED_IDENT, dispatcher.listSemanticModels(INPUT_NAMESPACE)[0]);
     assertTrue(dispatcher.dropSemanticModel(INPUT_IDENT));
 
-    verify(delegate).createSemanticModel(NORMALIZED_IDENT, "comment", definition, Map.of());
+    verify(delegate)
+        .createSemanticModel(
+            NORMALIZED_IDENT, "comment", definition, Map.of(), sources(definition));
     verify(delegate).loadSemanticModel(NORMALIZED_IDENT);
     verify(delegate).semanticModelExists(NORMALIZED_IDENT);
     verify(delegate).listSemanticModels(NORMALIZED_NAMESPACE);
@@ -120,23 +127,34 @@ public class TestSemanticModelNormalizeDispatcher {
   public void testRenameUsesStableSemanticModelRules() {
     SemanticModel model = mock(SemanticModel.class);
     SemanticModelChange rename = SemanticModelChange.rename("RevenueModel");
-    when(delegate.alterSemanticModel(NORMALIZED_IDENT, rename)).thenReturn(model);
+    when(delegate.alterSemanticModel(
+            NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename))
+        .thenReturn(model);
 
-    assertEquals(model, dispatcher.alterSemanticModel(INPUT_IDENT, rename));
-    verify(delegate).alterSemanticModel(NORMALIZED_IDENT, rename);
+    assertEquals(
+        model,
+        dispatcher.alterSemanticModel(INPUT_IDENT, SemanticModelSourceUpdate.preserve(), rename));
+    verify(delegate)
+        .alterSemanticModel(NORMALIZED_IDENT, SemanticModelSourceUpdate.preserve(), rename);
 
     NameIdentifier invalidIdent = NameIdentifier.of(INPUT_NAMESPACE, "invalid model");
     assertThrows(
         IllegalArgumentException.class,
-        () -> dispatcher.createSemanticModel(invalidIdent, null, definition(), Map.of()));
+        () ->
+            dispatcher.createSemanticModel(
+                invalidIdent, null, definition(), Map.of(), sources(definition())));
     assertThrows(
         IllegalArgumentException.class,
         () ->
             dispatcher.alterSemanticModel(
-                INPUT_IDENT, SemanticModelChange.rename("invalid model")));
+                INPUT_IDENT,
+                SemanticModelSourceUpdate.preserve(),
+                SemanticModelChange.rename("invalid model")));
     assertThrows(
         IllegalArgumentException.class,
-        () -> dispatcher.alterSemanticModel(INPUT_IDENT, new SemanticModelChange[0]));
+        () ->
+            dispatcher.alterSemanticModel(
+                INPUT_IDENT, SemanticModelSourceUpdate.preserve(), new SemanticModelChange[0]));
   }
 
   @Test
@@ -144,18 +162,25 @@ public class TestSemanticModelNormalizeDispatcher {
     SemanticModel model = mock(SemanticModel.class);
     Map<String, String> properties = Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     when(delegate.importSemanticModel(
-            eq(NORMALIZED_IDENT), isNull(), any(SemanticModelDefinition.class), eq(properties)))
+            eq(NORMALIZED_IDENT),
+            isNull(),
+            any(SemanticModelDefinition.class),
+            eq(properties),
+            any()))
         .thenReturn(model);
 
     assertEquals(
         model,
         dispatcher.importOssieDocument(
-            INPUT_NAMESPACE, ossieDocument("SalesModel"), definitionToValidate -> {}));
+            INPUT_NAMESPACE,
+            ossieDocument("SalesModel"),
+            definitionToValidate -> sources(definitionToValidate)));
 
     ArgumentCaptor<SemanticModelDefinition> definition =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
     verify(delegate)
-        .importSemanticModel(eq(NORMALIZED_IDENT), isNull(), definition.capture(), eq(properties));
+        .importSemanticModel(
+            eq(NORMALIZED_IDENT), isNull(), definition.capture(), eq(properties), any());
     assertEquals(definition(), definition.getValue());
     verifyNoMoreInteractions(delegate);
   }
@@ -166,7 +191,9 @@ public class TestSemanticModelNormalizeDispatcher {
         IllegalArgumentException.class,
         () ->
             dispatcher.importOssieDocument(
-                INPUT_NAMESPACE, ossieDocument("invalid model"), definition -> {}));
+                INPUT_NAMESPACE,
+                ossieDocument("invalid model"),
+                definition -> sources(definition)));
     verifyNoInteractions(delegate);
   }
 

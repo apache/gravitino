@@ -43,6 +43,7 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 
 /** Dispatches always-managed Semantic Model operations to Gravitino's EntityStore. */
@@ -117,7 +118,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(properties != null, "Properties must not be null");
@@ -130,7 +132,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     schemaDispatcher.loadSchema(schemaIdent);
-    return managedOperations.createSemanticModel(ident, comment, definition, effectiveProperties);
+    return managedOperations.createSemanticModel(
+        ident, comment, definition, effectiveProperties, sourceUpdate);
   }
 
   @Override
@@ -138,8 +141,9 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
-    return createSemanticModel(ident, comment, definition, properties);
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
+    return createSemanticModel(ident, comment, definition, properties, sourceUpdate);
   }
 
   /** {@inheritDoc} */
@@ -149,7 +153,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     if (changes == null || changes.length == 0) {
@@ -161,7 +166,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-    return managedOperations.alterSemanticModel(ident, changes);
+    return managedOperations.alterSemanticModel(ident, sourceUpdate, changes);
   }
 
   @Override
