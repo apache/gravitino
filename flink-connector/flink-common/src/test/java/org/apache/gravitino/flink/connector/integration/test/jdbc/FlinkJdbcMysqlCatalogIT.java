@@ -23,9 +23,13 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Map;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.CloseableIterator;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -206,9 +210,14 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     try {
       catalog.asSchemas().createSchema(schemaName, null, ImmutableMap.of());
       tableEnv.useCatalog(CATALOG_NAME);
-      tableEnv.useDatabase(schemaName);
-      tableEnv.executeSql("CREATE TABLE " + tableName + " (id INT)");
-      tableEnv.executeSql("INSERT INTO " + tableName + " VALUES (1)");
+      // Prepare an external table without registering its ID under a different Gravitino catalog.
+      try (Connection connection =
+              DriverManager.getConnection(mysqlUrl, mysqlUsername, mysqlPassword);
+          Statement statement = connection.createStatement()) {
+        String mysqlTableName = schemaName + "." + tableName;
+        statement.execute("CREATE TABLE " + mysqlTableName + " (id INT)");
+        statement.executeUpdate("INSERT INTO " + mysqlTableName + " VALUES (1)");
+      }
 
       catalogWithoutDefaultDatabase =
           metalake.createCatalog(
@@ -226,12 +235,13 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
                   JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER,
                   mysqlDriver));
 
-      Assertions.assertEquals(
-          Row.of(1),
+      try (CloseableIterator<Row> rows =
           tableEnv
               .executeSql("SELECT * FROM " + catalogName + "." + schemaName + "." + tableName)
-              .collect()
-              .next());
+              .collect()) {
+        Assertions.assertEquals(Row.of(1), rows.next());
+        Assertions.assertFalse(rows.hasNext());
+      }
     } finally {
       if (catalogWithoutDefaultDatabase != null) {
         metalake.dropCatalog(catalogName, true);
