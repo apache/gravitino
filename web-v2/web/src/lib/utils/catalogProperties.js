@@ -55,6 +55,13 @@ export const isCatalogPropertyHidden = (prop, context = {}) => {
   const { editCatalog, catalogProperties, catalogBackend, authType, currentProvider } = context
   const { parentField, hide, key } = prop
 
+  // In edit mode, hide props not present in the loaded catalog response. Fields flagged
+  // `alwaysVisible` opt out so the dialog can still render optional properties the catalog omits,
+  // but they keep honoring parent-dependent hiding below.
+  if (editCatalog && catalogProperties && !(key in catalogProperties) && !prop.alwaysVisible) {
+    return true
+  }
+
   // Visibility driven by another field always wins.
   if (parentField === 'catalog-backend') {
     return Boolean(catalogBackend && hide && hide.includes(catalogBackend))
@@ -66,11 +73,6 @@ export const isCatalogPropertyHidden = (prop, context = {}) => {
 
   if (editCatalog && prop.alwaysVisible) {
     return false
-  }
-
-  // In edit mode, hide props not present in the loaded catalog response.
-  if (editCatalog && catalogProperties && !(key in catalogProperties)) {
-    return true
   }
 
   // Outside edit mode every field is rendered; in edit mode only required/region/location survive.
@@ -111,14 +113,22 @@ export const buildCatalogProperties = ({
       return
     }
 
-    const value = values[key] || (item.value instanceof Array ? item.value.join(',') : item.value)
+    const defaultValue = item.value instanceof Array ? item.value.join(',') : item.value
+    const value = values[key] || defaultValue
 
-    // Fields flagged alwaysVisible are rendered on the edit dialog even when the catalog does not
-    // report them yet. Keep them absent until the user gives them a value, otherwise saving an
-    // unrelated change would write empty or default-valued properties.
-    if (isDefaultProp && editCatalog && !(key in catalogProperties)) {
-      const defaultValue = item.value instanceof Array ? item.value.join(',') : item.value
-      if (value === '' || value == null || value === defaultValue) {
+    if (isDefaultProp && editCatalog) {
+      // Optional, editable alwaysVisible fields are rendered even when the catalog omits them.
+      // Leave them out when the user clears them so an existing property is removed instead of
+      // being written back as an empty string.
+      if (item.alwaysVisible && !item.required && !item.immutable && !item.disabled) {
+        if (values[key] === '' || values[key] == null) {
+          return
+        }
+      }
+
+      // Keep fields the catalog does not report absent until the user gives them a value, otherwise
+      // saving an unrelated change would write empty or default-valued properties.
+      if (!(key in catalogProperties) && (value === '' || value == null || value === defaultValue)) {
         return
       }
     }

@@ -102,6 +102,25 @@ describe('isCatalogPropertyHidden', () => {
     ).toBe(false)
   })
 
+  it('hides required parent-dependent properties the catalog does not report', () => {
+    const jdbcUser = {
+      key: 'jdbc-user',
+      required: true,
+      parentField: 'catalog-backend',
+      hide: ['hive', 'rest']
+    }
+
+    const context = {
+      editCatalog: true,
+      catalogProperties: { 'catalog-backend': 'jdbc', 'jdbc-url': 'jdbc:mysql://h:3306' },
+      catalogBackend: 'jdbc'
+    }
+
+    // A JDBC-backed catalog may omit the credentials from the response. The empty required field
+    // must stay hidden so it cannot block saving an unrelated change.
+    expect(isCatalogPropertyHidden(jdbcUser, context)).toBe(true)
+  })
+
   it('hides fields depending on the selected catalog backend', () => {
     const jdbcDriver = {
       key: 'jdbc-driver',
@@ -180,6 +199,24 @@ describe('buildCatalogProperties', () => {
 
     // Untouched fields still holding their declared default are left out of the request.
     expect(properties).not.toHaveProperty('table-format-filter')
+  })
+
+  it('omits cleared optional alwaysVisible properties so the update removes them', () => {
+    const catalogProperties = {
+      'aws-region': 'us-east-1',
+      warehouse: 's3://b/w',
+      'aws-glue-endpoint': 'http://localhost:4566'
+    }
+
+    const properties = buildCatalogProperties({
+      values: { 'aws-region': 'us-east-1', warehouse: 's3://b/w', 'aws-glue-endpoint': '' },
+      defaultProps: visibleGlueProps,
+      editCatalog: true,
+      catalogProperties
+    })
+
+    // Leaving the endpoint empty must produce a removeProperty update, not setProperty with ''.
+    expect(properties).not.toHaveProperty('aws-glue-endpoint')
   })
 
   it('round-trips properties the catalog already reports', () => {
