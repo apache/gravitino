@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -57,6 +58,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -195,6 +197,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     Preconditions.checkArgument(
         representations != null && representations.length >= 1,
         "representations must not be null or empty");
+    if (columns != null) {
+      WritableDataTypeValidator.validateColumns(columns, "columns");
+    }
 
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
@@ -232,6 +237,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    for (int i = 0; i < changes.length; i++) {
+      if (changes[i] instanceof ViewChange.ReplaceView) {
+        WritableDataTypeValidator.validateColumns(
+            ((ViewChange.ReplaceView) changes[i]).getColumns(), "updates[" + i + "].columns");
+      }
+    }
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
     boolean isRenameView =
         Arrays.stream(changes).anyMatch(change -> change instanceof ViewChange.RenameView);
@@ -355,6 +366,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
               store.delete(ident, VIEW);
             } catch (NoSuchEntityException e) {
               LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -599,6 +612,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     } catch (SoftDeletedEntityIdentifierException e) {
       throw softDeletedExternalIdentifierException(ident, uid, VIEW);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);

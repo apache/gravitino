@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.maintenance.optimizer.monitor.evaluator.MetricsEvaluatorForTest;
 import org.apache.gravitino.maintenance.optimizer.monitor.job.TableJobRelationProviderForTest;
@@ -41,6 +42,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestOptimizerCmd {
+
+  // A spark_master entry with an empty value in the printed job configuration.
+  private static final Pattern EMPTY_SPARK_MASTER = Pattern.compile("\\bspark_master=\\s*[,}]");
 
   @Test
   void testGlobalHelpIncludesImplementedCommands() {
@@ -497,7 +501,8 @@ class TestOptimizerCmd {
     Assertions.assertTrue(output[0].contains("jobTemplate=builtin-iceberg-update-stats"));
     Assertions.assertTrue(output[0].contains("update_mode=stats"));
     Assertions.assertTrue(output[0].contains("table_identifier=ab.t1"));
-    Assertions.assertTrue(output[0].contains("spark_master=local[*]"));
+    // Without a configured master, the job executor decides it.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
     Assertions.assertTrue(output[0].contains("catalog_type=rest"));
     Assertions.assertTrue(output[0].contains("catalog_uri=http://localhost:9001/iceberg"));
     Assertions.assertTrue(output[0].contains("warehouse_location=/tmp/warehouse"));
@@ -554,13 +559,21 @@ class TestOptimizerCmd {
                 + "\"spark.sql.catalog.rest.type\":\"rest\","
                 + "\"spark.sql.catalog.rest.uri\":\"http://localhost:9001/iceberg\","
                 + "\"spark.sql.catalog.rest.warehouse\":\"/tmp/warehouse\","
-                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\"}",
+                + "\"spark.sql.extensions\":\"org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions\","
+                + "\"spark.master\":\"local[2]\"}",
             "--dry-run",
             "--conf-path",
             confPath.toString());
     Assertions.assertTrue(output[1].isEmpty(), "stderr=" + output[1] + ", stdout=" + output[0]);
     Assertions.assertTrue(output[0].contains("custom-metrics-updater"));
     Assertions.assertTrue(output[0].contains("spark.sql.catalog.rest"));
+    // The master of spark_conf isn't passed as the spark_master parameter, and the user is told.
+    Assertions.assertTrue(EMPTY_SPARK_MASTER.matcher(output[0]).find(), output[0]);
+    Assertions.assertTrue(
+        output[0].contains(
+            "WARN: spark.master=local[2] in the Spark configurations is ignored by the job."
+                + " Set gravitino.optimizer.jobSubmitterConfig.spark_master instead."),
+        output[0]);
   }
 
   @Test

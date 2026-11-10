@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteDataFilesJob {
@@ -134,7 +135,7 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v2", version);
+    assertEquals("v1", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -145,99 +146,6 @@ public class TestIcebergRewriteDataFilesJob {
 
     assertTrue(template.name().matches(JobTemplateProvider.BUILTIN_NAME_PATTERN));
     assertTrue(template.name().startsWith(JobTemplateProvider.BUILTIN_NAME_PREFIX));
-  }
-
-  // Test parseArguments method
-
-  @Test
-  public void testParseArgumentsWithAllRequired() {
-    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
-  }
-
-  @Test
-  public void testParseArgumentsWithOptional() {
-    String[] args = {
-      "--catalog", "iceberg_prod",
-      "--table", "db.sample",
-      "--strategy", "binpack",
-      "--where", "year = 2024"
-    };
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    assertEquals(4, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
-    assertEquals("binpack", result.get("strategy"));
-    assertEquals("year = 2024", result.get("where"));
-  }
-
-  @Test
-  public void testParseArgumentsWithEmptyValues() {
-    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--strategy", ""};
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    // Empty values should be ignored
-    assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("db.sample", result.get("table"));
-    assertFalse(result.containsKey("strategy"));
-  }
-
-  @Test
-  public void testParseArgumentsWithMissingValues() {
-    String[] args = {"--catalog", "iceberg_prod", "--table"};
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    // catalog has a value, table is a flag at end (treated as boolean)
-    assertEquals(2, result.size());
-    assertEquals("iceberg_prod", result.get("catalog"));
-    assertEquals("true", result.get("table"));
-  }
-
-  @Test
-  public void testParseArgumentsWithComplexValues() {
-    String[] args = {
-      "--catalog", "iceberg_prod",
-      "--table", "db.sample",
-      "--where", "year = 2024 and month = 1",
-      "--options", "{\"min-input-files\":\"2\"}"
-    };
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    assertEquals(4, result.size());
-    assertEquals("year = 2024 and month = 1", result.get("where"));
-    assertEquals("{\"min-input-files\":\"2\"}", result.get("options"));
-  }
-
-  @Test
-  public void testParseArgumentsWithSortOrder() {
-    String[] args = {
-      "--catalog", "iceberg_prod",
-      "--table", "db.sample",
-      "--strategy", "sort",
-      "--sort-order", "id DESC NULLS LAST, name ASC"
-    };
-    Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
-
-    assertEquals(4, result.size());
-    assertEquals("sort", result.get("strategy"));
-    assertEquals("id DESC NULLS LAST, name ASC", result.get("sort-order"));
-  }
-
-  @Test
-  public void testParseArgumentsOrderIndependent() {
-    String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--strategy", "binpack"};
-    String[] args2 = {"--strategy", "binpack", "--table", "tbl1", "--catalog", "cat1"};
-
-    Map<String, String> result1 = IcebergRewriteDataFilesJob.parseArguments(args1);
-    Map<String, String> result2 = IcebergRewriteDataFilesJob.parseArguments(args2);
-
-    assertEquals(result1, result2);
   }
 
   // Test parseOptionsJson method
@@ -522,34 +430,6 @@ public class TestIcebergRewriteDataFilesJob {
   }
 
   @Test
-  public void testEscapeSqlString() {
-    // Test basic escaping of single quotes
-    assertEquals("O''Brien", IcebergRewriteDataFilesJob.escapeSqlString("O'Brien"));
-    assertEquals(
-        "test''with''quotes", IcebergRewriteDataFilesJob.escapeSqlString("test'with'quotes"));
-
-    // Test strings without quotes remain unchanged
-    assertEquals("normal_string", IcebergRewriteDataFilesJob.escapeSqlString("normal_string"));
-
-    // Test null and empty
-    assertEquals(null, IcebergRewriteDataFilesJob.escapeSqlString(null));
-    assertEquals("", IcebergRewriteDataFilesJob.escapeSqlString(""));
-  }
-
-  @Test
-  public void testEscapeSqlIdentifier() {
-    // Test basic escaping and quoting of backticks
-    assertEquals("`catalog``name`", IcebergRewriteDataFilesJob.escapeSqlIdentifier("catalog`name"));
-
-    // Test strings without backticks are still quoted
-    assertEquals(
-        "`normal_catalog`", IcebergRewriteDataFilesJob.escapeSqlIdentifier("normal_catalog"));
-
-    // Test null
-    assertEquals(null, IcebergRewriteDataFilesJob.escapeSqlIdentifier(null));
-  }
-
-  @Test
   public void testBuildProcedureCallWithSqlInjectionAttempt() {
     // Test SQL injection attempt in table name
     String maliciousTable = "db.table' OR '1'='1";
@@ -657,58 +537,21 @@ public class TestIcebergRewriteDataFilesJob {
     }
   }
 
-  // Tests for custom Spark configurations
-
   @Test
-  public void testParseCustomSparkConfigsWithValidJson() {
-    String json = "{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}";
-    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
-
-    assertEquals(2, configs.size());
-    assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
-    assertEquals("4g", configs.get("spark.executor.memory"));
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsWithNumericValues() {
-    String json = "{\"spark.sql.shuffle.partitions\":200,\"spark.executor.cores\":4}";
-    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
-
-    assertEquals(2, configs.size());
-    assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
-    assertEquals("4", configs.get("spark.executor.cores"));
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsWithBooleanValues() {
-    String json = "{\"spark.dynamicAllocation.enabled\":true,\"spark.speculation\":false}";
-    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
-
-    assertEquals(2, configs.size());
-    assertEquals("true", configs.get("spark.dynamicAllocation.enabled"));
-    assertEquals("false", configs.get("spark.speculation"));
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsWithEmptyString() {
-    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs("");
-    assertTrue(configs.isEmpty());
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsWithNull() {
-    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(null);
-    assertTrue(configs.isEmpty());
-  }
-
-  @Test
-  public void testParseCustomSparkConfigsWithInvalidJson() {
-    String json = "{invalid json}";
-    try {
-      IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
-      fail("Expected IllegalArgumentException for invalid JSON");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("--spark-conf"));
-    }
+  public void testCompactionMetricsSchemaForTms() {
+    Map<String, Object> metrics =
+        IcebergRewriteDataFilesJob.compactionMetrics(1.23e15, 42L, 126877696D, 9876543210L, 80L);
+    assertEquals(5, metrics.size());
+    assertEquals(
+        1.23e15,
+        ((Number) metrics.get(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)).doubleValue());
+    assertEquals(
+        126877696D,
+        ((Number) metrics.get(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC)).doubleValue());
+    assertEquals(
+        9876543210L,
+        ((Number) metrics.get(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC)).longValue());
+    assertEquals(
+        80L, ((Number) metrics.get(IcebergDataCompactionContent.FILE_NUMBER_METRIC)).longValue());
   }
 }

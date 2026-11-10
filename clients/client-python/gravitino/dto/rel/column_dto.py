@@ -73,6 +73,20 @@ class ColumnDTO(Column, DataClassJsonMixin):
     )
     """Whether the column is an auto-increment column."""
 
+    # Keep after _auto_increment so positional constructors stay compatible with the
+    # pre-initialDefaultValue field order (name, type, comment, default, nullable, autoIncrement).
+    _initial_default_value: Optional[Union[Expression, List[Expression]]] = field(
+        default_factory=lambda: Column.INITIAL_DEFAULT_VALUE_NOT_SET,
+        metadata=config(
+            field_name="initialDefaultValue",
+            encoder=ColumnDefaultValueSerdes.serialize,
+            decoder=ColumnDefaultValueSerdes.deserialize,
+            exclude=lambda value: value is None
+            or value is Column.INITIAL_DEFAULT_VALUE_NOT_SET,
+        ),
+    )
+    """The initial default value of the column."""
+
     def name(self) -> str:
         return self._name
 
@@ -90,6 +104,9 @@ class ColumnDTO(Column, DataClassJsonMixin):
 
     def default_value(self) -> Union[Expression, List[Expression]]:
         return self._default_value
+
+    def initial_default_value(self) -> Union[Expression, List[Expression]]:
+        return self._initial_default_value
 
     def validate(self) -> None:
         Precondition.check_string_not_empty(
@@ -123,6 +140,7 @@ class ColumnDTO(Column, DataClassJsonMixin):
             and self._nullable == other._nullable
             and self._auto_increment == other._auto_increment
             and self._default_value == other._default_value
+            and self._initial_default_value == other._initial_default_value
         )
 
     def __hash__(self) -> int:
@@ -138,6 +156,12 @@ class ColumnDTO(Column, DataClassJsonMixin):
                     if self._default_value is Column.DEFAULT_VALUE_NOT_SET
                     else self._default_value
                 ),
+                (
+                    None
+                    if self._initial_default_value
+                    is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                    else self._initial_default_value
+                ),
             )
         )
 
@@ -149,6 +173,7 @@ class ColumnDTO(Column, DataClassJsonMixin):
             self._nullable: bool = True
             self._auto_increment: bool = False
             self._default_value = None
+            self._initial_default_value = None
 
         def with_name(self, name: str) -> ColumnDTO.Builder:
             """Sets the name of the column.
@@ -222,6 +247,20 @@ class ColumnDTO(Column, DataClassJsonMixin):
             self._default_value = default_value
             return self
 
+        def with_initial_default_value(
+            self, initial_default_value: Expression
+        ) -> ColumnDTO.Builder:
+            """Sets the initial default value of the column.
+
+            Args:
+                initial_default_value (Expression): The initial default value of the column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._initial_default_value = initial_default_value
+            return self
+
         def build(self) -> ColumnDTO:
             """Builds a Column DTO based on the provided builder parameters.
 
@@ -247,5 +286,10 @@ class ColumnDTO(Column, DataClassJsonMixin):
                     Column.DEFAULT_VALUE_NOT_SET
                     if self._default_value is None
                     else self._default_value
+                ),
+                _initial_default_value=(
+                    Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                    if self._initial_default_value is None
+                    else self._initial_default_value
                 ),
             )

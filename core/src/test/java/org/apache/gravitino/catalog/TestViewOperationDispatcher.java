@@ -61,6 +61,7 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -611,6 +612,54 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         "gravitino.identifier");
 
     Assertions.assertFalse(created.properties().containsKey(ID_KEY));
+  }
+
+  @Test
+  public void testImportViewPropagatesOptimisticLockConflict() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_import_view_occ");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_import_occ");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+    entityStore.delete(viewIdent, VIEW);
+
+    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), eq(VIEW), any());
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .put(any(ViewEntity.class), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    } finally {
+      reset(entityStore);
+    }
+  }
+
+  @Test
+  public void testDropViewPropagatesOptimisticLockConflict() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view_occ");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_occ");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), eq(VIEW), anyBoolean());
+    try {
+      Assertions.assertThrows(
+          OptimisticLockException.class, () -> viewOperationDispatcher.dropView(viewIdent));
+    } finally {
+      reset(entityStore);
+    }
   }
 
   @Test

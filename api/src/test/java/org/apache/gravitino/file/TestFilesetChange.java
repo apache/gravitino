@@ -24,6 +24,24 @@ import org.junit.jupiter.api.Test;
 
 public class TestFilesetChange {
   @Test
+  void testUpdateTypeChange() {
+    for (Fileset.Type type : Fileset.Type.values()) {
+      FilesetChange.UpdateFilesetType change =
+          (FilesetChange.UpdateFilesetType) FilesetChange.updateType(type);
+      Assertions.assertEquals(type, change.getNewType());
+      Assertions.assertEquals(change, FilesetChange.updateType(type));
+      Assertions.assertEquals(change.hashCode(), FilesetChange.updateType(type).hashCode());
+      Assertions.assertNotEquals(change, null);
+      Assertions.assertNotEquals(change, FilesetChange.rename("fileset"));
+      Assertions.assertEquals("UPDATEFILESETTYPE " + type, change.toString());
+    }
+    Assertions.assertNotEquals(
+        FilesetChange.updateType(Fileset.Type.MANAGED),
+        FilesetChange.updateType(Fileset.Type.EXTERNAL));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> FilesetChange.updateType(null));
+  }
+
+  @Test
   void testRemovePropertyChange() {
     String property = "property1";
     FilesetChange change = FilesetChange.removeProperty(property);

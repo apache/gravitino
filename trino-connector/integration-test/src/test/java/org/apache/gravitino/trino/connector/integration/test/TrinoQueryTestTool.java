@@ -109,7 +109,8 @@ public class TrinoQueryTestTool {
           true,
           "Specify the Gravitino connector JAR path. "
               + "The JAR file under ${trino_connector_dir} will be copied into the test image, "
-              + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
+              + "the default value is the connector directory pinned in the test docker-compose "
+              + "file.");
 
       options.addOption(
           "test_containers",
@@ -136,7 +137,7 @@ public class TrinoQueryTestTool {
                 + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
                 + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino version:\n"
-                + "TrinoTestTool --auto=all --trino_version=440\n\n"
+                + "TrinoTestTool --auto=all --trino_version=483\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino connector JAR files:\n"
                 + "TrinoTestTool --auto=all --trino_connector_dir=./trino-connector/libs\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"

@@ -32,10 +32,12 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
  * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
  * responses (which may be masked as {@code ******}). Plaintext for hidden static credentials,
  * including {@code s3-access-key-id}, is recovered via {@code getSecrets()} when the caller holds
- * {@code USE_SECRETS} and {@code INCLUDE_CREDENTIAL_SECRETS}, or via {@code getCredentials()} (no
- * dedicated privilege). Masked placeholders are dropped by {@link #omitStaticCredentialProperties}.
- * Callers with only {@code USE_SECRETS} receive {@code getSecrets()} with cloud access-key pairs
- * omitted via {@link #omitCloudAccessKeyPairProperties}.
+ * {@code USE_SECRETS} and {@code INCLUDE_CREDENTIAL_SECRETS}, or via {@code getCredentials()}.
+ * Catalog credential vending requires both privileges or metalake ownership, in addition to
+ * metadata access; fileset credential vending uses path-based authorization. Masked placeholders
+ * are dropped by {@link #omitStaticCredentialProperties}. Callers with only {@code USE_SECRETS}
+ * receive {@code getSecrets()} with cloud access-key pairs omitted via {@link
+ * #omitCloudAccessKeyPairProperties}.
  *
  * <p>{@code azure-storage-account-name} is intentionally left non-hidden (and not listed here):
  * unlike S3/OSS/COS access key IDs, the account name is already disclosed in ADLS URIs such as

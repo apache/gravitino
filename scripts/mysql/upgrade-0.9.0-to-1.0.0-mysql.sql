@@ -59,12 +59,43 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     KEY `idx_mid` (`metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
+-- MySQL has no ADD COLUMN IF NOT EXISTS. Guard the unique-key conversion so
+-- a failed upgrade can be restarted from the beginning: skip exactly the
+-- completed steps and fail on any other unexpected schema state.
+
 -- using default 'unknown' to fill in the new column for compatibility
-ALTER TABLE `model_version_info` ADD COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'model version uri name' AFTER `model_version_properties`;
-ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`;
-ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE KEY (`model_id`, `version`, `model_version_uri_name`, `deleted_at`);
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND column_name = 'model_version_uri_name'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` ADD COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL DEFAULT ''unknown'' COMMENT ''model version uri name'' AFTER `model_version_properties`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(NOT EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'uk_mid_ver_del'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND index_name = 'uk_mid_ver_uri_del'),
+    'SELECT 1',
+    'ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE KEY (`model_id`, `version`, `model_version_uri_name`, `deleted_at`)');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- remove the default value for model_version_uri_name
-ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT;
+SET @ddl = IF(EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'model_version_info' AND column_name = 'model_version_uri_name' AND column_default IS NOT NULL),
+    'ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT',
+    'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

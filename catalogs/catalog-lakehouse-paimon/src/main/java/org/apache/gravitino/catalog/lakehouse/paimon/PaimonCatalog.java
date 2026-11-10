@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -53,6 +54,11 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
     return "lakehouse-paimon";
   }
 
+  @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
   /**
    * Creates a new instance of {@link PaimonCatalogOperations} with the provided configuration.
    *
@@ -62,6 +68,18 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     return new PaimonCatalogOperations();
+  }
+
+  /**
+   * Validates the required Paimon backend settings in the proposed catalog configuration.
+   *
+   * @param configuration the complete proposed catalog configuration
+   * @throws IllegalArgumentException if the configuration is invalid
+   */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    CatalogUtils.checkPaimonConfig(
+        PaimonCatalogOperations.toPaimonConfig(configuration, CATALOG_PROPERTIES_META));
   }
 
   @Override

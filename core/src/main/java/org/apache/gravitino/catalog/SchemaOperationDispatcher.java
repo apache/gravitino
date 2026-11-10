@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -42,10 +43,12 @@ import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -54,11 +57,13 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -136,6 +141,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @throws NoSuchCatalogException If the catalog corresponding to the provided identifier does not
    *     exist.
    * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadSchema to import it.
    */
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
@@ -143,6 +150,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * @throws GravitinoRuntimeException If external creation succeeds but registration fails; resolve
+   *     the entity-store error, verify the source identity, and use loadSchema to import it. Secret
+   *     material referenced by the externally created schema is retained for reconciliation.
+   */
   @Override
   public Schema createSchema(
       NameIdentifier ident,
@@ -181,26 +195,52 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Write secrets before createSchema: create paths that resolve URNs (e.g. Fileset FS
     // mergeUpLevelConfigurations, catalog createBaseCatalog) require secrets to exist first.
-    // Roll back on any create failure (same pattern as CatalogManager /
-    // FilesetOperationDispatcher).
+    // Roll back secrets only if external creation has not succeeded. Once the source schema
+    // exists, it may reference these secrets even if registration fails.
     secretManager.writeSecrets(secretMaterials);
+    AtomicBoolean createdInCatalog = new AtomicBoolean();
     try {
       return TreeLockUtils.doWithTreeLock(
           catalogIdent,
           LockType.WRITE,
           () -> {
+            boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
+            if (!isManagedSchema) {
+              // Check before source creation so an existing registration cannot be replaced.
+              // Never interpret a store failure as permission to replace its identity.
+              try {
+                if (store.exists(ident, SCHEMA)) {
+                  throw new SchemaAlreadyExistsException(
+                      "Schema %s is already registered in Gravitino. Verify the registered and source "
+                          + "identities and follow the catalog-specific recovery guidance before "
+                          + "removing the stale registration or creating this name.",
+                      ident);
+                }
+              } catch (IOException e) {
+                throw new GravitinoRuntimeException(
+                    e,
+                    "Cannot verify the registration of schema %s. Resolve the entity-store error "
+                        + "before retrying; source creation has not been attempted.",
+                    ident);
+              }
+            }
             // we do not retrieve the schema again (to obtain some values generated by underlying
             // catalog)
             // since some catalogs' API is async and the schema may not be created immediately
             Schema schema =
                 doWithCatalog(
                     catalogIdent,
-                    c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, updatedProperties)),
+                    c ->
+                        c.doWithSchemaOps(
+                            s -> {
+                              Schema created = s.createSchema(ident, comment, updatedProperties);
+                              createdInCatalog.set(true);
+                              return created;
+                            }),
                     NoSuchCatalogException.class,
                     SchemaAlreadyExistsException.class);
 
             // If the Schema is maintained by the Gravitino's store, we don't have to store again.
-            boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
             if (isManagedSchema) {
               return EntityCombinedSchema.of(schema)
                   .withHiddenProperties(
@@ -227,14 +267,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
             try {
               store.put(schemaEntity, true /* overwrite */);
+            } catch (EntityAlreadyExistsException e) {
+              throw new SchemaAlreadyExistsException(
+                  e,
+                  "Schema %s was created in the external catalog, but its registration conflicts "
+                      + "with an existing entity. Verify and reconcile the registered and source "
+                      + "identities before continuing; loading the schema does not resolve this conflict.",
+                  ident);
             } catch (Exception e) {
               LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-              return EntityCombinedSchema.of(schema)
-                  .withHiddenProperties(
-                      getMaskAndOmitKeys(
-                          catalogIdent,
-                          HasPropertyMetadata::schemaPropertiesMetadata,
-                          schema.properties()));
+              throw new GravitinoRuntimeException(
+                  e,
+                  "Schema %s was created in the external catalog, but its registration in Gravitino "
+                      + "failed. Resolve the entity-store error, verify the source identity, and use "
+                      + "loadSchema to import it. Do not repeat createSchema; it will report already exists.",
+                  ident);
             }
 
             // Merge both the metadata from catalog operation and the metadata from entity store.
@@ -246,7 +293,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                         schema.properties()));
           });
     } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
+      // An externally created schema may already reference these URNs. Keep its credentials
+      // available for reconciliation when only the entity-store registration failed.
+      if (!createdInCatalog.get()) {
+        secretManager.rollbackSecrets(secretMaterials);
+      }
       throw e;
     }
   }
@@ -512,9 +563,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * Drops a schema.
    *
    * @param ident The identifier of the schema to be dropped.
-   * @param cascade If true, drops all tables within the schema as well.
+   * @param cascade Whether to request cascading deletion. A catalog may reject a non-empty schema
+   *     even when this is true if it cannot safely contain the deletion.
    * @return True if the schema was successfully dropped, false if the schema doesn't exist.
-   * @throws NonEmptySchemaException If the schema contains tables and cascade is set to false.
+   * @throws NonEmptySchemaException If the schema is non-empty and cascade is false, or if the
+   *     catalog cannot safely support the requested cascading deletion.
    * @throws RuntimeException If an error occurs while dropping the schema.
    */
   @Override
@@ -580,6 +633,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               droppedFromStore = store.delete(ident, SCHEMA, true);
             } catch (NoSuchEntityException e) {
               LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -653,13 +708,48 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       uid = idGenerator.nextId();
     }
 
+    if (stringId != null) {
+      try {
+        for (SchemaEntity existing :
+            store.list(identifier.namespace(), SchemaEntity.class, SCHEMA)) {
+          if (existing.id() == uid && !existing.nameIdentifier().equals(identifier)) {
+            // Keep the ownership check for copied source identifiers and external renames, but
+            // require manual cleanup instead of moving the existing registration to this path.
+            throw retainedExternalIdentifierConflictException(identifier, SCHEMA);
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(
+            "Failed to verify schema identifier ownership for " + identifier, e);
+      }
+    }
+
+    // Persist source properties, not the masked client view, so a recovered registration retains
+    // secret URNs. The EntityCombinedSchema returned to the caller still applies masking.
+    Map<String, String> sourceProperties =
+        SecretPropertyUtils.copyEntityProperties(schema.schema().properties());
+    for (Map.Entry<String, String> property : sourceProperties.entrySet()) {
+      String value = property.getValue();
+      if (value != null && value.startsWith(SecretConstants.URN_PREFIX)) {
+        SecretUrn urn = SecretUrn.parse(value);
+        if (urn.identifierSegments().size() == 3
+            && !SecretPropertyUtils.isWriteThroughForEntity(
+                property.getKey(), value, "schema", uid)) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot import schema %s: write-through secret for property %s is not owned by "
+                      + "this schema identifier and property. Remove the copied reference or "
+                      + "restore the matching source identity before importing.",
+                  identifier, property.getKey()));
+        }
+      }
+    }
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(uid)
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
-            .withProperties(
-                schema.properties() == null ? Collections.emptyMap() : schema.properties())
+            .withProperties(sourceProperties)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(schema.auditInfo().creator())
@@ -675,6 +765,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     } catch (SoftDeletedEntityIdentifierException e) {
       throw softDeletedExternalIdentifierException(identifier, uid, SCHEMA);
     } catch (EntityAlreadyExistsException e) {
+      throw e;
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);

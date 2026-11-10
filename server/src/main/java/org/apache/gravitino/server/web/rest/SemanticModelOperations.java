@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 import javax.inject.Inject;
@@ -52,12 +53,11 @@ import org.apache.gravitino.dto.responses.SemanticModelResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
-import org.apache.gravitino.semantic.OssieDocumentConverter;
-import org.apache.gravitino.semantic.OssieDocumentConverter.ImportedSemanticModel;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -239,14 +239,11 @@ public class SemanticModelOperations {
                 MediaType.APPLICATION_JSON_TYPE.isCompatible(headers.getMediaType())
                     ? OssieDocument.json(document)
                     : OssieDocument.yaml(document);
-            ImportedSemanticModel imported = OssieDocumentConverter.importDocument(ossieDocument);
-            sourceValidator.validate(metalake, imported.definition());
             SemanticModel semanticModel =
-                dispatcher.createSemanticModel(
-                    NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, imported.name()),
-                    imported.comment(),
-                    imported.definition(),
-                    imported.properties());
+                dispatcher.importOssieDocument(
+                    NamespaceUtil.ofSemanticModel(metalake, catalog, schema),
+                    ossieDocument,
+                    definition -> sourceValidator.validate(metalake, definition));
             LOG.info(
                 "Apache Ossie Semantic Model imported: {}.{}.{}.{}",
                 metalake,
@@ -354,13 +351,19 @@ public class SemanticModelOperations {
                 request.getUpdates().stream()
                     .map(SemanticModelUpdateRequest::semanticModelChange)
                     .toArray(SemanticModelChange[]::new);
+            if (Arrays.stream(changes)
+                .anyMatch(change -> change instanceof SemanticModelChange.ReplaceDefinition)) {
+              dispatcher.loadSemanticModel(ident);
+            }
+            SemanticModelSourceUpdate sourceUpdate = SemanticModelSourceUpdate.preserve();
             for (SemanticModelChange change : changes) {
               if (change instanceof SemanticModelChange.ReplaceDefinition) {
-                sourceValidator.validate(
-                    metalake, ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
+                sourceUpdate =
+                    sourceValidator.validate(
+                        metalake, ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
               }
             }
-            SemanticModel altered = dispatcher.alterSemanticModel(ident, changes);
+            SemanticModel altered = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
             LOG.info(
                 "Semantic Model altered: {}.{}.{}.{}", metalake, catalog, schema, altered.name());
             return Utils.ok(new SemanticModelResponse(DTOConverters.toDTO(altered)));
@@ -483,14 +486,15 @@ public class SemanticModelOperations {
       String metalake, String catalog, String schema, SemanticModelCreateRequest request) {
     request.validate();
     SemanticModelDefinition definition = request.toDefinition();
-    sourceValidator.validate(metalake, definition);
+    SemanticModelSourceUpdate sourceUpdate = sourceValidator.validate(metalake, definition);
     NameIdentifier ident =
         NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, request.getName());
     return dispatcher.createSemanticModel(
         ident,
         request.getComment(),
         definition,
-        request.getProperties() == null ? Collections.emptyMap() : request.getProperties());
+        request.getProperties() == null ? Collections.emptyMap() : request.getProperties(),
+        sourceUpdate);
   }
 
   private static OssieFormat parseOssieFormat(String format) {

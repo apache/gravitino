@@ -3274,6 +3274,10 @@ public class CatalogClickHouseIT extends BaseIT {
     String password = CLICKHOUSE_CONTAINER.getPassword();
     String wrongPassword = password + "wrong";
     catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+    // This test deliberately creates the catalog with a wrong password and then fixes it via
+    // alterCatalog, so it must opt out of create-time backend verification; otherwise the create
+    // itself would be rejected for the unreachable backend (the behavior added in #13767).
+    catalogProperties.put(JdbcConfig.VERIFY_ON_CREATE.getKey(), "false");
 
     metalake.createCatalog(
         testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
@@ -3980,6 +3984,46 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertTrue(
         normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
         "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testLoadNativeTextDataSkippingIndexes() {
+    String tableName = GravitinoITUtils.genRandomName("ch_text_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+
+    // ClickHouse 24.8 requires the experimental text-index setting for this table creation.
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` UInt64,\n"
+                + "  `token_text` String,\n"
+                + "  `ngram_text` String,\n"
+                + "  INDEX `idx_tokens` `token_text` TYPE text(tokenizer = 'default') GRANULARITY 1,\n"
+                + "  INDEX `idx_ngrams` `ngram_text` TYPE text(tokenizer = 'ngram', ngram_size = 3) GRANULARITY 1\n"
+                + ") ENGINE = MergeTree ORDER BY `id` COMMENT 'text index IT' "
+                + "SETTINGS allow_experimental_full_text_index = 1",
+            schemaName, tableName));
+
+    Table loaded = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Index loadedTokens =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_tokens"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, loadedTokens.type());
+    Assertions.assertArrayEquals(new String[][] {{"token_text"}}, loadedTokens.fieldNames());
+    Assertions.assertEquals(Map.of("tokenizer", "tokens"), loadedTokens.properties());
+
+    Index loadedNgrams =
+        Arrays.stream(loaded.index())
+            .filter(index -> Objects.equals(index.name(), "idx_ngrams"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TEXT, loadedNgrams.type());
+    Assertions.assertArrayEquals(new String[][] {{"ngram_text"}}, loadedNgrams.fieldNames());
+    Assertions.assertEquals(
+        Map.of("tokenizer", "ngrams", "ngram_size", "3"), loadedNgrams.properties());
   }
 
   @Test

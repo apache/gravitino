@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * A schema-scoped analytical Semantic Model managed by Gravitino. The entity composes its immutable
@@ -74,6 +76,26 @@ public interface SemanticModel extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * Returns the tag operations for this Semantic Model.
+   *
+   * @return The {@link SupportsTags} if the Semantic Model supports tag operations.
+   * @throws UnsupportedOperationException If the Semantic Model does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Semantic Model does not support tag operations.");
+  }
+
+  /**
+   * Returns the tag-derived policy lookup operations for this Semantic Model.
+   *
+   * @return The {@link SupportsPolicies} if the Semantic Model supports policy operations.
+   * @throws UnsupportedOperationException If the Semantic Model does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() {
+    throw new UnsupportedOperationException("Semantic Model does not support policy operations.");
   }
 
   /**

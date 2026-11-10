@@ -22,7 +22,9 @@ from http.client import HTTPResponse
 from unittest.mock import MagicMock, Mock, patch
 
 from gravitino import Catalog, Fileset, GravitinoMetalake
+from gravitino.api.policy.policy_change import PolicyChange
 from gravitino.api.tag.tag_change import TagChange
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
 from gravitino.client.generic_model_catalog import GenericModelCatalog
@@ -30,6 +32,7 @@ from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.model_dto import ModelDTO
+from gravitino.dto.policy_dto import AccessControlContentDTO, PolicyDTO
 from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.namespace import Namespace
@@ -213,7 +216,9 @@ def mock_load_fileset(name: str, location: str):
         _audit=audit_dto,
     )
     return GenericFileset(
-        fileset, None, Namespace.of("metalake_demo", "fileset_catalog", "tmp")
+        fileset,
+        HTTPClient("http://localhost:9090", is_debug=True),
+        Namespace.of("metalake_demo", "fileset_catalog", "tmp"),
     )
 
 
@@ -374,6 +379,148 @@ def mock_tag_methods():
         create_tag=MagicMock(side_effect=repo.mock_create_tag),
         alter_tag=MagicMock(side_effect=repo.mock_alter_tag),
         delete_tag=MagicMock(side_effect=repo.mock_delete_tag),
+    ) as mocks:
+        yield mocks, repo
+
+
+def build_policy_dto(
+    name: str = "policyA",
+    comment: str = "commentA",
+    policy_type: str = "system_access_control",
+    content=None,
+    enabled: bool = True,
+) -> PolicyDTO:
+    if content is None:
+        content = AccessControlContentDTO.from_dict(
+            {"privileges": ["select_table"], "applicableRoles": ["analyst"]},
+            infer_missing=True,
+        )
+
+    return (
+        PolicyDTO.builder()
+        .name(name)
+        .comment(comment)
+        .policy_type(policy_type)
+        .enabled(enabled)
+        .content(content)
+        .audit_info(build_audit_info())
+        .inherited(False)
+        .build()
+    )
+
+
+def _rebuild_policy_dto(policy_dto: PolicyDTO, **overrides) -> PolicyDTO:
+    values = {
+        "_name": policy_dto.name(),
+        "_policy_type": policy_dto.policy_type(),
+        "_content": policy_dto.content(),
+        "_comment": policy_dto.comment(),
+        "_enabled": policy_dto.enabled(),
+        "_inherited": policy_dto.inherited(),
+        "_audit": policy_dto.audit_info(),
+    }
+    values.update(overrides)
+    return PolicyDTO(**values)
+
+
+class MockPolicyRepo:
+    def __init__(self) -> None:
+        self.policy_store = {
+            "policyA": build_policy_dto("policyA", "mock policy A"),
+            "policyB": build_policy_dto("policyB", "mock policy B"),
+        }
+
+    def mock_list_policies(self) -> list[str]:
+        return list(self.policy_store.keys())
+
+    def mock_list_policy_infos(self) -> list[PolicyDTO]:
+        return list(self.policy_store.values())
+
+    def mock_get_policy(self, policy_name: str) -> PolicyDTO:
+        if policy_name not in self.policy_store:
+            raise ValueError(f"Policy {policy_name} does not exist")
+        return self.policy_store[policy_name]
+
+    def mock_create_policy(
+        self,
+        policy_name: str,
+        policy_type: str = "system_access_control",
+        comment: str = "",
+        enabled: bool = True,
+        content=None,
+    ) -> PolicyDTO:
+        if policy_name in self.policy_store:
+            raise ValueError(f"Policy {policy_name} already exists")
+        content_dto = None
+        if content is not None:
+            content_dto = DTOConverters.to_policy_content_dto(content)
+        self.policy_store[policy_name] = build_policy_dto(
+            policy_name, comment, policy_type, content_dto, enabled
+        )
+        return self.policy_store[policy_name]
+
+    def mock_alter_policy(self, policy_name: str, *changes) -> PolicyDTO:
+        if policy_name not in self.policy_store:
+            raise ValueError(f"Policy {policy_name} does not exist")
+
+        for change in changes:
+            current_policy_obj = self.policy_store[policy_name]
+
+            if isinstance(change, PolicyChange.RenamePolicy):
+                self.policy_store[change.new_name] = _rebuild_policy_dto(
+                    current_policy_obj, _name=change.new_name
+                )
+                del self.policy_store[policy_name]
+                policy_name = change.new_name
+
+            elif isinstance(change, PolicyChange.UpdatePolicyComment):
+                self.policy_store[policy_name] = _rebuild_policy_dto(
+                    current_policy_obj, _comment=change.new_comment
+                )
+
+            elif isinstance(change, PolicyChange.UpdateContent):
+                self.policy_store[policy_name] = _rebuild_policy_dto(
+                    current_policy_obj,
+                    _policy_type=change.policy_type,
+                    _content=DTOConverters.to_policy_content_dto(change.content),
+                )
+
+            else:
+                raise ValueError(f"Unknown policy change type: {change}")
+
+        return self.policy_store[policy_name]
+
+    def mock_delete_policy(self, policy_name: str) -> bool:
+        if policy_name not in self.policy_store:
+            return False
+        del self.policy_store[policy_name]
+        return True
+
+    def mock_enable_policy(self, policy_name: str) -> None:
+        self.policy_store[policy_name] = _rebuild_policy_dto(
+            self.mock_get_policy(policy_name), _enabled=True
+        )
+
+    def mock_disable_policy(self, policy_name: str) -> None:
+        self.policy_store[policy_name] = _rebuild_policy_dto(
+            self.mock_get_policy(policy_name), _enabled=False
+        )
+
+
+@contextmanager
+def mock_policy_methods():
+    repo = MockPolicyRepo()
+
+    with patch.multiple(
+        GravitinoMetalake,
+        list_policies=MagicMock(side_effect=repo.mock_list_policies),
+        list_policy_infos=MagicMock(side_effect=repo.mock_list_policy_infos),
+        get_policy=MagicMock(side_effect=repo.mock_get_policy),
+        create_policy=MagicMock(side_effect=repo.mock_create_policy),
+        alter_policy=MagicMock(side_effect=repo.mock_alter_policy),
+        delete_policy=MagicMock(side_effect=repo.mock_delete_policy),
+        enable_policy=MagicMock(side_effect=repo.mock_enable_policy),
+        disable_policy=MagicMock(side_effect=repo.mock_disable_policy),
     ) as mocks:
         yield mocks, repo
 

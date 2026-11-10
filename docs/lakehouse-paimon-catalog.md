@@ -159,7 +159,7 @@ Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-
 :::note
 Sensitive catalog properties such as `jdbc-password` and DLF credential keys are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover JDBC / DLF credential fields via either path:
 
-- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (no dedicated privilege beyond loading the catalog)
+- `getCredentials` / `JdbcCredential` / `DlfSecretKeyCredential` (requires catalog access plus both `USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership)
 - `getSecrets` / `GET .../objects/{type}/{fullName}/secrets` with `USE_SECRETS` (DLF cloud access-key pairs also need `INCLUDE_CREDENTIAL_SECRETS`)
 
 Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` only.

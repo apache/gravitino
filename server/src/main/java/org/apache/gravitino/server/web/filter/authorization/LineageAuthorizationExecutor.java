@@ -38,9 +38,9 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.lineage.source.rest.LineageEventValidator;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -80,11 +80,7 @@ public class LineageAuthorizationExecutor implements AuthorizationExecutor {
   @Override
   public boolean execute(AuthorizationRequestContext context) {
     if (!authorizationTargetsResolved) {
-      try {
-        resolveAuthorizationTargets(extractRunEvent());
-      } catch (IllegalArgumentException e) {
-        throw new BadRequestException(e, "%s", e.getMessage());
-      }
+      RequestValidation.validate(() -> resolveAuthorizationTargets(extractRunEvent()));
     }
 
     AuthorizationExpressionEvaluator evaluator = new AuthorizationExpressionEvaluator(expression);

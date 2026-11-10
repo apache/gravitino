@@ -31,10 +31,23 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
  * catalog implementation supports model objects, it should implement this interface.
+ *
+ * <p>Gravitino does not serialize calls to this interface: methods may be invoked concurrently,
+ * including for the same model, from one server or from several. An implementation must keep
+ * version numbers and aliases unique under concurrent calls itself, for example by enforcing them
+ * in its storage.
+ *
+ * <p>Conflicting operations may fail with {@link OptimisticLockException}. This includes reads when
+ * concurrent changes prevent obtaining consistent model-version metadata. Callers may retry reads
+ * with a bounded number of attempts; before retrying writes, reload the metadata and reconsider the
+ * intended change. For example, {@link #deleteModel} and {@link #alterModel} fail this way when a
+ * version of the model was linked, altered or deleted after the model was read, so that a drop
+ * never removes a version it did not observe.
  */
 @Evolving
 public interface ModelCatalog {
@@ -330,10 +343,11 @@ public interface ModelCatalog {
    * @param changes the several {@link ModelChange} instances to apply to the model
    * @return the updated {@link Model} instance
    * @throws NoSuchModelException If the model does not exist
+   * @throws ModelAlreadyExistsException If the new name is already used by another model.
    * @throws IllegalArgumentException If the change is rejected by the implementation
    */
   Model alterModel(NameIdentifier ident, ModelChange... changes)
-      throws NoSuchModelException, IllegalArgumentException;
+      throws NoSuchModelException, ModelAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Applies the specified {@link ModelVersionChange changes} to a model version identified by its

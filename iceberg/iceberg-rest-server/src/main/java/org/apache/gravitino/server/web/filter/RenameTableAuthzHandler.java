@@ -28,13 +28,14 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /**
@@ -55,18 +56,26 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     RenameTableRequest renameTableRequest = null;
+    boolean found = false;
     for (int i = 0; i < parameters.length; i++) {
       IcebergAuthorizationMetadata metadata =
           parameters[i].getAnnotation(IcebergAuthorizationMetadata.class);
       if (metadata != null
           && metadata.type() == IcebergAuthorizationMetadata.RequestType.RENAME_TABLE) {
         renameTableRequest = (RenameTableRequest) args[i];
+        found = true;
         break;
       }
     }
 
-    if (renameTableRequest == null) {
+    if (!found) {
       throw new ForbiddenException("RenameTableRequest not found in parameters");
+    }
+    if (renameTableRequest == null
+        || renameTableRequest.source() == null
+        || renameTableRequest.destination() == null) {
+      throw new BadRequestException(
+          "Invalid table rename request: both source and destination are required");
     }
 
     // Extract metalake and catalog from nameIdentifierMap
@@ -106,6 +115,11 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
   public boolean authorizationCompleted() {
     // Return true if we performed complete authorization (cross-namespace case)
     return crossNamespaceRename;
+  }
+
+  @Override
+  public EntityType entityType() {
+    return EntityType.TABLE;
   }
 
   /**

@@ -38,11 +38,15 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
@@ -101,7 +105,14 @@ public class IcebergConfigOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "config." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "config", absolute = true)
-  public Response getConfig(@DefaultValue("") @QueryParam("warehouse") String warehouse) {
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.CATALOG)
+  public Response getConfig(
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          @DefaultValue("")
+          @QueryParam("warehouse")
+          String warehouse) {
     String catalogName = getCatalogName(warehouse);
     CatalogWrapperForREST catalogWrapper = getCatalogWrapper(catalogName);
     boolean supportsView = catalogWrapper.supportsViewOperations();
@@ -137,7 +148,9 @@ public class IcebergConfigOperations {
 
   private String getCatalogName(String warehouse) {
     if (StringUtils.isBlank(warehouse)) {
-      return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
+      // The same default catalog an empty prefix resolves to, and that the request is authorized
+      // against.
+      return IcebergRESTUtils.getCatalogName(warehouse);
     } else {
       return warehouse;
     }

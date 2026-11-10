@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcPropertiesConverter {
   private final JdbcPropertiesConverter jdbcPropertiesConverter =
@@ -49,6 +51,23 @@ public class TestJdbcPropertiesConverter {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> instance.toGravitinoTableProperties(ImmutableMap.of("someKey", "value")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"owner", "OWNER"})
+  void testSparkOwnershipIsNotForwardedAsATableOption(String ownerKey) {
+    Map<String, String> properties =
+        ImmutableMap.of(ownerKey, "alice", "engine", "InnoDB", "unknown-key", "value");
+
+    Map<String, String> converted = jdbcPropertiesConverter.toGravitinoTableProperties(properties);
+
+    Assertions.assertEquals(ImmutableMap.of("engine", "InnoDB", "unknown-key", "value"), converted);
+    // Keep caller-owned input intact and forward unknown user keys for server-side validation.
+    Assertions.assertEquals("alice", properties.get(ownerKey));
+    Assertions.assertTrue(
+        jdbcPropertiesConverter
+            .toGravitinoTableProperties(ImmutableMap.of(ownerKey, "alice"))
+            .isEmpty());
   }
 
   @Test

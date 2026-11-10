@@ -1,0 +1,151 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.trino.connector.system.storedprocedure;
+
+import static io.trino.spi.type.BooleanType.BOOLEAN;
+import static io.trino.spi.type.VarcharType.VARCHAR;
+
+import io.airlift.log.Logger;
+import io.trino.spi.TrinoException;
+import io.trino.spi.procedure.Procedure;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
+import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
+
+/**
+ * Stored procedure implementation for dropping an existing catalog in Gravitino.
+ *
+ * <p>This procedure allows dropping a catalog with optional ignoreNotExist flag.
+ */
+public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
+  private static final Logger LOG = Logger.get(DropCatalogStoredProcedure.class);
+
+  private final CatalogConnectorManager catalogConnectorManager;
+  @Nullable private final String configuredMetalake;
+
+  /**
+   * Constructs a new DropCatalogStoredProcedure.
+   *
+   * @param catalogConnectorManager the catalog connector manager
+   * @param configuredMetalake the metalake name, or null when the connector is not configured with
+   *     one
+   */
+  public DropCatalogStoredProcedure(
+      CatalogConnectorManager catalogConnectorManager, @Nullable String configuredMetalake) {
+    this.catalogConnectorManager = catalogConnectorManager;
+    this.configuredMetalake = configuredMetalake;
+  }
+
+  @Override
+  public Procedure createStoredProcedure() throws NoSuchMethodException, IllegalAccessException {
+    // call gravitino.system.drop_catalog(catalog, ignore_not_exist, metalake)
+    MethodHandle dropCatalog =
+        MethodHandles.lookup()
+            .unreflect(
+                DropCatalogStoredProcedure.class.getMethod(
+                    "dropCatalog", String.class, boolean.class, String.class))
+            .bindTo(this);
+    List<Procedure.Argument> arguments =
+        List.of(
+            new Procedure.Argument("CATALOG", VARCHAR),
+            new Procedure.Argument("IGNORE_NOT_EXIST", BOOLEAN, false, false),
+            new Procedure.Argument(METALAKE_ARGUMENT, VARCHAR, false, null));
+    return new Procedure(
+        GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "drop_catalog", arguments, dropCatalog);
+  }
+
+  /**
+   * Drops the specified catalog.
+   *
+   * <p>If the catalog is not present in the local connector cache, falls back to a server-side drop
+   * so that catalogs that failed to load can still be removed.
+   *
+   * @param catalogName the name of the catalog to drop
+   * @param ignoreNotExist whether to ignore if the catalog does not exist
+   * @param metalakeArgument the metalake to drop the catalog from, null to use the configured one
+   * @throws TrinoException if the catalog does not exist and ignoreNotExist is false, or the
+   *     operation fails
+   */
+  public void dropCatalog(
+      String catalogName, boolean ignoreNotExist, @Nullable String metalakeArgument) {
+    String metalake = resolveMetalake(configuredMetalake, metalakeArgument);
+    try {
+      CatalogConnectorContext catalogConnector =
+          catalogConnectorManager.getCatalogConnector(metalake, catalogName);
+      if (catalogConnector == null) {
+        boolean dropped =
+            catalogConnectorManager.getMetalake(metalake).dropCatalog(catalogName, true);
+        if (!dropped) {
+          if (ignoreNotExist) {
+            return;
+          }
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
+              "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
+        }
+        // Refresh before returning: the catalog left a state row behind when its registration
+        // failed, and catalog_status would keep reporting a catalog that no longer exists until
+        // the next poll of the load loop. The drop itself has already succeeded, so a refresh
+        // that does not complete must not be reported as its failure; the scheduled poll will
+        // catch up.
+        try {
+          catalogConnectorManager.loadMetalakeSync();
+        } catch (Exception e) {
+          LOG.warn(
+              "Dropped catalog %s in metalake %s, but refreshing the registration state failed: %s",
+              catalogName, metalake, CatalogRegister.describe(e));
+        }
+        LOG.info(
+            "Drop catalog %s in metalake %s from server (no local connector) successfully.",
+            catalogName, metalake);
+        return;
+      }
+
+      // Always ignore "ignoreNotExist" inside Metalake.dropCatalog()
+      // because we already handled the null check above.
+      catalogConnector.getMetalake().dropCatalog(catalogName, true);
+
+      catalogConnectorManager.loadMetalakeSync();
+
+      if (catalogConnectorManager.getCatalogConnector(metalake, catalogName) != null) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
+            "Drop catalog failed due to the reloading process fails");
+      }
+
+      LOG.info("Drop catalog %s in metalake %s successfully.", catalogName, metalake);
+
+    } catch (NoSuchMetalakeException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS,
+          "Metalake " + metalake + " not exists.");
+    } catch (Exception e) {
+      throw GravitinoErrorCode.toTrinoException(
+          e, "Drop catalog " + NameIdentifier.of(metalake, catalogName) + " failed");
+    }
+  }
+}
