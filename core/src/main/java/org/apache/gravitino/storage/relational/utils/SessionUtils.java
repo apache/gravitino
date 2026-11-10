@@ -94,7 +94,7 @@ public class SessionUtils {
     try {
       SqlSession session = SqlSessions.getSqlSession();
       session.clearCache();
-      return func.apply(session.getMapper(mapperClazz));
+      return getWithoutCommit(mapperClazz, func);
     } finally {
       SqlSessions.closeSqlSession();
     }
