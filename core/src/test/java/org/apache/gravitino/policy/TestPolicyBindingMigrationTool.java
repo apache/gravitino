@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,6 +89,16 @@ public class TestPolicyBindingMigrationTool {
     assertLaunchSucceeds(bin);
     assertLaunchSucceeds(bin);
     assertTrue(launch(bin, "--unknown") != 0);
+    assertEquals(0, launch(bin, (Path) null), Files.readString(directory.resolve("launcher.log")));
+    Path customConf = Files.createDirectories(directory.resolve("custom-conf"));
+    Files.copy(conf.resolve("gravitino-env.sh"), customConf.resolve("gravitino-env.sh"));
+    Files.move(conf.resolve("gravitino.conf"), customConf.resolve("gravitino.conf"));
+    assertEquals(0, launch(bin, customConf), Files.readString(directory.resolve("launcher.log")));
+    Files.delete(customConf.resolve("gravitino.conf"));
+    assertTrue(launch(bin, customConf) != 0);
+    assertTrue(
+        Files.readString(directory.resolve("launcher.log"))
+            .contains("Config file " + customConf.resolve("gravitino.conf") + " not found"));
   }
 
   private void assertLaunchSucceeds(Path bin, String... args) throws Exception {
@@ -96,13 +107,22 @@ public class TestPolicyBindingMigrationTool {
   }
 
   private int launch(Path bin, String... args) throws Exception {
+    return launch(bin, directory.resolve("conf"), args);
+  }
+
+  private int launch(Path bin, @Nullable Path confDirectory, String... args) throws Exception {
     List<String> command = new ArrayList<>();
     command.add("bash");
     command.add(bin.resolve("migrate-policy-bindings.sh").toString());
     command.addAll(Arrays.asList(args));
     ProcessBuilder builder = new ProcessBuilder(command);
     builder.environment().put("GRAVITINO_HOME", directory.toString());
-    builder.environment().put("GRAVITINO_CONF_DIR", directory.resolve("conf").toString());
+    if (confDirectory == null) {
+      builder.environment().remove("GRAVITINO_CONF_DIR");
+    } else {
+      builder.environment().put("GRAVITINO_CONF_DIR", confDirectory.toString());
+    }
+    builder.directory(Files.createDirectories(directory.resolve("unrelated-cwd")).toFile());
     builder.environment().put("GRAVITINO_CLASSPATH", System.getProperty("java.class.path"));
     builder.environment().put("JAVA_HOME", System.getProperty("java.home"));
     Path output = directory.resolve("launcher.log");

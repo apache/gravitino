@@ -50,6 +50,7 @@ public final class PolicyBindingMigrationTool {
   public static void main(String[] args) throws Exception {
     Preconditions.checkArgument(args.length == 0, "Usage: bin/migrate-policy-bindings.sh [--help]");
     Config config = new Config() {};
+    // Config resolves GRAVITINO_CONF_DIR, falling back to GRAVITINO_HOME/conf.
     config.loadFromFile("gravitino.conf");
     Preconditions.checkArgument(
         Configs.RELATIONAL_ENTITY_STORE.equals(config.get(Configs.ENTITY_STORE))

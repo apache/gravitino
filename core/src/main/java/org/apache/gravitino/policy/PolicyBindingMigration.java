@@ -27,6 +27,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -83,6 +84,12 @@ public final class PolicyBindingMigration {
     for (long policyId : pendingPolicies()) {
       try {
         PolicyEntity policy = loadPolicy(policyId);
+        if (policy == null) {
+          LOG.warn(
+              "Skipping legacy bindings for policy_id={}: policy or metalake is missing or deleted",
+              policyId);
+          continue;
+        }
         TagEntity tag = hiddenTag(policy);
         long converted = bindObjects(policy);
         verifyReplacement(policyId, tag.id(), converted);
@@ -104,6 +111,7 @@ public final class PolicyBindingMigration {
         throw new SQLException(
             "Cannot migrate policy " + policyId + "; legacy bindings remain active", e);
       } finally {
+        // Balance this temporary reference; the caller still owns the thread-bound session.
         SqlSessions.getSqlSession().clearCache();
         SqlSessions.closeSqlSession();
       }
@@ -124,6 +132,7 @@ public final class PolicyBindingMigration {
     return ids;
   }
 
+  @Nullable
   private PolicyEntity loadPolicy(long policyId) throws IOException, SQLException {
     try (PreparedStatement statement =
             prepare(
@@ -133,7 +142,7 @@ public final class PolicyBindingMigration {
                 policyId);
         ResultSet rows = statement.executeQuery()) {
       if (!rows.next()) {
-        throw new SQLException("Missing policy or metalake for policy " + policyId);
+        return null;
       }
       return entityStore.get(
           NameIdentifierUtil.ofPolicy(rows.getString(1), rows.getString(2)),

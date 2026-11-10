@@ -19,6 +19,8 @@
 package org.apache.gravitino.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -147,6 +149,10 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(1, activeLegacyBindings());
     assertEquals(1, count("tag_meta"));
     assertEquals(1, count("tag_relation_meta"));
+    // Restart the caller's session, as a new invocation would after an interruption.
+    SessionUtils.rollbackTransaction();
+    SessionUtils.beginTransaction();
+    connection = SqlSessions.currentConnection();
     assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
     assertEquals(2, count("tag_meta"));
   }
@@ -192,15 +198,81 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(0, count("tag_meta"));
   }
 
-  /** A failed policy leaves earlier committed policies intact. */
+  /** Missing policy rows are retained without preventing later live policies from migrating. */
   @TestTemplate
-  public void testMissingPolicyBlocksMigration() throws Exception {
-    insertBinding(2, Long.MAX_VALUE, catalog.id(), "CATALOG");
+  public void testMissingPolicyDoesNotBlockLaterPolicies() throws Exception {
+    insertBinding(2, 19L, catalog.id(), "CATALOG");
     connection.commit();
-    assertThrows(
-        SQLException.class, () -> new PolicyBindingMigration(connection, entityStore).migrate());
+    PolicyBindingMigration migration = new PolicyBindingMigration(connection, entityStore);
+    assertEquals(1, migration.migrate());
     assertEquals(1, count("tag_meta"));
     assertEquals(1, activeLegacyBindings());
+    assertEquals(0, migration.migrate());
+    assertEquals(1, activeLegacyBindings());
+  }
+
+  /** A soft-deleted policy's orphaned bindings must not abort the run. */
+  @TestTemplate
+  public void testDeletedPolicyDoesNotBlockLaterPolicies() throws Exception {
+    PolicyEntity deleted = createPolicy(19L, policy.namespace(), "deleted_policy", AUDIT_INFO);
+    backend.insert(deleted, false);
+    removeAutomaticallyCreatedTag(deleted.id());
+    insertBinding(2, deleted.id(), catalog.id(), "CATALOG");
+    try (Statement statement = connection.createStatement()) {
+      statement.executeUpdate("UPDATE policy_meta SET deleted_at = 1 WHERE policy_id = 19");
+    }
+    connection.commit();
+    assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
+    assertEquals(1, activeLegacyBindings());
+    assertEquals(1, count("tag_relation_meta"));
+  }
+
+  /** A soft-deleted metalake's orphaned bindings must not abort the run. */
+  @TestTemplate
+  public void testDeletedMetalakeDoesNotBlockLaterPolicies() throws Exception {
+    createAndInsertMakeLake("deleted_metalake");
+    PolicyEntity deleted =
+        createPolicy(19L, Namespace.of("deleted_metalake"), "deleted_policy", AUDIT_INFO);
+    backend.insert(deleted, false);
+    removeAutomaticallyCreatedTag(deleted.id());
+    insertBinding(2, deleted.id(), catalog.id(), "CATALOG");
+    try (Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "UPDATE metalake_meta SET deleted_at = 1 WHERE metalake_name = 'deleted_metalake'");
+    }
+    connection.commit();
+    assertEquals(1, new PolicyBindingMigration(connection, entityStore).migrate());
+    assertEquals(1, activeLegacyBindings());
+    assertEquals(1, count("tag_relation_meta"));
+  }
+
+  /** Both policy transactions keep the caller's connection live with auto-commit disabled. */
+  @TestTemplate
+  public void testMultiplePoliciesKeepSessionOpen() throws Exception {
+    PolicyEntity second = createPolicy(21L, policy.namespace(), "second_policy", AUDIT_INFO);
+    backend.insert(second, false);
+    removeAutomaticallyCreatedTag(second.id());
+    insertBinding(2, second.id(), catalog.id(), "CATALOG");
+    connection.commit();
+    Connection checked = spy(connection);
+    AtomicInteger policyLoads = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              assertFalse(connection.isClosed());
+              assertFalse(connection.getAutoCommit());
+              assertSame(connection, SqlSessions.currentConnection());
+              policyLoads.incrementAndGet();
+              return connection.prepareStatement(invocation.getArgument(0));
+            })
+        .when(checked)
+        .prepareStatement(startsWith("SELECT m.metalake_name, p.policy_name"));
+    assertEquals(2, new PolicyBindingMigration(checked, entityStore).migrate());
+    assertEquals(2, policyLoads.get());
+    assertFalse(connection.isClosed());
+    assertFalse(connection.getAutoCommit());
+    assertSame(connection, SqlSessions.currentConnection());
+    assertEquals(0, activeLegacyBindings());
+    assertEquals(2, count("tag_relation_meta"));
   }
 
   /** Object types without tag support and noncanonical names are rejected. */

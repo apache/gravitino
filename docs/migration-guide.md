@@ -118,8 +118,13 @@ store. H2, MySQL, and PostgreSQL are supported; use the same JDBC driver as the 
    assignments with their audit information, verify the replacements, then soft-delete the legacy
    rows. A missing or incorrect policy-to-tag relation fails verification and leaves the legacy
    bindings active. No tables, columns, or indexes are added.
-3. If a policy fails, fix the reported cause and rerun the same command. Its changes roll back;
-   already committed policies remain migrated, and retries use the remaining active legacy rows.
+   Bindings whose policy or metalake is missing or deleted are logged and left untouched; they
+   do not prevent later live policies from migrating.
+3. If a policy fails or the command is interrupted, keep all servers and policy consumers stopped.
+   Fix any reported failure and rerun the same command: completed policies remain committed, while
+   the unfinished policy rolls back and is retried from its active legacy rows. A partially migrated
+   database is only an offline intermediate state, not a deployment to start serving requests.
+   Restore the backup only when abandoning or rolling back the upgrade.
 4. Start the server and compare resolved policy names and `inherited` values on representative
    objects and descendants. Check disabled policies and existing business tag associations before
    resuming consumers.
