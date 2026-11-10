@@ -114,32 +114,18 @@ With the local job executor, `spark.jars` in `spark_conf` doesn't add it: the dr
 Use the Spark, Scala, and Iceberg versions that match your cluster. See
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
-**Multi-level / non-identity partition rewrite** — behavior depends on the release and on
-whether the job uses an empty `where_clause` or a strategy-generated partition filter.
+**Multi-level / non-identity partition rewrite** — a **direct**
+`builtin-iceberg-rewrite-data-files` submit with an empty `where_clause` can succeed on layouts
+beyond pure identity partitions (for example `PARTITIONED BY (p, days(ts))` with a non-zero
+rewrite count). Pure `days(ts)` / `bucket` tables may also complete, often with
+`Rewritten data files: 0` when files are not rewrite-eligible.
 
-In `1.2.0`, rewriting tables that combine an identity transform with a time or bucket transform
-(for example `PARTITIONED BY (p, days(ts))`) failed with:
-
-```text
-Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
-```
-
-Confirm that failure mode in job run status and `error.log` under
-`builtin-iceberg-rewrite-data-files`. The `1.2.0` matrix was:
-
-| Partitioning                                                   | Direct rewrite (`1.2.0`) |
-| -------------------------------------------------------------- | ------------------------ |
-| `p`, `p, c2`                                                   | Works                    |
-| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)` | Fails                    |
-| `p, truncate(1, c2)`, `p, bucket(8, id)`                       | Fails                    |
-
-From `1.3.x`, a **direct** `builtin-iceberg-rewrite-data-files` submit with an empty
-`where_clause` can succeed on those layouts (for example `PARTITIONED BY (p, days(ts))` with a
-non-zero rewrite count, and pure `days(ts)` / `bucket` tables completing — often with
-`Rewritten data files: 0` when files are not rewrite-eligible). Do not treat the `1.2.0` table as
-current. If a rewrite still fails with the Spark expression error on `1.3.x`, check whether the
-submit used a **strategy-generated partition `where_clause`** rather than a whole-table empty
-filter; that path is separate from the direct empty-`where_clause` case.
+If the job fails with a Spark expression error such as
+`Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter`, check
+whether the submit used a **strategy-generated partition `where_clause`** rather than a
+whole-table empty filter. Confirm in job run status and `error.log` under
+`builtin-iceberg-rewrite-data-files`. The built-in compaction **strategy** still targets
+identity-partitioned tables; broader layouts are a direct-submit path.
 
 ## Related
 

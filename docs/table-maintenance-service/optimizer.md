@@ -23,8 +23,8 @@ Confirm your environment matches this list before starting an evaluation against
 
 - Compaction and orphan file cleanup have built-in strategies. Snapshot expiration is available as a directly submitted built-in job. Scheduling and minimum run intervals remain separate from strategy evaluation. Sort and cluster maintenance also require custom strategies.
 - Compaction **strategy** applies to Iceberg tables only, and only where every partition uses an
-  identity transform. Direct `builtin-iceberg-rewrite-data-files` on `1.3.x` can cover broader
-  layouts; see [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+  identity transform. Direct `builtin-iceberg-rewrite-data-files` can cover broader layouts; see
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
 ## How It Works
