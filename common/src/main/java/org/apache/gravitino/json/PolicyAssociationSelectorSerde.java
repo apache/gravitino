@@ -65,14 +65,19 @@ public final class PolicyAssociationSelectorSerde {
   }
 
   /**
-   * Deserializes a selector.
+   * Deserializes a non-null selector.
    *
    * @param json The selector JSON.
    * @return The selector.
+   * @throws IllegalArgumentException If the JSON is invalid, unsupported, or represents null.
    */
   public static PolicyAssociationSelector deserialize(String json) {
     try {
-      return MAPPER.readValue(json, PolicyAssociationSelector.class);
+      PolicyAssociationSelector selector = MAPPER.readValue(json, PolicyAssociationSelector.class);
+      if (selector == null) {
+        throw new IllegalArgumentException("Policy association selector cannot be JSON null");
+      }
+      return selector;
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Failed to deserialize policy association selector", e);
     }

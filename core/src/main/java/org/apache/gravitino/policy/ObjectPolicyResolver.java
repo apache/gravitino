@@ -212,7 +212,7 @@ public class ObjectPolicyResolver {
               .map(PolicyAssociationSelectorSerde::deserialize)
               .orElseGet(AllValuesSelector::get);
       TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
-      boolean matches = matches(selector, assignment);
+      boolean matches = PolicySelectorMatcher.matches(selector, assignment);
       MatchState state =
           matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
       state.record(matches, tag.inherited().orElse(false), resolvedTag.source());
@@ -223,18 +223,6 @@ public class ObjectPolicyResolver {
         .map(MatchState::toMatch)
         .filter(match -> match.policy().enabled())
         .toArray(Match[]::new);
-  }
-
-  private static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
-    if (selector instanceof AllValuesSelector) {
-      return true;
-    }
-    if (selector instanceof TagValueSelector) {
-      String expectedValue = ((TagValueSelector) selector).value();
-      return Arrays.asList(assignment.values()).contains(expectedValue);
-    }
-    throw new IllegalArgumentException(
-        "Unsupported policy association selector type: " + selector.type());
   }
 
   /**
