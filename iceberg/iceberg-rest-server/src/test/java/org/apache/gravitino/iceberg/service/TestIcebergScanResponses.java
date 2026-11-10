@@ -19,15 +19,12 @@
 package org.apache.gravitino.iceberg.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -39,10 +36,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.PlanStatus;
-import org.apache.iceberg.rest.credentials.Credential;
-import org.apache.iceberg.rest.credentials.ImmutableCredential;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
-import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 import org.apache.iceberg.types.Types;
@@ -51,7 +45,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Scan response tests shared by the standard and experimental Iceberg runtimes. */
+/** Verifies scan response construction and serialization with the supported Iceberg runtime. */
 public class TestIcebergScanResponses {
 
   private static final TableIdentifier IDENT = TableIdentifier.of("db", "table");
@@ -105,6 +99,21 @@ public class TestIcebergScanResponses {
   }
 
   @Test
+  void testProtectedScanMethodsAreAccessible() {
+    HiddenScanResponse response = new HiddenScanResponse();
+    Map<Integer, PartitionSpec> specs = Map.of(0, PartitionSpec.unpartitioned());
+    assertSame(
+        response,
+        IcebergRESTUtils.resolveScanResponseMethod(
+                HiddenScanResponse.class, "withSpecsById", Map.class)
+            .invoke(response, specs));
+    assertEquals(
+        specs,
+        IcebergRESTUtils.resolveScanResponseMethod(HiddenScanResponse.class, "specsById")
+            .invoke(response));
+  }
+
+  @Test
   void testPlanEmptyTable() throws IOException {
     PlanTableScanResponse response = plan();
     assertEquals(PlanStatus.COMPLETED, response.planStatus());
@@ -114,7 +123,7 @@ public class TestIcebergScanResponses {
   }
 
   @Test
-  void testPlanAndCopyCredentialsPreservesTasksAndHistoricalSpecs() throws IOException {
+  void testPlanPreservesTasksAndHistoricalSpecs() throws IOException {
     table
         .newFastAppend()
         .appendFile(
@@ -129,83 +138,9 @@ public class TestIcebergScanResponses {
     assertEquals(1, original.fileScanTasks().size());
     assertEquals(2, IcebergRESTUtils.scanResponseSpecs(original).size());
 
-    List<Credential> credentials =
-        Collections.singletonList(
-            ImmutableCredential.builder()
-                .prefix(table.location())
-                .config(Map.of("s3.access-key-id", "key"))
-                .build());
-    PlanTableScanResponse copied = IcebergRESTUtils.copyWithCredentials(original, credentials);
-    assertEquals(original.planStatus(), copied.planStatus());
-    assertEquals(original.fileScanTasks(), copied.fileScanTasks());
-    assertEquals(
-        IcebergRESTUtils.scanResponseSpecs(original), IcebergRESTUtils.scanResponseSpecs(copied));
-    assertEquals(credentials, copied.credentials());
-    assertTrue(original.credentials() == null || original.credentials().isEmpty());
-
-    PlanTableScanResponse decoded = roundTrip(copied);
+    PlanTableScanResponse decoded = roundTrip(original);
     assertEquals(1, decoded.fileScanTasks().size());
     assertEquals(table.specs().keySet(), IcebergRESTUtils.scanResponseSpecs(decoded).keySet());
-    assertEquals(credentials.get(0).config(), decoded.credentials().get(0).config());
-  }
-
-  @Test
-  void testRewriteScanCredentials() {
-    PlanTableScanResponse original = plan();
-    assertSame(original, IcebergRESTUtils.rewriteScanPlanCredentials("catalog", IDENT, original));
-    Credential credential =
-        ImmutableCredential.builder()
-            .prefix(table.location())
-            .config(
-                Map.of(
-                    "s3.access-key-id", "key",
-                    "s3.session-token", "token",
-                    "client.refresh-credentials-endpoint", "https://upstream/credentials"))
-            .build();
-    PlanTableScanResponse upstream =
-        IcebergRESTUtils.copyWithCredentials(original, Collections.singletonList(credential));
-    PlanTableScanResponse rewritten =
-        IcebergRESTUtils.rewriteScanPlanCredentials("catalog", IDENT, upstream);
-    assertEquals(1, rewritten.credentials().size());
-    assertEquals(
-        "v1/catalog/namespaces/db/tables/table/credentials",
-        rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
-    assertEquals("key", rewritten.credentials().get(0).config().get("s3.access-key-id"));
-    assertEquals(
-        IcebergRESTUtils.scanResponseSpecs(original),
-        IcebergRESTUtils.scanResponseSpecs(rewritten));
-    assertFalse(
-        upstream.credentials().get(0).config().equals(rewritten.credentials().get(0).config()));
-  }
-
-  @Test
-  void testCopyPreservesPlanIdAndTasks() {
-    PlanTableScanResponse original =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanId("plan-id")
-            .withPlanTasks(Collections.singletonList("task"))
-            .build();
-    PlanTableScanResponse copied =
-        IcebergRESTUtils.copyWithCredentials(original, Collections.emptyList());
-    assertEquals(original.planStatus(), copied.planStatus());
-    assertEquals(original.planId(), copied.planId());
-    assertEquals(original.planTasks(), copied.planTasks());
-  }
-
-  @Test
-  void testCopyPreservesError() {
-    ErrorResponse error =
-        ErrorResponse.builder().responseCode(500).withType("error").withMessage("failed").build();
-    PlanTableScanResponse original =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.FAILED)
-            .withErrorResponse(error)
-            .build();
-    PlanTableScanResponse copied =
-        IcebergRESTUtils.copyWithCredentials(original, Collections.emptyList());
-    assertEquals(original.planStatus(), copied.planStatus());
-    assertSame(error, copied.errorResponse());
   }
 
   private PlanTableScanResponse plan() {
@@ -217,5 +152,20 @@ public class TestIcebergScanResponses {
         IcebergObjectMapper.getInstance().readTree(PlanTableScanResponseParser.toJson(response)),
         table.specs(),
         true);
+  }
+
+  private static class HiddenScanResponse {
+    private Map<Integer, PartitionSpec> specs;
+
+    /** Returns the specs through a protected method, as the experimental runtime does. */
+    protected Map<Integer, PartitionSpec> specsById() {
+      return specs;
+    }
+
+    /** Sets specs through a protected builder method. */
+    protected HiddenScanResponse withSpecsById(Map<Integer, PartitionSpec> newSpecs) {
+      specs = newSpecs;
+      return this;
+    }
   }
 }

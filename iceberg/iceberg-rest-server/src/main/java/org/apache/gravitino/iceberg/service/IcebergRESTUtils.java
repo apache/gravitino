@@ -52,11 +52,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.PartitionSpec;
->>>>>>> f38f3de65 ([#14749][#14424] fix: Support experimental scans and validate tag selectors (#14779))
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -72,6 +68,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -312,50 +309,6 @@ public class IcebergRESTUtils {
     return builder.build();
   }
 
-<<<<<<< HEAD
-=======
-  /**
-   * Rewrites credentials in a {@link PlanTableScanResponse} so their {@code
-   * refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
-   * catalog. Returns the response unchanged when no credentials are present.
-   *
-   * @param catalogName IRC catalog name used to build refresh paths
-   * @param tableIdentifier table receiving the credentials
-   * @param response the scan plan response returned by the upstream REST catalog
-   * @return the scan plan response with IRC-local refresh endpoints on any credentials
-   */
-  @SuppressWarnings("deprecation")
-  public static PlanTableScanResponse rewriteScanPlanCredentials(
-      String catalogName, TableIdentifier tableIdentifier, PlanTableScanResponse response) {
-    if (response.credentials() == null || response.credentials().isEmpty()) {
-      return response;
-    }
-    List<org.apache.iceberg.rest.credentials.Credential> rewritten = new ArrayList<>();
-    for (org.apache.iceberg.rest.credentials.Credential cred : response.credentials()) {
-      rewritten.add(rewriteCredential(catalogName, tableIdentifier, cred.prefix(), cred.config()));
-    }
-    return copyWithCredentials(response, rewritten);
-  }
-
-  /**
-   * Copies a {@link PlanTableScanResponse} with replacement credentials.
-   *
-   * <p>TODO: Remove when PlanTableScanResponse supports a native copy/toBuilder method.
-   */
-  @SuppressWarnings("deprecation")
-  static PlanTableScanResponse copyWithCredentials(
-      PlanTableScanResponse response,
-      List<org.apache.iceberg.rest.credentials.Credential> credentials) {
-    return scanPlanResponseBuilder(scanResponseSpecs(response))
-        .withPlanStatus(response.planStatus())
-        .withPlanId(response.planId())
-        .withPlanTasks(response.planTasks())
-        .withFileScanTasks(response.fileScanTasks())
-        .withErrorResponse(response.errorResponse())
-        .withCredentials(credentials)
-        .build();
-  }
-
   /** Creates a scan response builder with specs on both supported Iceberg runtimes. */
   static PlanTableScanResponse.Builder scanPlanResponseBuilder(
       @Nullable Map<Integer, PartitionSpec> specs) {
@@ -387,7 +340,6 @@ public class IcebergRESTUtils {
     }
   }
 
->>>>>>> f38f3de65 ([#14749][#14424] fix: Support experimental scans and validate tag selectors (#14779))
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
   }
