@@ -152,6 +152,7 @@ paimon4flink22 = "1.4.1"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
+objenesis = "3.3"
 asm = "9.8"
 ranger = "2.8.0"
 zookeeper = "3.8.8"
@@ -371,6 +372,7 @@ kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.re
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+objenesis = { group = "org.objenesis", name = "objenesis", version.ref = "objenesis" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
