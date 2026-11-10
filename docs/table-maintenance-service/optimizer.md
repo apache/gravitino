@@ -30,7 +30,7 @@ Confirm your environment matches this list before starting an evaluation against
 Maintenance runs as four steps. Each is a separate command, so you can stop after any of them, and the dry run on step two shows what would be submitted before anything runs.
 
 | Step     | What you run                                      | What it produces                                        |
-|----------|---------------------------------------------------|---------------------------------------------------------|
+| -------- | ------------------------------------------------- | ------------------------------------------------------- |
 | Collect  | `update-statistics`, `append-metrics`             | Statistics on the table, metrics in the JDBC repository |
 | Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted               |
 | Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs     |
@@ -49,7 +49,7 @@ The local calculator reads a JSONL file you supply and updates statistics and me
 Three identifiers look interchangeable and are not.
 
 | Term          | Example                      | Where it appears                                           |
-|---------------|------------------------------|------------------------------------------------------------|
+| ------------- | ---------------------------- | ---------------------------------------------------------- |
 | Policy name   | `iceberg_compaction_default` | The policy's own name, and the CLI `--strategy-name`       |
 | Policy type   | `system_iceberg_compaction`  | The `policyType` field when creating a policy over REST    |
 | Strategy type | `iceberg-data-compaction`    | The `strategy.type` field, and the strategy handler config |

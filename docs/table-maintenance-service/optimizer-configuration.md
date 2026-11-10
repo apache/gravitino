@@ -219,12 +219,12 @@ and `builtin-iceberg-update-stats` / `submit-update-stats-job`. Supported types 
 **`simple`**, **`basic`**, and **`oauth`** (client-credentials only). Put the same fields in either
 place:
 
-| Type               | CLI conf (`gravitino-optimizer.conf`)                                                                                                                                 | Short name in `updater_options` / `--updater-options`                                      |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `none` (default)   | omit keys, or `gravitino.optimizer.auth.type = none`                                                                                                                  | omit keys, or `auth_type=none`                                                             |
-| `simple`           | `gravitino.optimizer.auth.type`, optional `gravitino.optimizer.auth.username`                                                                                         | `auth_type`, optional `username`                                                           |
-| `basic`            | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.username`, `gravitino.optimizer.auth.password`                                                              | `auth_type`, `username`, `password`                                                        |
-| `oauth`            | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.oauth.serverUri`, `gravitino.optimizer.auth.oauth.path`, `gravitino.optimizer.auth.oauth.credential`, `gravitino.optimizer.auth.oauth.scope` | `auth_type`, `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
+| Type             | CLI conf (`gravitino-optimizer.conf`)                                                                                                                                                                   | Short name in `updater_options` / `--updater-options`                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `none` (default) | omit keys, or `gravitino.optimizer.auth.type = none`                                                                                                                                                    | omit keys, or `auth_type=none`                                                   |
+| `simple`         | `gravitino.optimizer.auth.type`, optional `gravitino.optimizer.auth.username`                                                                                                                           | `auth_type`, optional `username`                                                 |
+| `basic`          | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.username`, `gravitino.optimizer.auth.password`                                                                                               | `auth_type`, `username`, `password`                                              |
+| `oauth`          | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.oauth.serverUri`, `gravitino.optimizer.auth.oauth.path`, `gravitino.optimizer.auth.oauth.credential`, `gravitino.optimizer.auth.oauth.scope` | `auth_type`, `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
 
 Short names are promoted onto the `gravitino.optimizer.auth.*` keys before the client is built.
 Use CLI conf when the optimizer process talks to a secured server; use short names in
@@ -361,14 +361,14 @@ Four things are worth confirming before assuming a configuration problem is a co
 Submit `builtin-iceberg-remove-orphan-files` with the same Spark and catalog
 settings described above. Its job-specific `jobConf` keys are:
 
-| Key                | Meaning                                                                                 | Default                          |
-| ------------------ | --------------------------------------------------------------------------------------- | -------------------------------- |
-| `catalog_name`     | Iceberg catalog registered in Spark                                                     | Required                         |
-| `table_identifier` | Table identifier within the catalog, such as `db.sample`                                | Required                         |
-| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old   | Three days ago (Iceberg default) |
-| `location`         | Scan only this directory within the table's storage location                            | Table location                   |
-| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                           | `false`                          |
-| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed   | None                             |
+| Key                | Meaning                                                                               | Default                          |
+| ------------------ | ------------------------------------------------------------------------------------- | -------------------------------- |
+| `catalog_name`     | Iceberg catalog registered in Spark                                                   | Required                         |
+| `table_identifier` | Table identifier within the catalog, such as `db.sample`                              | Required                         |
+| `older_than`       | Timestamp (explicit offset or Spark session time zone); must be at least 24 hours old | Three days ago (Iceberg default) |
+| `location`         | Scan only this directory within the table's storage location                          | Table location                   |
+| `dry_run`          | `true` logs candidate paths without deleting; `false` deletes                         | `false`                          |
+| `spark_conf`       | JSON string containing custom Spark settings, including the Iceberg runtime if needed | None                             |
 
 For direct template submission, supply `older_than: ""` and `location: ""` to
 use the defaults, `dry_run: "false"` (or `"true"` to preview), and
