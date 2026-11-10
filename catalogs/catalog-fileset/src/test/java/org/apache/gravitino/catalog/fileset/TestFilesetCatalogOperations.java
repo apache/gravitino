@@ -2844,6 +2844,40 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  void testInitializeReportsStorageAccessFailureAsConnectionFailure() throws IOException {
+    String location = "s3a://test-connection-bucket/catalog";
+    Path locationPath = new Path(location);
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    when(fileSystem.exists(any())).thenThrow(new IOException("Forbidden"));
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      Mockito.doReturn(fileSystem)
+          .when(ops)
+          .getFileSystemWithCache(Mockito.eq(locationPath), any(Map.class));
+
+      // The named-location existence check runs during catalog initialization, before the probe
+      // and failure classification. A storage-access failure there must surface as a
+      // connection-failed result (HTTP 200 / code 1007) rather than a generic RuntimeException
+      // (HTTP 500 / code 1002).
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s3", location),
+                      randomCatalogInfo("m1", "c1"),
+                      FILESET_PROPERTIES_METADATA));
+
+      // The failing location is identified and the underlying reason preserved.
+      Assertions.assertTrue(
+          exception.getMessage().contains("location name s3"), exception.getMessage());
+      Assertions.assertTrue(exception.getMessage().contains(location), exception.getMessage());
+      Assertions.assertTrue(exception.getMessage().contains("Forbidden"), exception.getMessage());
+    }
+  }
+
+  @Test
   public void testTestConnectionAggregatesLocationResolutionAndProbeFailures() throws IOException {
     String unsupportedLocation = "unsupported://archive/{{catalog}}";
     Map<String, String> properties =

@@ -1202,8 +1202,19 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           + locationName);
                 }
               } catch (IOException e) {
-                throw ExceptionMessages.wrap(
-                    "Failed to check if fileset catalog location exists: " + v, e);
+                // A storage-access failure here (e.g. forbidden bucket, bad credentials) is a
+                // connection failure, not an internal error. Throw ConnectionFailedException so
+                // that testConnection reports it as a connection-failed result instead of HTTP
+                // 500, and identify the failing location.
+                throw new ConnectionFailedException(
+                    e,
+                    "%s",
+                    ExceptionMessages.withCause(
+                        "Failed to check if fileset catalog location exists for location name "
+                            + locationName
+                            + ": "
+                            + v,
+                        e));
               }
             }
 
