@@ -951,6 +951,39 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @Test
+  void testGetFileSystemWithCacheDoesNotExposeCredentials() throws IOException {
+    Path path = new Path(TEST_ROOT_PATH);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "s3-access-key-id", "DUMMY_ACCESS_KEY", "s3-secret-access-key", "DUMMY_SECRET");
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, TEST_ROOT_PATH),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      IOException cause = new IOException("boom");
+      Mockito.doThrow(cause).when(ops).getFileSystem(Mockito.eq(path), any(Map.class));
+
+      GravitinoRuntimeException exception =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+
+      // The configuration map must not be dumped into the message, otherwise plaintext
+      // credentials leak into logs for callers that log the exception.
+      Assertions.assertFalse(
+          exception.getMessage().contains("DUMMY_SECRET"), exception.getMessage());
+      Assertions.assertFalse(
+          exception.getMessage().contains("DUMMY_ACCESS_KEY"), exception.getMessage());
+      // Useful path context and the original cause are preserved.
+      Assertions.assertTrue(
+          exception.getMessage().contains(path.toString()), exception.getMessage());
+      Assertions.assertSame(cause, exception.getCause());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testDropSchemaWhenDirectoryDisappearsDuringDelete(boolean throwException)

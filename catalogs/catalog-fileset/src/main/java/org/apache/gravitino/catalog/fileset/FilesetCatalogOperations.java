@@ -1470,8 +1470,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           try {
             return getFileSystem(path, conf);
           } catch (IOException e) {
+            // Do not include the configuration map in the message: it can contain plaintext
+            // credentials (e.g. s3-secret-access-key) that would then leak into logs for callers
+            // that log the exception. The path keeps the diagnostic context, and the original
+            // cause is preserved.
             throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+                e, "Failed to get FileSystem for fileset: path: %s", path);
           }
         });
   }
