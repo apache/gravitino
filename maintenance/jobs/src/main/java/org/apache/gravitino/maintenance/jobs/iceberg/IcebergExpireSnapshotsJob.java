@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -347,39 +348,33 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
 
   /** Print usage information. */
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergExpireSnapshotsJob [OPTIONS]\n"
-            + "\n"
-            + "Required Options:\n"
-            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
-            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
-            + "\n"
-            + "Optional Options:\n"
-            + "  --older-than <timestamp>  Expire snapshots older than this timestamp\n"
-            + "                              Example: '2024-01-01 00:00:00'\n"
-            + "                              Default: 5 days ago (Iceberg default)\n"
-            + "  --retain-last <count>     Number of most recent snapshots to retain\n"
-            + "                              Must be a positive integer (>= 1)\n"
-            + "                              Default: 1 (Iceberg default)\n"
-            + "  --stream-results [bool]   Stream intermediate delete results (true or false)\n"
-            + "                              A bare --stream-results means true\n"
-            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
-            + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
-            + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
-            + "\n"
-            + "Examples:\n"
-            + "  # Basic expire with defaults (5 days, retain 1)\n"
-            + "  --catalog iceberg_prod --table db.sample\n"
-            + "\n"
-            + "  # Expire snapshots older than a specific date\n"
-            + "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'\n"
-            + "\n"
-            + "  # Retain the last 5 snapshots\n"
-            + "  --catalog iceberg_prod --table db.sample --retain-last 5\n"
-            + "\n"
-            + "  # Expire with all options and streaming\n"
-            + "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\\n"
-            + "    --retain-last 3 --stream-results");
+    IcebergJobUtils.printCliUsage(
+        IcebergExpireSnapshotsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --older-than <timestamp>  Expire snapshots older than this timestamp",
+            "                              Example: '2024-01-01 00:00:00'",
+            "                              Default: 5 days ago (Iceberg default)",
+            "  --retain-last <count>     Number of most recent snapshots to retain",
+            "                              Must be a positive integer (>= 1)",
+            "                              Default: 1 (Iceberg default)",
+            "  --stream-results [bool]   Stream intermediate delete results (true or false)",
+            "                              A bare --stream-results means true"),
+        ImmutableList.of(
+            "  # Basic expire with defaults (5 days, retain 1)",
+            "  --catalog iceberg_prod --table db.sample",
+            "",
+            "  # Expire snapshots older than a specific date",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'",
+            "",
+            "  # Retain the last 5 snapshots",
+            "  --catalog iceberg_prod --table db.sample --retain-last 5",
+            "",
+            "  # Expire with all options and streaming",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\",
+            "    --retain-last 3 --stream-results"));
   }
 
   /**

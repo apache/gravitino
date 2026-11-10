@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -301,10 +302,17 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
   }
 
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergRewriteManifestsJob --catalog <catalog_name> --table <table_identifier>"
-            + " [--use-caching <true|false>] [--spec-id <non-negative integer>]"
-            + " [--spark-conf <json>]");
+    IcebergJobUtils.printCliUsage(
+        IcebergRewriteManifestsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --use-caching <bool>      Whether to use caching during rewrite",
+            "  --spec-id <int>           Non-negative partition spec id to rewrite"),
+        ImmutableList.of(
+            "  --catalog iceberg_prod --table db.sample",
+            "  --catalog iceberg_prod --table db.sample --use-caching false --spec-id 0"));
   }
 
   /**

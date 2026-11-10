@@ -23,6 +23,7 @@ import static org.apache.spark.sql.functions.lit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -404,9 +405,18 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
   }
 
   private static void printUsage() {
-    LOG.error(
-        "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
-            + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
-            + "[--dry-run true|false] [--spark-conf <json>]");
+    IcebergJobUtils.printCliUsage(
+        IcebergRemoveOrphanFilesJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --older-than <timestamp>  Remove orphans older than this timestamp",
+            "                              Example: '2024-01-01 00:00:00'",
+            "  --location <path>         Orphan scan root location",
+            "  --dry-run <bool>          List orphans without deleting (true or false)"),
+        ImmutableList.of(
+            "  --catalog iceberg_prod --table db.sample --dry-run true",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'"));
   }
 }
