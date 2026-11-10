@@ -19,10 +19,13 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -74,7 +77,84 @@ public final class IcebergJobUtils {
    */
   private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
 
+  /**
+   * Shared {@code --spark-conf} usage lines aligned with {@link #filterCustomSparkConfigs}. Catalog
+   * and Iceberg extensions are <em>not</em> blocked: CLI jobs register them through spark-conf.
+   */
+  public static final List<String> SPARK_CONF_USAGE_LINES =
+      ImmutableList.of(
+          "  --spark-conf <json>       JSON map of custom Spark configurations",
+          "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'",
+          "                              Note: Ignored when already set by spark-submit: spark.master,",
+          "                              spark.submit.deployMode. Always ignored: spark.kubernetes.*.",
+          "                              CLI jobs must pass Iceberg catalog (and usually extensions)",
+          "                              via spark-conf; those keys are not blocked.");
+
   private IcebergJobUtils() {}
+
+  /**
+   * Prints a consistent CLI usage block to {@code System.err}.
+   *
+   * @param jobSimpleName simple class name shown after {@code Usage:}
+   * @param requiredLines required option lines (already indented)
+   * @param optionalLines optional option lines (already indented); may be empty
+   * @param exampleLines example lines; may be empty to omit the Examples section
+   */
+  public static void printCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    System.err.println(formatCliUsage(jobSimpleName, requiredLines, optionalLines, exampleLines));
+  }
+
+  @VisibleForTesting
+  static String formatCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    Preconditions.checkArgument(jobSimpleName != null && !jobSimpleName.isEmpty(), "jobSimpleName");
+    Preconditions.checkNotNull(requiredLines, "requiredLines");
+    Preconditions.checkNotNull(optionalLines, "optionalLines");
+    Preconditions.checkNotNull(exampleLines, "exampleLines");
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("Usage: ").append(jobSimpleName).append(" [OPTIONS]\n\n");
+    sb.append("Required Options:\n");
+    appendLines(sb, requiredLines);
+    if (!optionalLines.isEmpty()) {
+      sb.append("\nOptional Options:\n");
+      appendLines(sb, optionalLines);
+    }
+    if (!exampleLines.isEmpty()) {
+      sb.append("\nExamples:\n");
+      appendLines(sb, exampleLines);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Appends {@link #SPARK_CONF_USAGE_LINES} after job-specific optional option lines.
+   *
+   * @param optionalWithoutSparkConf optional lines excluding {@code --spark-conf}
+   * @return optional lines including the shared spark-conf note
+   */
+  public static List<String> withSparkConfUsage(String... optionalWithoutSparkConf) {
+    return ImmutableList.<String>builder()
+        .add(optionalWithoutSparkConf)
+        .addAll(SPARK_CONF_USAGE_LINES)
+        .build();
+  }
+
+  private static void appendLines(StringBuilder sb, List<String> lines) {
+    for (String line : lines) {
+      sb.append(line);
+      if (!line.endsWith("\n")) {
+        sb.append('\n');
+      }
+    }
+  }
 
   /**
    * Return the given argument value unless it is an unresolved job template placeholder.
