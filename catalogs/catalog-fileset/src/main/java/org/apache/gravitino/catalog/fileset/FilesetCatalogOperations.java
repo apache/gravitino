@@ -464,6 +464,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           if (StringUtils.isBlank(name)) {
             throw new IllegalArgumentException("Location name must not be blank");
           }
+          EntityFieldLimits.checkMaxLength(
+              name,
+              EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+              "storage location name",
+              Entity.EntityType.FILESET);
           if (StringUtils.isBlank(path)) {
             throw new IllegalArgumentException(
                 "Storage location must not be blank for location name: " + name);

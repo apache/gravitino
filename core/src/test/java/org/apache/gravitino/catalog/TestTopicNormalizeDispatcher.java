@@ -105,6 +105,23 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testNameLength() {
+    Namespace topicNs = Namespace.of(metalake, catalog, "testNameLength");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier tooLongIdent =
+        NameIdentifier.of(topicNs, StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH + 1));
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> topicNormalizeDispatcher.createTopic(tooLongIdent, "comment", null, props));
+    Assertions.assertEquals(
+        "The name of the topic must not exceed 128 characters", exception.getMessage());
+    Assertions.assertFalse(topicNormalizeDispatcher.topicExists(tooLongIdent));
+  }
+
+  @Test
   public void testCommentLength() {
     Namespace topicNs = Namespace.of(metalake, catalog, "testCommentLength");
     Map<String, String> props = ImmutableMap.of("k1", "v1");

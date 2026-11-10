@@ -3625,6 +3625,25 @@ public class TestFilesetCatalogOperations {
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
+      // too long location name in storage location
+      String tooLongLocationName =
+          StringUtils.repeat("l", EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH + 1);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of(tooLongLocationName, TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals(
+          "The storage location name of the fileset must not exceed 256 characters",
+          exception.getMessage());
+
       // empty fileset storage location
       exception =
           Assertions.assertThrows(
