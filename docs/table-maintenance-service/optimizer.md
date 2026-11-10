@@ -27,14 +27,17 @@ Confirm your environment matches this list before starting an evaluation against
 
 ## How It Works
 
-Maintenance runs as four steps. Each is a separate command, so you can stop after any of them, and the dry run on step two shows what would be submitted before anything runs.
+This is the shared CLI workflow for the table maintenance service, not a single job type.
+Maintenance runs as four steps. Each is a separate command, so you can stop after any of them,
+and the dry run on Evaluate shows what would be submitted before anything runs. Direct
+`POST .../jobs/runs` submissions skip Evaluate and go straight to a chosen job template.
 
-| Step     | What you run                                      | What it produces                                        |
-| -------- | ------------------------------------------------- | ------------------------------------------------------- |
+| Step     | What you run                                      | What it produces                                    |
+| -------- | ------------------------------------------------- | --------------------------------------------------- |
 | Collect  | `update-statistics`, `append-metrics`             | Statistics on the table, metrics in the JDBC repository |
-| Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted               |
-| Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs     |
-| Observe  | `monitor-metrics`, `list-table-metrics`           | Before and after metrics, and rewritten data files      |
+| Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted           |
+| Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs |
+| Observe  | `monitor-metrics`, `list-table-metrics`           | Before and after metrics, and job staging logs      |
 
 ## Execution Modes
 
@@ -44,9 +47,12 @@ The built-in workflow drives everything through the Gravitino server and its job
 
 The local calculator reads a JSONL file you supply and updates statistics and metrics directly from it. Use it for testing and batch scripts, where you already have the numbers and want to feed them in without the server computing them.
 
-## Naming
+## Policy-driven naming
 
-Three identifiers look interchangeable and are not.
+These three identifiers matter for the **policy-driven** path (`submit-strategy-jobs` and
+tag-associated policies). They are not compaction-only — each policy-backed task has its own
+names — but direct `runJob` submissions do not use `--strategy-name` and do not need this
+distinction. Task sections below state which policy name / type apply when a policy path exists.
 
 | Term          | Example                      | Where it appears                                           |
 | ------------- | ---------------------------- | ---------------------------------------------------------- |
